@@ -13,4 +13,6 @@ export interface ActivityLogResult {
   fitnessXpEarned: number;
   eggsUpdated: number;
   player: Player;
+  groupBonusXp?: number;
+  groupXpBonusPct?: number;
 }

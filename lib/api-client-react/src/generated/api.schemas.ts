@@ -386,6 +386,7 @@ export interface LogActivityInput {
   type: string;
   value: number;
   note?: string;
+  groupId?: number;
 }
 
 export interface ActivityLogResult {
@@ -393,6 +394,8 @@ export interface ActivityLogResult {
   fitnessXpEarned: number;
   eggsUpdated: number;
   player: Player;
+  groupBonusXp?: number;
+  groupXpBonusPct?: number;
 }
 
 export interface FitnessQuest {
@@ -544,6 +547,164 @@ export interface SuccessResult {
   success: boolean;
 }
 
+export interface WorkoutGroupSummary {
+  id: number;
+  name: string;
+  type: string;
+  inviteCode: string;
+  creatorPlayerId: number;
+  teamEnergy: number;
+  totalTeamEnergy: number;
+  maxMembers: number;
+  isActive: boolean;
+  memberCount: number;
+  activeChallenges: number;
+  hasActiveRaid: boolean;
+  createdAt: string;
+}
+
+export interface GroupMemberDetail {
+  id: number;
+  groupId: number;
+  playerId: number;
+  username: string;
+  /** @nullable */
+  displayName?: string | null;
+  friendshipLevel: number;
+  coWorkoutCount: number;
+  /** @nullable */
+  lastWorkoutTogether?: string | null;
+  joinedAt: string;
+}
+
+export interface GroupChallenge {
+  id: number;
+  groupId: number;
+  title: string;
+  description: string;
+  targetValue: number;
+  currentValue: number;
+  rewardType: string;
+  rewardAmount: number;
+  isCompleted: boolean;
+  progressPct: number;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface GroupRaid {
+  id: number;
+  groupId: number;
+  bossName: string;
+  bossHp: number;
+  currentDamage: number;
+  status: string;
+  hpPct: number;
+  unlockedAt: string;
+  createdAt: string;
+}
+
+export interface WorkoutGroupDetail {
+  id: number;
+  name: string;
+  type: string;
+  inviteCode: string;
+  creatorPlayerId: number;
+  teamEnergy: number;
+  totalTeamEnergy: number;
+  maxMembers: number;
+  isActive: boolean;
+  memberCount: number;
+  createdAt: string;
+  members: GroupMemberDetail[];
+  challenges: GroupChallenge[];
+  raid?: GroupRaid | null;
+}
+
+export interface GroupMessage {
+  id: number;
+  groupId: number;
+  playerId: number;
+  playerName: string;
+  content: string;
+  isFiltered: boolean;
+  createdAt: string;
+}
+
+export interface CreateGroupInput {
+  /**
+     * @minLength 2
+     * @maxLength 40
+     */
+  name: string;
+  type?: string;
+  creatorPlayerId: number;
+  maxMembers?: number;
+}
+
+export interface LeaveGroupInput {
+  playerId: number;
+}
+
+export interface JoinGroupInput {
+  playerId: number;
+  inviteCode?: string;
+}
+
+export interface LogGroupWorkoutInput {
+  playerId: number;
+  baseXp: number;
+  steps?: number;
+  workoutType?: string;
+}
+
+export interface GroupWorkoutResult {
+  energyGained: number;
+  teamEnergy: number;
+  bonusXp: number;
+  xpBonusPct: number;
+  memberCount: number;
+  challengesAdvanced: number;
+  raidDamage: number;
+  raidUnlocked: boolean;
+  fitnessXpEarned: number;
+  activity?: FitnessActivity;
+  player?: Player;
+}
+
+export interface SendGroupMessageInput {
+  playerId: number;
+  /**
+     * @minLength 1
+     * @maxLength 280
+     */
+  content: string;
+}
+
+export interface JoinGroupByCodeInput {
+  playerId: number;
+  /**
+     * @minLength 6
+     * @maxLength 6
+     */
+  inviteCode: string;
+}
+
+export interface GroupChallengeProgressInput {
+  playerId: number;
+  progressValue: number;
+}
+
+export interface GroupChallengeProgressResult {
+  challengesAdvanced: number;
+  challenges: GroupChallenge[];
+}
+
+export interface GroupRaidAttackInput {
+  playerId: number;
+  damage: number;
+}
+
 export type ListHatchlingsParams = {
 playerId?: number;
 limit?: number;
@@ -624,6 +785,10 @@ limit?: number;
 };
 
 export type GetMealPlanParams = {
+playerId: number;
+};
+
+export type ListMyGroupsParams = {
 playerId: number;
 };
 

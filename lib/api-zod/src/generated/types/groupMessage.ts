@@ -6,10 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface LogActivityInput {
+export interface GroupMessage {
+  id: number;
+  groupId: number;
   playerId: number;
-  type: string;
-  value: number;
-  note?: string;
-  groupId?: number;
+  playerName: string;
+  content: string;
+  isFiltered: boolean;
+  createdAt: string;
 }

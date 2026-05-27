@@ -15,6 +15,7 @@ import Explore from "@/pages/explore";
 import Hatch from "@/pages/hatch";
 import Training from "@/pages/training";
 import Social from "@/pages/social";
+import Groups from "@/pages/groups";
 import HatchlingDetail from "@/pages/hatchling-detail";
 import Race from "@/pages/race";
 import HealthSettings from "@/pages/health-settings";
@@ -209,6 +210,7 @@ function AppRoutes() {
         <Route path="/hatch" component={Hatch} />
         <Route path="/training" component={Training} />
         <Route path="/social" component={Social} />
+        <Route path="/groups" component={Groups} />
         <Route path="/health-settings" component={HealthSettings} />
         <Route path="/hatchlings/:id" component={HatchlingDetail} />
         <Route path="/compete/race" component={Race} />

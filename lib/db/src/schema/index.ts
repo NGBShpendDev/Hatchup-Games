@@ -9,3 +9,4 @@ export * from "./eggs";
 export * from "./fitness";
 export * from "./training";
 export * from "./health";
+export * from "./groups";

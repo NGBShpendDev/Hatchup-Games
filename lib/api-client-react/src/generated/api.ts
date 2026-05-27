@@ -27,6 +27,7 @@ import type {
   Competition,
   CompetitionInput,
   CompetitionResultInput,
+  CreateGroupInput,
   Egg,
   EvolutionCategory,
   EvolutionType,
@@ -42,6 +43,12 @@ import type {
   GetMealPlanParams,
   GetModeLeaderboardParams,
   GetWorkoutPlanParams,
+  GroupChallengeProgressInput,
+  GroupChallengeProgressResult,
+  GroupMessage,
+  GroupRaid,
+  GroupRaidAttackInput,
+  GroupWorkoutResult,
   HatchEggInput,
   HatchResult,
   Hatchling,
@@ -51,7 +58,10 @@ import type {
   HealthStatus,
   Item,
   JoinClubInput,
+  JoinGroupByCodeInput,
+  JoinGroupInput,
   LeaderboardEntry,
+  LeaveGroupInput,
   ListClubsParams,
   ListCompetitionsParams,
   ListEggsParams,
@@ -60,10 +70,12 @@ import type {
   ListFitnessActivitiesParams,
   ListHatchlingsParams,
   ListItemsParams,
+  ListMyGroupsParams,
   ListRealmsParams,
   ListWorkoutSessionsParams,
   LiveEvent,
   LogActivityInput,
+  LogGroupWorkoutInput,
   LogSessionInput,
   MealPlan,
   Player,
@@ -72,9 +84,12 @@ import type {
   PlayerUpdate,
   RankDistribution,
   RealmInfo,
+  SendGroupMessageInput,
   SuccessResult,
   SyncResult,
   UseItemInput,
+  WorkoutGroupDetail,
+  WorkoutGroupSummary,
   WorkoutPlan,
   WorkoutSession
 } from './api.schemas';
@@ -3780,6 +3795,818 @@ export const useGenerateMealPlan = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getGenerateMealPlanMutationOptions(options));
+    }
+
+export const getJoinGroupByCodeUrl = () => {
+
+
+
+
+  return `/api/groups/join-by-code`
+}
+
+/**
+ * @summary Join a group using only an invite code (no group ID needed)
+ */
+export const joinGroupByCode = async (joinGroupByCodeInput: JoinGroupByCodeInput, options?: RequestInit): Promise<WorkoutGroupSummary> => {
+
+  return customFetch<WorkoutGroupSummary>(getJoinGroupByCodeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      joinGroupByCodeInput,)
+  }
+);}
+
+
+
+
+export const getJoinGroupByCodeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinGroupByCode>>, TError,{data: BodyType<JoinGroupByCodeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof joinGroupByCode>>, TError,{data: BodyType<JoinGroupByCodeInput>}, TContext> => {
+
+const mutationKey = ['joinGroupByCode'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof joinGroupByCode>>, {data: BodyType<JoinGroupByCodeInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  joinGroupByCode(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type JoinGroupByCodeMutationResult = NonNullable<Awaited<ReturnType<typeof joinGroupByCode>>>
+    export type JoinGroupByCodeMutationBody = BodyType<JoinGroupByCodeInput>
+    export type JoinGroupByCodeMutationError = ErrorType<void>
+
+    /**
+ * @summary Join a group using only an invite code (no group ID needed)
+ */
+export const useJoinGroupByCode = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinGroupByCode>>, TError,{data: BodyType<JoinGroupByCodeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof joinGroupByCode>>,
+        TError,
+        {data: BodyType<JoinGroupByCodeInput>},
+        TContext
+      > => {
+      return useMutation(getJoinGroupByCodeMutationOptions(options));
+    }
+
+export const getListMyGroupsUrl = (params: ListMyGroupsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/groups/mine?${stringifiedParams}` : `/api/groups/mine`
+}
+
+/**
+ * @summary List workout groups for a player
+ */
+export const listMyGroups = async (params: ListMyGroupsParams, options?: RequestInit): Promise<WorkoutGroupSummary[]> => {
+
+  return customFetch<WorkoutGroupSummary[]>(getListMyGroupsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMyGroupsQueryKey = (params?: ListMyGroupsParams,) => {
+    return [
+    `/api/groups/mine`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMyGroupsQueryOptions = <TData = Awaited<ReturnType<typeof listMyGroups>>, TError = ErrorType<unknown>>(params: ListMyGroupsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyGroups>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMyGroupsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyGroups>>> = ({ signal }) => listMyGroups(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMyGroups>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMyGroupsQueryResult = NonNullable<Awaited<ReturnType<typeof listMyGroups>>>
+export type ListMyGroupsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List workout groups for a player
+ */
+
+export function useListMyGroups<TData = Awaited<ReturnType<typeof listMyGroups>>, TError = ErrorType<unknown>>(
+ params: ListMyGroupsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyGroups>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMyGroupsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateGroupUrl = () => {
+
+
+
+
+  return `/api/groups`
+}
+
+/**
+ * @summary Create a new workout group
+ */
+export const createGroup = async (createGroupInput: CreateGroupInput, options?: RequestInit): Promise<WorkoutGroupSummary> => {
+
+  return customFetch<WorkoutGroupSummary>(getCreateGroupUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createGroupInput,)
+  }
+);}
+
+
+
+
+export const getCreateGroupMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createGroup>>, TError,{data: BodyType<CreateGroupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createGroup>>, TError,{data: BodyType<CreateGroupInput>}, TContext> => {
+
+const mutationKey = ['createGroup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createGroup>>, {data: BodyType<CreateGroupInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createGroup(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateGroupMutationResult = NonNullable<Awaited<ReturnType<typeof createGroup>>>
+    export type CreateGroupMutationBody = BodyType<CreateGroupInput>
+    export type CreateGroupMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a new workout group
+ */
+export const useCreateGroup = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createGroup>>, TError,{data: BodyType<CreateGroupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createGroup>>,
+        TError,
+        {data: BodyType<CreateGroupInput>},
+        TContext
+      > => {
+      return useMutation(getCreateGroupMutationOptions(options));
+    }
+
+export const getGetGroupUrl = (id: number,) => {
+
+
+
+
+  return `/api/groups/${id}`
+}
+
+/**
+ * @summary Get group detail with members, challenges, and raid
+ */
+export const getGroup = async (id: number, options?: RequestInit): Promise<WorkoutGroupDetail> => {
+
+  return customFetch<WorkoutGroupDetail>(getGetGroupUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetGroupQueryKey = (id: number,) => {
+    return [
+    `/api/groups/${id}`
+    ] as const;
+    }
+
+
+export const getGetGroupQueryOptions = <TData = Awaited<ReturnType<typeof getGroup>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGroup>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetGroupQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getGroup>>> = ({ signal }) => getGroup(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getGroup>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetGroupQueryResult = NonNullable<Awaited<ReturnType<typeof getGroup>>>
+export type GetGroupQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get group detail with members, challenges, and raid
+ */
+
+export function useGetGroup<TData = Awaited<ReturnType<typeof getGroup>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGroup>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetGroupQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getJoinGroupUrl = (id: number,) => {
+
+
+
+
+  return `/api/groups/${id}/join`
+}
+
+/**
+ * @summary Join a group by invite code or direct join
+ */
+export const joinGroup = async (id: number,
+    joinGroupInput: JoinGroupInput, options?: RequestInit): Promise<SuccessResult> => {
+
+  return customFetch<SuccessResult>(getJoinGroupUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      joinGroupInput,)
+  }
+);}
+
+
+
+
+export const getJoinGroupMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinGroup>>, TError,{id: number;data: BodyType<JoinGroupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof joinGroup>>, TError,{id: number;data: BodyType<JoinGroupInput>}, TContext> => {
+
+const mutationKey = ['joinGroup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof joinGroup>>, {id: number;data: BodyType<JoinGroupInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  joinGroup(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type JoinGroupMutationResult = NonNullable<Awaited<ReturnType<typeof joinGroup>>>
+    export type JoinGroupMutationBody = BodyType<JoinGroupInput>
+    export type JoinGroupMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Join a group by invite code or direct join
+ */
+export const useJoinGroup = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinGroup>>, TError,{id: number;data: BodyType<JoinGroupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof joinGroup>>,
+        TError,
+        {id: number;data: BodyType<JoinGroupInput>},
+        TContext
+      > => {
+      return useMutation(getJoinGroupMutationOptions(options));
+    }
+
+export const getLeaveGroupUrl = (id: number,) => {
+
+
+
+
+  return `/api/groups/${id}/leave`
+}
+
+/**
+ * @summary Leave a group
+ */
+export const leaveGroup = async (id: number,
+    leaveGroupInput: LeaveGroupInput, options?: RequestInit): Promise<SuccessResult> => {
+
+  return customFetch<SuccessResult>(getLeaveGroupUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      leaveGroupInput,)
+  }
+);}
+
+
+
+
+export const getLeaveGroupMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof leaveGroup>>, TError,{id: number;data: BodyType<LeaveGroupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof leaveGroup>>, TError,{id: number;data: BodyType<LeaveGroupInput>}, TContext> => {
+
+const mutationKey = ['leaveGroup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof leaveGroup>>, {id: number;data: BodyType<LeaveGroupInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  leaveGroup(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LeaveGroupMutationResult = NonNullable<Awaited<ReturnType<typeof leaveGroup>>>
+    export type LeaveGroupMutationBody = BodyType<LeaveGroupInput>
+    export type LeaveGroupMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Leave a group
+ */
+export const useLeaveGroup = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof leaveGroup>>, TError,{id: number;data: BodyType<LeaveGroupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof leaveGroup>>,
+        TError,
+        {id: number;data: BodyType<LeaveGroupInput>},
+        TContext
+      > => {
+      return useMutation(getLeaveGroupMutationOptions(options));
+    }
+
+export const getLogGroupWorkoutUrl = (id: number,) => {
+
+
+
+
+  return `/api/groups/${id}/workout`
+}
+
+/**
+ * @summary Log a group workout, earn team energy and XP bonus
+ */
+export const logGroupWorkout = async (id: number,
+    logGroupWorkoutInput: LogGroupWorkoutInput, options?: RequestInit): Promise<GroupWorkoutResult> => {
+
+  return customFetch<GroupWorkoutResult>(getLogGroupWorkoutUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      logGroupWorkoutInput,)
+  }
+);}
+
+
+
+
+export const getLogGroupWorkoutMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logGroupWorkout>>, TError,{id: number;data: BodyType<LogGroupWorkoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof logGroupWorkout>>, TError,{id: number;data: BodyType<LogGroupWorkoutInput>}, TContext> => {
+
+const mutationKey = ['logGroupWorkout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logGroupWorkout>>, {id: number;data: BodyType<LogGroupWorkoutInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  logGroupWorkout(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LogGroupWorkoutMutationResult = NonNullable<Awaited<ReturnType<typeof logGroupWorkout>>>
+    export type LogGroupWorkoutMutationBody = BodyType<LogGroupWorkoutInput>
+    export type LogGroupWorkoutMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Log a group workout, earn team energy and XP bonus
+ */
+export const useLogGroupWorkout = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logGroupWorkout>>, TError,{id: number;data: BodyType<LogGroupWorkoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof logGroupWorkout>>,
+        TError,
+        {id: number;data: BodyType<LogGroupWorkoutInput>},
+        TContext
+      > => {
+      return useMutation(getLogGroupWorkoutMutationOptions(options));
+    }
+
+export const getContributeGroupChallengeUrl = (id: number,) => {
+
+
+
+
+  return `/api/groups/${id}/challenge-progress`
+}
+
+/**
+ * @summary Contribute progress toward active group challenges
+ */
+export const contributeGroupChallenge = async (id: number,
+    groupChallengeProgressInput: GroupChallengeProgressInput, options?: RequestInit): Promise<GroupChallengeProgressResult> => {
+
+  return customFetch<GroupChallengeProgressResult>(getContributeGroupChallengeUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      groupChallengeProgressInput,)
+  }
+);}
+
+
+
+
+export const getContributeGroupChallengeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof contributeGroupChallenge>>, TError,{id: number;data: BodyType<GroupChallengeProgressInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof contributeGroupChallenge>>, TError,{id: number;data: BodyType<GroupChallengeProgressInput>}, TContext> => {
+
+const mutationKey = ['contributeGroupChallenge'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof contributeGroupChallenge>>, {id: number;data: BodyType<GroupChallengeProgressInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  contributeGroupChallenge(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ContributeGroupChallengeMutationResult = NonNullable<Awaited<ReturnType<typeof contributeGroupChallenge>>>
+    export type ContributeGroupChallengeMutationBody = BodyType<GroupChallengeProgressInput>
+    export type ContributeGroupChallengeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Contribute progress toward active group challenges
+ */
+export const useContributeGroupChallenge = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof contributeGroupChallenge>>, TError,{id: number;data: BodyType<GroupChallengeProgressInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof contributeGroupChallenge>>,
+        TError,
+        {id: number;data: BodyType<GroupChallengeProgressInput>},
+        TContext
+      > => {
+      return useMutation(getContributeGroupChallengeMutationOptions(options));
+    }
+
+export const getAttackGroupRaidUrl = (id: number,) => {
+
+
+
+
+  return `/api/groups/${id}/raid/attack`
+}
+
+/**
+ * @summary Deal damage to the active raid boss
+ */
+export const attackGroupRaid = async (id: number,
+    groupRaidAttackInput: GroupRaidAttackInput, options?: RequestInit): Promise<GroupRaid> => {
+
+  return customFetch<GroupRaid>(getAttackGroupRaidUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      groupRaidAttackInput,)
+  }
+);}
+
+
+
+
+export const getAttackGroupRaidMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof attackGroupRaid>>, TError,{id: number;data: BodyType<GroupRaidAttackInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof attackGroupRaid>>, TError,{id: number;data: BodyType<GroupRaidAttackInput>}, TContext> => {
+
+const mutationKey = ['attackGroupRaid'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof attackGroupRaid>>, {id: number;data: BodyType<GroupRaidAttackInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  attackGroupRaid(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AttackGroupRaidMutationResult = NonNullable<Awaited<ReturnType<typeof attackGroupRaid>>>
+    export type AttackGroupRaidMutationBody = BodyType<GroupRaidAttackInput>
+    export type AttackGroupRaidMutationError = ErrorType<void>
+
+    /**
+ * @summary Deal damage to the active raid boss
+ */
+export const useAttackGroupRaid = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof attackGroupRaid>>, TError,{id: number;data: BodyType<GroupRaidAttackInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof attackGroupRaid>>,
+        TError,
+        {id: number;data: BodyType<GroupRaidAttackInput>},
+        TContext
+      > => {
+      return useMutation(getAttackGroupRaidMutationOptions(options));
+    }
+
+export const getListGroupMessagesUrl = (id: number,) => {
+
+
+
+
+  return `/api/groups/${id}/messages`
+}
+
+/**
+ * @summary Get recent group chat messages (membership required)
+ */
+export const listGroupMessages = async (id: number, options?: RequestInit): Promise<GroupMessage[]> => {
+
+  return customFetch<GroupMessage[]>(getListGroupMessagesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListGroupMessagesQueryKey = (id: number,) => {
+    return [
+    `/api/groups/${id}/messages`
+    ] as const;
+    }
+
+
+export const getListGroupMessagesQueryOptions = <TData = Awaited<ReturnType<typeof listGroupMessages>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGroupMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListGroupMessagesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listGroupMessages>>> = ({ signal }) => listGroupMessages(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listGroupMessages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListGroupMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof listGroupMessages>>>
+export type ListGroupMessagesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get recent group chat messages (membership required)
+ */
+
+export function useListGroupMessages<TData = Awaited<ReturnType<typeof listGroupMessages>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGroupMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListGroupMessagesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSendGroupMessageUrl = (id: number,) => {
+
+
+
+
+  return `/api/groups/${id}/messages`
+}
+
+/**
+ * @summary Send a message in group chat
+ */
+export const sendGroupMessage = async (id: number,
+    sendGroupMessageInput: SendGroupMessageInput, options?: RequestInit): Promise<GroupMessage> => {
+
+  return customFetch<GroupMessage>(getSendGroupMessageUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      sendGroupMessageInput,)
+  }
+);}
+
+
+
+
+export const getSendGroupMessageMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendGroupMessage>>, TError,{id: number;data: BodyType<SendGroupMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendGroupMessage>>, TError,{id: number;data: BodyType<SendGroupMessageInput>}, TContext> => {
+
+const mutationKey = ['sendGroupMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendGroupMessage>>, {id: number;data: BodyType<SendGroupMessageInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  sendGroupMessage(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendGroupMessageMutationResult = NonNullable<Awaited<ReturnType<typeof sendGroupMessage>>>
+    export type SendGroupMessageMutationBody = BodyType<SendGroupMessageInput>
+    export type SendGroupMessageMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Send a message in group chat
+ */
+export const useSendGroupMessage = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendGroupMessage>>, TError,{id: number;data: BodyType<SendGroupMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendGroupMessage>>,
+        TError,
+        {id: number;data: BodyType<SendGroupMessageInput>},
+        TContext
+      > => {
+      return useMutation(getSendGroupMessageMutationOptions(options));
     }
 
 export const getListHealthConnectionsUrl = () => {

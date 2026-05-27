@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { fitnessActivitiesTable, fitnessQuestsTable, playersTable, eggsTable } from "@workspace/db";
+import { fitnessActivitiesTable, fitnessQuestsTable, playersTable, eggsTable, groupsTable, groupMembersTable } from "@workspace/db";
 import { eq, desc, gte, and, sql } from "drizzle-orm";
 import {
   GetFitnessStatsParams,
@@ -11,6 +11,13 @@ import {
   ListRealmsQueryParams,
 } from "@workspace/api-zod";
 import { logFitnessActivity } from "../services/fitnessLog";
+
+function getGroupXpBonus(memberCount: number): number {
+  if (memberCount >= 6) return 0.5;
+  if (memberCount >= 4) return 0.25;
+  if (memberCount >= 2) return 0.1;
+  return 0;
+}
 
 const router = Router();
 
@@ -175,15 +182,51 @@ router.post("/fitness/log", async (req, res) => {
     return;
   }
 
+  let groupBonusXp = 0;
+  let groupXpBonusPct = 0;
+
+  if (body.data.groupId) {
+    const member = await db.query.groupMembersTable.findFirst({
+      where: and(
+        eq(groupMembersTable.groupId, body.data.groupId),
+        eq(groupMembersTable.playerId, body.data.playerId)
+      ),
+    });
+    if (member) {
+      const members = await db.query.groupMembersTable.findMany({
+        where: eq(groupMembersTable.groupId, body.data.groupId),
+      });
+      const bonusPct = getGroupXpBonus(members.length);
+      groupBonusXp = Math.round(result.fitnessXpEarned * bonusPct);
+      groupXpBonusPct = Math.round(bonusPct * 100);
+
+      if (groupBonusXp > 0) {
+        await db.update(playersTable)
+          .set({ fitnessXp: sql`${playersTable.fitnessXp} + ${groupBonusXp}` })
+          .where(eq(playersTable.id, body.data.playerId));
+
+        const energyGained = Math.round(body.data.value * 0.1) + 10;
+        await db.update(groupsTable)
+          .set({
+            teamEnergy: sql`${groupsTable.teamEnergy} + ${energyGained}`,
+            totalTeamEnergy: sql`${groupsTable.totalTeamEnergy} + ${energyGained}`,
+          })
+          .where(eq(groupsTable.id, body.data.groupId));
+      }
+    }
+  }
+
   const activityFormatted = result.activity
     ? { ...result.activity, createdAt: result.activity.createdAt.toISOString() }
     : null;
 
   res.status(201).json({
     activity: activityFormatted,
-    fitnessXpEarned: result.fitnessXpEarned,
+    fitnessXpEarned: result.fitnessXpEarned + groupBonusXp,
     eggsUpdated: result.eggsUpdated,
     player: result.updatedPlayer,
+    groupBonusXp: groupBonusXp > 0 ? groupBonusXp : undefined,
+    groupXpBonusPct: groupXpBonusPct > 0 ? groupXpBonusPct : undefined,
   });
 });
 

@@ -6,10 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface LogActivityInput {
+export interface JoinGroupByCodeInput {
   playerId: number;
-  type: string;
-  value: number;
-  note?: string;
-  groupId?: number;
+  /**
+     * @minLength 6
+     * @maxLength 6
+     */
+  inviteCode: string;
 }

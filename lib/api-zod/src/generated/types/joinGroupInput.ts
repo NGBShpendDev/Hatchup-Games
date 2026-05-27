@@ -6,10 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface LogActivityInput {
+export interface JoinGroupInput {
   playerId: number;
-  type: string;
-  value: number;
-  note?: string;
-  groupId?: number;
+  inviteCode?: string;
 }

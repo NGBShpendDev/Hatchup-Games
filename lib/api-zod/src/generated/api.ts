@@ -1122,7 +1122,8 @@ export const LogActivityBody = zod.object({
   "playerId": zod.number(),
   "type": zod.string(),
   "value": zod.number(),
-  "note": zod.string().optional()
+  "note": zod.string().optional(),
+  "groupId": zod.number().optional()
 })
 
 
@@ -1370,6 +1371,322 @@ export const GenerateMealPlanBody = zod.object({
   "playerId": zod.number(),
   "goal": zod.string(),
   "calories": zod.number().optional()
+})
+
+
+/**
+ * @summary Join a group using only an invite code (no group ID needed)
+ */
+export const joinGroupByCodeBodyInviteCodeMin = 6;
+export const joinGroupByCodeBodyInviteCodeMax = 6;
+
+
+
+export const JoinGroupByCodeBody = zod.object({
+  "playerId": zod.number(),
+  "inviteCode": zod.string().min(joinGroupByCodeBodyInviteCodeMin).max(joinGroupByCodeBodyInviteCodeMax)
+})
+
+export const JoinGroupByCodeResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "type": zod.string(),
+  "inviteCode": zod.string(),
+  "creatorPlayerId": zod.number(),
+  "teamEnergy": zod.number(),
+  "totalTeamEnergy": zod.number(),
+  "maxMembers": zod.number(),
+  "isActive": zod.boolean(),
+  "memberCount": zod.number(),
+  "activeChallenges": zod.number(),
+  "hasActiveRaid": zod.boolean(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary List workout groups for a player
+ */
+export const ListMyGroupsQueryParams = zod.object({
+  "playerId": zod.coerce.number()
+})
+
+export const ListMyGroupsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "type": zod.string(),
+  "inviteCode": zod.string(),
+  "creatorPlayerId": zod.number(),
+  "teamEnergy": zod.number(),
+  "totalTeamEnergy": zod.number(),
+  "maxMembers": zod.number(),
+  "isActive": zod.boolean(),
+  "memberCount": zod.number(),
+  "activeChallenges": zod.number(),
+  "hasActiveRaid": zod.boolean(),
+  "createdAt": zod.string()
+})
+export const ListMyGroupsResponse = zod.array(ListMyGroupsResponseItem)
+
+
+/**
+ * @summary Create a new workout group
+ */
+export const createGroupBodyNameMin = 2;
+export const createGroupBodyNameMax = 40;
+
+
+
+export const CreateGroupBody = zod.object({
+  "name": zod.string().min(createGroupBodyNameMin).max(createGroupBodyNameMax),
+  "type": zod.string().optional(),
+  "creatorPlayerId": zod.number(),
+  "maxMembers": zod.number().optional()
+})
+
+
+/**
+ * @summary Get group detail with members, challenges, and raid
+ */
+export const GetGroupParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetGroupResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "type": zod.string(),
+  "inviteCode": zod.string(),
+  "creatorPlayerId": zod.number(),
+  "teamEnergy": zod.number(),
+  "totalTeamEnergy": zod.number(),
+  "maxMembers": zod.number(),
+  "isActive": zod.boolean(),
+  "memberCount": zod.number(),
+  "createdAt": zod.string(),
+  "members": zod.array(zod.object({
+  "id": zod.number(),
+  "groupId": zod.number(),
+  "playerId": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullish(),
+  "friendshipLevel": zod.number(),
+  "coWorkoutCount": zod.number(),
+  "lastWorkoutTogether": zod.string().nullish(),
+  "joinedAt": zod.string()
+})),
+  "challenges": zod.array(zod.object({
+  "id": zod.number(),
+  "groupId": zod.number(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "targetValue": zod.number(),
+  "currentValue": zod.number(),
+  "rewardType": zod.string(),
+  "rewardAmount": zod.number(),
+  "isCompleted": zod.boolean(),
+  "progressPct": zod.number(),
+  "expiresAt": zod.string(),
+  "createdAt": zod.string()
+})),
+  "raid": zod.union([zod.object({
+  "id": zod.number(),
+  "groupId": zod.number(),
+  "bossName": zod.string(),
+  "bossHp": zod.number(),
+  "currentDamage": zod.number(),
+  "status": zod.string(),
+  "hpPct": zod.number(),
+  "unlockedAt": zod.string(),
+  "createdAt": zod.string()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Join a group by invite code or direct join
+ */
+export const JoinGroupParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const JoinGroupBody = zod.object({
+  "playerId": zod.number(),
+  "inviteCode": zod.string().optional()
+})
+
+export const JoinGroupResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Leave a group
+ */
+export const LeaveGroupParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const LeaveGroupBody = zod.object({
+  "playerId": zod.number()
+})
+
+export const LeaveGroupResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Log a group workout, earn team energy and XP bonus
+ */
+export const LogGroupWorkoutParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const LogGroupWorkoutBody = zod.object({
+  "playerId": zod.number(),
+  "baseXp": zod.number(),
+  "steps": zod.number().optional(),
+  "workoutType": zod.string().optional()
+})
+
+export const LogGroupWorkoutResponse = zod.object({
+  "energyGained": zod.number(),
+  "teamEnergy": zod.number(),
+  "bonusXp": zod.number(),
+  "xpBonusPct": zod.number(),
+  "memberCount": zod.number(),
+  "challengesAdvanced": zod.number(),
+  "raidDamage": zod.number(),
+  "raidUnlocked": zod.boolean(),
+  "fitnessXpEarned": zod.number(),
+  "activity": zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "type": zod.string(),
+  "value": zod.number(),
+  "unit": zod.string(),
+  "fitnessXpEarned": zod.number(),
+  "realm": zod.string(),
+  "note": zod.string().nullish(),
+  "createdAt": zod.string()
+}).optional(),
+  "player": zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "level": zod.number(),
+  "xp": zod.number(),
+  "coins": zod.number(),
+  "rank": zod.string(),
+  "rankScore": zod.number().optional(),
+  "totalWins": zod.number(),
+  "totalMatches": zod.number(),
+  "clubId": zod.number().nullish(),
+  "totalSteps": zod.number(),
+  "totalWorkouts": zod.number().optional(),
+  "fitnessXp": zod.number(),
+  "currentStreak": zod.number(),
+  "longestStreak": zod.number().optional(),
+  "fitnessRealm": zod.string(),
+  "waterCups": zod.number().optional(),
+  "dailyStepGoal": zod.number().optional(),
+  "lastActiveDate": zod.string().nullish(),
+  "createdAt": zod.string()
+}).optional()
+})
+
+
+/**
+ * @summary Contribute progress toward active group challenges
+ */
+export const ContributeGroupChallengeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ContributeGroupChallengeBody = zod.object({
+  "playerId": zod.number(),
+  "progressValue": zod.number()
+})
+
+export const ContributeGroupChallengeResponse = zod.object({
+  "challengesAdvanced": zod.number(),
+  "challenges": zod.array(zod.object({
+  "id": zod.number(),
+  "groupId": zod.number(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "targetValue": zod.number(),
+  "currentValue": zod.number(),
+  "rewardType": zod.string(),
+  "rewardAmount": zod.number(),
+  "isCompleted": zod.boolean(),
+  "progressPct": zod.number(),
+  "expiresAt": zod.string(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Deal damage to the active raid boss
+ */
+export const AttackGroupRaidParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AttackGroupRaidBody = zod.object({
+  "playerId": zod.number(),
+  "damage": zod.number()
+})
+
+export const AttackGroupRaidResponse = zod.object({
+  "id": zod.number(),
+  "groupId": zod.number(),
+  "bossName": zod.string(),
+  "bossHp": zod.number(),
+  "currentDamage": zod.number(),
+  "status": zod.string(),
+  "hpPct": zod.number(),
+  "unlockedAt": zod.string(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Get recent group chat messages (membership required)
+ */
+export const ListGroupMessagesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListGroupMessagesResponseItem = zod.object({
+  "id": zod.number(),
+  "groupId": zod.number(),
+  "playerId": zod.number(),
+  "playerName": zod.string(),
+  "content": zod.string(),
+  "isFiltered": zod.boolean(),
+  "createdAt": zod.string()
+})
+export const ListGroupMessagesResponse = zod.array(ListGroupMessagesResponseItem)
+
+
+/**
+ * @summary Send a message in group chat
+ */
+export const SendGroupMessageParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const sendGroupMessageBodyContentMax = 280;
+
+
+
+export const SendGroupMessageBody = zod.object({
+  "playerId": zod.number(),
+  "content": zod.string().min(1).max(sendGroupMessageBodyContentMax)
 })
 
 

@@ -12,6 +12,7 @@ import eggsRouter from "./eggs";
 import fitnessRouter from "./fitness";
 import trainingRouter from "./training";
 import healthSyncRouter from "./health-sync";
+import groupsRouter from "./groups";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(eggsRouter);
 router.use(fitnessRouter);
 router.use(trainingRouter);
 router.use(healthSyncRouter);
+router.use(groupsRouter);
 
 export default router;

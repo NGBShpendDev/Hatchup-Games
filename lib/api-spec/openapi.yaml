@@ -34,6 +34,8 @@ tags:
     description: AI workout plans, meal plans, and coaching
   - name: health-sync
     description: Health platform connections and passive fitness sync
+  - name: groups
+    description: Workout groups, team energy, challenges, raids, and chat
 
 paths:
   /healthz:
@@ -1030,6 +1032,266 @@ paths:
               schema:
                 $ref: "#/components/schemas/MealPlan"
 
+  # ── Groups ───────────────────────────────────────────────────────────────
+  /groups/join-by-code:
+    post:
+      operationId: joinGroupByCode
+      tags: [groups]
+      summary: Join a group using only an invite code (no group ID needed)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinGroupByCodeInput"
+      responses:
+        "200":
+          description: Joined
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkoutGroupSummary"
+        "404":
+          description: Group not found
+        "403":
+          description: Invalid invite code
+        "409":
+          description: Already a member
+
+  /groups/mine:
+    get:
+      operationId: listMyGroups
+      tags: [groups]
+      summary: List workout groups for a player
+      parameters:
+        - name: playerId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Player's groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkoutGroupSummary"
+
+  /groups:
+    post:
+      operationId: createGroup
+      tags: [groups]
+      summary: Create a new workout group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGroupInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkoutGroupSummary"
+
+  /groups/{id}:
+    get:
+      operationId: getGroup
+      tags: [groups]
+      summary: Get group detail with members, challenges, and raid
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Group detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkoutGroupDetail"
+        "403":
+          description: Not a group member
+        "404":
+          description: Not found
+
+  /groups/{id}/join:
+    post:
+      operationId: joinGroup
+      tags: [groups]
+      summary: Join a group by invite code or direct join
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinGroupInput"
+      responses:
+        "200":
+          description: Joined
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResult"
+
+  /groups/{id}/leave:
+    post:
+      operationId: leaveGroup
+      tags: [groups]
+      summary: Leave a group
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaveGroupInput"
+      responses:
+        "200":
+          description: Left group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResult"
+
+  /groups/{id}/workout:
+    post:
+      operationId: logGroupWorkout
+      tags: [groups]
+      summary: Log a group workout, earn team energy and XP bonus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogGroupWorkoutInput"
+      responses:
+        "200":
+          description: Workout logged with bonuses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupWorkoutResult"
+
+  /groups/{id}/challenge-progress:
+    post:
+      operationId: contributeGroupChallenge
+      tags: [groups]
+      summary: Contribute progress toward active group challenges
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupChallengeProgressInput"
+      responses:
+        "200":
+          description: Challenge progress updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupChallengeProgressResult"
+
+  /groups/{id}/raid/attack:
+    post:
+      operationId: attackGroupRaid
+      tags: [groups]
+      summary: Deal damage to the active raid boss
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupRaidAttackInput"
+      responses:
+        "200":
+          description: Raid damage dealt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupRaid"
+        "404":
+          description: No active raid
+
+  /groups/{id}/messages:
+    get:
+      operationId: listGroupMessages
+      tags: [groups]
+      summary: Get recent group chat messages (membership required)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GroupMessage"
+    post:
+      operationId: sendGroupMessage
+      tags: [groups]
+      summary: Send a message in group chat
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendGroupMessageInput"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupMessage"
+
   # ── Health Sync ───────────────────────────────────────────────────────────
   /health/connections:
     get:
@@ -1502,15 +1764,18 @@ components:
         type:     { type: string }
         value:    { type: integer }
         note:     { type: string }
+        groupId:  { type: integer }
 
     ActivityLogResult:
       type: object
       required: [activity, fitnessXpEarned, eggsUpdated, player]
       properties:
-        activity:       { $ref: "#/components/schemas/FitnessActivity" }
-        fitnessXpEarned: { type: integer }
-        eggsUpdated:    { type: integer }
-        player:         { $ref: "#/components/schemas/Player" }
+        activity:         { $ref: "#/components/schemas/FitnessActivity" }
+        fitnessXpEarned:  { type: integer }
+        eggsUpdated:      { type: integer }
+        player:           { $ref: "#/components/schemas/Player" }
+        groupBonusXp:     { type: integer }
+        groupXpBonusPct:  { type: integer }
 
     FitnessQuest:
       type: object
@@ -1704,3 +1969,192 @@ components:
       required: [success]
       properties:
         success: { type: boolean }
+
+    # ── Groups ────────────────────────────────────────────────────────────────
+    WorkoutGroupSummary:
+      type: object
+      required: [id, name, type, inviteCode, creatorPlayerId, teamEnergy, totalTeamEnergy, maxMembers, isActive, memberCount, activeChallenges, hasActiveRaid, createdAt]
+      properties:
+        id:                { type: integer }
+        name:              { type: string }
+        type:              { type: string }
+        inviteCode:        { type: string }
+        creatorPlayerId:   { type: integer }
+        teamEnergy:        { type: integer }
+        totalTeamEnergy:   { type: integer }
+        maxMembers:        { type: integer }
+        isActive:          { type: boolean }
+        memberCount:       { type: integer }
+        activeChallenges:  { type: integer }
+        hasActiveRaid:     { type: boolean }
+        createdAt:         { type: string }
+
+    GroupMemberDetail:
+      type: object
+      required: [id, groupId, playerId, friendshipLevel, coWorkoutCount, joinedAt, username]
+      properties:
+        id:                  { type: integer }
+        groupId:             { type: integer }
+        playerId:            { type: integer }
+        username:            { type: string }
+        displayName:         { type: ["string", "null"] }
+        friendshipLevel:     { type: integer }
+        coWorkoutCount:      { type: integer }
+        lastWorkoutTogether: { type: ["string", "null"] }
+        joinedAt:            { type: string }
+
+    GroupChallenge:
+      type: object
+      required: [id, groupId, title, description, targetValue, currentValue, rewardType, rewardAmount, isCompleted, progressPct, expiresAt, createdAt]
+      properties:
+        id:           { type: integer }
+        groupId:      { type: integer }
+        title:        { type: string }
+        description:  { type: string }
+        targetValue:  { type: integer }
+        currentValue: { type: integer }
+        rewardType:   { type: string }
+        rewardAmount: { type: integer }
+        isCompleted:  { type: boolean }
+        progressPct:  { type: integer }
+        expiresAt:    { type: string }
+        createdAt:    { type: string }
+
+    GroupRaid:
+      type: object
+      required: [id, groupId, bossName, bossHp, currentDamage, status, hpPct, unlockedAt, createdAt]
+      properties:
+        id:            { type: integer }
+        groupId:       { type: integer }
+        bossName:      { type: string }
+        bossHp:        { type: integer }
+        currentDamage: { type: integer }
+        status:        { type: string }
+        hpPct:         { type: integer }
+        unlockedAt:    { type: string }
+        createdAt:     { type: string }
+
+    WorkoutGroupDetail:
+      type: object
+      required: [id, name, type, inviteCode, creatorPlayerId, teamEnergy, totalTeamEnergy, maxMembers, isActive, memberCount, members, challenges, createdAt]
+      properties:
+        id:              { type: integer }
+        name:            { type: string }
+        type:            { type: string }
+        inviteCode:      { type: string }
+        creatorPlayerId: { type: integer }
+        teamEnergy:      { type: integer }
+        totalTeamEnergy: { type: integer }
+        maxMembers:      { type: integer }
+        isActive:        { type: boolean }
+        memberCount:     { type: integer }
+        createdAt:       { type: string }
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/GroupMemberDetail"
+        challenges:
+          type: array
+          items:
+            $ref: "#/components/schemas/GroupChallenge"
+        raid:
+          oneOf:
+            - $ref: "#/components/schemas/GroupRaid"
+            - type: "null"
+
+    GroupMessage:
+      type: object
+      required: [id, groupId, playerId, playerName, content, isFiltered, createdAt]
+      properties:
+        id:         { type: integer }
+        groupId:    { type: integer }
+        playerId:   { type: integer }
+        playerName: { type: string }
+        content:    { type: string }
+        isFiltered: { type: boolean }
+        createdAt:  { type: string }
+
+    CreateGroupInput:
+      type: object
+      required: [name, creatorPlayerId]
+      properties:
+        name:            { type: string, minLength: 2, maxLength: 40 }
+        type:            { type: string }
+        creatorPlayerId: { type: integer }
+        maxMembers:      { type: integer }
+
+    LeaveGroupInput:
+      type: object
+      required: [playerId]
+      properties:
+        playerId: { type: integer }
+
+    JoinGroupInput:
+      type: object
+      required: [playerId]
+      properties:
+        playerId:   { type: integer }
+        inviteCode: { type: string }
+
+    LogGroupWorkoutInput:
+      type: object
+      required: [playerId, baseXp]
+      properties:
+        playerId: { type: integer }
+        baseXp:   { type: integer }
+        steps:    { type: integer }
+        workoutType: { type: string }
+
+    GroupWorkoutResult:
+      type: object
+      required: [energyGained, teamEnergy, bonusXp, xpBonusPct, memberCount, challengesAdvanced, raidDamage, raidUnlocked, fitnessXpEarned]
+      properties:
+        energyGained:      { type: integer }
+        teamEnergy:        { type: integer }
+        bonusXp:           { type: integer }
+        xpBonusPct:        { type: integer }
+        memberCount:       { type: integer }
+        challengesAdvanced: { type: integer }
+        raidDamage:        { type: integer }
+        raidUnlocked:      { type: boolean }
+        fitnessXpEarned:   { type: integer }
+        activity:          { $ref: "#/components/schemas/FitnessActivity" }
+        player:            { $ref: "#/components/schemas/Player" }
+
+    SendGroupMessageInput:
+      type: object
+      required: [playerId, content]
+      properties:
+        playerId: { type: integer }
+        content:  { type: string, minLength: 1, maxLength: 280 }
+
+    JoinGroupByCodeInput:
+      type: object
+      required: [playerId, inviteCode]
+      properties:
+        playerId:   { type: integer }
+        inviteCode: { type: string, minLength: 6, maxLength: 6 }
+
+    GroupChallengeProgressInput:
+      type: object
+      required: [playerId, progressValue]
+      properties:
+        playerId:      { type: integer }
+        progressValue: { type: integer }
+
+    GroupChallengeProgressResult:
+      type: object
+      required: [challengesAdvanced, challenges]
+      properties:
+        challengesAdvanced: { type: integer }
+        challenges:
+          type: array
+          items:
+            $ref: "#/components/schemas/GroupChallenge"
+
+    GroupRaidAttackInput:
+      type: object
+      required: [playerId, damage]
+      properties:
+        playerId: { type: integer }
+        damage:   { type: integer }
