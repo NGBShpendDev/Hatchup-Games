@@ -1,5 +1,5 @@
 import { Layout } from "@/components/layout";
-import { PLAYER_ID } from "@/lib/constants";
+import { usePlayer } from "@/lib/playerContext";
 import { useListHatchlings, getListHatchlingsQueryKey, useCreateCompetition } from "@workspace/api-client-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
@@ -18,9 +18,11 @@ export default function Race() {
   const [gameState, setGameState] = useState<'select' | 'racing' | 'result'>('select');
   const [result, setResult] = useState<{rank: number, xp: number, coins: number} | null>(null);
 
+  const { playerId } = usePlayer();
+  const pid = playerId ?? 0;
   const { data: hatchlings } = useListHatchlings(
-    { playerId: PLAYER_ID },
-    { query: { enabled: true, queryKey: getListHatchlingsQueryKey({ playerId: PLAYER_ID }) } }
+    { playerId: pid },
+    { query: { enabled: !!playerId, queryKey: getListHatchlingsQueryKey({ playerId: pid }) } }
   );
 
   const startMutation = useCreateCompetition();
@@ -33,7 +35,7 @@ export default function Race() {
     setTimeout(() => {
       // Create competition in backend
       startMutation.mutate(
-        { data: { mode: modeName, playerId: PLAYER_ID, hatchlingId: selectedHatchlingId } },
+        { data: { mode: modeName, playerId: pid, hatchlingId: selectedHatchlingId } },
         {
           onSuccess: (comp) => {
             // Assume the backend generated a result for standard types instantly for this demo

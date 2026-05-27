@@ -9,8 +9,52 @@ import {
   UpdatePlayerParams,
   GetPlayerDashboardParams,
 } from "@workspace/api-zod";
+import { requireAuth } from "../middlewares/auth";
 
 const router = Router();
+
+// GET /players/me — returns current player (JIT provision if first time)
+router.get("/players/me", requireAuth, async (req, res) => {
+  const clerkId = req.clerkUserId!;
+  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.clerkId, clerkId) });
+  if (!player) {
+    res.status(404).json({ error: "Player not found" });
+    return;
+  }
+  res.json(player);
+});
+
+// POST /players/me — create profile for new user
+router.post("/players/me", requireAuth, async (req, res) => {
+  const clerkId = req.clerkUserId!;
+
+  const existing = await db.query.playersTable.findFirst({ where: eq(playersTable.clerkId, clerkId) });
+  if (existing) {
+    res.json(existing);
+    return;
+  }
+
+  const { username, displayName, avatarUrl } = req.body as { username?: string; displayName?: string; avatarUrl?: string };
+  if (!username) {
+    res.status(400).json({ error: "username is required" });
+    return;
+  }
+
+  const taken = await db.query.playersTable.findFirst({ where: eq(playersTable.username, username) });
+  if (taken) {
+    res.status(409).json({ error: "Username already taken" });
+    return;
+  }
+
+  const player = await db.insert(playersTable).values({
+    clerkId,
+    username,
+    displayName: displayName ?? username,
+    avatarUrl: avatarUrl ?? null,
+  }).returning();
+
+  res.status(201).json(player[0]);
+});
 
 router.post("/players", async (req, res) => {
   const body = CreatePlayerBody.safeParse(req.body);

@@ -1,6 +1,6 @@
 import { Layout } from "@/components/layout";
 import { useListRealms, getListRealmsQueryKey } from "@workspace/api-client-react";
-import { PLAYER_ID } from "@/lib/constants";
+import { usePlayer } from "@/lib/playerContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,9 +8,11 @@ import { motion } from "framer-motion";
 import { Map, Lock, Zap } from "lucide-react";
 
 export default function Explore() {
+  const { playerId } = usePlayer();
+  const pid = playerId ?? 0;
   const { data: realms, isLoading } = useListRealms(
-    { playerId: PLAYER_ID },
-    { query: { queryKey: getListRealmsQueryKey({ playerId: PLAYER_ID }) } }
+    { playerId: pid },
+    { query: { queryKey: getListRealmsQueryKey({ playerId: pid }), enabled: !!playerId } }
   );
 
   return (

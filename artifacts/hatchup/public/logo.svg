@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40" viewBox="0 0 120 40">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff2d55"/>
+      <stop offset="100%" style="stop-color:#bf00ff"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="20" cy="20" rx="14" ry="17" fill="none" stroke="url(#g)" stroke-width="2.5"/>
+  <ellipse cx="20" cy="22" rx="7" ry="9" fill="url(#g)" opacity="0.7"/>
+  <path d="M16 18 Q20 14 24 18" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+  <text x="40" y="26" font-family="system-ui, sans-serif" font-weight="800" font-size="18" fill="white" letter-spacing="-0.5">HATCHUP</text>
+</svg>

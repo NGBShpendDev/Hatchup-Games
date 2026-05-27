@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Layout } from "@/components/layout";
-import { PLAYER_ID } from "@/lib/constants";
+import { usePlayer } from "@/lib/playerContext";
 import { useGetPlayerDashboard, getGetPlayerDashboardQueryKey, useLogActivity } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,9 +17,11 @@ import { useToast } from "@/hooks/use-toast";
 export default function Home() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { playerId } = usePlayer();
+  const pid = playerId ?? 0;
 
-  const { data: dashboard, isLoading } = useGetPlayerDashboard(PLAYER_ID, {
-    query: { queryKey: getGetPlayerDashboardQueryKey(PLAYER_ID) }
+  const { data: dashboard, isLoading } = useGetPlayerDashboard(pid, {
+    query: { queryKey: getGetPlayerDashboardQueryKey(pid), enabled: !!playerId }
   });
 
   const logActivity = useLogActivity();
@@ -32,13 +34,13 @@ export default function Home() {
     if (!activityValue || isNaN(Number(activityValue))) return;
     
     logActivity.mutate(
-      { data: { playerId: PLAYER_ID, type: activityType, value: Number(activityValue), unit: activityType === 'steps' ? 'count' : 'minutes', realm: "strength" } },
+      { data: { playerId: pid, type: activityType, value: Number(activityValue), unit: activityType === 'steps' ? 'count' : 'minutes', realm: "strength" } },
       {
         onSuccess: (res) => {
           toast({ title: "Activity Logged!", description: `Earned ${res.xpEarned} XP!` });
           setLogModalOpen(false);
           setActivityValue("");
-          queryClient.invalidateQueries({ queryKey: getGetPlayerDashboardQueryKey(PLAYER_ID) });
+          queryClient.invalidateQueries({ queryKey: getGetPlayerDashboardQueryKey(pid) });
         }
       }
     );

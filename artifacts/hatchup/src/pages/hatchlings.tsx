@@ -1,5 +1,5 @@
 import { Layout } from "@/components/layout";
-import { PLAYER_ID } from "@/lib/constants";
+import { usePlayer } from "@/lib/playerContext";
 import { HatchlingCard } from "@/components/hatchling-card";
 import { useListHatchlings, getListHatchlingsQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,9 +8,11 @@ import { Link } from "wouter";
 import { motion } from "framer-motion";
 
 export default function Hatchlings() {
+  const { playerId } = usePlayer();
+  const pid = playerId ?? 0;
   const { data: hatchlings, isLoading } = useListHatchlings(
-    { playerId: PLAYER_ID },
-    { query: { enabled: true, queryKey: getListHatchlingsQueryKey({ playerId: PLAYER_ID }) } }
+    { playerId: pid },
+    { query: { enabled: !!playerId, queryKey: getListHatchlingsQueryKey({ playerId: pid }) } }
   );
 
   return (

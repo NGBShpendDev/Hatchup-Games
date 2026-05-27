@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Layout } from "@/components/layout";
-import { PLAYER_ID } from "@/lib/constants";
+import { usePlayer } from "@/lib/playerContext";
 import { 
   useGetWorkoutPlan, getGetWorkoutPlanQueryKey, 
   useGenerateWorkoutPlan, 
@@ -23,25 +23,27 @@ import { useToast } from "@/hooks/use-toast";
 export default function Training() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { playerId } = usePlayer();
+  const pid = playerId ?? 0;
 
   const { data: workoutPlan, isLoading: isLoadingWorkout, error: workoutError } = useGetWorkoutPlan(
-    { playerId: PLAYER_ID },
-    { query: { queryKey: getGetWorkoutPlanQueryKey({ playerId: PLAYER_ID }), retry: false } }
+    { playerId: pid },
+    { query: { queryKey: getGetWorkoutPlanQueryKey({ playerId: pid }), retry: false, enabled: !!playerId } }
   );
 
   const { data: quests, isLoading: isLoadingQuests } = useGetActiveQuests(
-    PLAYER_ID,
-    { query: { queryKey: getGetActiveQuestsQueryKey(PLAYER_ID) } }
+    pid,
+    { query: { queryKey: getGetActiveQuestsQueryKey(pid), enabled: !!playerId } }
   );
 
   const { data: mealPlan, isLoading: isLoadingMeals, error: mealError } = useGetMealPlan(
-    { playerId: PLAYER_ID },
-    { query: { queryKey: getGetMealPlanQueryKey({ playerId: PLAYER_ID }), retry: false } }
+    { playerId: pid },
+    { query: { queryKey: getGetMealPlanQueryKey({ playerId: pid }), retry: false, enabled: !!playerId } }
   );
 
   const { data: sessions, isLoading: isLoadingSessions } = useListWorkoutSessions(
-    { playerId: PLAYER_ID, limit: 10 },
-    { query: { queryKey: getListWorkoutSessionsQueryKey({ playerId: PLAYER_ID, limit: 10 }) } }
+    { playerId: pid, limit: 10 },
+    { query: { queryKey: getListWorkoutSessionsQueryKey({ playerId: pid, limit: 10 }), enabled: !!playerId } }
   );
 
   const generateWorkout = useGenerateWorkoutPlan();
@@ -53,25 +55,25 @@ export default function Training() {
 
   const handleGenerateWorkout = () => {
     generateWorkout.mutate(
-      { data: { playerId: PLAYER_ID, goal: workoutGoal, fitnessLevel: "intermediate", equipment: ["dumbbells", "bodyweight"] } },
-      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetWorkoutPlanQueryKey({ playerId: PLAYER_ID }) }) }
+      { data: { playerId: pid, goal: workoutGoal, fitnessLevel: "intermediate", equipment: ["dumbbells", "bodyweight"] } },
+      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetWorkoutPlanQueryKey({ playerId: pid }) }) }
     );
   };
 
   const handleGenerateMeal = () => {
     generateMeal.mutate(
-      { data: { playerId: PLAYER_ID, goal: mealGoal, dietType: "standard", allergies: [] } },
-      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetMealPlanQueryKey({ playerId: PLAYER_ID }) }) }
+      { data: { playerId: pid, goal: mealGoal, dietType: "standard", allergies: [] } },
+      { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetMealPlanQueryKey({ playerId: pid }) }) }
     );
   };
 
   const handleLogSession = (type: string, duration: number) => {
     logSession.mutate(
-      { data: { playerId: PLAYER_ID, workoutType: type, durationMinutes: duration, exercisesCompleted: 5, realm: "strength" } },
+      { data: { playerId: pid, workoutType: type, durationMinutes: duration, exercisesCompleted: 5, realm: "strength" } },
       { 
         onSuccess: () => {
           toast({ title: "Workout logged!", description: "XP and coins earned." });
-          queryClient.invalidateQueries({ queryKey: getListWorkoutSessionsQueryKey({ playerId: PLAYER_ID, limit: 10 }) });
+          queryClient.invalidateQueries({ queryKey: getListWorkoutSessionsQueryKey({ playerId: pid, limit: 10 }) });
         }
       }
     );

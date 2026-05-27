@@ -1,5 +1,5 @@
 import { Layout } from "@/components/layout";
-import { PLAYER_ID } from "@/lib/constants";
+import { usePlayer } from "@/lib/playerContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   useGetGlobalLeaderboard, 
@@ -20,6 +20,8 @@ import { Trophy, Calendar, Users, Swords, Medal } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Social() {
+  const { playerId } = usePlayer();
+  const pid = playerId ?? 0;
   const { data: leaderboard, isLoading: isLoadingLeaderboard } = useGetGlobalLeaderboard(
     { limit: 10 },
     { query: { queryKey: getGetGlobalLeaderboardQueryKey({ limit: 10 }) } }

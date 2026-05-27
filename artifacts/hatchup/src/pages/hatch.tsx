@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Layout } from "@/components/layout";
-import { PLAYER_ID } from "@/lib/constants";
+import { usePlayer } from "@/lib/playerContext";
 import { 
   useListEggs, getListEggsQueryKey,
   useHatchEgg,
@@ -23,15 +23,17 @@ import { Link } from "wouter";
 export default function Hatch() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { playerId } = usePlayer();
+  const pid = playerId ?? 0;
 
   const { data: eggs, isLoading: isLoadingEggs } = useListEggs(
-    { playerId: PLAYER_ID, hatched: false },
-    { query: { queryKey: getListEggsQueryKey({ playerId: PLAYER_ID, hatched: false }) } }
+    { playerId: pid, hatched: false },
+    { query: { queryKey: getListEggsQueryKey({ playerId: pid, hatched: false }), enabled: !!playerId } }
   );
 
   const { data: hatchlings, isLoading: isLoadingHatchlings } = useListHatchlings(
-    { playerId: PLAYER_ID },
-    { query: { queryKey: getListHatchlingsQueryKey({ playerId: PLAYER_ID }) } }
+    { playerId: pid },
+    { query: { queryKey: getListHatchlingsQueryKey({ playerId: pid }), enabled: !!playerId } }
   );
 
   const hatchMutation = useHatchEgg();
@@ -56,8 +58,8 @@ export default function Hatch() {
       {
         onSuccess: (res) => {
           setHatchResult(res);
-          queryClient.invalidateQueries({ queryKey: getListEggsQueryKey({ playerId: PLAYER_ID, hatched: false }) });
-          queryClient.invalidateQueries({ queryKey: getListHatchlingsQueryKey({ playerId: PLAYER_ID }) });
+          queryClient.invalidateQueries({ queryKey: getListEggsQueryKey({ playerId: pid, hatched: false }) });
+          queryClient.invalidateQueries({ queryKey: getListHatchlingsQueryKey({ playerId: pid }) });
         },
         onError: () => {
           toast({ title: "Failed to hatch", variant: "destructive" });
@@ -68,11 +70,11 @@ export default function Hatch() {
 
   const handleAddEgg = () => {
     addEggMutation.mutate(
-      { data: { playerId: PLAYER_ID, eggType: "balanced" } },
+      { data: { playerId: pid, eggType: "balanced" } },
       {
         onSuccess: () => {
           toast({ title: "New egg found!" });
-          queryClient.invalidateQueries({ queryKey: getListEggsQueryKey({ playerId: PLAYER_ID, hatched: false }) });
+          queryClient.invalidateQueries({ queryKey: getListEggsQueryKey({ playerId: pid, hatched: false }) });
         }
       }
     );
