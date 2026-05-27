@@ -163,7 +163,7 @@ export async function syncGoogleFit(
           { dataTypeName: "com.google.active_minutes" },
           { dataTypeName: "com.google.calories.expended" },
         ],
-        bucketByTime: { durationMillis: 86400000 },
+        bucketByTime: { durationMillis: 3600000 },
         startTimeMillis,
         endTimeMillis,
       }),
@@ -174,6 +174,7 @@ export async function syncGoogleFit(
     const aggregateData = await aggregateRes.json() as {
       bucket: Array<{
         startTimeMillis: string;
+        endTimeMillis: string;
         dataset: Array<{
           dataSourceId: string;
           point: Array<{ value: Array<{ intVal?: number; fpVal?: number }> }>;
@@ -182,7 +183,10 @@ export async function syncGoogleFit(
     };
 
     for (const bucket of aggregateData.bucket ?? []) {
-      const day = new Date(Number(bucket.startTimeMillis)).toISOString().split("T")[0];
+      const bucketStart = Number(bucket.startTimeMillis);
+      const bucketEnd = Number(bucket.endTimeMillis);
+      const bucketKey = `${bucketStart}_${bucketEnd}`;
+      const bucketLabel = new Date(bucketStart).toISOString().slice(0, 16).replace("T", " ");
 
       for (const dataset of bucket.dataset ?? []) {
         const point = dataset.point?.[0];
@@ -191,13 +195,13 @@ export async function syncGoogleFit(
         if (dataset.dataSourceId.includes("step_count")) {
           const steps = point.value?.[0]?.intVal ?? 0;
           if (steps > 0) {
-            const externalId = `gfit_steps_${day}`;
+            const externalId = `gfit_steps_${bucketKey}`;
             const result = await logFitnessActivity({
               playerId,
               type: "steps",
               value: steps,
               externalId,
-              note: `Google Fit: ${steps} steps on ${day}`,
+              note: `Google Fit: ${steps} steps at ${bucketLabel}`,
               isPassiveSync: true,
             });
             if (result.isNew) { activitiesImported++; xpEarned += result.fitnessXpEarned; }
@@ -205,13 +209,13 @@ export async function syncGoogleFit(
         } else if (dataset.dataSourceId.includes("active_minutes")) {
           const minutes = point.value?.[0]?.intVal ?? 0;
           if (minutes > 0) {
-            const externalId = `gfit_active_min_${day}`;
+            const externalId = `gfit_active_min_${bucketKey}`;
             const result = await logFitnessActivity({
               playerId,
               type: "active_minutes",
               value: minutes,
               externalId,
-              note: `Google Fit: ${minutes} active minutes on ${day}`,
+              note: `Google Fit: ${minutes} active min at ${bucketLabel}`,
               isPassiveSync: true,
             });
             if (result.isNew) { activitiesImported++; xpEarned += result.fitnessXpEarned; }
@@ -219,13 +223,13 @@ export async function syncGoogleFit(
         } else if (dataset.dataSourceId.includes("calories")) {
           const kcal = Math.round(point.value?.[0]?.fpVal ?? 0);
           if (kcal > 0) {
-            const externalId = `gfit_calories_${day}`;
+            const externalId = `gfit_calories_${bucketKey}`;
             const result = await logFitnessActivity({
               playerId,
               type: "calories",
               value: kcal,
               externalId,
-              note: `Google Fit: ${kcal} kcal burned on ${day}`,
+              note: `Google Fit: ${kcal} kcal at ${bucketLabel}`,
               isPassiveSync: true,
             });
             if (result.isNew) { activitiesImported++; xpEarned += result.fitnessXpEarned; }

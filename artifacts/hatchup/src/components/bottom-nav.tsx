@@ -1,15 +1,18 @@
 import { Link, useLocation } from "wouter";
 import { Home, Compass, Egg, Dumbbell, Users } from "lucide-react";
+import { usePlayer } from "@/lib/playerContext";
 
 export function BottomNav() {
   const [location] = useLocation();
+  const { player } = usePlayer();
+  const hasPassiveXp = (player?.passiveXpSinceLastVisit ?? 0) > 0;
 
   const navItems = [
-    { href: "/", label: "Home", icon: <Home className="w-6 h-6" /> },
-    { href: "/explore", label: "Explore", icon: <Compass className="w-6 h-6" /> },
-    { href: "/hatch", label: "Hatch", icon: <Egg className="w-6 h-6" /> },
-    { href: "/training", label: "Training", icon: <Dumbbell className="w-6 h-6" /> },
-    { href: "/social", label: "Social", icon: <Users className="w-6 h-6" /> },
+    { href: "/", label: "Home", icon: <Home className="w-6 h-6" />, badge: hasPassiveXp },
+    { href: "/explore", label: "Explore", icon: <Compass className="w-6 h-6" />, badge: false },
+    { href: "/hatch", label: "Hatch", icon: <Egg className="w-6 h-6" />, badge: false },
+    { href: "/training", label: "Training", icon: <Dumbbell className="w-6 h-6" />, badge: false },
+    { href: "/social", label: "Social", icon: <Users className="w-6 h-6" />, badge: false },
   ];
 
   return (
@@ -26,8 +29,11 @@ export function BottomNav() {
                     : "text-muted-foreground hover:text-foreground hover:scale-105"
                 }`}
               >
-                <div className={`mb-1 transition-transform duration-300 ${isActive ? '-translate-y-1' : ''}`}>
+                <div className={`mb-1 transition-transform duration-300 relative ${isActive ? '-translate-y-1' : ''}`}>
                   {item.icon}
+                  {item.badge && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-yellow-400 border-2 border-card animate-pulse" />
+                  )}
                 </div>
                 <span className={`text-[10px] font-black uppercase tracking-wider transition-opacity duration-300 ${isActive ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}>
                   {item.label}

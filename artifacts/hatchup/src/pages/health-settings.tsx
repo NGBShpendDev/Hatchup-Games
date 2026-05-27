@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,16 @@ export default function HealthSettings() {
 
   const googleFitConnection = connections.find(c => c.platform === "google_fit");
   const isGoogleConnected = googleFitConnection?.isConnected ?? false;
+
+  const [appleNotifyRequested, setAppleNotifyRequested] = useState<boolean>(() => {
+    try { return localStorage.getItem("hatchup_apple_health_notify") === "1"; } catch { return false; }
+  });
+
+  const handleAppleNotify = useCallback(() => {
+    try { localStorage.setItem("hatchup_apple_health_notify", "1"); } catch { /* ignore */ }
+    setAppleNotifyRequested(true);
+    toast({ title: "You're on the list!", description: "We'll notify you when Apple Health support launches." });
+  }, [toast]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -234,7 +244,7 @@ export default function HealthSettings() {
         </div>
 
         {/* Apple Health */}
-        <div className="bg-card border border-border/50 rounded-2xl overflow-hidden opacity-60">
+        <div className="bg-card border border-border/50 rounded-2xl overflow-hidden">
           <div className="p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -253,10 +263,21 @@ export default function HealthSettings() {
             <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
               Full Apple Health and Apple Watch support is coming in the HatchUp mobile app. Steps, workouts, sleep, and heart rate will all sync to power your Pals.
             </p>
-            <Button size="sm" disabled className="w-full opacity-50">
-              <Smartphone className="w-3.5 h-3.5 mr-1.5" />
-              Available in mobile app
-            </Button>
+            {appleNotifyRequested ? (
+              <div className="flex items-center gap-2 text-sm text-green-400 bg-green-400/10 border border-green-400/20 rounded-xl px-4 py-2.5">
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                You're on the list! We'll notify you at launch.
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                className="w-full bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30"
+                onClick={handleAppleNotify}
+              >
+                <Smartphone className="w-3.5 h-3.5 mr-1.5" />
+                Notify me when it launches
+              </Button>
+            )}
           </div>
         </div>
 
