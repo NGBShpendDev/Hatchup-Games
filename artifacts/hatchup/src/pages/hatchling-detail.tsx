@@ -184,7 +184,7 @@ export default function HatchlingDetail() {
   const handleEvolve = () => {
     if (!hatchling) return;
     evolveMutation.mutate(
-      { data: { hatchlingId, evolutionId: 1, useItem: false } },
+      { id: hatchlingId, data: { triggerId: 1 } },
       {
         onSuccess: () => {
           toast({ title: "Evolution Complete!", description: `${hatchling.name} has reached Stage ${(hatchling.evolutionStage ?? 1) + 1}!` });

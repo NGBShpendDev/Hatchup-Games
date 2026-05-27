@@ -182,7 +182,7 @@ export default function Hatch() {
     setTimeout(() => setHatchPhase("burst"), 800);
     setTimeout(() => {
       hatchMutation.mutate(
-        { data: { eggId: selectedEgg, name: hatchName || "Mystery Pal" } },
+        { id: selectedEgg, data: { playerId: pid, name: hatchName || "Mystery Pal" } },
         {
           onSuccess: (res) => {
             setHatchResult(res);
@@ -271,7 +271,7 @@ export default function Hatch() {
                           <span className="text-xs font-black text-muted-foreground">{style.label}</span>
                         </div>
 
-                        <EggSvg realm={realm} isReady={egg.isReady} progress={egg.progressPct} />
+                        <EggSvg realm={realm} isReady={egg.isReady ?? false} progress={egg.progressPct ?? 0} />
 
                         <div className="w-full mt-4">
                           <div className="flex justify-between text-xs font-bold mb-1">
@@ -297,7 +297,7 @@ export default function Hatch() {
                           </motion.div>
                         ) : (
                           <Button className="w-full font-bold mt-4" variant="secondary" disabled>
-                            Incubating ({Math.round(egg.progressPct)}%)
+                            Incubating ({Math.round(egg.progressPct ?? 0)}%)
                           </Button>
                         )}
                       </CardContent>
