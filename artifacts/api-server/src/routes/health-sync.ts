@@ -1,9 +1,14 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { healthConnectionsTable, playersTable } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
-import { encryptToken, syncGoogleFit } from "../services/googleFitSync";
+import {
+  encryptToken,
+  syncGoogleFit,
+  createOAuthState,
+  verifyOAuthState,
+} from "../services/googleFitSync";
 
 const router = Router();
 
@@ -90,7 +95,7 @@ router.get("/health/google/connect", requireAuth, async (req, res) => {
   if (!player) { res.status(404).json({ error: "Player not found" }); return; }
 
   const redirectUri = getRedirectUri(req);
-  const state = Buffer.from(JSON.stringify({ playerId: player.id })).toString("base64url");
+  const state = createOAuthState(player.id);
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -119,15 +124,12 @@ router.get("/health/google/callback", async (req, res) => {
     return;
   }
 
-  let playerId: number;
-  try {
-    const decoded = JSON.parse(Buffer.from(state, "base64url").toString("utf8"));
-    playerId = Number(decoded.playerId);
-    if (!playerId) throw new Error("no playerId");
-  } catch {
+  const verified = verifyOAuthState(state);
+  if (!verified) {
     res.redirect(`${frontendBase}/health-settings?error=invalid_state`);
     return;
   }
+  const playerId = verified.playerId;
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;

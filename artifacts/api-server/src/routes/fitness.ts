@@ -10,24 +10,10 @@ import {
   CompleteQuestParams,
   ListRealmsQueryParams,
 } from "@workspace/api-zod";
+import { logFitnessActivity } from "../services/fitnessLog";
 
 const router = Router();
 
-// XP formulas per activity type
-const ACTIVITY_CONFIG: Record<string, { unit: string; xpPer: number; realm: string; stepsEquiv: number }> = {
-  steps:       { unit: "steps",   xpPer: 0.05,  realm: "cardio",   stepsEquiv: 1 },
-  running:     { unit: "minutes", xpPer: 8,     realm: "cardio",   stepsEquiv: 150 },
-  walking:     { unit: "minutes", xpPer: 4,     realm: "cardio",   stepsEquiv: 100 },
-  cycling:     { unit: "minutes", xpPer: 6,     realm: "cardio",   stepsEquiv: 80 },
-  weightlifting: { unit: "minutes", xpPer: 7,  realm: "strength", stepsEquiv: 60 },
-  hiit:        { unit: "minutes", xpPer: 10,    realm: "beast",    stepsEquiv: 200 },
-  yoga:        { unit: "minutes", xpPer: 4,     realm: "balance",  stepsEquiv: 40 },
-  meditation:  { unit: "minutes", xpPer: 3,     realm: "balance",  stepsEquiv: 30 },
-  sleep:       { unit: "hours",   xpPer: 15,    realm: "balance",  stepsEquiv: 200 },
-  hydration:   { unit: "cups",    xpPer: 5,     realm: "balance",  stepsEquiv: 25 },
-  stretching:  { unit: "minutes", xpPer: 3,     realm: "balance",  stepsEquiv: 30 },
-  swimming:    { unit: "minutes", xpPer: 7,     realm: "beast",    stepsEquiv: 120 },
-};
 
 const REALMS = [
   {
@@ -176,86 +162,28 @@ router.post("/fitness/log", async (req, res) => {
   const body = LogActivityBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
-  const config = ACTIVITY_CONFIG[body.data.type] ?? { unit: "reps", xpPer: 1, realm: "strength", stepsEquiv: 0 };
-  const fitnessXpEarned = Math.round(body.data.value * config.xpPer);
-  const stepsEquiv = Math.round(body.data.value * config.stepsEquiv);
-
-  const activity = await db.insert(fitnessActivitiesTable).values({
+  const result = await logFitnessActivity({
     playerId: body.data.playerId,
     type: body.data.type,
     value: body.data.value,
-    unit: config.unit,
-    fitnessXpEarned,
-    realm: config.realm,
     note: body.data.note ?? null,
-  }).returning();
-
-  // Update player stats
-  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, body.data.playerId) });
-  if (!player) { res.status(404).json({ error: "Player not found" }); return; }
-
-  const today = new Date().toISOString().split("T")[0];
-  const lastActive = player.lastActiveDate;
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split("T")[0];
-
-  let newStreak = player.currentStreak;
-  if (lastActive !== today) {
-    newStreak = lastActive === yesterdayStr ? player.currentStreak + 1 : 1;
-  }
-
-  const isWorkout = body.data.type !== "steps" && body.data.type !== "hydration" && body.data.type !== "sleep";
-  const updatedPlayers = await db.update(playersTable)
-    .set({
-      fitnessXp: player.fitnessXp + fitnessXpEarned,
-      totalSteps: player.totalSteps + stepsEquiv,
-      totalWorkouts: isWorkout ? player.totalWorkouts + 1 : player.totalWorkouts,
-      currentStreak: newStreak,
-      longestStreak: Math.max(player.longestStreak, newStreak),
-      waterCups: body.data.type === "hydration" ? player.waterCups + body.data.value : player.waterCups,
-      lastActiveDate: today,
-    })
-    .where(eq(playersTable.id, body.data.playerId))
-    .returning();
-
-  // Update egg progress with steps equivalent
-  let eggsUpdated = 0;
-  if (stepsEquiv > 0) {
-    const activeEggs = await db.query.eggsTable.findMany({
-      where: and(eq(eggsTable.playerId, body.data.playerId), eq(eggsTable.isHatched, false)),
-    });
-    for (const egg of activeEggs) {
-      const newProgress = Math.min(egg.stepsRequired, egg.stepsProgress + stepsEquiv);
-      await db.update(eggsTable)
-        .set({ stepsProgress: newProgress })
-        .where(eq(eggsTable.id, egg.id));
-      eggsUpdated++;
-    }
-  }
-
-  // Update quest progress
-  const activeQuests = await db.query.fitnessQuestsTable.findMany({
-    where: and(
-      eq(fitnessQuestsTable.playerId, body.data.playerId),
-      eq(fitnessQuestsTable.isCompleted, false),
-      eq(fitnessQuestsTable.type, body.data.type),
-    ),
+    isPassiveSync: false,
   });
-  for (const quest of activeQuests) {
-    const newValue = Math.min(quest.targetValue, quest.currentValue + body.data.value);
-    await db.update(fitnessQuestsTable)
-      .set({ currentValue: newValue, isCompleted: newValue >= quest.targetValue })
-      .where(eq(fitnessQuestsTable.id, quest.id));
+
+  if (!result.updatedPlayer) {
+    res.status(404).json({ error: "Player not found" });
+    return;
   }
 
-  const activityFormatted = { ...activity[0], createdAt: activity[0].createdAt.toISOString() };
+  const activityFormatted = result.activity
+    ? { ...result.activity, createdAt: result.activity.createdAt.toISOString() }
+    : null;
 
   res.status(201).json({
     activity: activityFormatted,
-    fitnessXpEarned,
-    eggsUpdated,
-    player: updatedPlayers[0],
+    fitnessXpEarned: result.fitnessXpEarned,
+    eggsUpdated: result.eggsUpdated,
+    player: result.updatedPlayer,
   });
 });
 

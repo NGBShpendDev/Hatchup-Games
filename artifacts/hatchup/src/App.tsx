@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ClerkProvider, SignIn, SignUp, Show, useClerk } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
@@ -131,13 +131,56 @@ function PassiveXpNudge() {
 
   useEffect(() => {
     if (!player || hasShownRef.current) return;
-    if ((player.passiveXpSinceLastVisit ?? 0) > 0) {
+    const passiveXp = player.passiveXpSinceLastVisit ?? 0;
+    if (passiveXp > 0) {
       hasShownRef.current = true;
-      acknowledgePassiveXp();
+      const toastContainer = document.getElementById("passive-xp-toast");
+      if (toastContainer) {
+        toastContainer.setAttribute("data-xp", String(passiveXp));
+        toastContainer.setAttribute("data-show", "true");
+      }
+      setTimeout(() => {
+        acknowledgePassiveXp();
+      }, 6000);
     }
   }, [player?.id]);
 
   return null;
+}
+
+function PassiveXpBanner() {
+  const [xp, setXp] = useState(0);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const check = () => {
+      const el = document.getElementById("passive-xp-toast");
+      if (el?.getAttribute("data-show") === "true") {
+        const xpVal = Number(el.getAttribute("data-xp") ?? 0);
+        setXp(xpVal);
+        setVisible(true);
+        el.removeAttribute("data-show");
+      }
+    };
+    const interval = setInterval(check, 200);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!visible) return null;
+
+  return (
+    <div
+      className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] bg-gradient-to-r from-violet-600 to-pink-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-4 duration-500 max-w-xs w-[calc(100%-2rem)]"
+      onClick={() => setVisible(false)}
+    >
+      <span className="text-xl">⚡</span>
+      <div className="flex-1 min-w-0">
+        <p className="font-bold text-sm leading-tight">Your Pals grew while you were away!</p>
+        <p className="text-xs text-white/80">+{xp} XP earned from background sync</p>
+      </div>
+      <button className="text-white/60 hover:text-white text-lg leading-none flex-shrink-0" onClick={() => setVisible(false)}>×</button>
+    </div>
+  );
 }
 
 function AppRoutes() {
@@ -157,6 +200,8 @@ function AppRoutes() {
 
   return (
     <>
+      <div id="passive-xp-toast" className="hidden" aria-hidden="true" />
+      <PassiveXpBanner />
       <PassiveXpNudge />
       <Switch>
         <Route path="/" component={Home} />
