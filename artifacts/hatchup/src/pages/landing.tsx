@@ -1,14 +1,14 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { Egg, Zap, Trophy, Users, Activity, ChevronRight } from "lucide-react";
+import { Egg, Zap, Trophy, Users, Activity, ChevronRight, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const features = [
-  { icon: Egg, title: "Hatch Creatures", desc: "Walk, run, and train to hatch unique creatures from fitness-powered eggs." },
-  { icon: Activity, title: "Real Fitness Goals", desc: "Log steps, workouts, sleep, and nutrition — every rep evolves your roster." },
-  { icon: Zap, title: "AI Coach", desc: "Get personalized workout and meal plans tailored to your fitness goals." },
-  { icon: Trophy, title: "Compete & Rank", desc: "Battle other players, climb leaderboards, and win exclusive rewards." },
-  { icon: Users, title: "Join Clubs", desc: "Team up with friends in clubs, tackle events, and dominate together." },
+  { icon: Egg, title: "Hatch Your Pals", desc: "Walk, run, and train to hatch unique Fitness Pals from eggs powered by your real activity." },
+  { icon: Activity, title: "Real Fitness Goals", desc: "Log steps, workouts, sleep, and nutrition — every rep evolves your Pals and unlocks new abilities." },
+  { icon: Heart, title: "Fitness Is Better With Pals", desc: "Your creatures cheer you on, grow stronger when you do, and need you to keep moving." },
+  { icon: Trophy, title: "Compete & Rank", desc: "Battle other Trainers, climb leaderboards, and win exclusive rewards with your Pals." },
+  { icon: Users, title: "Train Together. Evolve Together.", desc: "Join clubs, tackle events, and grow stronger as a community." },
 ];
 
 export default function Landing() {
@@ -20,7 +20,7 @@ export default function Landing() {
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#ff2d55] to-[#bf00ff] flex items-center justify-center">
             <Egg size={16} className="text-white" />
           </div>
-          <span className="font-black text-lg tracking-tight">HATCHUP</span>
+          <span className="font-black text-lg tracking-tight">HatchUp</span>
         </div>
         <div className="flex items-center gap-3">
           <Link href="/sign-in">
@@ -43,18 +43,19 @@ export default function Landing() {
         >
           <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 text-sm text-white/70 mb-6">
             <Zap size={12} className="text-[#ff2d55]" />
-            Every Step Evolves You
+            Every Step Evolves You.
           </div>
           <h1 className="text-5xl font-black leading-tight mb-4">
             Your Fitness
             <span className="block bg-gradient-to-r from-[#ff2d55] to-[#bf00ff] bg-clip-text text-transparent">
-              Hatches Creatures
+              Hatches Pals
             </span>
           </h1>
-          <p className="text-white/60 text-lg mb-8 leading-relaxed">
-            HatchUp is the fitness RPG where your real workouts power your creatures.
+          <p className="text-white/60 text-lg mb-3 leading-relaxed">
+            HatchUp Fitness Pals is the fitness RPG where your real workouts hatch and evolve your creature companions.
             Walk to hatch eggs. Train to evolve. Compete to become legend.
           </p>
+          <p className="text-white/40 text-sm mb-8 font-medium">Fitness Is Better With Pals.</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link href="/sign-up">
               <Button size="lg" className="w-full sm:w-auto bg-gradient-to-r from-[#ff2d55] to-[#bf00ff] text-white border-0 hover:opacity-90 text-base font-bold px-8">
@@ -126,11 +127,12 @@ export default function Landing() {
       {/* CTA */}
       <section className="px-6 pb-20 text-center">
         <div className="bg-gradient-to-r from-[#ff2d55]/10 to-[#bf00ff]/10 border border-white/10 rounded-3xl p-8 max-w-md mx-auto">
-          <h2 className="text-2xl font-black mb-2">Ready to Evolve?</h2>
-          <p className="text-white/50 text-sm mb-6">Sign up free with Google or Apple ID — no credit card needed.</p>
+          <h2 className="text-2xl font-black mb-2">Ready to Meet Your Pals?</h2>
+          <p className="text-white/50 text-sm mb-1">Sign up free with Google or Apple ID — no credit card needed.</p>
+          <p className="text-white/30 text-xs mb-6">Train Together. Evolve Together.</p>
           <Link href="/sign-up">
             <Button size="lg" className="w-full bg-gradient-to-r from-[#ff2d55] to-[#bf00ff] text-white border-0 hover:opacity-90 font-bold">
-              Create Your Account
+              Join HatchUp Fitness Pals
             </Button>
           </Link>
         </div>

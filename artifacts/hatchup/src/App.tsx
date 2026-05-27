@@ -252,7 +252,7 @@ function ClerkProviderWithRoutes() {
         },
         signUp: {
           start: {
-            title: "Join HatchUp",
+            title: "Join HatchUp Fitness Pals",
             subtitle: "Every step you take hatches something amazing",
           },
         },

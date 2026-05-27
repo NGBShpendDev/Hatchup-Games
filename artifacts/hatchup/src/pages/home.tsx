@@ -97,7 +97,7 @@ export default function Home() {
           <div className="relative z-10 flex flex-col h-full justify-between gap-6">
             <div>
               <h2 className="text-3xl font-black mb-1 drop-shadow-md">Keep Moving!</h2>
-              <p className="text-white/80 font-medium text-sm">Your creatures are waiting to evolve.</p>
+              <p className="text-white/80 font-medium text-sm">Your Pals are waiting to evolve.</p>
             </div>
             
             <div className="space-y-2">
@@ -187,7 +187,7 @@ export default function Home() {
         {/* Top Hatchling */}
         <section>
           <div className="flex justify-between items-end mb-4">
-            <h2 className="text-xl font-black flex items-center gap-2"><Star className="w-5 h-5 text-yellow-500" /> Star Creature</h2>
+            <h2 className="text-xl font-black flex items-center gap-2"><Star className="w-5 h-5 text-yellow-500" /> Star Pal</h2>
             <Link href="/hatchlings" className="text-xs font-bold text-primary flex items-center hover:underline">View All <ChevronRight className="w-3 h-3" /></Link>
           </div>
           
@@ -216,8 +216,8 @@ export default function Home() {
           ) : (
             <Card className="bg-card border-dashed">
               <CardContent className="p-6 text-center">
-                <p className="text-sm text-muted-foreground font-bold mb-3">No creatures yet!</p>
-                <Link href="/hatch"><Button size="sm" className="font-bold">Hatch your first</Button></Link>
+                <p className="text-sm text-muted-foreground font-bold mb-3">No Pals yet!</p>
+                <Link href="/hatch"><Button size="sm" className="font-bold">Hatch your first Pal</Button></Link>
               </CardContent>
             </Card>
           )}

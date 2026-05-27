@@ -23,7 +23,7 @@ export default function Explore() {
             <Map className="w-10 h-10" /> Fitness Realms
           </h1>
           <p className="text-lg text-muted-foreground font-medium">
-            Explore diverse environments to unlock specialized creature evolutions and powerful stat bonuses.
+            Explore diverse environments to unlock specialized Pal evolutions and powerful stat bonuses.
           </p>
         </div>
 

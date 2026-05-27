@@ -20,11 +20,11 @@ export default function Hatchlings() {
       <div className="max-w-6xl mx-auto space-y-8 pb-12">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-4xl font-black tracking-tight text-primary">My Hatchlings</h1>
-            <p className="text-muted-foreground font-medium mt-1">Manage, train, and evolve your creatures.</p>
+            <h1 className="text-4xl font-black tracking-tight text-primary">My Pals</h1>
+            <p className="text-muted-foreground font-medium mt-1">Manage, train, and evolve your Fitness Pals.</p>
           </div>
           <Link href="/hatch">
-            <Button size="lg" variant="secondary" className="font-bold active-elevate">Hatch New</Button>
+            <Button size="lg" variant="secondary" className="font-bold active-elevate">Hatch a Pal</Button>
           </Link>
         </div>
 
@@ -55,10 +55,10 @@ export default function Hatchlings() {
           </motion.div>
         ) : (
           <div className="text-center p-16 bg-card rounded-3xl border-4 border-dashed border-border mt-10">
-            <h2 className="text-2xl font-black mb-4">No Hatchlings Yet!</h2>
-            <p className="text-muted-foreground mb-8">Start your journey by hatching your first creature.</p>
+            <h2 className="text-2xl font-black mb-4">No Pals Yet!</h2>
+            <p className="text-muted-foreground mb-8">Start your journey by hatching your first Fitness Pal.</p>
             <Link href="/hatch">
-              <Button size="lg" className="font-bold text-lg px-8 active-elevate">Hatch Now</Button>
+              <Button size="lg" className="font-bold text-lg px-8 active-elevate">Hatch Your First Pal</Button>
             </Link>
           </div>
         )}

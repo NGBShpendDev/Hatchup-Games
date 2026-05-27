@@ -54,7 +54,7 @@ export default function Hatch() {
   const submitHatch = () => {
     if (!selectedEgg) return;
     hatchMutation.mutate(
-      { data: { eggId: selectedEgg, name: hatchName || "Mystery Hatchling" } },
+      { data: { eggId: selectedEgg, name: hatchName || "Mystery Pal" } },
       {
         onSuccess: (res) => {
           setHatchResult(res);
@@ -179,7 +179,7 @@ export default function Hatch() {
         </div>
 
         <div>
-          <h2 className="text-2xl font-black mb-6">Creature Collection</h2>
+          <h2 className="text-2xl font-black mb-6">Your Pals</h2>
           {isLoadingHatchlings ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-2xl" />)}
@@ -205,7 +205,7 @@ export default function Hatch() {
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground font-medium">No creatures hatched yet.</p>
+            <p className="text-muted-foreground font-medium">No Pals hatched yet.</p>
           )}
         </div>
       </div>
@@ -226,7 +226,7 @@ export default function Hatch() {
                   >
                     <EggIcon className="w-24 h-24 text-primary" />
                   </motion.div>
-                  <p className="text-center font-bold mb-4 text-lg">Give your new companion a name:</p>
+                  <p className="text-center font-bold mb-4 text-lg">Give your new Pal a name:</p>
                   <Input 
                     value={hatchName} 
                     onChange={e => setHatchName(e.target.value)} 

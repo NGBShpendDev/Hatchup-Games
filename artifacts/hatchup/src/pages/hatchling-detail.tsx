@@ -155,7 +155,7 @@ export default function HatchlingDetail() {
             
             <div className="mt-8 relative z-10 w-full">
               <Button size="lg" className="w-full font-black text-lg h-14 active-elevate bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-white border-0" onClick={handleEvolve} disabled={evolveMutation.isPending}>
-                <ArrowUpCircle className="w-6 h-6 mr-2" /> {evolveMutation.isPending ? "Evolving..." : "Evolve Creature"}
+                <ArrowUpCircle className="w-6 h-6 mr-2" /> {evolveMutation.isPending ? "Evolving..." : "Evolve Pal"}
               </Button>
             </div>
           </motion.div>
@@ -235,7 +235,7 @@ export default function HatchlingDetail() {
             
             <div className="pt-4 flex justify-end">
               <Button variant="ghost" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 font-bold" onClick={handleRelease}>
-                <Trash2 className="w-4 h-4 mr-2" /> Release Creature
+                <Trash2 className="w-4 h-4 mr-2" /> Release Pal
               </Button>
             </div>
 

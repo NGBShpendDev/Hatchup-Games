@@ -87,7 +87,7 @@ export default function Training() {
             <Dumbbell className="w-10 h-10" /> AI Coach
           </h1>
           <p className="text-lg text-muted-foreground font-medium">
-            Your personalized training hub. Complete workouts and quests to evolve your creatures faster.
+            Your personalized training hub. Complete workouts and quests to evolve your Pals faster.
           </p>
         </div>
 

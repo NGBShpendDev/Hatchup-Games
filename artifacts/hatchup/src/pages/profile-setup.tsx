@@ -51,14 +51,14 @@ export default function ProfileSetup() {
             <Egg size={32} className="text-white" />
           </div>
           <h1 className="text-2xl font-black">Create Your Trainer Profile</h1>
-          <p className="text-white/50 text-sm mt-1">Choose how you'll appear in the HatchUp universe</p>
+          <p className="text-white/50 text-sm mt-1">Choose how you'll appear in HatchUp Fitness Pals</p>
         </div>
 
         {/* Sparkles */}
         <div className="bg-gradient-to-r from-[#ff2d55]/10 to-[#bf00ff]/10 border border-white/10 rounded-2xl p-1 mb-6">
           <div className="flex items-center gap-2 px-3 py-2">
             <Sparkles size={14} className="text-[#ff2d55]" />
-            <span className="text-xs text-white/60">Your first egg is waiting — just pick your name!</span>
+            <span className="text-xs text-white/60">Your first Pal is waiting — just pick your name!</span>
           </div>
         </div>
 
@@ -102,7 +102,7 @@ export default function ProfileSetup() {
             disabled={loading}
             className="w-full bg-gradient-to-r from-[#ff2d55] to-[#bf00ff] text-white border-0 hover:opacity-90 font-bold h-11"
           >
-            {loading ? "Creating your profile..." : "Enter the HatchUp Universe →"}
+            {loading ? "Creating your profile..." : "Start Your Fitness Pals Journey →"}
           </Button>
         </form>
       </motion.div>
