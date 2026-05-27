@@ -1,0 +1,121 @@
+HEALTH APP + SMART DEVICE INTEGRATION:
+
+HatchUp Fitness Pals must deeply integrate with the native health and fitness systems already installed on users’ devices.
+
+The app should automatically sync and track activity using:
+
+IOS:
+- Apple Health
+- Apple Watch
+- Fitness App
+- HealthKit APIs
+
+ANDROID:
+- Google Fit
+- Samsung Health
+- Fitbit integration
+- Health Connect APIs
+
+WEARABLE SUPPORT:
+Support:
+- Apple Watch
+- Fitbit
+- Garmin
+- Samsung Galaxy Watch
+- WHOOP
+- Oura Ring
+- smart fitness devices
+
+The app should automatically import:
+- steps
+- walking distance
+- running
+- calories burned
+- heart rate
+- workouts
+- sleep
+- hydration
+- active minutes
+- exercise sessions
+
+The syncing experience should feel:
+- automatic
+- smooth
+- accurate
+- seamless
+- battery efficient
+
+PASSIVE PROGRESSION:
+Users should continue earning:
+- XP
+- hatch progress
+- evolution energy
+- coins
+- streaks
+
+even when the app is closed through health app syncing.
+
+This is extremely important for retention and daily engagement.
+
+BACKGROUND TRACKING:
+Allow background syncing so users feel constantly rewarded for real-life movement.
+
+Examples:
+- walking at work progresses eggs
+- gym workouts evolve creatures
+- sleep improves recovery stats
+- hydration boosts aura progression
+
+The game should feel connected to the player’s actual lifestyle.
+
+FITNESS DETECTION:
+Automatically detect workout types such as:
+- running
+- walking
+- cycling
+- strength training
+- HIIT
+- yoga
+- stretching
+- sports activity
+
+Different activities should affect different creature stats and evolutions.
+
+SMART HEALTH AI:
+Use health data to create personalized:
+- workout suggestions
+- meal plans
+- recovery recommendations
+- hydration reminders
+- streak encouragement
+- sleep improvement tips
+
+The AI coach should adapt based on real user activity.
+
+PRIVACY + TRUST:
+Health data handling must feel:
+- safe
+- transparent
+- secure
+- user-controlled
+
+Include:
+- privacy settings
+- permission management
+- encrypted data storage
+- clear explanations of tracked activity
+
+Users should feel comfortable syncing their health information.
+
+OFFLINE PROGRESSION:
+Even if users forget to open the app, their movement should still count toward:
+- creature growth
+- XP progression
+- egg hatching
+- streak systems
+- realm progression
+
+This creates a constant feeling of progression tied to real life.
+
+GOAL:
+The app should seamlessly transform everyday movement into meaningful in-game progression without requiring users to constantly open the app manually.
