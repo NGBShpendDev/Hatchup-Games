@@ -9,6 +9,7 @@ import {
   createOAuthState,
   verifyOAuthState,
 } from "../services/googleFitSync";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -172,6 +173,7 @@ router.get("/health/google/callback", async (req, res) => {
     ),
   });
 
+  let connectionId: number;
   if (existingConn) {
     await db.update(healthConnectionsTable)
       .set({
@@ -180,18 +182,34 @@ router.get("/health/google/callback", async (req, res) => {
         tokenExpiresAt: expiresAt,
       })
       .where(eq(healthConnectionsTable.id, existingConn.id));
+    connectionId = existingConn.id;
   } else {
-    await db.insert(healthConnectionsTable).values({
+    const [inserted] = await db.insert(healthConnectionsTable).values({
       playerId,
       platform: "google_fit",
       accessToken: encryptToken(tokens.access_token),
       refreshToken: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null,
       tokenExpiresAt: expiresAt,
       consentGivenAt: new Date(),
-    });
+    }).returning({ id: healthConnectionsTable.id });
+    connectionId = inserted.id;
   }
 
   res.redirect(`${frontendBase}/health-settings?connected=google_fit`);
+
+  setImmediate(async () => {
+    try {
+      const conn = await db.query.healthConnectionsTable.findFirst({
+        where: eq(healthConnectionsTable.id, connectionId),
+      });
+      if (conn) {
+        const result = await syncGoogleFit(playerId, conn);
+        logger.info({ playerId, ...result }, "Initial Google Fit backfill completed after OAuth connect");
+      }
+    } catch (err) {
+      logger.error({ err, playerId }, "Initial Google Fit backfill failed after OAuth connect");
+    }
+  });
 });
 
 router.post("/health/acknowledge-passive-xp", requireAuth, async (req, res) => {
