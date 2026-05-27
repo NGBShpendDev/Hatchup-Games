@@ -145,6 +145,7 @@ export interface Egg {
   playerId: number;
   rarity: string;
   eggType: string;
+  realm: string;
   stepsRequired: number;
   stepsProgress: number;
   isHatched: boolean;
@@ -551,6 +552,7 @@ limit?: number;
 export type ListEvolutionsParams = {
 category?: string;
 rarity?: string;
+realm?: string;
 };
 
 export type ListCompetitionsParams = {

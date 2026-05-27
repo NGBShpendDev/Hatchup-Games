@@ -287,6 +287,10 @@ paths:
           in: query
           schema:
             type: string
+        - name: realm
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Evolution catalog
@@ -1413,12 +1417,13 @@ components:
     # ── Eggs ─────────────────────────────────────────────────────────────────
     Egg:
       type: object
-      required: [id, playerId, rarity, eggType, stepsRequired, stepsProgress, isHatched, name, createdAt]
+      required: [id, playerId, rarity, eggType, stepsRequired, stepsProgress, isHatched, name, realm, createdAt]
       properties:
         id:            { type: integer }
         playerId:      { type: integer }
         rarity:        { type: string }
         eggType:       { type: string }
+        realm:         { type: string }
         stepsRequired: { type: integer }
         stepsProgress: { type: integer }
         isHatched:     { type: boolean }

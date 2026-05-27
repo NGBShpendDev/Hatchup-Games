@@ -206,6 +206,7 @@ export const GetPlayerDashboardResponse = zod.object({
   "playerId": zod.number(),
   "rarity": zod.string(),
   "eggType": zod.string(),
+  "realm": zod.string(),
   "stepsRequired": zod.number(),
   "stepsProgress": zod.number(),
   "isHatched": zod.boolean(),
@@ -500,7 +501,8 @@ export const GetHatchlingShowcaseResponse = zod.array(GetHatchlingShowcaseRespon
  */
 export const ListEvolutionsQueryParams = zod.object({
   "category": zod.coerce.string().optional(),
-  "rarity": zod.coerce.string().optional()
+  "rarity": zod.coerce.string().optional(),
+  "realm": zod.coerce.string().optional()
 })
 
 export const ListEvolutionsResponseItem = zod.object({
@@ -955,6 +957,7 @@ export const ListEggsResponseItem = zod.object({
   "playerId": zod.number(),
   "rarity": zod.string(),
   "eggType": zod.string(),
+  "realm": zod.string(),
   "stepsRequired": zod.number(),
   "stepsProgress": zod.number(),
   "isHatched": zod.boolean(),
@@ -982,6 +985,7 @@ export const GetEggResponse = zod.object({
   "playerId": zod.number(),
   "rarity": zod.string(),
   "eggType": zod.string(),
+  "realm": zod.string(),
   "stepsRequired": zod.number(),
   "stepsProgress": zod.number(),
   "isHatched": zod.boolean(),
@@ -1018,6 +1022,7 @@ export const HatchEggResponse = zod.object({
   "playerId": zod.number(),
   "rarity": zod.string(),
   "eggType": zod.string(),
+  "realm": zod.string(),
   "stepsRequired": zod.number(),
   "stepsProgress": zod.number(),
   "isHatched": zod.boolean(),

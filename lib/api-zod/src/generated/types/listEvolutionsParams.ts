@@ -9,4 +9,5 @@
 export type ListEvolutionsParams = {
 category?: string;
 rarity?: string;
+realm?: string;
 };

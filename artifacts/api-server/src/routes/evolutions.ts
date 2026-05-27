@@ -50,11 +50,16 @@ const REALM_META = [
 ];
 
 router.get("/evolutions", async (req, res) => {
-  const query = ListEvolutionsQueryParams.safeParse({ category: req.query.category as string | undefined, rarity: req.query.rarity as string | undefined });
+  const query = ListEvolutionsQueryParams.safeParse({
+    category: req.query.category as string | undefined,
+    rarity: req.query.rarity as string | undefined,
+    realm: req.query.realm as string | undefined,
+  });
   if (!query.success) { res.status(400).json({ error: "Invalid query" }); return; }
 
   let results = await db.query.evolutionTypesTable.findMany();
-  if (query.data.category) results = results.filter(e => e.category === query.data.category);
+  if (query.data.realm) results = results.filter(e => e.realm === query.data.realm);
+  else if (query.data.category) results = results.filter(e => e.category === query.data.category);
   if (query.data.rarity) results = results.filter(e => e.rarity === query.data.rarity);
   res.json(results);
 });

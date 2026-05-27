@@ -11,6 +11,7 @@ export interface Egg {
   playerId: number;
   rarity: string;
   eggType: string;
+  realm: string;
   stepsRequired: number;
   stepsProgress: number;
   isHatched: boolean;

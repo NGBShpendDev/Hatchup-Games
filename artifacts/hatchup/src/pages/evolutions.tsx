@@ -195,8 +195,8 @@ export default function Evolutions() {
   });
 
   const { data: evolutions, isLoading: isLoadingEvos } = useListEvolutions(
-    { category: selectedRealm },
-    { query: { queryKey: getListEvolutionsQueryKey({ category: selectedRealm }) } }
+    { realm: selectedRealm },
+    { query: { queryKey: getListEvolutionsQueryKey({ realm: selectedRealm }) } }
   );
 
   const activeStyle = REALM_STYLES[selectedRealm] ?? REALM_STYLES["balance"];
