@@ -137,6 +137,17 @@ export default function Landing() {
           </Link>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="px-6 pb-8 text-center border-t border-white/5 pt-8">
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#ff2d55] to-[#bf00ff] flex items-center justify-center">
+            <Egg size={12} className="text-white" />
+          </div>
+          <span className="font-black text-sm tracking-tight">HatchUp Fitness Pals</span>
+        </div>
+        <p className="text-white/30 text-xs">Every Step Evolves You.</p>
+      </footer>
     </div>
   );
 }

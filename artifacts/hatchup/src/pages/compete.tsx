@@ -18,7 +18,7 @@ export default function Compete() {
           <div className="relative z-10">
             <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">Compete & Conquer</h1>
             <p className="text-lg font-medium max-w-2xl opacity-90">
-              Pit your hatchlings against players worldwide in various game modes. Earn XP, coins, and climb the global leaderboard.
+              Pit your Pals against players worldwide in various game modes. Earn XP, coins, and climb the global leaderboard.
             </p>
           </div>
         </div>

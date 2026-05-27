@@ -110,7 +110,7 @@ export default function Race() {
                 className="w-32 h-32 border-8 border-primary border-t-transparent rounded-full mx-auto mb-8"
               />
               <h2 className="text-4xl font-black animate-pulse">RACING...</h2>
-              <p className="text-xl text-muted-foreground mt-4 font-bold">Your hatchling is giving it their all!</p>
+              <p className="text-xl text-muted-foreground mt-4 font-bold">Your Pal is giving it their all!</p>
             </motion.div>
           )}
 

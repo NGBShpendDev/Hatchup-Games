@@ -46,7 +46,7 @@ export default function Evolutions() {
           <h1 className="text-5xl font-black tracking-tight text-primary mb-4 flex items-center justify-center gap-3">
             <Zap className="w-10 h-10" /> Evolution Atlas
           </h1>
-          <p className="text-lg text-muted-foreground font-medium">Discover all the magical forms your hatchlings can take.</p>
+          <p className="text-lg text-muted-foreground font-medium">Discover all the magical forms your Pals can take.</p>
         </div>
 
         {/* Categories */}

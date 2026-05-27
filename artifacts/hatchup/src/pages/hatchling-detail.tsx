@@ -113,7 +113,7 @@ export default function HatchlingDetail() {
     );
   }
 
-  if (!hatchling) return <Layout><div className="p-8 text-center font-bold">Hatchling not found</div></Layout>;
+  if (!hatchling) return <Layout><div className="p-8 text-center font-bold">Pal not found</div></Layout>;
 
   const getFallbackImage = (category?: string) => {
     switch(category?.toLowerCase()) {
@@ -220,7 +220,7 @@ export default function HatchlingDetail() {
               <CardContent className="p-6">
                 <h3 className="font-black text-xl mb-2 flex items-center gap-2"><Shield className="w-5 h-5 text-primary" /> Special Ability</h3>
                 <p className="font-bold text-lg">{hatchling.abilityName || "Unknown Ability"}</p>
-                <p className="text-muted-foreground font-medium mt-1">{hatchling.abilityDesc || "This hatchling hasn't discovered its true power yet."}</p>
+                <p className="text-muted-foreground font-medium mt-1">{hatchling.abilityDesc || "This Pal hasn't discovered its true power yet."}</p>
               </CardContent>
             </Card>
 

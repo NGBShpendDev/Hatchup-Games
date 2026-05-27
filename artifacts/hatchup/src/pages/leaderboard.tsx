@@ -33,7 +33,7 @@ export default function Leaderboard() {
             <div className="grid grid-cols-12 gap-4 p-4 border-b border-border bg-muted/50 text-xs font-bold text-muted-foreground uppercase tracking-wider">
               <div className="col-span-1 text-center">Rank</div>
               <div className="col-span-5">Player</div>
-              <div className="col-span-3">Top Hatchling</div>
+              <div className="col-span-3">Top Pal</div>
               <div className="col-span-1 text-right">Wins</div>
               <div className="col-span-2 text-right">Score</div>
             </div>

@@ -1,0 +1,185 @@
+GLOBAL REAL-TIME COMPETITION SYSTEM:
+
+Create a worldwide real-time competition system where users can challenge and compete against anyone in the world at any time inside HatchUp Fitness Pals.
+
+The system should feel:
+- alive 24/7
+- global
+- exciting
+- social
+- highly competitive
+- endlessly active
+
+Players should always be able to find:
+- rivals
+- tournaments
+- live events
+- step battles
+- raid groups
+- workout competitions
+
+regardless of time zone.
+
+WORLDWIDE MATCHMAKING:
+Allow users to instantly compete with:
+- friends
+- nearby players
+- random global players
+- similar fitness levels
+- same creature tiers
+- same age groups
+- same progression ranks
+
+The matchmaking system should feel:
+- fast
+- fair
+- balanced
+- seamless
+
+LIVE GLOBAL CHALLENGES:
+Create always-active global competitions such as:
+- step races
+- cardio battles
+- endurance contests
+- workout streak wars
+- hydration challenges
+- clan tournaments
+- raid contribution rankings
+
+Users should constantly see:
+- live leaderboards
+- active challengers
+- global rankings
+- rising competitors
+
+REAL-TIME FITNESS BATTLES:
+Allow players to:
+- issue challenges instantly
+- wager XP
+- join open competitions
+- spectate top players
+- battle asynchronously or live
+
+Examples:
+- “Beat my 5K run today.”
+- “Challenge me to a 10k step race.”
+- “Join the global endurance event.”
+
+24/7 ACTIVE WORLD:
+The game world should NEVER feel inactive.
+
+Include:
+- live events every hour
+- rotating competitions
+- global raids
+- world invasions
+- timed creature outbreaks
+- seasonal tournaments
+
+Players should always feel:
+“There’s something happening right now.”
+
+GLOBAL LEADERBOARDS:
+Create worldwide rankings for:
+- XP
+- steps
+- workouts
+- streaks
+- raids
+- creature power
+- clan strength
+- seasonal rankings
+
+Allow filters by:
+- country
+- city
+- age
+- realm type
+- fitness style
+- friend groups
+
+LIVE RANKING MOVEMENT:
+Rankings should update in real time.
+
+Examples:
+- live climbing animations
+- overtaking notifications
+- streak alerts
+- tournament countdowns
+- victory announcements
+
+The world should feel highly competitive and alive.
+
+TIME ZONE EVENT SYSTEM:
+Design events around global participation.
+
+Examples:
+- North America raid windows
+- Europe clan wars
+- Asia fitness tournaments
+- worldwide synchronized events
+
+No matter when users log in, they should find active players.
+
+GLOBAL SOCIAL SYSTEM:
+Allow worldwide interaction through:
+- friend requests
+- clan invites
+- challenge requests
+- reactions
+- comments
+- global feeds
+- raid coordination
+
+The app should feel like a worldwide fitness gaming community.
+
+WORLD CHAMPIONSHIP EVENTS:
+Host massive competitive events such as:
+- monthly championships
+- global raid weekends
+- seasonal fitness cups
+- legendary tournaments
+- worldwide clan wars
+
+Top players earn:
+- legendary titles
+- exclusive creatures
+- prestige cosmetics
+- world rankings
+- rare evolution paths
+
+LIVE ACTIVITY MAP:
+Display real-time activity around the world.
+
+Examples:
+- active raids
+- world bosses
+- creature outbreaks
+- top fitness zones
+- trending workout areas
+
+The map should make the game feel globally connected.
+
+INFINITE COMPETITION:
+There should always be:
+- new goals
+- new rivals
+- new events
+- new rankings
+- new rewards
+
+The competitive ecosystem should support years of long-term engagement.
+
+GOAL:
+Create the first truly global real-time fitness RPG where users can:
+- compete worldwide
+- build social status
+- challenge anyone
+- evolve endlessly
+- participate in a living competitive universe
+
+The game should feel like:
+- a worldwide sport
+- a social MMO
+- a fitness movement
+- a real-time global adventure
