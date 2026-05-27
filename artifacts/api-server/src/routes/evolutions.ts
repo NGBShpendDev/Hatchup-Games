@@ -1,10 +1,53 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { evolutionTypesTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { ListEvolutionsQueryParams, GetEvolutionParams } from "@workspace/api-zod";
 
 const router = Router();
+
+const REALM_META = [
+  {
+    id: "strength",
+    name: "Strength Realm",
+    description: "Forged in iron and volcanic fire. Strength Pals grow powerful through resistance training and heavy lifting.",
+    color: "#ef4444",
+    auraColor: "#f97316",
+    fitnessTypes: ["strength", "weightlifting", "powerlifting", "crossfit"],
+  },
+  {
+    id: "cardio",
+    name: "Cardio Realm",
+    description: "Born from lightning and wind. Cardio Pals thrive on speed, endurance, and relentless movement.",
+    color: "#06b6d4",
+    auraColor: "#3b82f6",
+    fitnessTypes: ["running", "cycling", "swimming", "hiit", "cardio"],
+  },
+  {
+    id: "balance",
+    name: "Balance Realm",
+    description: "Woven from starlight and cosmic harmony. Balance Pals heal, protect, and elevate those around them.",
+    color: "#8b5cf6",
+    auraColor: "#d946ef",
+    fitnessTypes: ["yoga", "pilates", "stretching", "meditation", "flexibility"],
+  },
+  {
+    id: "beast",
+    name: "Beast Realm",
+    description: "Risen from primal shadow and instinct. Beast Pals are untameable hunters who dominate through raw aggression.",
+    color: "#22c55e",
+    auraColor: "#166534",
+    fitnessTypes: ["hiit", "functional", "martial_arts", "sports"],
+  },
+  {
+    id: "mythic",
+    name: "Mythic Realm",
+    description: "Born at the intersection of all realms. Mythic Pals are impossibly rare — cosmic anomalies that transcend classification.",
+    color: "#ec4899",
+    auraColor: "#a855f7",
+    fitnessTypes: ["all"],
+  },
+];
 
 router.get("/evolutions", async (req, res) => {
   const query = ListEvolutionsQueryParams.safeParse({ category: req.query.category as string | undefined, rarity: req.query.rarity as string | undefined });
@@ -19,7 +62,7 @@ router.get("/evolutions", async (req, res) => {
 router.get("/evolutions/categories", async (req, res) => {
   const all = await db.query.evolutionTypesTable.findMany();
   const categoryMap: Record<string, { count: number; rarest: string; color: string | null }> = {};
-  const rarityOrder = ["Mythic", "Legendary", "Epic", "Rare", "Common"];
+  const rarityOrder = ["Mythic", "Legendary", "Epic", "Rare", "Uncommon", "Common"];
 
   for (const e of all) {
     if (!categoryMap[e.category]) {
@@ -32,6 +75,19 @@ router.get("/evolutions/categories", async (req, res) => {
   }
 
   const result = Object.entries(categoryMap).map(([category, data]) => ({ category, ...data }));
+  res.json(result);
+});
+
+router.get("/evolutions/realms", async (req, res) => {
+  const all = await db.query.evolutionTypesTable.findMany();
+  const countByRealm: Record<string, number> = {};
+  for (const e of all) {
+    countByRealm[e.realm] = (countByRealm[e.realm] ?? 0) + 1;
+  }
+  const result = REALM_META.map(r => ({
+    ...r,
+    evolutionCount: countByRealm[r.id] ?? 0,
+  }));
   res.json(result);
 });
 

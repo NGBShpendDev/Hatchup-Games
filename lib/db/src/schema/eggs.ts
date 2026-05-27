@@ -14,6 +14,8 @@ export const eggsTable = pgTable("eggs", {
   imageUrl: text("image_url"),
   name: text("name").notNull().default("Mystery Egg"),
   description: text("description"),
+  // Realm system
+  realm: text("realm").notNull().default("balance"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   hatchedAt: timestamp("hatched_at", { withTimezone: true }),
 });

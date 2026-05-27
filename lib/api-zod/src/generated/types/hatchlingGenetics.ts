@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListFitnessActivitiesParams = {
-playerId: number;
-limit?: number;
-};
+/**
+ * @nullable
+ */
+export type HatchlingGenetics = { [key: string]: unknown } | null;

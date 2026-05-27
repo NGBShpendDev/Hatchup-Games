@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -14,6 +14,11 @@ export const evolutionTypesTable = pgTable("evolution_types", {
   abilityDesc: text("ability_desc"),
   unlockedCount: integer("unlocked_count").notNull().default(0),
   color: text("color"),
+  // Realm system
+  realm: text("realm").notNull().default("balance"),
+  stage: integer("stage").notNull().default(1),
+  evolutionPath: text("evolution_path").notNull().default("A"),
+  isPrestige: boolean("is_prestige").notNull().default(false),
 });
 
 export const insertEvolutionTypeSchema = createInsertSchema(evolutionTypesTable).omit({ id: true });

@@ -331,6 +331,21 @@ paths:
                 items:
                   $ref: "#/components/schemas/EvolutionCategory"
 
+  /evolutions/realms:
+    get:
+      operationId: getEvolutionRealms
+      tags: [evolutions]
+      summary: Get realm metadata with evolution counts
+      responses:
+        "200":
+          description: Realm metadata
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RealmInfo"
+
   # ── Competitions ──────────────────────────────────────────────────────────
   /competitions:
     get:
@@ -1152,7 +1167,7 @@ components:
     # ── Hatchling ────────────────────────────────────────────────────────────
     Hatchling:
       type: object
-      required: [id, playerId, name, species, evolutionStage, personality, mood, level, xp, happiness, hunger, energy, fitnessType, createdAt]
+      required: [id, playerId, name, species, evolutionStage, personality, mood, level, xp, happiness, hunger, energy, fitnessType, realm, friendshipLevel, moodState, createdAt]
       properties:
         id:             { type: integer }
         playerId:       { type: integer }
@@ -1177,6 +1192,11 @@ components:
         color:          { type: ["string", "null"] }
         fitnessType:    { type: string }
         eggId:          { type: ["integer", "null"] }
+        realm:          { type: string }
+        genetics:       { type: ["object", "null"] }
+        friendshipLevel: { type: integer }
+        moodState:      { type: string }
+        lastWorkoutAt:  { type: ["string", "null"] }
         createdAt:      { type: string }
 
     HatchlingInput:
@@ -1191,11 +1211,14 @@ components:
     HatchlingUpdate:
       type: object
       properties:
-        name:      { type: string }
-        mood:      { type: string }
-        happiness: { type: integer }
-        hunger:    { type: integer }
-        energy:    { type: integer }
+        name:           { type: string }
+        mood:           { type: string }
+        happiness:      { type: integer }
+        hunger:         { type: integer }
+        energy:         { type: integer }
+        moodState:      { type: string }
+        friendshipLevel: { type: integer }
+        lastWorkoutAt:  { type: string }
 
     EvolveInput:
       type: object
@@ -1206,7 +1229,7 @@ components:
     # ── Evolution ────────────────────────────────────────────────────────────
     EvolutionType:
       type: object
-      required: [id, name, category, rarity, description, unlockedCount]
+      required: [id, name, category, rarity, description, unlockedCount, realm, stage, evolutionPath, isPrestige]
       properties:
         id:            { type: integer }
         name:          { type: string }
@@ -1220,6 +1243,10 @@ components:
         unlockedCount: { type: integer }
         color:         { type: ["string", "null"] }
         fitnessType:   { type: ["string", "null"] }
+        realm:         { type: string }
+        stage:         { type: integer }
+        evolutionPath: { type: string }
+        isPrestige:    { type: boolean }
 
     EvolutionCategory:
       type: object
@@ -1229,6 +1256,21 @@ components:
         count:    { type: integer }
         rarest:   { type: string }
         color:    { type: ["string", "null"] }
+
+    RealmInfo:
+      type: object
+      required: [id, name, description, color, auraColor, evolutionCount, fitnessTypes]
+      properties:
+        id:            { type: string }
+        name:          { type: string }
+        description:   { type: string }
+        color:         { type: string }
+        auraColor:     { type: string }
+        evolutionCount: { type: integer }
+        fitnessTypes:
+          type: array
+          items:
+            type: string
 
     # ── Competition ──────────────────────────────────────────────────────────
     Competition:

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { eggsTable, hatchlingsTable, playersTable } from "@workspace/db";
+import { eggsTable, hatchlingsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import {
   ListEggsQueryParams,
@@ -12,75 +12,108 @@ import {
 
 const router = Router();
 
+// ── Realm mapping ──────────────────────────────────────────────────────────────
+const EGG_TYPE_TO_REALM: Record<string, string> = {
+  strength: "strength",
+  cardio: "cardio",
+  balance: "balance",
+  beast: "beast",
+  balanced: "balance",
+  legendary: "mythic",
+  mythic: "mythic",
+};
+
 const EGG_TYPE_CONFIG: Record<string, {
   stepsRequired: number; name: string; description: string;
-  fitnessType: string; species: string; evolutionType: string; color: string;
+  fitnessType: string; color: string;
 }> = {
   strength: {
-    stepsRequired: 10000, name: "Titan Egg", fitnessType: "strength",
-    description: "A heavy, armored egg that pulses with raw power. Hatches gym-born creatures.",
-    species: "Titan Hatchling", evolutionType: "strength", color: "#ef4444",
+    stepsRequired: 10000, name: "Titan Egg", fitnessType: "strength", color: "#ef4444",
+    description: "A heavy, magma-veined egg that pulses with raw power. Cracks glow orange-red. Hatches Strength Pals.",
   },
   cardio: {
-    stepsRequired: 15000, name: "Storm Egg", fitnessType: "cardio",
-    description: "A crackling egg that hums with electric energy. Hatches speed and sky creatures.",
-    species: "Storm Hatchling", evolutionType: "cardio", color: "#3b82f6",
+    stepsRequired: 15000, name: "Storm Egg", fitnessType: "cardio", color: "#06b6d4",
+    description: "A crackling egg that arcs with electric energy. Lightning veins pulse in cyan. Hatches Cardio Pals.",
   },
   balance: {
-    stepsRequired: 8000, name: "Mystic Egg", fitnessType: "balance",
-    description: "A glowing orb wrapped in auroras. Hatches healer and aura creatures.",
-    species: "Mystic Hatchling", evolutionType: "balance", color: "#8b5cf6",
+    stepsRequired: 8000, name: "Celestial Egg", fitnessType: "balance", color: "#8b5cf6",
+    description: "A glowing orb wrapped in soft auroras and stardust particles. Hatches Balance Pals.",
   },
   beast: {
-    stepsRequired: 20000, name: "Rage Egg", fitnessType: "beast",
-    description: "A cracked, burning egg that barely contains the creature inside. Hatches combat beasts.",
-    species: "Beast Hatchling", evolutionType: "beast", color: "#f97316",
+    stepsRequired: 20000, name: "Shadowrage Egg", fitnessType: "beast", color: "#22c55e",
+    description: "A cracked, shadow-pulsing egg that barely contains the primal creature inside. Hatches Beast Pals.",
   },
   balanced: {
-    stepsRequired: 5000, name: "Mystery Egg", fitnessType: "balanced",
-    description: "A shimmering egg that could hatch anything. The easiest egg to hatch.",
-    species: "Mystery Hatchling", evolutionType: "balanced", color: "#10b981",
+    stepsRequired: 5000, name: "Prism Egg", fitnessType: "balanced", color: "#10b981",
+    description: "A shimmering prismatic egg that shifts colors. The easiest egg to hatch.",
   },
   legendary: {
-    stepsRequired: 50000, name: "Legendary Egg", fitnessType: "strength",
-    description: "An ancient egg radiating mythic power. Only the most dedicated trainers can hatch this.",
-    species: "Legendary Hatchling", evolutionType: "strength", color: "#fbbf24",
+    stepsRequired: 50000, name: "Legendary Egg", fitnessType: "strength", color: "#fbbf24",
+    description: "An ancient egg radiating mythic cosmic power. Only the most dedicated trainers can hatch this.",
   },
 };
 
-const SPECIES_BY_FITNESS: Record<string, string[]> = {
-  strength: ["Iron Golem", "Titan Drake", "Stone Colossus", "Lava Warden", "Armor Gryphon"],
-  cardio:   ["Storm Falcon", "Sky Racer", "Thunder Sprite", "Wind Rider", "Lightning Kite"],
-  balance:  ["Aura Wisp", "Celestial Fox", "Healing Crane", "Moonborn Fae", "Serenity Dragon"],
-  beast:    ["Shadow Raptor", "Rage Chimera", "Dark Berserker", "Combat Hydra", "Feral Titan"],
-  balanced: ["Dragon", "Phoenix", "Crystal Wolf", "Cosmic Cat", "Prism Serpent"],
+// ── Species catalog per realm ──────────────────────────────────────────────────
+const SPECIES_BY_REALM: Record<string, string[]> = {
+  strength: ["Cragborn Pup", "Ashclaw Whelp", "Ironwall Hatchling", "Emberstrike Cub", "Lavahide Grunt"],
+  cardio:   ["Zephyr Fawn", "Crackle Sprite", "Stormwing Chick", "Blitzclaw Runt", "Tailwind Pup"],
+  balance:  ["Lumin Seedling", "Dewdrop Imp", "Crescent Wisp", "Auraveil Hatchling", "Starbloom Fae"],
+  beast:    ["Shadowpaw Runt", "Tanglewyrm Hatchling", "Razorback Cub", "Predator Whelp", "Grimfang Pup"],
+  mythic:   ["Starweave Hatchling", "Prism Wisp", "Nebula Pup", "Paradox Sprite", "Cosmicborn Runt"],
 };
 
-const ABILITIES: Record<string, { name: string; desc: string }[]> = {
+// ── Abilities per realm ────────────────────────────────────────────────────────
+const ABILITIES_BY_REALM: Record<string, { name: string; desc: string }[]> = {
   strength: [
-    { name: "Iron Fortress", desc: "Hardens shell to reduce incoming damage by 40%" },
-    { name: "Seismic Slam", desc: "Channels raw strength for a devastating ground strike" },
+    { name: "Stone Fist", desc: "Slams the ground causing shockwaves that stagger opponents." },
+    { name: "Seismic Slam", desc: "Channels raw strength for a devastating ground strike dealing 3x damage." },
+    { name: "Iron Fortress", desc: "Hardens shell to block 60% of incoming damage." },
   ],
   cardio: [
-    { name: "Sonic Dash", desc: "Reaches supersonic speeds for 3 seconds" },
-    { name: "Tailwind", desc: "Generates a powerful gust that boosts ally speed" },
+    { name: "Quick Dash", desc: "Surges forward at lightning speed leaving a trail of sparks." },
+    { name: "Tailwind Surge", desc: "Generates a powerful gust that accelerates ally speed by 40%." },
+    { name: "Static Shock", desc: "Releases a burst of static that stuns opponents for 2 seconds." },
   ],
   balance: [
-    { name: "Aura Heal", desc: "Radiates calming energy that restores 20% HP to allies" },
-    { name: "Celestial Shield", desc: "Creates a protective barrier from starlight energy" },
+    { name: "Aura Flare", desc: "Emits a calming aura that reduces opponent aggression by 30%." },
+    { name: "Celestial Mend", desc: "Radiates starlight energy restoring 25% HP to all allies." },
+    { name: "Mist Veil", desc: "Wraps allies in protective mist reducing incoming damage." },
   ],
   beast: [
-    { name: "Rage Mode", desc: "Enters berserk state doubling attack for 5 seconds" },
-    { name: "Shadow Strike", desc: "Vanishes into darkness then strikes with lethal precision" },
+    { name: "Feral Lunge", desc: "Leaps from shadows with primal ferocity doubling strike speed." },
+    { name: "Shadow Strike", desc: "Vanishes into darkness then strikes with lethal precision dealing 5x damage." },
+    { name: "Tangle Bind", desc: "Wraps opponents in muscular coils preventing escape for 3 seconds." },
   ],
-  balanced: [
-    { name: "Adaptive Burst", desc: "Adapts to any situation with a versatile power surge" },
-    { name: "Harmony Wave", desc: "Emits balanced energy that empowers all stats equally" },
+  mythic: [
+    { name: "Stardust Veil", desc: "Wraps in stardust reducing all damage and dazzling opponents." },
+    { name: "Prismatic Burst", desc: "Explodes in a rainbow of energy hitting opponents of every type." },
+    { name: "Quantum Strike", desc: "Strikes from 5 dimensions at once making it impossible to dodge." },
   ],
 };
 
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function generateGenetics() {
+  return {
+    temperament:   Math.floor(Math.random() * 100),
+    energyType:    Math.floor(Math.random() * 100),
+    auraColor:     Math.floor(Math.random() * 100),
+    physique:      Math.floor(Math.random() * 100),
+    loyalty:       Math.floor(Math.random() * 100),
+    aggression:    Math.floor(Math.random() * 100),
+    mutationChance: Math.floor(Math.random() * 10),
+  };
+}
+
+function derivePersonality(genetics: ReturnType<typeof generateGenetics>): string {
+  const { energyType, loyalty, aggression } = genetics;
+  if (energyType < 20) return "Sleepy";
+  if (energyType > 80) return "Hyper";
+  if (loyalty > 70)   return "Loyal";
+  if (aggression > 70) return "Competitive";
+  return "Calm";
 }
 
 // GET /eggs
@@ -143,31 +176,37 @@ router.post("/eggs/:id/hatch", async (req, res) => {
     return;
   }
 
-  const config = EGG_TYPE_CONFIG[egg.eggType] ?? EGG_TYPE_CONFIG["balanced"];
-  const speciesList = SPECIES_BY_FITNESS[egg.eggType] ?? SPECIES_BY_FITNESS["balanced"];
+  const realm = EGG_TYPE_TO_REALM[egg.eggType] ?? "balance";
+  const speciesList = SPECIES_BY_REALM[realm] ?? SPECIES_BY_REALM["balance"];
   const species = pickRandom(speciesList);
-  const abilities = ABILITIES[egg.eggType] ?? ABILITIES["balanced"];
-  const ability = pickRandom(abilities);
+  const abilitiesList = ABILITIES_BY_REALM[realm] ?? ABILITIES_BY_REALM["balance"];
+  const ability = pickRandom(abilitiesList);
+  const config = EGG_TYPE_CONFIG[egg.eggType] ?? EGG_TYPE_CONFIG["balanced"];
 
   const rarityRoll = Math.random();
   const rarity = egg.rarity === "Legendary" ? "Legendary"
+    : egg.eggType === "legendary" ? "Legendary"
     : rarityRoll < 0.02 ? "Mythic"
     : rarityRoll < 0.08 ? "Legendary"
     : rarityRoll < 0.20 ? "Epic"
     : rarityRoll < 0.40 ? "Rare"
+    : rarityRoll < 0.65 ? "Uncommon"
     : "Common";
 
   const isShiny = Math.random() < 0.05;
-  const personalities = ["fierce", "gentle", "chaotic", "wise", "energetic", "mysterious", "playful", "stoic"];
+  const genetics = generateGenetics();
+  const personality = derivePersonality(genetics);
 
   const hatchling = await db.insert(hatchlingsTable).values({
     playerId: body.data.playerId,
     name: body.data.name,
     species,
     rarity,
+    realm,
     category: egg.eggType,
-    personality: pickRandom(personalities),
+    personality,
     mood: "excited",
+    moodState: "happy",
     fitnessType: egg.eggType,
     eggId: egg.id,
     isShiny,
@@ -176,8 +215,11 @@ router.post("/eggs/:id/hatch", async (req, res) => {
     energy: 100,
     abilityName: ability.name,
     abilityDesc: ability.desc,
-    evolutionType: config.evolutionType,
+    evolutionType: realm,
     color: config.color,
+    genetics,
+    friendshipLevel: 0,
+    evolutionStage: 1,
   }).returning();
 
   const updatedEgg = await db.update(eggsTable)
@@ -193,7 +235,10 @@ router.post("/eggs/:id/hatch", async (req, res) => {
       progressPct: 100,
       isReady: false,
     },
-    hatchling: hatchling[0],
+    hatchling: {
+      ...hatchling[0],
+      createdAt: hatchling[0].createdAt.toISOString(),
+    },
   });
 });
 
@@ -204,6 +249,7 @@ router.post("/eggs/incubate", async (req, res) => {
 
   const eggType = body.data.eggType ?? "balanced";
   const config = EGG_TYPE_CONFIG[eggType] ?? EGG_TYPE_CONFIG["balanced"];
+  const realm = EGG_TYPE_TO_REALM[eggType] ?? "balance";
 
   const rarityOverride = body.data.rarity;
   const rarity = rarityOverride ?? (Math.random() < 0.05 ? "Epic" : Math.random() < 0.20 ? "Rare" : "Common");
@@ -215,6 +261,7 @@ router.post("/eggs/incubate", async (req, res) => {
     playerId: body.data.playerId,
     rarity,
     eggType,
+    realm,
     stepsRequired,
     stepsProgress: 0,
     name: config.name,

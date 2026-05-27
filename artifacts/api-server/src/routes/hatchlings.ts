@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { hatchlingsTable, evolutionTypesTable, playersTable } from "@workspace/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { hatchlingsTable, evolutionTypesTable } from "@workspace/db";
+import { eq, desc } from "drizzle-orm";
 import {
   ListHatchlingsQueryParams,
   CreateHatchlingBody,
@@ -15,9 +15,16 @@ import {
 
 const router = Router();
 
-const PERSONALITIES = ["chaotic", "playful", "sleepy", "shy", "energetic", "mischievous", "heroic", "emotional", "competitive"];
-const CATEGORIES = ["dragons", "phoenix", "sharks", "wolves", "dinosaurs", "angels", "demons", "cyber", "cosmic", "slimes", "candy", "shadow", "jungle", "robotic", "crystal"];
-const RARITIES = ["Common", "Rare", "Epic", "Legendary", "Mythic"];
+// ── Mood state helpers ─────────────────────────────────────────────────────────
+function computeMoodState(lastWorkoutAt: Date | null): string {
+  if (!lastWorkoutAt) return "happy";
+  const now = Date.now();
+  const ms = now - lastWorkoutAt.getTime();
+  const hours = ms / (1000 * 60 * 60);
+  if (hours < 2) return "celebrating";
+  if (hours > 24) return "resting";
+  return "happy";
+}
 
 router.get("/hatchlings", async (req, res) => {
   const query = ListHatchlingsQueryParams.safeParse({ playerId: req.query.playerId ? Number(req.query.playerId) : undefined, limit: req.query.limit ? Number(req.query.limit) : 20 });
@@ -27,30 +34,54 @@ router.get("/hatchlings", async (req, res) => {
     limit: query.data.limit ?? 20,
     orderBy: [desc(hatchlingsTable.createdAt)],
   });
-  res.json(results);
+  res.json(results.map(h => ({
+    ...h,
+    moodState: computeMoodState(h.lastWorkoutAt),
+    createdAt: h.createdAt.toISOString(),
+    lastWorkoutAt: h.lastWorkoutAt?.toISOString() ?? null,
+  })));
 });
 
 router.post("/hatchlings", async (req, res) => {
   const body = CreateHatchlingBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
-  const personality = PERSONALITIES[Math.floor(Math.random() * PERSONALITIES.length)];
-  const category = CATEGORIES[Math.floor(Math.random() * CATEGORIES.length)];
+  const realms = ["strength", "cardio", "balance", "beast"];
+  const realm = realms[Math.floor(Math.random() * realms.length)];
+  const genetics = {
+    temperament: Math.floor(Math.random() * 100),
+    energyType: Math.floor(Math.random() * 100),
+    auraColor: Math.floor(Math.random() * 100),
+    physique: Math.floor(Math.random() * 100),
+    loyalty: Math.floor(Math.random() * 100),
+    aggression: Math.floor(Math.random() * 100),
+    mutationChance: Math.floor(Math.random() * 10),
+  };
+  const personalities = ["Sleepy", "Hyper", "Loyal", "Competitive", "Calm"];
+  const personality = personalities[Math.floor(Math.random() * personalities.length)];
   const rarity = Math.random() < 0.05 ? "Legendary" : Math.random() < 0.15 ? "Epic" : Math.random() < 0.35 ? "Rare" : "Common";
 
   const hatchling = await db.insert(hatchlingsTable).values({
     playerId: body.data.playerId,
     name: body.data.name,
-    species: body.data.species ?? "Mystery Egg",
+    species: body.data.species ?? "Mystery Pal",
     personality,
-    category,
+    realm,
+    category: realm,
     rarity,
     mood: "excited",
+    moodState: "happy",
     happiness: 90,
     hunger: 50,
     energy: 100,
+    genetics,
+    friendshipLevel: 0,
   }).returning();
-  res.status(201).json(hatchling[0]);
+  res.status(201).json({
+    ...hatchling[0],
+    createdAt: hatchling[0].createdAt.toISOString(),
+    lastWorkoutAt: null,
+  });
 });
 
 router.get("/hatchlings/showcase", async (req, res) => {
@@ -58,7 +89,12 @@ router.get("/hatchlings/showcase", async (req, res) => {
     orderBy: [desc(hatchlingsTable.level), desc(hatchlingsTable.xp)],
     limit: 8,
   });
-  res.json(results);
+  res.json(results.map(h => ({
+    ...h,
+    moodState: computeMoodState(h.lastWorkoutAt),
+    createdAt: h.createdAt.toISOString(),
+    lastWorkoutAt: h.lastWorkoutAt?.toISOString() ?? null,
+  })));
 });
 
 router.get("/hatchlings/:id", async (req, res) => {
@@ -66,7 +102,12 @@ router.get("/hatchlings/:id", async (req, res) => {
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const hatchling = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, params.data.id) });
   if (!hatchling) { res.status(404).json({ error: "Hatchling not found" }); return; }
-  res.json(hatchling);
+  res.json({
+    ...hatchling,
+    moodState: computeMoodState(hatchling.lastWorkoutAt),
+    createdAt: hatchling.createdAt.toISOString(),
+    lastWorkoutAt: hatchling.lastWorkoutAt?.toISOString() ?? null,
+  });
 });
 
 router.patch("/hatchlings/:id", async (req, res) => {
@@ -74,9 +115,37 @@ router.patch("/hatchlings/:id", async (req, res) => {
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const body = UpdateHatchlingBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
-  const updated = await db.update(hatchlingsTable).set(body.data).where(eq(hatchlingsTable.id, params.data.id)).returning();
+
+  type HatchlingPatch = {
+    name?: string; mood?: string; happiness?: number; hunger?: number;
+    energy?: number; moodState?: string; friendshipLevel?: number; lastWorkoutAt?: Date | null;
+  };
+
+  const { lastWorkoutAt: lastWorkoutAtStr, ...restBody } = body.data;
+  const updateData: HatchlingPatch = { ...restBody };
+
+  // If a workout is being logged (lastWorkoutAt sent), auto-increment friendship and set mood
+  if (body.data.lastWorkoutAt) {
+    const current = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, params.data.id) });
+    if (current) {
+      updateData.friendshipLevel = Math.min(100, current.friendshipLevel + 5);
+      updateData.moodState = "celebrating";
+      updateData.lastWorkoutAt = new Date(body.data.lastWorkoutAt);
+    }
+  }
+
+  const updated = await db.update(hatchlingsTable)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .set(updateData as any)
+    .where(eq(hatchlingsTable.id, params.data.id))
+    .returning();
   if (!updated.length) { res.status(404).json({ error: "Hatchling not found" }); return; }
-  res.json(updated[0]);
+  res.json({
+    ...updated[0],
+    moodState: computeMoodState(updated[0].lastWorkoutAt),
+    createdAt: updated[0].createdAt.toISOString(),
+    lastWorkoutAt: updated[0].lastWorkoutAt?.toISOString() ?? null,
+  });
 });
 
 router.delete("/hatchlings/:id", async (req, res) => {
@@ -98,10 +167,13 @@ router.post("/hatchlings/:id/evolve", async (req, res) => {
   const evolutionType = await db.query.evolutionTypesTable.findFirst({ where: eq(evolutionTypesTable.id, body.data.triggerId) });
   if (!evolutionType) { res.status(404).json({ error: "Evolution type not found" }); return; }
 
+  const newStage = Math.min(3, hatchling.evolutionStage + 1);
+
   const updated = await db.update(hatchlingsTable).set({
-    evolutionStage: hatchling.evolutionStage + 1,
+    evolutionStage: newStage,
     evolutionType: evolutionType.name,
     category: evolutionType.category,
+    realm: evolutionType.realm,
     rarity: evolutionType.rarity,
     abilityName: evolutionType.abilityName,
     abilityDesc: evolutionType.abilityDesc,
@@ -109,11 +181,18 @@ router.post("/hatchlings/:id/evolve", async (req, res) => {
     color: evolutionType.color,
     level: hatchling.level + 2,
     xp: hatchling.xp + 500,
+    moodState: "celebrating",
+    lastWorkoutAt: new Date(),
   }).where(eq(hatchlingsTable.id, params.data.id)).returning();
 
   await db.update(evolutionTypesTable).set({ unlockedCount: evolutionType.unlockedCount + 1 }).where(eq(evolutionTypesTable.id, evolutionType.id));
 
-  res.json(updated[0]);
+  res.json({
+    ...updated[0],
+    moodState: "celebrating",
+    createdAt: updated[0].createdAt.toISOString(),
+    lastWorkoutAt: updated[0].lastWorkoutAt?.toISOString() ?? null,
+  });
 });
 
 export default router;

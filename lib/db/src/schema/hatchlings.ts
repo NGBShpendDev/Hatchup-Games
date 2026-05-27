@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -11,7 +11,7 @@ export const hatchlingsTable = pgTable("hatchlings", {
   evolutionType: text("evolution_type"),
   category: text("category").notNull().default("dragons"),
   rarity: text("rarity").notNull().default("Common"),
-  personality: text("personality").notNull().default("playful"),
+  personality: text("personality").notNull().default("Calm"),
   mood: text("mood").notNull().default("happy"),
   level: integer("level").notNull().default(1),
   xp: integer("xp").notNull().default(0),
@@ -24,9 +24,14 @@ export const hatchlingsTable = pgTable("hatchlings", {
   isShiny: boolean("is_shiny").notNull().default(false),
   isFusion: boolean("is_fusion").notNull().default(false),
   color: text("color"),
-  // Fitness integration
   fitnessType: text("fitness_type").notNull().default("balanced"),
   eggId: integer("egg_id"),
+  // Realm & genetics system
+  realm: text("realm").notNull().default("balance"),
+  genetics: jsonb("genetics"),
+  friendshipLevel: integer("friendship_level").notNull().default(0),
+  moodState: text("mood_state").notNull().default("happy"),
+  lastWorkoutAt: timestamp("last_workout_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

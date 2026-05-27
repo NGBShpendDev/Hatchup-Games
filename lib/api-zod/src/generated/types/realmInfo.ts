@@ -6,11 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface Exercise {
+export interface RealmInfo {
+  id: string;
   name: string;
-  sets: number;
-  reps: string;
-  rest: string;
-  tip?: string;
-  muscle?: string;
+  description: string;
+  color: string;
+  auraColor: string;
+  evolutionCount: number;
+  fitnessTypes: string[];
 }
