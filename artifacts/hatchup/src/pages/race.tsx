@@ -1,0 +1,147 @@
+import { Layout, PLAYER_ID } from "@/components/layout";
+import { useListHatchlings, getListHatchlingsQueryKey, useCreateCompetition } from "@workspace/api-client-react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
+import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { HatchlingCard } from "@/components/hatchling-card";
+
+export default function Race() {
+  const [searchParams] = useState(() => new URLSearchParams(window.location.search));
+  const modeName = searchParams.get('mode') || 'Race';
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  const [selectedHatchlingId, setSelectedHatchlingId] = useState<number | null>(null);
+  const [gameState, setGameState] = useState<'select' | 'racing' | 'result'>('select');
+  const [result, setResult] = useState<{rank: number, xp: number, coins: number} | null>(null);
+
+  const { data: hatchlings } = useListHatchlings(
+    { playerId: PLAYER_ID },
+    { query: { enabled: true, queryKey: getListHatchlingsQueryKey({ playerId: PLAYER_ID }) } }
+  );
+
+  const startMutation = useCreateCompetition();
+
+  const startRace = () => {
+    if (!selectedHatchlingId) return;
+    setGameState('racing');
+    
+    // Simulate race duration
+    setTimeout(() => {
+      // Create competition in backend
+      startMutation.mutate(
+        { data: { mode: modeName, playerId: PLAYER_ID, hatchlingId: selectedHatchlingId } },
+        {
+          onSuccess: (comp) => {
+            // Assume the backend generated a result for standard types instantly for this demo
+            setResult({
+              rank: comp.rank || Math.floor(Math.random() * 8) + 1,
+              xp: comp.xpEarned || 150,
+              coins: comp.coinsEarned || 50
+            });
+            setGameState('result');
+          },
+          onError: () => {
+            toast({ title: "Error", description: "Failed to complete race.", variant: "destructive" });
+            setGameState('select');
+          }
+        }
+      );
+    }, 4000);
+  };
+
+  return (
+    <Layout>
+      <div className="max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[80vh]">
+        <AnimatePresence mode="wait">
+          
+          {gameState === 'select' && (
+            <motion.div 
+              key="select"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="w-full"
+            >
+              <div className="text-center mb-10">
+                <h1 className="text-5xl font-black mb-4">Join {modeName}</h1>
+                <p className="text-xl text-muted-foreground font-medium">Select your champion for this event.</p>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-10">
+                {hatchlings?.map(h => (
+                  <div 
+                    key={h.id} 
+                    className={`rounded-3xl border-4 transition-all cursor-pointer ${selectedHatchlingId === h.id ? 'border-primary scale-105 shadow-2xl shadow-primary/20' : 'border-transparent hover:border-border'}`}
+                    onClick={() => setSelectedHatchlingId(h.id)}
+                  >
+                    <div className="pointer-events-none">
+                      <HatchlingCard hatchling={h} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-center">
+                <Button 
+                  size="lg" 
+                  className="font-black text-2xl px-16 py-8 rounded-full shadow-xl active-elevate"
+                  disabled={!selectedHatchlingId}
+                  onClick={startRace}
+                >
+                  START RACE
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          {gameState === 'racing' && (
+            <motion.div 
+              key="racing"
+              initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+              className="text-center"
+            >
+              <motion.div 
+                animate={{ rotate: 360 }} 
+                transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                className="w-32 h-32 border-8 border-primary border-t-transparent rounded-full mx-auto mb-8"
+              />
+              <h2 className="text-4xl font-black animate-pulse">RACING...</h2>
+              <p className="text-xl text-muted-foreground mt-4 font-bold">Your hatchling is giving it their all!</p>
+            </motion.div>
+          )}
+
+          {gameState === 'result' && result && (
+            <motion.div 
+              key="result"
+              initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }}
+              className="text-center w-full max-w-lg bg-card border-2 border-border p-12 rounded-3xl shadow-2xl"
+            >
+              <h2 className="text-3xl font-black mb-2 uppercase text-muted-foreground">Race Finished</h2>
+              <div className="text-8xl font-black text-primary my-8 drop-shadow-lg">
+                #{result.rank}
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className="bg-muted p-4 rounded-2xl">
+                  <p className="text-sm font-bold text-muted-foreground uppercase">XP Earned</p>
+                  <p className="text-3xl font-black text-green-500">+{result.xp}</p>
+                </div>
+                <div className="bg-muted p-4 rounded-2xl">
+                  <p className="text-sm font-bold text-muted-foreground uppercase">Coins Earned</p>
+                  <p className="text-3xl font-black text-yellow-500">+{result.coins}</p>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <Button size="lg" className="flex-1 font-bold" onClick={() => setGameState('select')}>Race Again</Button>
+                <Button size="lg" variant="secondary" className="flex-1 font-bold" onClick={() => setLocation('/compete')}>Back to Modes</Button>
+              </div>
+            </motion.div>
+          )}
+
+        </AnimatePresence>
+      </div>
+    </Layout>
+  );
+}

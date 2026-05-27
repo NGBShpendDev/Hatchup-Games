@@ -1,0 +1,90 @@
+import { Layout } from "@/components/layout";
+import { useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Calendar, Clock, Gift, Users } from "lucide-react";
+import { motion } from "framer-motion";
+
+export default function Events() {
+  const { data: events, isLoading } = useListEvents(
+    {},
+    { query: { queryKey: getListEventsQueryKey({}) } }
+  );
+
+  return (
+    <Layout>
+      <div className="max-w-5xl mx-auto space-y-8 pb-12">
+        <div className="text-center max-w-2xl mx-auto py-8">
+          <h1 className="text-5xl font-black tracking-tight text-primary mb-4 flex items-center justify-center gap-3">
+            <Calendar className="w-10 h-10" /> Live Events
+          </h1>
+          <p className="text-lg text-muted-foreground font-medium">Massive community events with exclusive rewards.</p>
+        </div>
+
+        {isLoading ? (
+          <div className="space-y-6">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-64 w-full rounded-3xl" />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {events?.map(event => (
+              <motion.div key={event.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                <Card className={`overflow-hidden border-2 transition-all ${event.status === 'active' ? 'border-red-500 shadow-xl shadow-red-500/10' : 'border-border opacity-75'}`}>
+                  <div className="flex flex-col md:flex-row">
+                    <div className="w-full md:w-1/3 h-48 md:h-auto bg-muted relative">
+                      {event.imageUrl && <img src={event.imageUrl} alt={event.name} className="w-full h-full object-cover" />}
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent to-background/90 md:bg-gradient-to-l" />
+                      {event.status === 'active' && (
+                        <div className="absolute top-4 left-4 bg-red-500 text-white text-xs font-black uppercase px-3 py-1.5 rounded-full animate-pulse shadow-lg">
+                          Live Now
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="p-6 md:p-8 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                          <span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {new Date(event.startsAt).toLocaleDateString()}</span>
+                          <span>•</span>
+                          <span className="text-primary">{event.type}</span>
+                        </div>
+                        <h2 className="text-3xl font-black mb-3">{event.name}</h2>
+                        <p className="text-muted-foreground font-medium mb-6">{event.description}</p>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-4 items-center justify-between mt-auto">
+                        <div className="flex gap-6">
+                          <div className="flex items-center gap-2 text-sm font-bold">
+                            <Users className="w-5 h-5 text-blue-500" />
+                            <span>{event.participants.toLocaleString()} players</span>
+                          </div>
+                          {event.reward && (
+                            <div className="flex items-center gap-2 text-sm font-bold">
+                              <Gift className="w-5 h-5 text-yellow-500" />
+                              <span>{event.reward}</span>
+                            </div>
+                          )}
+                        </div>
+                        <Button 
+                          size="lg" 
+                          variant={event.status === 'active' ? 'default' : 'secondary'}
+                          className="font-bold w-full md:w-auto active-elevate"
+                          disabled={event.status !== 'active'}
+                        >
+                          {event.status === 'active' ? 'Join Event' : 'Starts Soon'}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Layout>
+  );
+}

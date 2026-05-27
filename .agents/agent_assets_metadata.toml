@@ -1,0 +1,38 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "oay6Wy5eGhboe9ztO78WA"
+uri = "file://artifacts/hatchup/src/assets/images/lava-dragon.png"
+type = "image"
+title = "Lava dragon creature"
+
+[[generated]]
+id = "Gc9U5Ldfg-lFQvBOcEYTh"
+uri = "file://artifacts/hatchup/src/assets/images/crystal-guardian.png"
+type = "image"
+title = "Crystal guardian creature"
+
+[[generated]]
+id = "MNq6XTWLdZwcq0XK8YnkK"
+uri = "file://artifacts/hatchup/src/assets/images/cosmic-entity.png"
+type = "image"
+title = "Cosmic entity creature"
+
+[[generated]]
+id = "f_wACn4loR1kfnb7Wu7m2"
+uri = "file://artifacts/hatchup/src/assets/images/shadow-beast.png"
+type = "image"
+title = "Shadow beast creature"
+
+[[generated]]
+id = "lmammI7tTp9pHxS9dz0UX"
+uri = "file://artifacts/hatchup/src/assets/images/candy-monster.png"
+type = "image"
+title = "Candy monster creature"
+
+[[generated]]
+id = "PBbrSIRt1e5fLg-prDsN9"
+uri = "file://artifacts/hatchup/src/assets/images/cyber-creature.png"
+type = "image"
+title = "Cyber creature"

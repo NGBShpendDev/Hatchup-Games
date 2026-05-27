@@ -1,0 +1,268 @@
+==================================================
+COMPETITIVE MINI-GAME & SKILL SYSTEM FOR HATCHUP
+==================================================
+
+Expand HATCHUP into a highly social and competitive multiplayer experience where players can compete using their Hatchlings in skill-based mini games, races, tournaments, and live events.
+
+Competition should feel:
+- fun
+- chaotic
+- social
+- rewarding
+- easy to learn
+- highly replayable
+
+The system should combine the addictive social competition of:
+- Mario Kart
+- Fall Guys
+- Roblox mini games
+- Rocket League
+- Pokémon competitions
+
+while remaining simple and child-friendly.
+
+==================================================
+CORE COMPETITIVE SYSTEM
+==================================================
+
+Players can use their Hatchlings and evolved creatures to compete against other players online in real-time multiplayer mini games.
+
+Competition modes should include:
+- flying races
+- dragon races
+- obstacle courses
+- parkour challenges
+- hoverboard races
+- swimming races
+- sky races
+- battle arenas
+- rhythm dance battles
+- puzzle tournaments
+- treasure hunts
+- team mini games
+- survival modes
+- capture-the-flag
+- dodgeball-style chaos games
+- soccer-style mini games
+- tag/chase modes
+
+Every creature type should affect gameplay differently.
+
+==================================================
+CREATURE ABILITY SYSTEM
+==================================================
+
+Different evolutions should provide unique gameplay abilities.
+
+Examples:
+
+DRAGONS
+- faster flying
+- fire boost
+- aerial drifting
+- wind gliding
+- flame dash
+
+SHARK CREATURES
+- faster swimming
+- water boosts
+- wave jumps
+
+ROBOTIC CREATURES
+- speed bursts
+- hover movement
+- shield boosts
+
+SHADOW CREATURES
+- stealth
+- teleportation
+- speed invisibility
+
+CRYSTAL CREATURES
+- defense boosts
+- terrain stability
+- energy shields
+
+Abilities should create:
+- strategic variety
+- personality
+- unique playstyles
+
+BUT remain balanced and fair.
+
+==================================================
+FLYING RACE SYSTEM
+==================================================
+
+Flying races should become one of the signature game modes.
+
+Features:
+- dragon flying physics
+- boost rings
+- drifting
+- aerial tricks
+- shortcut paths
+- obstacle dodging
+- weather effects
+- sky maps
+- moving environments
+
+Race environments:
+- volcano skies
+- storm clouds
+- crystal caves
+- floating islands
+- cyber cities
+- outer space
+- underwater bubble tunnels
+
+Flying should feel:
+- smooth
+- satisfying
+- cinematic
+- fast
+- magical
+
+==================================================
+RANKED & CASUAL PLAY
+==================================================
+
+Include:
+- casual matchmaking
+- ranked modes
+- tournaments
+- seasonal ladders
+- party modes
+- custom lobbies
+
+Rank systems:
+- Bronze
+- Silver
+- Gold
+- Diamond
+- Master
+- Cosmic
+- Legendary
+
+Players should feel motivated to:
+- improve
+- flex rank
+- unlock rewards
+- compete socially
+
+==================================================
+TEAM & CLUB COMPETITIONS
+==================================================
+
+Allow:
+- clubs/guilds
+- team tournaments
+- seasonal championships
+- community competitions
+- leaderboard events
+
+Examples:
+- dragon racing leagues
+- sky championship cups
+- obstacle race seasons
+- creator tournaments
+
+==================================================
+LIVE EVENT COMPETITIONS
+==================================================
+
+Add rotating live mini-game events:
+- giant race weekends
+- world tournaments
+- boss races
+- team survival events
+- creator-hosted competitions
+- limited-time challenge maps
+
+Events should create:
+- urgency
+- social excitement
+- replayability
+- streaming moments
+
+==================================================
+REWARD SYSTEM
+==================================================
+
+Players should earn:
+- coins
+- XP
+- cosmetics
+- rare accessories
+- limited emotes
+- trophies
+- animated effects
+- exclusive dragon skins
+- seasonal badges
+
+Top players can unlock:
+- legendary cosmetics
+- ultra rare flying trails
+- exclusive rank rewards
+- title cards
+- championship crowns
+
+==================================================
+SPECTATOR & REPLAY SYSTEM
+==================================================
+
+Include:
+- spectator mode
+- instant replay
+- highlight clips
+- cinematic cameras
+- funny fail replays
+- social sharing tools
+
+The competition system should naturally create:
+- TikTok clips
+- YouTube Shorts
+- streamer content
+- viral moments
+
+==================================================
+ANTI-TOXICITY SYSTEM
+==================================================
+
+Competition must remain:
+- positive
+- child friendly
+- non-toxic
+
+Include:
+- AI moderation
+- positive emote systems
+- anti-bullying protections
+- sportsmanship rewards
+- safe communication systems
+
+The game should encourage:
+- teamwork
+- positivity
+- fun competition
+
+==================================================
+FINAL GOAL
+==================================================
+
+The mini-game and competitive system should make HATCHUP feel like:
+- a social playground
+- a racing game
+- a creature collection game
+- a live-service multiplayer world
+- a viral streaming experience
+
+Players should constantly return to:
+- compete
+- improve skills
+- flex creatures
+- unlock rewards
+- climb ranks
+- participate in live events
+- race friends
+- become legendary players

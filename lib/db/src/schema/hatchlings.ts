@@ -1,0 +1,32 @@
+import { pgTable, serial, text, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod/v4";
+
+export const hatchlingsTable = pgTable("hatchlings", {
+  id: serial("id").primaryKey(),
+  playerId: integer("player_id").notNull(),
+  name: text("name").notNull(),
+  species: text("species").notNull().default("Mystery"),
+  evolutionStage: integer("evolution_stage").notNull().default(1),
+  evolutionType: text("evolution_type"),
+  category: text("category").notNull().default("dragons"),
+  rarity: text("rarity").notNull().default("Common"),
+  personality: text("personality").notNull().default("playful"),
+  mood: text("mood").notNull().default("happy"),
+  level: integer("level").notNull().default(1),
+  xp: integer("xp").notNull().default(0),
+  happiness: integer("happiness").notNull().default(80),
+  hunger: integer("hunger").notNull().default(60),
+  energy: integer("energy").notNull().default(90),
+  abilityName: text("ability_name"),
+  abilityDesc: text("ability_desc"),
+  imageUrl: text("image_url"),
+  isShiny: boolean("is_shiny").notNull().default(false),
+  isFusion: boolean("is_fusion").notNull().default(false),
+  color: text("color"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertHatchlingSchema = createInsertSchema(hatchlingsTable).omit({ id: true, createdAt: true });
+export type InsertHatchling = z.infer<typeof insertHatchlingSchema>;
+export type Hatchling = typeof hatchlingsTable.$inferSelect;
