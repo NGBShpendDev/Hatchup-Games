@@ -33,5 +33,8 @@ export interface Hatchling {
   isFusion?: boolean;
   /** @nullable */
   color?: string | null;
+  fitnessType: string;
+  /** @nullable */
+  eggId?: number | null;
   createdAt: string;
 }

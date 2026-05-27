@@ -9,4 +9,7 @@
 export interface PlayerUpdate {
   displayName?: string;
   avatarUrl?: string;
+  fitnessRealm?: string;
+  dailyStepGoal?: number;
+  waterCups?: number;
 }

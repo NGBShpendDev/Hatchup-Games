@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface UseItemInput {
-  hatchlingId: number;
-}
+export type ListFitnessActivitiesParams = {
+playerId: number;
+limit?: number;
+};

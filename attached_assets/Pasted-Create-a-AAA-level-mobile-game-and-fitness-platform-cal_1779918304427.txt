@@ -1,0 +1,333 @@
+Create a AAA-level mobile game and fitness platform called “HatchUp.”
+
+HatchUp is a revolutionary mobile game inspired by Pokémon GO, RPG creature evolution games, social competition, fitness tracking, and real-world exploration.
+
+The goal is to make fitness addictive, emotional, social, and rewarding through creature hatching, evolution, progression systems, and real-world movement.
+
+This should feel like:
+- Pokémon GO meets fitness
+- Duolingo streak addiction
+- Clash Royale progression systems
+- Tamagotchi emotional attachment
+- Social MMO elements
+- RPG creature collection
+- TikTok-style virality
+
+CORE PHILOSOPHY:
+Users should NOT feel like they are using a fitness app.
+Users should feel like they are playing a fun, addictive creature evolution game that secretly improves their health, confidence, discipline, and lifestyle.
+
+CORE GAME LOOP:
+1. Move in real life
+2. Gain fitness XP
+3. Hatch eggs
+4. Evolve creatures
+5. Unlock powers/cosmetics/worlds
+6. Battle and socialize
+7. Compete in events
+8. Continue progression daily
+
+REAL WORLD FITNESS INTEGRATION:
+Integrate:
+- Apple Health
+- Fitbit
+- Garmin
+- Samsung Health
+- Smart watches
+- Phone motion tracking
+- AI camera movement detection
+
+Track:
+- Steps
+- Running
+- Walking
+- Weight lifting
+- Cardio
+- Sleep
+- Hydration
+- Stretching
+- Meditation
+- Workout consistency
+
+Every real-world action contributes XP and creature progression.
+
+CREATURE SYSTEM:
+Users hatch creatures from eggs.
+
+Every creature has:
+- Genetics
+- Traits
+- Personality
+- Rarity
+- Evolution trees
+- Elements
+- RPG stats
+
+Creature classes include:
+- Titans (strength)
+- Sprinters (cardio)
+- Mystics (recovery/wellness)
+- Beasts (hardcore training)
+- Hybrids (balanced builds)
+- Legendary hidden evolutions
+
+No two creatures should evolve exactly the same.
+
+EVOLUTION SYSTEM:
+Creature evolution depends on:
+- Fitness style
+- Activity type
+- Streaks
+- Sleep quality
+- Hydration
+- Goals completed
+- Random genetics
+- Hidden evolution paths
+- Event participation
+
+Evolution stages should feel emotional, exciting, and visually rewarding.
+
+Include:
+- Rare mutations
+- Secret evolutions
+- Legendary forms
+- Prestige evolutions
+- Fusion evolutions
+- Shiny variants
+
+The game should constantly surprise users with hidden unlocks.
+
+FITNESS REALMS:
+Create different progression sections/worlds.
+
+1. Strength Realm
+- Weightlifting
+- Gym workouts
+- Power training
+Unlocks giant armored creatures.
+
+2. Cardio Realm
+- Running
+- Walking
+- Cycling
+Unlocks speed and flying evolutions.
+
+3. Balance Realm
+- Sleep
+- Hydration
+- Meditation
+- Recovery
+Unlocks healer and aura creatures.
+
+4. Beast Realm
+- Hardcore fitness
+- HIIT
+- Burpees
+- Athletic training
+Unlocks rage and combat evolutions.
+
+5. Mythic Realm
+Hidden endgame area with legendary evolutions.
+
+OPEN WORLD EXPLORATION:
+Use GPS and AR systems.
+
+Players should:
+- Explore real-world locations
+- Discover eggs
+- Find rare creatures
+- Battle bosses outdoors
+- Claim gyms and territories
+- Participate in live world events
+
+Location-based creature spawning:
+- Parks = nature creatures
+- Downtown = cyber creatures
+- Beaches = water creatures
+- Gyms = titan creatures
+- Trails = beast creatures
+
+AR FEATURES:
+Include augmented reality systems where users can:
+- View creatures in the real world
+- Take photos/videos
+- Share clips to social media
+- Battle AR bosses
+- Hatch eggs through walking
+
+SOCIAL FEATURES:
+Create strong social and competitive systems.
+
+Include:
+- Clans/guilds
+- Friend lists
+- Fitness raids
+- Team battles
+- Weekly tournaments
+- School leagues
+- Gym territory wars
+- Global leaderboards
+- Transformation sharing
+- Social feed similar to TikTok/Instagram
+
+Players should be able to:
+- Trade eggs
+- Trade cosmetics
+- Show off rare creatures
+- Flex streaks
+- Share evolution reveals
+
+MINI GAMES:
+Add addictive mini-games connected to creature types.
+
+Examples:
+- Flying races
+- Sprint challenges
+- Obstacle courses
+- Reaction games
+- Dodge mechanics
+- Rhythm boxing
+- Raid bosses
+- Team fitness events
+
+BODY TRANSFORMATION SYSTEM:
+The user’s real fitness progress should influence creature appearance.
+
+Examples:
+- Losing weight makes creatures leaner/faster
+- Building muscle creates armored evolutions
+- Better endurance unlocks wings
+- Consistency unlocks aura effects
+
+Users should emotionally connect with both:
+- their own self-improvement
+- their creature’s growth
+
+This should create powerful before/after sharing potential.
+
+AI COACH:
+Include an advanced AI fitness companion.
+
+The AI should:
+- Motivate users
+- Suggest workouts
+- Encourage healthy habits
+- Prevent overtraining
+- Adjust goals dynamically
+- Adapt to beginners or elite athletes
+- Provide emotional encouragement
+
+The AI should feel like:
+- coach
+- teammate
+- mentor
+- motivational companion
+
+DAILY DOPAMINE SYSTEMS:
+Create addictive but positive progression loops.
+
+Include:
+- Daily quests
+- Streak rewards
+- Loot rewards
+- Random drops
+- Rare mutations
+- Surprise encounters
+- Seasonal events
+- Progress meters
+- Evolution timers
+- Near-completion excitement
+
+The game should constantly make users feel:
+“I’m close to something amazing.”
+
+VISUAL DESIGN:
+Art style should be:
+- Premium
+- Colorful
+- Smooth
+- Anime-inspired
+- Friendly
+- Emotional
+- Highly recognizable
+
+Blend:
+- Nintendo polish
+- Supercell simplicity
+- Fantasy RPG visuals
+- Modern mobile UI
+
+Animations must feel:
+- satisfying
+- rewarding
+- fluid
+- high quality
+
+MONETIZATION:
+NO pay-to-win mechanics.
+
+Revenue sources:
+- Cosmetic skins
+- Battle passes
+- Premium animations
+- Egg cosmetics
+- Creature accessories
+- Seasonal content
+- Emotes
+- AR effects
+- AI premium coaching
+
+Players should never feel forced to pay.
+
+LIVE EVENTS:
+Include constant live-service updates.
+
+Examples:
+- Global step challenges
+- Seasonal creatures
+- Full moon evolutions
+- Raid weekends
+- Community goals
+- Limited-time eggs
+- Weather-based bonuses
+
+WEATHER SYSTEM:
+Real-world weather impacts gameplay.
+
+Examples:
+- Rain boosts water creatures
+- Heat boosts fire creatures
+- Snow unlocks ice evolutions
+- Thunderstorms increase electric spawns
+
+TECH STACK:
+Use:
+- React Native or Flutter
+- Firebase backend
+- Node.js
+- Scalable multiplayer architecture
+- Cloud saves
+- Real-time syncing
+- AI fitness detection
+- Anti-cheat movement verification
+- GPS mapping
+- AR support
+
+GAME DESIGN GOAL:
+This should become:
+- the Pokémon GO of fitness
+- a social movement
+- a self-improvement platform
+- a lifestyle brand
+- a long-term live service ecosystem
+
+The app must make users feel:
+- proud
+- motivated
+- rewarded
+- emotionally attached
+- socially connected
+- healthier
+
+Most importantly:
+Fitness should feel FUN instead of stressful.

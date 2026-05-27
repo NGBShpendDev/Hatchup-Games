@@ -6,20 +6,29 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './activityLogResult';
+export * from './addEggInput';
 export * from './club';
 export * from './clubInput';
 export * from './competition';
 export * from './competitionInput';
 export * from './competitionResultInput';
+export * from './egg';
 export * from './evolutionCategory';
 export * from './evolutionType';
 export * from './evolveInput';
+export * from './fitnessActivity';
+export * from './fitnessQuest';
+export * from './fitnessRealm';
+export * from './fitnessStats';
 export * from './gameMode';
 export * from './getGlobalLeaderboardParams';
 export * from './getModeLeaderboardParams';
+export * from './hatchEggInput';
 export * from './hatchling';
 export * from './hatchlingInput';
 export * from './hatchlingUpdate';
+export * from './hatchResult';
 export * from './healthStatus';
 export * from './item';
 export * from './joinClubInput';
@@ -27,12 +36,16 @@ export * from './leaderboardEntry';
 export * from './listClubsParams';
 export * from './listCompetitionsParams';
 export * from './listCompetitionsStatus';
+export * from './listEggsParams';
 export * from './listEventsParams';
 export * from './listEventsStatus';
 export * from './listEvolutionsParams';
+export * from './listFitnessActivitiesParams';
 export * from './listHatchlingsParams';
 export * from './listItemsParams';
+export * from './listRealmsParams';
 export * from './liveEvent';
+export * from './logActivityInput';
 export * from './player';
 export * from './playerDashboard';
 export * from './playerInput';

@@ -26,6 +26,10 @@ tags:
     description: Live events
   - name: clubs
     description: Clubs and guilds
+  - name: eggs
+    description: Egg incubation and hatching
+  - name: fitness
+    description: Fitness tracking, quests, and realms
 
 paths:
   /healthz:
@@ -663,6 +667,220 @@ paths:
               schema:
                 $ref: "#/components/schemas/Club"
 
+  # ── Eggs ─────────────────────────────────────────────────────────────────
+  /eggs:
+    get:
+      operationId: listEggs
+      tags: [eggs]
+      summary: List player's eggs
+      parameters:
+        - name: playerId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: hatched
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Eggs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Egg"
+
+  /eggs/{id}:
+    get:
+      operationId: getEgg
+      tags: [eggs]
+      summary: Get egg by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Egg found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Egg"
+
+  /eggs/{id}/hatch:
+    post:
+      operationId: hatchEgg
+      tags: [eggs]
+      summary: Hatch a ready egg into a creature
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HatchEggInput"
+      responses:
+        "200":
+          description: Hatched creature
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HatchResult"
+
+  /eggs/incubate:
+    post:
+      operationId: addEgg
+      tags: [eggs]
+      summary: Add a new egg to incubation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddEggInput"
+      responses:
+        "201":
+          description: Egg added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Egg"
+
+  # ── Fitness ──────────────────────────────────────────────────────────────
+  /fitness/stats/{playerId}:
+    get:
+      operationId: getFitnessStats
+      tags: [fitness]
+      summary: Get player's fitness stats and today's summary
+      parameters:
+        - name: playerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Fitness stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FitnessStats"
+
+  /fitness/log:
+    post:
+      operationId: logActivity
+      tags: [fitness]
+      summary: Log a fitness activity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogActivityInput"
+      responses:
+        "201":
+          description: Activity logged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityLogResult"
+
+  /fitness/activities:
+    get:
+      operationId: listFitnessActivities
+      tags: [fitness]
+      summary: List recent fitness activities for a player
+      parameters:
+        - name: playerId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Activities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FitnessActivity"
+
+  /fitness/quests/{playerId}:
+    get:
+      operationId: getActiveQuests
+      tags: [fitness]
+      summary: Get active daily quests for a player
+      parameters:
+        - name: playerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Daily quests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FitnessQuest"
+
+  /fitness/quests/{id}/complete:
+    post:
+      operationId: completeQuest
+      tags: [fitness]
+      summary: Mark a quest as completed and claim reward
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Quest completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FitnessQuest"
+
+  /fitness/realms:
+    get:
+      operationId: listRealms
+      tags: [fitness]
+      summary: Get all fitness realms with progression info
+      parameters:
+        - name: playerId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Realms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FitnessRealm"
+
 components:
   schemas:
     HealthStatus:
@@ -675,21 +893,30 @@ components:
     # ── Player ──────────────────────────────────────────────────────────────
     Player:
       type: object
-      required: [id, username, level, xp, coins, rank, totalWins, totalMatches, createdAt]
+      required: [id, username, level, xp, coins, rank, totalWins, totalMatches, totalSteps, fitnessXp, currentStreak, fitnessRealm, createdAt]
       properties:
-        id:          { type: integer }
-        username:    { type: string }
-        displayName: { type: ["string", "null"] }
-        avatarUrl:   { type: ["string", "null"] }
-        level:       { type: integer }
-        xp:          { type: integer }
-        coins:       { type: integer }
-        rank:        { type: string }
-        rankScore:   { type: integer }
-        totalWins:   { type: integer }
-        totalMatches: { type: integer }
-        clubId:      { type: ["integer", "null"] }
-        createdAt:   { type: string }
+        id:             { type: integer }
+        username:       { type: string }
+        displayName:    { type: ["string", "null"] }
+        avatarUrl:      { type: ["string", "null"] }
+        level:          { type: integer }
+        xp:             { type: integer }
+        coins:          { type: integer }
+        rank:           { type: string }
+        rankScore:      { type: integer }
+        totalWins:      { type: integer }
+        totalMatches:   { type: integer }
+        clubId:         { type: ["integer", "null"] }
+        totalSteps:     { type: integer }
+        totalWorkouts:  { type: integer }
+        fitnessXp:      { type: integer }
+        currentStreak:  { type: integer }
+        longestStreak:  { type: integer }
+        fitnessRealm:   { type: string }
+        waterCups:      { type: integer }
+        dailyStepGoal:  { type: integer }
+        lastActiveDate: { type: ["string", "null"] }
+        createdAt:      { type: string }
 
     PlayerInput:
       type: object
@@ -702,12 +929,15 @@ components:
     PlayerUpdate:
       type: object
       properties:
-        displayName: { type: string }
-        avatarUrl:   { type: string }
+        displayName:   { type: string }
+        avatarUrl:     { type: string }
+        fitnessRealm:  { type: string }
+        dailyStepGoal: { type: integer }
+        waterCups:     { type: integer }
 
     PlayerDashboard:
       type: object
-      required: [player, hatchlingCount, totalWins, recentCompetitions, activeEvents, topHatchling]
+      required: [player, hatchlingCount, totalWins, recentCompetitions, activeEvents, topHatchling, activeEggs, fitnessStats]
       properties:
         player:               { $ref: "#/components/schemas/Player" }
         hatchlingCount:       { type: integer }
@@ -722,11 +952,16 @@ components:
           items:
             $ref: "#/components/schemas/LiveEvent"
         topHatchling:         { $ref: "#/components/schemas/Hatchling" }
+        activeEggs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Egg"
+        fitnessStats:         { $ref: "#/components/schemas/FitnessStats" }
 
     # ── Hatchling ────────────────────────────────────────────────────────────
     Hatchling:
       type: object
-      required: [id, playerId, name, species, evolutionStage, personality, mood, level, xp, happiness, hunger, energy, createdAt]
+      required: [id, playerId, name, species, evolutionStage, personality, mood, level, xp, happiness, hunger, energy, fitnessType, createdAt]
       properties:
         id:             { type: integer }
         playerId:       { type: integer }
@@ -749,15 +984,18 @@ components:
         isShiny:        { type: boolean }
         isFusion:       { type: boolean }
         color:          { type: ["string", "null"] }
+        fitnessType:    { type: string }
+        eggId:          { type: ["integer", "null"] }
         createdAt:      { type: string }
 
     HatchlingInput:
       type: object
       required: [playerId, name]
       properties:
-        playerId: { type: integer }
-        name:     { type: string, minLength: 1, maxLength: 30 }
-        species:  { type: string }
+        playerId:    { type: integer }
+        name:        { type: string, minLength: 1, maxLength: 30 }
+        species:     { type: string }
+        fitnessType: { type: string }
 
     HatchlingUpdate:
       type: object
@@ -790,6 +1028,7 @@ components:
         abilityDesc:   { type: ["string", "null"] }
         unlockedCount: { type: integer }
         color:         { type: ["string", "null"] }
+        fitnessType:   { type: ["string", "null"] }
 
     EvolutionCategory:
       type: object
@@ -833,116 +1072,240 @@ components:
       properties:
         score:    { type: integer }
         duration: { type: integer }
-        rank:     { type: integer }
+        playerId: { type: integer }
 
     GameMode:
       type: object
-      required: [id, name, description, type, maxPlayers, minLevel]
+      required: [id, name, description, minLevel]
       properties:
         id:          { type: integer }
         name:        { type: string }
         description: { type: string }
-        type:        { type: string }
-        maxPlayers:  { type: integer }
         minLevel:    { type: integer }
-        iconEmoji:   { type: ["string", "null"] }
-        color:       { type: ["string", "null"] }
+        maxPlayers:  { type: ["integer", "null"] }
+        xpMultiplier: { type: number }
         isLive:      { type: boolean }
 
     # ── Leaderboard ──────────────────────────────────────────────────────────
     LeaderboardEntry:
       type: object
-      required: [position, playerId, username, rank, score, wins, hatchlingName]
+      required: [rank, playerId, username, score, level]
       properties:
-        position:      { type: integer }
-        playerId:      { type: integer }
-        username:      { type: string }
-        displayName:   { type: ["string", "null"] }
-        avatarUrl:     { type: ["string", "null"] }
-        rank:          { type: string }
-        score:         { type: integer }
-        wins:          { type: integer }
-        hatchlingName: { type: string }
-        hatchlingCategory: { type: ["string", "null"] }
+        rank:        { type: integer }
+        playerId:    { type: integer }
+        username:    { type: string }
+        displayName: { type: ["string", "null"] }
+        score:       { type: integer }
+        level:       { type: integer }
+        wins:        { type: integer }
+        hatchlingCount: { type: integer }
+        topHatchlingName: { type: ["string", "null"] }
+        currentStreak: { type: integer }
 
     RankDistribution:
       type: object
-      required: [rank, count, percentage, color]
+      required: [rank, count, percentage]
       properties:
         rank:       { type: string }
         count:      { type: integer }
         percentage: { type: number }
-        color:      { type: string }
 
     # ── Item ─────────────────────────────────────────────────────────────────
     Item:
       type: object
-      required: [id, name, description, category, price, effectType, effectValue]
+      required: [id, name, description, type, cost, effect]
       properties:
         id:          { type: integer }
         name:        { type: string }
         description: { type: string }
-        category:    { type: string }
-        price:       { type: integer }
+        type:        { type: string }
+        cost:        { type: integer }
+        effect:      { type: string }
         imageUrl:    { type: ["string", "null"] }
-        effectType:  { type: string }
-        effectValue: { type: integer }
         rarity:      { type: string }
-        color:       { type: ["string", "null"] }
 
     UseItemInput:
       type: object
-      required: [hatchlingId, playerId]
+      required: [hatchlingId]
       properties:
         hatchlingId: { type: integer }
-        playerId:    { type: integer }
 
     # ── Live Event ────────────────────────────────────────────────────────────
     LiveEvent:
       type: object
-      required: [id, name, description, type, status, startsAt, endsAt, participants]
-      properties:
-        id:           { type: integer }
-        name:         { type: string }
-        description:  { type: string }
-        type:         { type: string }
-        status:       { type: string }
-        startsAt:     { type: string }
-        endsAt:       { type: string }
-        participants: { type: integer }
-        reward:       { type: ["string", "null"] }
-        imageUrl:     { type: ["string", "null"] }
-        color:        { type: ["string", "null"] }
-        isFeatured:   { type: boolean }
-
-    # ── Club ──────────────────────────────────────────────────────────────────
-    Club:
-      type: object
-      required: [id, name, description, memberCount, level, totalWins, createdAt]
+      required: [id, name, description, type, status, startTime, endTime]
       properties:
         id:          { type: integer }
         name:        { type: string }
         description: { type: string }
-        emblem:      { type: ["string", "null"] }
+        type:        { type: string }
+        status:      { type: string }
+        startTime:   { type: string }
+        endTime:     { type: string }
+        rewardXp:    { type: ["integer", "null"] }
+        rewardCoins: { type: ["integer", "null"] }
+        imageUrl:    { type: ["string", "null"] }
+        participantCount: { type: integer }
+
+    # ── Club ─────────────────────────────────────────────────────────────────
+    Club:
+      type: object
+      required: [id, name, description, memberCount, totalXp, rank, createdAt]
+      properties:
+        id:          { type: integer }
+        name:        { type: string }
+        description: { type: string }
+        badge:       { type: ["string", "null"] }
         memberCount: { type: integer }
         maxMembers:  { type: integer }
-        level:       { type: integer }
-        totalWins:   { type: integer }
+        totalXp:     { type: integer }
+        rank:        { type: string }
         isPublic:    { type: boolean }
-        color:       { type: ["string", "null"] }
         createdAt:   { type: string }
 
     ClubInput:
       type: object
-      required: [name, description]
+      required: [name]
       properties:
         name:        { type: string, minLength: 2, maxLength: 30 }
         description: { type: string }
         isPublic:    { type: boolean }
-        color:       { type: string }
 
     JoinClubInput:
       type: object
       required: [playerId]
       properties:
         playerId: { type: integer }
+
+    # ── Eggs ─────────────────────────────────────────────────────────────────
+    Egg:
+      type: object
+      required: [id, playerId, rarity, eggType, stepsRequired, stepsProgress, isHatched, name, createdAt]
+      properties:
+        id:            { type: integer }
+        playerId:      { type: integer }
+        rarity:        { type: string }
+        eggType:       { type: string }
+        stepsRequired: { type: integer }
+        stepsProgress: { type: integer }
+        isHatched:     { type: boolean }
+        hatchlingId:   { type: ["integer", "null"] }
+        imageUrl:      { type: ["string", "null"] }
+        name:          { type: string }
+        description:   { type: ["string", "null"] }
+        progressPct:   { type: number }
+        isReady:       { type: boolean }
+        createdAt:     { type: string }
+        hatchedAt:     { type: ["string", "null"] }
+
+    AddEggInput:
+      type: object
+      required: [playerId, eggType]
+      properties:
+        playerId: { type: integer }
+        eggType:  { type: string }
+        rarity:   { type: string }
+
+    HatchEggInput:
+      type: object
+      required: [playerId, name]
+      properties:
+        playerId: { type: integer }
+        name:     { type: string, minLength: 1, maxLength: 30 }
+
+    HatchResult:
+      type: object
+      required: [egg, hatchling]
+      properties:
+        egg:       { $ref: "#/components/schemas/Egg" }
+        hatchling: { $ref: "#/components/schemas/Hatchling" }
+
+    # ── Fitness ──────────────────────────────────────────────────────────────
+    FitnessStats:
+      type: object
+      required: [playerId, totalSteps, totalWorkouts, fitnessXp, currentStreak, longestStreak, fitnessRealm, waterCups, todaySteps, todayXp, dailyStepGoal]
+      properties:
+        playerId:       { type: integer }
+        totalSteps:     { type: integer }
+        totalWorkouts:  { type: integer }
+        fitnessXp:      { type: integer }
+        currentStreak:  { type: integer }
+        longestStreak:  { type: integer }
+        fitnessRealm:   { type: string }
+        waterCups:      { type: integer }
+        todaySteps:     { type: integer }
+        todayXp:        { type: integer }
+        dailyStepGoal:  { type: integer }
+        stepGoalPct:    { type: number }
+        recentActivities:
+          type: array
+          items:
+            $ref: "#/components/schemas/FitnessActivity"
+
+    FitnessActivity:
+      type: object
+      required: [id, playerId, type, value, unit, fitnessXpEarned, realm, createdAt]
+      properties:
+        id:              { type: integer }
+        playerId:        { type: integer }
+        type:            { type: string }
+        value:           { type: integer }
+        unit:            { type: string }
+        fitnessXpEarned: { type: integer }
+        realm:           { type: string }
+        note:            { type: ["string", "null"] }
+        createdAt:       { type: string }
+
+    LogActivityInput:
+      type: object
+      required: [playerId, type, value]
+      properties:
+        playerId: { type: integer }
+        type:     { type: string }
+        value:    { type: integer }
+        note:     { type: string }
+
+    ActivityLogResult:
+      type: object
+      required: [activity, fitnessXpEarned, eggsUpdated, player]
+      properties:
+        activity:       { $ref: "#/components/schemas/FitnessActivity" }
+        fitnessXpEarned: { type: integer }
+        eggsUpdated:    { type: integer }
+        player:         { $ref: "#/components/schemas/Player" }
+
+    FitnessQuest:
+      type: object
+      required: [id, playerId, title, description, type, targetValue, currentValue, xpReward, coinReward, isCompleted, realm, expiresAt, createdAt]
+      properties:
+        id:           { type: integer }
+        playerId:     { type: integer }
+        title:        { type: string }
+        description:  { type: string }
+        type:         { type: string }
+        targetValue:  { type: integer }
+        currentValue: { type: integer }
+        xpReward:     { type: integer }
+        coinReward:   { type: integer }
+        isCompleted:  { type: boolean }
+        realm:        { type: string }
+        expiresAt:    { type: string }
+        createdAt:    { type: string }
+        progressPct:  { type: number }
+
+    FitnessRealm:
+      type: object
+      required: [id, name, description, color, icon, fitnessTypes, evolutionBonus]
+      properties:
+        id:            { type: string }
+        name:          { type: string }
+        description:   { type: string }
+        color:         { type: string }
+        icon:          { type: string }
+        fitnessTypes:
+          type: array
+          items:
+            type: string
+        evolutionBonus: { type: string }
+        playerXp:      { type: ["integer", "null"] }
+        isUnlocked:    { type: boolean }

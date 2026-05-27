@@ -6,14 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface Item {
+export interface FitnessActivity {
   id: number;
-  name: string;
-  description: string;
+  playerId: number;
   type: string;
-  cost: number;
-  effect: string;
+  value: number;
+  unit: string;
+  fitnessXpEarned: number;
+  realm: string;
   /** @nullable */
-  imageUrl?: string | null;
-  rarity?: string;
+  note?: string | null;
+  createdAt: string;
 }

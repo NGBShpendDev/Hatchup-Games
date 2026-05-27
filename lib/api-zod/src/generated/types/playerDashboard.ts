@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Competition } from './competition';
+import type { Egg } from './egg';
+import type { FitnessStats } from './fitnessStats';
 import type { Hatchling } from './hatchling';
 import type { LiveEvent } from './liveEvent';
 import type { Player } from './player';
@@ -18,4 +20,6 @@ export interface PlayerDashboard {
   recentCompetitions: Competition[];
   activeEvents: LiveEvent[];
   topHatchling: Hatchling;
+  activeEggs: Egg[];
+  fitnessStats: FitnessStats;
 }

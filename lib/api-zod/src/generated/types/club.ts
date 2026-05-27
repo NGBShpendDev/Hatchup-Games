@@ -11,13 +11,11 @@ export interface Club {
   name: string;
   description: string;
   /** @nullable */
-  emblem?: string | null;
+  badge?: string | null;
   memberCount: number;
   maxMembers?: number;
-  level: number;
-  totalWins: number;
+  totalXp: number;
+  rank: string;
   isPublic?: boolean;
-  /** @nullable */
-  color?: string | null;
   createdAt: string;
 }

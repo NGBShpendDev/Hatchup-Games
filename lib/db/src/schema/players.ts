@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -15,6 +15,16 @@ export const playersTable = pgTable("players", {
   totalWins: integer("total_wins").notNull().default(0),
   totalMatches: integer("total_matches").notNull().default(0),
   clubId: integer("club_id"),
+  // Fitness fields
+  totalSteps: integer("total_steps").notNull().default(0),
+  totalWorkouts: integer("total_workouts").notNull().default(0),
+  fitnessXp: integer("fitness_xp").notNull().default(0),
+  currentStreak: integer("current_streak").notNull().default(0),
+  longestStreak: integer("longest_streak").notNull().default(0),
+  fitnessRealm: text("fitness_realm").notNull().default("strength"),
+  waterCups: integer("water_cups").notNull().default(0),
+  lastActiveDate: date("last_active_date"),
+  dailyStepGoal: integer("daily_step_goal").notNull().default(8000),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

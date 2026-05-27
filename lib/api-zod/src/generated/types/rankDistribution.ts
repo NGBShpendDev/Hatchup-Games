@@ -10,5 +10,4 @@ export interface RankDistribution {
   rank: string;
   count: number;
   percentage: number;
-  color: string;
 }

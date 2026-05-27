@@ -14,4 +14,5 @@ export interface HatchlingInput {
      */
   name: string;
   species?: string;
+  fitnessType?: string;
 }

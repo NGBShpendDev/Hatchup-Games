@@ -7,17 +7,16 @@
  */
 
 export interface LeaderboardEntry {
-  position: number;
+  rank: number;
   playerId: number;
   username: string;
   /** @nullable */
   displayName?: string | null;
-  /** @nullable */
-  avatarUrl?: string | null;
-  rank: string;
   score: number;
-  wins: number;
-  hatchlingName: string;
+  level: number;
+  wins?: number;
+  hatchlingCount?: number;
   /** @nullable */
-  hatchlingCategory?: string | null;
+  topHatchlingName?: string | null;
+  currentStreak?: number;
 }

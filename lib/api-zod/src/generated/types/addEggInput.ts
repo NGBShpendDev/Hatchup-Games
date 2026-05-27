@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface UseItemInput {
-  hatchlingId: number;
+export interface AddEggInput {
+  playerId: number;
+  eggType: string;
+  rarity?: string;
 }

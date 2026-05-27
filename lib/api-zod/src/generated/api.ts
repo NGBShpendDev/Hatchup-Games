@@ -51,6 +51,15 @@ export const GetPlayerResponse = zod.object({
   "totalWins": zod.number(),
   "totalMatches": zod.number(),
   "clubId": zod.number().nullish(),
+  "totalSteps": zod.number(),
+  "totalWorkouts": zod.number().optional(),
+  "fitnessXp": zod.number(),
+  "currentStreak": zod.number(),
+  "longestStreak": zod.number().optional(),
+  "fitnessRealm": zod.string(),
+  "waterCups": zod.number().optional(),
+  "dailyStepGoal": zod.number().optional(),
+  "lastActiveDate": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -64,7 +73,10 @@ export const UpdatePlayerParams = zod.object({
 
 export const UpdatePlayerBody = zod.object({
   "displayName": zod.string().optional(),
-  "avatarUrl": zod.string().optional()
+  "avatarUrl": zod.string().optional(),
+  "fitnessRealm": zod.string().optional(),
+  "dailyStepGoal": zod.number().optional(),
+  "waterCups": zod.number().optional()
 })
 
 export const UpdatePlayerResponse = zod.object({
@@ -80,6 +92,15 @@ export const UpdatePlayerResponse = zod.object({
   "totalWins": zod.number(),
   "totalMatches": zod.number(),
   "clubId": zod.number().nullish(),
+  "totalSteps": zod.number(),
+  "totalWorkouts": zod.number().optional(),
+  "fitnessXp": zod.number(),
+  "currentStreak": zod.number(),
+  "longestStreak": zod.number().optional(),
+  "fitnessRealm": zod.string(),
+  "waterCups": zod.number().optional(),
+  "dailyStepGoal": zod.number().optional(),
+  "lastActiveDate": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -105,6 +126,15 @@ export const GetPlayerDashboardResponse = zod.object({
   "totalWins": zod.number(),
   "totalMatches": zod.number(),
   "clubId": zod.number().nullish(),
+  "totalSteps": zod.number(),
+  "totalWorkouts": zod.number().optional(),
+  "fitnessXp": zod.number(),
+  "currentStreak": zod.number(),
+  "longestStreak": zod.number().optional(),
+  "fitnessRealm": zod.string(),
+  "waterCups": zod.number().optional(),
+  "dailyStepGoal": zod.number().optional(),
+  "lastActiveDate": zod.string().nullish(),
   "createdAt": zod.string()
 }),
   "hatchlingCount": zod.number(),
@@ -131,13 +161,12 @@ export const GetPlayerDashboardResponse = zod.object({
   "description": zod.string(),
   "type": zod.string(),
   "status": zod.string(),
-  "startsAt": zod.string(),
-  "endsAt": zod.string(),
-  "participants": zod.number(),
-  "reward": zod.string().nullish(),
+  "startTime": zod.string(),
+  "endTime": zod.string(),
+  "rewardXp": zod.number().nullish(),
+  "rewardCoins": zod.number().nullish(),
   "imageUrl": zod.string().nullish(),
-  "color": zod.string().nullish(),
-  "isFeatured": zod.boolean().optional()
+  "participantCount": zod.number().optional()
 })),
   "topHatchling": zod.object({
   "id": zod.number(),
@@ -161,7 +190,51 @@ export const GetPlayerDashboardResponse = zod.object({
   "isShiny": zod.boolean().optional(),
   "isFusion": zod.boolean().optional(),
   "color": zod.string().nullish(),
+  "fitnessType": zod.string(),
+  "eggId": zod.number().nullish(),
   "createdAt": zod.string()
+}),
+  "activeEggs": zod.array(zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "rarity": zod.string(),
+  "eggType": zod.string(),
+  "stepsRequired": zod.number(),
+  "stepsProgress": zod.number(),
+  "isHatched": zod.boolean(),
+  "hatchlingId": zod.number().nullish(),
+  "imageUrl": zod.string().nullish(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "progressPct": zod.number().optional(),
+  "isReady": zod.boolean().optional(),
+  "createdAt": zod.string(),
+  "hatchedAt": zod.string().nullish()
+})),
+  "fitnessStats": zod.object({
+  "playerId": zod.number(),
+  "totalSteps": zod.number(),
+  "totalWorkouts": zod.number(),
+  "fitnessXp": zod.number(),
+  "currentStreak": zod.number(),
+  "longestStreak": zod.number(),
+  "fitnessRealm": zod.string(),
+  "waterCups": zod.number(),
+  "todaySteps": zod.number(),
+  "todayXp": zod.number(),
+  "dailyStepGoal": zod.number(),
+  "stepGoalPct": zod.number().optional(),
+  "recentActivities": zod.array(zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "type": zod.string(),
+  "value": zod.number(),
+  "unit": zod.string(),
+  "fitnessXpEarned": zod.number(),
+  "realm": zod.string(),
+  "note": zod.string().nullish(),
+  "createdAt": zod.string()
+})).optional()
 })
 })
 
@@ -198,6 +271,8 @@ export const ListHatchlingsResponseItem = zod.object({
   "isShiny": zod.boolean().optional(),
   "isFusion": zod.boolean().optional(),
   "color": zod.string().nullish(),
+  "fitnessType": zod.string(),
+  "eggId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 export const ListHatchlingsResponse = zod.array(ListHatchlingsResponseItem)
@@ -213,7 +288,8 @@ export const createHatchlingBodyNameMax = 30;
 export const CreateHatchlingBody = zod.object({
   "playerId": zod.number(),
   "name": zod.string().min(1).max(createHatchlingBodyNameMax),
-  "species": zod.string().optional()
+  "species": zod.string().optional(),
+  "fitnessType": zod.string().optional()
 })
 
 
@@ -246,6 +322,8 @@ export const GetHatchlingResponse = zod.object({
   "isShiny": zod.boolean().optional(),
   "isFusion": zod.boolean().optional(),
   "color": zod.string().nullish(),
+  "fitnessType": zod.string(),
+  "eggId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 
@@ -287,6 +365,8 @@ export const UpdateHatchlingResponse = zod.object({
   "isShiny": zod.boolean().optional(),
   "isFusion": zod.boolean().optional(),
   "color": zod.string().nullish(),
+  "fitnessType": zod.string(),
+  "eggId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 
@@ -332,6 +412,8 @@ export const EvolveHatchlingResponse = zod.object({
   "isShiny": zod.boolean().optional(),
   "isFusion": zod.boolean().optional(),
   "color": zod.string().nullish(),
+  "fitnessType": zod.string(),
+  "eggId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 
@@ -361,6 +443,8 @@ export const GetHatchlingShowcaseResponseItem = zod.object({
   "isShiny": zod.boolean().optional(),
   "isFusion": zod.boolean().optional(),
   "color": zod.string().nullish(),
+  "fitnessType": zod.string(),
+  "eggId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 export const GetHatchlingShowcaseResponse = zod.array(GetHatchlingShowcaseResponseItem)
@@ -385,7 +469,8 @@ export const ListEvolutionsResponseItem = zod.object({
   "abilityName": zod.string().nullish(),
   "abilityDesc": zod.string().nullish(),
   "unlockedCount": zod.number(),
-  "color": zod.string().nullish()
+  "color": zod.string().nullish(),
+  "fitnessType": zod.string().nullish()
 })
 export const ListEvolutionsResponse = zod.array(ListEvolutionsResponseItem)
 
@@ -408,7 +493,8 @@ export const GetEvolutionResponse = zod.object({
   "abilityName": zod.string().nullish(),
   "abilityDesc": zod.string().nullish(),
   "unlockedCount": zod.number(),
-  "color": zod.string().nullish()
+  "color": zod.string().nullish(),
+  "fitnessType": zod.string().nullish()
 })
 
 
@@ -497,7 +583,7 @@ export const SubmitCompetitionResultParams = zod.object({
 export const SubmitCompetitionResultBody = zod.object({
   "score": zod.number(),
   "duration": zod.number(),
-  "rank": zod.number().optional()
+  "playerId": zod.number().optional()
 })
 
 export const SubmitCompetitionResultResponse = zod.object({
@@ -524,11 +610,9 @@ export const ListGameModesResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string(),
-  "type": zod.string(),
-  "maxPlayers": zod.number(),
   "minLevel": zod.number(),
-  "iconEmoji": zod.string().nullish(),
-  "color": zod.string().nullish(),
+  "maxPlayers": zod.number().nullish(),
+  "xpMultiplier": zod.number().optional(),
   "isLive": zod.boolean().optional()
 })
 export const ListGameModesResponse = zod.array(ListGameModesResponseItem)
@@ -544,16 +628,16 @@ export const GetGlobalLeaderboardQueryParams = zod.object({
 })
 
 export const GetGlobalLeaderboardResponseItem = zod.object({
-  "position": zod.number(),
+  "rank": zod.number(),
   "playerId": zod.number(),
   "username": zod.string(),
   "displayName": zod.string().nullish(),
-  "avatarUrl": zod.string().nullish(),
-  "rank": zod.string(),
   "score": zod.number(),
-  "wins": zod.number(),
-  "hatchlingName": zod.string(),
-  "hatchlingCategory": zod.string().nullish()
+  "level": zod.number(),
+  "wins": zod.number().optional(),
+  "hatchlingCount": zod.number().optional(),
+  "topHatchlingName": zod.string().nullish(),
+  "currentStreak": zod.number().optional()
 })
 export const GetGlobalLeaderboardResponse = zod.array(GetGlobalLeaderboardResponseItem)
 
@@ -569,16 +653,16 @@ export const GetModeLeaderboardQueryParams = zod.object({
 })
 
 export const GetModeLeaderboardResponseItem = zod.object({
-  "position": zod.number(),
+  "rank": zod.number(),
   "playerId": zod.number(),
   "username": zod.string(),
   "displayName": zod.string().nullish(),
-  "avatarUrl": zod.string().nullish(),
-  "rank": zod.string(),
   "score": zod.number(),
-  "wins": zod.number(),
-  "hatchlingName": zod.string(),
-  "hatchlingCategory": zod.string().nullish()
+  "level": zod.number(),
+  "wins": zod.number().optional(),
+  "hatchlingCount": zod.number().optional(),
+  "topHatchlingName": zod.string().nullish(),
+  "currentStreak": zod.number().optional()
 })
 export const GetModeLeaderboardResponse = zod.array(GetModeLeaderboardResponseItem)
 
@@ -589,8 +673,7 @@ export const GetModeLeaderboardResponse = zod.array(GetModeLeaderboardResponseIt
 export const GetRankDistributionResponseItem = zod.object({
   "rank": zod.string(),
   "count": zod.number(),
-  "percentage": zod.number(),
-  "color": zod.string()
+  "percentage": zod.number()
 })
 export const GetRankDistributionResponse = zod.array(GetRankDistributionResponseItem)
 
@@ -606,13 +689,11 @@ export const ListItemsResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string(),
-  "category": zod.string(),
-  "price": zod.number(),
+  "type": zod.string(),
+  "cost": zod.number(),
+  "effect": zod.string(),
   "imageUrl": zod.string().nullish(),
-  "effectType": zod.string(),
-  "effectValue": zod.number(),
-  "rarity": zod.string().optional(),
-  "color": zod.string().nullish()
+  "rarity": zod.string().optional()
 })
 export const ListItemsResponse = zod.array(ListItemsResponseItem)
 
@@ -625,8 +706,7 @@ export const UseItemParams = zod.object({
 })
 
 export const UseItemBody = zod.object({
-  "hatchlingId": zod.number(),
-  "playerId": zod.number()
+  "hatchlingId": zod.number()
 })
 
 export const UseItemResponse = zod.object({
@@ -651,6 +731,8 @@ export const UseItemResponse = zod.object({
   "isShiny": zod.boolean().optional(),
   "isFusion": zod.boolean().optional(),
   "color": zod.string().nullish(),
+  "fitnessType": zod.string(),
+  "eggId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 
@@ -668,13 +750,12 @@ export const ListEventsResponseItem = zod.object({
   "description": zod.string(),
   "type": zod.string(),
   "status": zod.string(),
-  "startsAt": zod.string(),
-  "endsAt": zod.string(),
-  "participants": zod.number(),
-  "reward": zod.string().nullish(),
+  "startTime": zod.string(),
+  "endTime": zod.string(),
+  "rewardXp": zod.number().nullish(),
+  "rewardCoins": zod.number().nullish(),
   "imageUrl": zod.string().nullish(),
-  "color": zod.string().nullish(),
-  "isFeatured": zod.boolean().optional()
+  "participantCount": zod.number().optional()
 })
 export const ListEventsResponse = zod.array(ListEventsResponseItem)
 
@@ -692,13 +773,12 @@ export const GetLiveEventResponse = zod.object({
   "description": zod.string(),
   "type": zod.string(),
   "status": zod.string(),
-  "startsAt": zod.string(),
-  "endsAt": zod.string(),
-  "participants": zod.number(),
-  "reward": zod.string().nullish(),
+  "startTime": zod.string(),
+  "endTime": zod.string(),
+  "rewardXp": zod.number().nullish(),
+  "rewardCoins": zod.number().nullish(),
   "imageUrl": zod.string().nullish(),
-  "color": zod.string().nullish(),
-  "isFeatured": zod.boolean().optional()
+  "participantCount": zod.number().optional()
 })
 
 
@@ -715,13 +795,12 @@ export const ListClubsResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string(),
-  "emblem": zod.string().nullish(),
+  "badge": zod.string().nullish(),
   "memberCount": zod.number(),
   "maxMembers": zod.number().optional(),
-  "level": zod.number(),
-  "totalWins": zod.number(),
+  "totalXp": zod.number(),
+  "rank": zod.string(),
   "isPublic": zod.boolean().optional(),
-  "color": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const ListClubsResponse = zod.array(ListClubsResponseItem)
@@ -737,9 +816,8 @@ export const createClubBodyNameMax = 30;
 
 export const CreateClubBody = zod.object({
   "name": zod.string().min(createClubBodyNameMin).max(createClubBodyNameMax),
-  "description": zod.string(),
-  "isPublic": zod.boolean().optional(),
-  "color": zod.string().optional()
+  "description": zod.string().optional(),
+  "isPublic": zod.boolean().optional()
 })
 
 
@@ -754,13 +832,12 @@ export const GetClubResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string(),
-  "emblem": zod.string().nullish(),
+  "badge": zod.string().nullish(),
   "memberCount": zod.number(),
   "maxMembers": zod.number().optional(),
-  "level": zod.number(),
-  "totalWins": zod.number(),
+  "totalXp": zod.number(),
+  "rank": zod.string(),
   "isPublic": zod.boolean().optional(),
-  "color": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -780,14 +857,281 @@ export const JoinClubResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string(),
-  "emblem": zod.string().nullish(),
+  "badge": zod.string().nullish(),
   "memberCount": zod.number(),
   "maxMembers": zod.number().optional(),
-  "level": zod.number(),
-  "totalWins": zod.number(),
+  "totalXp": zod.number(),
+  "rank": zod.string(),
   "isPublic": zod.boolean().optional(),
-  "color": zod.string().nullish(),
   "createdAt": zod.string()
 })
+
+
+/**
+ * @summary List player's eggs
+ */
+export const ListEggsQueryParams = zod.object({
+  "playerId": zod.coerce.number(),
+  "hatched": zod.coerce.boolean().optional()
+})
+
+export const ListEggsResponseItem = zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "rarity": zod.string(),
+  "eggType": zod.string(),
+  "stepsRequired": zod.number(),
+  "stepsProgress": zod.number(),
+  "isHatched": zod.boolean(),
+  "hatchlingId": zod.number().nullish(),
+  "imageUrl": zod.string().nullish(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "progressPct": zod.number().optional(),
+  "isReady": zod.boolean().optional(),
+  "createdAt": zod.string(),
+  "hatchedAt": zod.string().nullish()
+})
+export const ListEggsResponse = zod.array(ListEggsResponseItem)
+
+
+/**
+ * @summary Get egg by ID
+ */
+export const GetEggParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetEggResponse = zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "rarity": zod.string(),
+  "eggType": zod.string(),
+  "stepsRequired": zod.number(),
+  "stepsProgress": zod.number(),
+  "isHatched": zod.boolean(),
+  "hatchlingId": zod.number().nullish(),
+  "imageUrl": zod.string().nullish(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "progressPct": zod.number().optional(),
+  "isReady": zod.boolean().optional(),
+  "createdAt": zod.string(),
+  "hatchedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Hatch a ready egg into a creature
+ */
+export const HatchEggParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const hatchEggBodyNameMax = 30;
+
+
+
+export const HatchEggBody = zod.object({
+  "playerId": zod.number(),
+  "name": zod.string().min(1).max(hatchEggBodyNameMax)
+})
+
+export const HatchEggResponse = zod.object({
+  "egg": zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "rarity": zod.string(),
+  "eggType": zod.string(),
+  "stepsRequired": zod.number(),
+  "stepsProgress": zod.number(),
+  "isHatched": zod.boolean(),
+  "hatchlingId": zod.number().nullish(),
+  "imageUrl": zod.string().nullish(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "progressPct": zod.number().optional(),
+  "isReady": zod.boolean().optional(),
+  "createdAt": zod.string(),
+  "hatchedAt": zod.string().nullish()
+}),
+  "hatchling": zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "name": zod.string(),
+  "species": zod.string(),
+  "evolutionStage": zod.number(),
+  "evolutionType": zod.string().nullish(),
+  "category": zod.string().optional(),
+  "rarity": zod.string().optional(),
+  "personality": zod.string(),
+  "mood": zod.string(),
+  "level": zod.number(),
+  "xp": zod.number(),
+  "happiness": zod.number(),
+  "hunger": zod.number(),
+  "energy": zod.number(),
+  "abilityName": zod.string().nullish(),
+  "abilityDesc": zod.string().nullish(),
+  "imageUrl": zod.string().nullish(),
+  "isShiny": zod.boolean().optional(),
+  "isFusion": zod.boolean().optional(),
+  "color": zod.string().nullish(),
+  "fitnessType": zod.string(),
+  "eggId": zod.number().nullish(),
+  "createdAt": zod.string()
+})
+})
+
+
+/**
+ * @summary Add a new egg to incubation
+ */
+export const AddEggBody = zod.object({
+  "playerId": zod.number(),
+  "eggType": zod.string(),
+  "rarity": zod.string().optional()
+})
+
+
+/**
+ * @summary Get player's fitness stats and today's summary
+ */
+export const GetFitnessStatsParams = zod.object({
+  "playerId": zod.coerce.number()
+})
+
+export const GetFitnessStatsResponse = zod.object({
+  "playerId": zod.number(),
+  "totalSteps": zod.number(),
+  "totalWorkouts": zod.number(),
+  "fitnessXp": zod.number(),
+  "currentStreak": zod.number(),
+  "longestStreak": zod.number(),
+  "fitnessRealm": zod.string(),
+  "waterCups": zod.number(),
+  "todaySteps": zod.number(),
+  "todayXp": zod.number(),
+  "dailyStepGoal": zod.number(),
+  "stepGoalPct": zod.number().optional(),
+  "recentActivities": zod.array(zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "type": zod.string(),
+  "value": zod.number(),
+  "unit": zod.string(),
+  "fitnessXpEarned": zod.number(),
+  "realm": zod.string(),
+  "note": zod.string().nullish(),
+  "createdAt": zod.string()
+})).optional()
+})
+
+
+/**
+ * @summary Log a fitness activity
+ */
+export const LogActivityBody = zod.object({
+  "playerId": zod.number(),
+  "type": zod.string(),
+  "value": zod.number(),
+  "note": zod.string().optional()
+})
+
+
+/**
+ * @summary List recent fitness activities for a player
+ */
+export const listFitnessActivitiesQueryLimitDefault = 20;
+
+export const ListFitnessActivitiesQueryParams = zod.object({
+  "playerId": zod.coerce.number(),
+  "limit": zod.coerce.number().default(listFitnessActivitiesQueryLimitDefault)
+})
+
+export const ListFitnessActivitiesResponseItem = zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "type": zod.string(),
+  "value": zod.number(),
+  "unit": zod.string(),
+  "fitnessXpEarned": zod.number(),
+  "realm": zod.string(),
+  "note": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const ListFitnessActivitiesResponse = zod.array(ListFitnessActivitiesResponseItem)
+
+
+/**
+ * @summary Get active daily quests for a player
+ */
+export const GetActiveQuestsParams = zod.object({
+  "playerId": zod.coerce.number()
+})
+
+export const GetActiveQuestsResponseItem = zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "type": zod.string(),
+  "targetValue": zod.number(),
+  "currentValue": zod.number(),
+  "xpReward": zod.number(),
+  "coinReward": zod.number(),
+  "isCompleted": zod.boolean(),
+  "realm": zod.string(),
+  "expiresAt": zod.string(),
+  "createdAt": zod.string(),
+  "progressPct": zod.number().optional()
+})
+export const GetActiveQuestsResponse = zod.array(GetActiveQuestsResponseItem)
+
+
+/**
+ * @summary Mark a quest as completed and claim reward
+ */
+export const CompleteQuestParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CompleteQuestResponse = zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "type": zod.string(),
+  "targetValue": zod.number(),
+  "currentValue": zod.number(),
+  "xpReward": zod.number(),
+  "coinReward": zod.number(),
+  "isCompleted": zod.boolean(),
+  "realm": zod.string(),
+  "expiresAt": zod.string(),
+  "createdAt": zod.string(),
+  "progressPct": zod.number().optional()
+})
+
+
+/**
+ * @summary Get all fitness realms with progression info
+ */
+export const ListRealmsQueryParams = zod.object({
+  "playerId": zod.coerce.number().optional()
+})
+
+export const ListRealmsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "color": zod.string(),
+  "icon": zod.string(),
+  "fitnessTypes": zod.array(zod.string()),
+  "evolutionBonus": zod.string(),
+  "playerXp": zod.number().nullish(),
+  "isUnlocked": zod.boolean().optional()
+})
+export const ListRealmsResponse = zod.array(ListRealmsResponseItem)
 
 

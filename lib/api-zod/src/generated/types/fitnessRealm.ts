@@ -6,14 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface Item {
-  id: number;
+export interface FitnessRealm {
+  id: string;
   name: string;
   description: string;
-  type: string;
-  cost: number;
-  effect: string;
+  color: string;
+  icon: string;
+  fitnessTypes: string[];
+  evolutionBonus: string;
   /** @nullable */
-  imageUrl?: string | null;
-  rarity?: string;
+  playerXp?: number | null;
+  isUnlocked?: boolean;
 }

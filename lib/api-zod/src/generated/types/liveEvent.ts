@@ -12,14 +12,13 @@ export interface LiveEvent {
   description: string;
   type: string;
   status: string;
-  startsAt: string;
-  endsAt: string;
-  participants: number;
+  startTime: string;
+  endTime: string;
   /** @nullable */
-  reward?: string | null;
+  rewardXp?: number | null;
+  /** @nullable */
+  rewardCoins?: number | null;
   /** @nullable */
   imageUrl?: string | null;
-  /** @nullable */
-  color?: string | null;
-  isFeatured?: boolean;
+  participantCount?: number;
 }

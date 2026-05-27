@@ -12,7 +12,6 @@ export interface ClubInput {
      * @maxLength 30
      */
   name: string;
-  description: string;
+  description?: string;
   isPublic?: boolean;
-  color?: string;
 }

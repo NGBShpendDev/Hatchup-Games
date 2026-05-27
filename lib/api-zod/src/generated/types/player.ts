@@ -22,5 +22,15 @@ export interface Player {
   totalMatches: number;
   /** @nullable */
   clubId?: number | null;
+  totalSteps: number;
+  totalWorkouts?: number;
+  fitnessXp: number;
+  currentStreak: number;
+  longestStreak?: number;
+  fitnessRealm: string;
+  waterCups?: number;
+  dailyStepGoal?: number;
+  /** @nullable */
+  lastActiveDate?: string | null;
   createdAt: string;
 }

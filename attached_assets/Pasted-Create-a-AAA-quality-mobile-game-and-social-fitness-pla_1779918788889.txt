@@ -1,0 +1,416 @@
+Create a AAA-quality mobile game and social fitness platform called “HatchUp Fitness.”
+
+SLOGAN:
+“Every Step Evolves You.”
+
+MISSION:
+HatchUp Fitness transforms real-life movement, workouts, wellness, and self-improvement into an addictive fantasy RPG adventure where users hatch, evolve, collect, and battle creatures through real-world fitness progression.
+
+The app should feel like:
+- Pokémon GO meets fitness
+- Duolingo habit addiction
+- Clash Royale polish
+- Tamagotchi emotional attachment
+- MMORPG progression systems
+- TikTok-style social virality
+
+CORE PHILOSOPHY:
+This should NOT feel like a fitness app.
+This should feel like an addictive creature evolution game that secretly improves users’ health, confidence, discipline, consistency, and lifestyle.
+
+CORE GAME LOOP:
+1. Move in real life
+2. Gain XP and energy
+3. Hatch eggs
+4. Evolve creatures
+5. Unlock powers, cosmetics, and worlds
+6. Compete and socialize
+7. Share progress
+8. Continue progressing forever
+
+NO LEVEL CAP:
+There should be NO maximum level limit.
+
+Users can level forever through:
+- workouts
+- exploration
+- streaks
+- battles
+- raids
+- social activity
+- challenges
+- seasonal events
+
+Include:
+- prestige systems
+- mastery ranks
+- legacy titles
+- infinite progression
+- evolving rarity systems
+- world rankings
+- seasonal rankings
+
+Players should always feel:
+“There’s still something bigger to unlock.”
+
+FITNESS TRACKING:
+Integrate:
+- Apple Health
+- Fitbit
+- Garmin
+- Samsung Health
+- Smart watches
+- GPS tracking
+- AI movement detection
+- Motion tracking
+- Camera exercise verification
+
+Track:
+- Walking
+- Running
+- Weight lifting
+- HIIT
+- Cycling
+- Sleep
+- Hydration
+- Stretching
+- Meditation
+- Recovery
+- Workout consistency
+
+REALMS / TRAINING PATHS:
+
+1. Strength Realm
+Focused on:
+- weightlifting
+- resistance training
+- gym workouts
+
+Unlocks:
+- giant beasts
+- armored titans
+- tank creatures
+- lava monsters
+
+2. Cardio Realm
+Focused on:
+- running
+- walking
+- endurance
+- cycling
+
+Unlocks:
+- lightning creatures
+- speed evolutions
+- flying dragons
+- agility beasts
+
+3. Balance Realm
+Focused on:
+- sleep
+- meditation
+- stretching
+- hydration
+- recovery
+
+Unlocks:
+- aura creatures
+- healers
+- psychic evolutions
+- celestial spirits
+
+4. Beast Realm
+Focused on:
+- extreme fitness
+- burpees
+- athletic training
+- combat fitness
+- HIIT
+
+Unlocks:
+- rage evolutions
+- combat monsters
+- dark beasts
+- legendary mutations
+
+5. Mythic Realm
+A hidden late-game realm with:
+- legendary creatures
+- world bosses
+- ultra rare evolutions
+- secret unlocks
+
+CREATURE SYSTEM:
+Players hatch creatures from eggs.
+
+Every creature has:
+- genetics
+- rarity
+- personality
+- hidden traits
+- evolution trees
+- elemental types
+- RPG stats
+
+Creature stats include:
+- Strength
+- Speed
+- Endurance
+- Recovery
+- Discipline
+- Aura
+
+No two creatures should evolve exactly the same.
+
+EVOLUTION SYSTEM:
+Evolution depends on:
+- fitness style
+- workout consistency
+- streaks
+- sleep quality
+- hydration
+- activity type
+- random genetics
+- social participation
+- live events
+- hidden conditions
+
+Include:
+- secret evolutions
+- shiny variants
+- prestige evolutions
+- fusion evolutions
+- legendary forms
+- mutations
+- event-exclusive creatures
+
+The evolution system should feel emotional, exciting, and rewarding.
+
+OPEN WORLD EXPLORATION:
+Use GPS and AR technology.
+
+Players should:
+- explore the real world
+- discover eggs
+- find creatures
+- battle outdoor bosses
+- capture territories
+- unlock hidden locations
+
+Location-based spawning:
+- parks = nature creatures
+- gyms = titan creatures
+- cities = cyber creatures
+- beaches = water creatures
+- trails = beast creatures
+
+AR FEATURES:
+Include augmented reality systems where users can:
+- see creatures in the real world
+- take photos/videos
+- share clips online
+- battle AR raid bosses
+- hatch eggs while walking
+
+SOCIAL FEATURES:
+Create a highly addictive social ecosystem.
+
+Users can:
+- add friends
+- follow players
+- inspect creatures
+- compare stats
+- trade eggs
+- trade cosmetics
+- build teams
+- join clans
+- join raids
+- battle other players
+
+FRIEND DASHBOARD:
+Create a live friend dashboard showing:
+- recent evolutions
+- new hatches
+- rare unlocks
+- streaks
+- rankings
+- workout milestones
+- raid participation
+
+Users should receive live notifications like:
+- “Ken evolved Stormfang into Sky Titan!”
+- “Sarah unlocked a Mythic Beast!”
+- “Mike reached a 30-day streak!”
+
+Allow reactions, comments, and likes.
+
+COLLECTION SYSTEM:
+Every player profile should include:
+- creature gallery
+- rarity showcase
+- legendary collections
+- achievement badges
+- streak records
+- favorite creatures
+- realm rankings
+
+Support:
+- hidden creatures
+- region exclusives
+- event-only evolutions
+- ultra rare mutations
+- prestige-only forms
+
+MINI GAMES:
+Include fun mini-games such as:
+- flying races
+- obstacle runs
+- dodge challenges
+- reaction games
+- rhythm boxing
+- team raids
+- world bosses
+
+SOCIAL SHARING REWARDS:
+Users earn bonus XP and rewards for sharing progress daily.
+
+Reward:
+- workout shares
+- evolution reveals
+- transformation videos
+- raid victories
+- milestone achievements
+- rare discoveries
+
+Allow one-tap sharing to:
+- TikTok
+- Instagram
+- Snapchat
+- YouTube Shorts
+- X/Twitter
+
+Daily sharing rewards include:
+- XP
+- coins
+- evolution shards
+- hatch boosts
+- cosmetics
+- rare item drops
+
+BODY TRANSFORMATION SYSTEM:
+The user’s real fitness progress affects creature appearance.
+
+Examples:
+- weight loss creates leaner evolutions
+- muscle gain creates armored forms
+- endurance unlocks wings
+- consistency unlocks aura effects
+
+Create emotional attachment between:
+- player growth
+- creature growth
+
+AI FITNESS COACH:
+Include a smart AI companion that:
+- motivates users
+- recommends workouts
+- adapts goals
+- tracks fatigue
+- prevents overtraining
+- encourages healthy habits
+- adjusts for beginners and athletes
+
+The AI should feel like:
+- coach
+- companion
+- motivator
+- teammate
+
+LIVE EVENTS:
+Create constant live-service events:
+- seasonal evolutions
+- global step challenges
+- world raids
+- weather events
+- full moon transformations
+- limited eggs
+- community goals
+
+WEATHER SYSTEM:
+Real-world weather affects gameplay.
+
+Examples:
+- rain boosts water creatures
+- heat boosts fire creatures
+- snow unlocks ice evolutions
+- storms increase electric spawns
+
+VISUAL STYLE:
+The art style should feel:
+- premium
+- colorful
+- anime-inspired
+- smooth
+- emotional
+- modern
+- highly recognizable
+
+Blend:
+- Nintendo polish
+- fantasy RPG visuals
+- Supercell simplicity
+- modern mobile UI
+
+Animations must feel:
+- satisfying
+- cinematic
+- rewarding
+- exciting
+
+MONETIZATION:
+NO pay-to-win mechanics.
+
+Revenue comes from:
+- cosmetics
+- battle passes
+- skins
+- creature accessories
+- profile customization
+- emotes
+- premium animations
+- seasonal content
+- AI coaching upgrades
+
+TECH STACK:
+Build using:
+- React Native or Flutter
+- Firebase backend
+- Node.js
+- scalable cloud architecture
+- real-time multiplayer systems
+- GPS integration
+- AR support
+- cloud saves
+- anti-cheat systems
+- AI movement verification
+
+GOAL:
+Create the definitive fitness RPG game and social platform.
+
+The app should:
+- make users healthier
+- make fitness fun
+- create emotional attachment
+- build community
+- encourage consistency
+- feel rewarding forever
+
+The experience should become:
+- a game
+- a social network
+- a fitness movement
+- a lifestyle brand
+- a long-term live-service universe
+
+Most importantly:
+Users should wake up excited to move in real life because every step evolves them inside the game.

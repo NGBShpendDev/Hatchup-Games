@@ -23,4 +23,6 @@ export interface EvolutionType {
   unlockedCount: number;
   /** @nullable */
   color?: string | null;
+  /** @nullable */
+  fitnessType?: string | null;
 }

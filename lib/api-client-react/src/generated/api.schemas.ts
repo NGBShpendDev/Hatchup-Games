@@ -25,6 +25,16 @@ export interface Player {
   totalMatches: number;
   /** @nullable */
   clubId?: number | null;
+  totalSteps: number;
+  totalWorkouts?: number;
+  fitnessXp: number;
+  currentStreak: number;
+  longestStreak?: number;
+  fitnessRealm: string;
+  waterCups?: number;
+  dailyStepGoal?: number;
+  /** @nullable */
+  lastActiveDate?: string | null;
   createdAt: string;
 }
 
@@ -41,6 +51,9 @@ export interface PlayerInput {
 export interface PlayerUpdate {
   displayName?: string;
   avatarUrl?: string;
+  fitnessRealm?: string;
+  dailyStepGoal?: number;
+  waterCups?: number;
 }
 
 export interface Competition {
@@ -71,16 +84,15 @@ export interface LiveEvent {
   description: string;
   type: string;
   status: string;
-  startsAt: string;
-  endsAt: string;
-  participants: number;
+  startTime: string;
+  endTime: string;
   /** @nullable */
-  reward?: string | null;
+  rewardXp?: number | null;
+  /** @nullable */
+  rewardCoins?: number | null;
   /** @nullable */
   imageUrl?: string | null;
-  /** @nullable */
-  color?: string | null;
-  isFeatured?: boolean;
+  participantCount?: number;
 }
 
 export interface Hatchling {
@@ -110,7 +122,61 @@ export interface Hatchling {
   isFusion?: boolean;
   /** @nullable */
   color?: string | null;
+  fitnessType: string;
+  /** @nullable */
+  eggId?: number | null;
   createdAt: string;
+}
+
+export interface Egg {
+  id: number;
+  playerId: number;
+  rarity: string;
+  eggType: string;
+  stepsRequired: number;
+  stepsProgress: number;
+  isHatched: boolean;
+  /** @nullable */
+  hatchlingId?: number | null;
+  /** @nullable */
+  imageUrl?: string | null;
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  progressPct?: number;
+  isReady?: boolean;
+  createdAt: string;
+  /** @nullable */
+  hatchedAt?: string | null;
+}
+
+export interface FitnessActivity {
+  id: number;
+  playerId: number;
+  type: string;
+  value: number;
+  unit: string;
+  fitnessXpEarned: number;
+  realm: string;
+  /** @nullable */
+  note?: string | null;
+  createdAt: string;
+}
+
+export interface FitnessStats {
+  playerId: number;
+  totalSteps: number;
+  totalWorkouts: number;
+  fitnessXp: number;
+  currentStreak: number;
+  longestStreak: number;
+  fitnessRealm: string;
+  waterCups: number;
+  todaySteps: number;
+  todayXp: number;
+  dailyStepGoal: number;
+  stepGoalPct?: number;
+  recentActivities?: FitnessActivity[];
 }
 
 export interface PlayerDashboard {
@@ -121,6 +187,8 @@ export interface PlayerDashboard {
   recentCompetitions: Competition[];
   activeEvents: LiveEvent[];
   topHatchling: Hatchling;
+  activeEggs: Egg[];
+  fitnessStats: FitnessStats;
 }
 
 export interface HatchlingInput {
@@ -131,6 +199,7 @@ export interface HatchlingInput {
      */
   name: string;
   species?: string;
+  fitnessType?: string;
 }
 
 export interface HatchlingUpdate {
@@ -162,6 +231,8 @@ export interface EvolutionType {
   unlockedCount: number;
   /** @nullable */
   color?: string | null;
+  /** @nullable */
+  fitnessType?: string | null;
 }
 
 export interface EvolutionCategory {
@@ -181,64 +252,55 @@ export interface CompetitionInput {
 export interface CompetitionResultInput {
   score: number;
   duration: number;
-  rank?: number;
+  playerId?: number;
 }
 
 export interface GameMode {
   id: number;
   name: string;
   description: string;
-  type: string;
-  maxPlayers: number;
   minLevel: number;
   /** @nullable */
-  iconEmoji?: string | null;
-  /** @nullable */
-  color?: string | null;
+  maxPlayers?: number | null;
+  xpMultiplier?: number;
   isLive?: boolean;
 }
 
 export interface LeaderboardEntry {
-  position: number;
+  rank: number;
   playerId: number;
   username: string;
   /** @nullable */
   displayName?: string | null;
-  /** @nullable */
-  avatarUrl?: string | null;
-  rank: string;
   score: number;
-  wins: number;
-  hatchlingName: string;
+  level: number;
+  wins?: number;
+  hatchlingCount?: number;
   /** @nullable */
-  hatchlingCategory?: string | null;
+  topHatchlingName?: string | null;
+  currentStreak?: number;
 }
 
 export interface RankDistribution {
   rank: string;
   count: number;
   percentage: number;
-  color: string;
 }
 
 export interface Item {
   id: number;
   name: string;
   description: string;
-  category: string;
-  price: number;
+  type: string;
+  cost: number;
+  effect: string;
   /** @nullable */
   imageUrl?: string | null;
-  effectType: string;
-  effectValue: number;
   rarity?: string;
-  /** @nullable */
-  color?: string | null;
 }
 
 export interface UseItemInput {
   hatchlingId: number;
-  playerId: number;
 }
 
 export interface Club {
@@ -246,14 +308,12 @@ export interface Club {
   name: string;
   description: string;
   /** @nullable */
-  emblem?: string | null;
+  badge?: string | null;
   memberCount: number;
   maxMembers?: number;
-  level: number;
-  totalWins: number;
+  totalXp: number;
+  rank: string;
   isPublic?: boolean;
-  /** @nullable */
-  color?: string | null;
   createdAt: string;
 }
 
@@ -263,13 +323,76 @@ export interface ClubInput {
      * @maxLength 30
      */
   name: string;
-  description: string;
+  description?: string;
   isPublic?: boolean;
-  color?: string;
 }
 
 export interface JoinClubInput {
   playerId: number;
+}
+
+export interface AddEggInput {
+  playerId: number;
+  eggType: string;
+  rarity?: string;
+}
+
+export interface HatchEggInput {
+  playerId: number;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  name: string;
+}
+
+export interface HatchResult {
+  egg: Egg;
+  hatchling: Hatchling;
+}
+
+export interface LogActivityInput {
+  playerId: number;
+  type: string;
+  value: number;
+  note?: string;
+}
+
+export interface ActivityLogResult {
+  activity: FitnessActivity;
+  fitnessXpEarned: number;
+  eggsUpdated: number;
+  player: Player;
+}
+
+export interface FitnessQuest {
+  id: number;
+  playerId: number;
+  title: string;
+  description: string;
+  type: string;
+  targetValue: number;
+  currentValue: number;
+  xpReward: number;
+  coinReward: number;
+  isCompleted: boolean;
+  realm: string;
+  expiresAt: string;
+  createdAt: string;
+  progressPct?: number;
+}
+
+export interface FitnessRealm {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  icon: string;
+  fitnessTypes: string[];
+  evolutionBonus: string;
+  /** @nullable */
+  playerXp?: number | null;
+  isUnlocked?: boolean;
 }
 
 export type ListHatchlingsParams = {
@@ -325,5 +448,19 @@ export const ListEventsStatus = {
 
 export type ListClubsParams = {
 limit?: number;
+};
+
+export type ListEggsParams = {
+playerId: number;
+hatched?: boolean;
+};
+
+export type ListFitnessActivitiesParams = {
+playerId: number;
+limit?: number;
+};
+
+export type ListRealmsParams = {
+playerId?: number;
 };
 

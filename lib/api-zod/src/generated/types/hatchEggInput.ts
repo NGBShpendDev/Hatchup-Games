@@ -6,6 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface UseItemInput {
-  hatchlingId: number;
+export interface HatchEggInput {
+  playerId: number;
+  /**
+     * @minLength 1
+     * @maxLength 30
+     */
+  name: string;
 }

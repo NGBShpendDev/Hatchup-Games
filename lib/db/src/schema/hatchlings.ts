@@ -24,6 +24,9 @@ export const hatchlingsTable = pgTable("hatchlings", {
   isShiny: boolean("is_shiny").notNull().default(false),
   isFusion: boolean("is_fusion").notNull().default(false),
   color: text("color"),
+  // Fitness integration
+  fitnessType: text("fitness_type").notNull().default("balanced"),
+  eggId: integer("egg_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

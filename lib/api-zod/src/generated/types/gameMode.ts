@@ -10,12 +10,9 @@ export interface GameMode {
   id: number;
   name: string;
   description: string;
-  type: string;
-  maxPlayers: number;
   minLevel: number;
   /** @nullable */
-  iconEmoji?: string | null;
-  /** @nullable */
-  color?: string | null;
+  maxPlayers?: number | null;
+  xpMultiplier?: number;
   isLive?: boolean;
 }
