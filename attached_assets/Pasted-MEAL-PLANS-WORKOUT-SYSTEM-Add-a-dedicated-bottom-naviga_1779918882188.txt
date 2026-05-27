@@ -1,0 +1,175 @@
+MEAL PLANS + WORKOUT SYSTEM:
+
+Add a dedicated bottom navigation tab called:
+“Training”
+
+The Training tab should contain:
+- AI workout plans
+- meal plans
+- recovery tracking
+- hydration goals
+- fitness recommendations
+- goal progression
+- personalized coaching
+
+The Training tab should feel:
+- simple
+- motivating
+- rewarding
+- premium
+- easy enough for beginners
+- advanced enough for athletes
+
+WORKOUT SYSTEM:
+Create personalized workout programs based on user goals.
+
+Users select goals such as:
+- lose weight
+- gain muscle
+- improve endurance
+- athletic performance
+- beginner fitness
+- body recomposition
+- flexibility
+- recovery
+- sports training
+
+The AI dynamically builds workout plans based on:
+- age
+- fitness level
+- current progress
+- activity history
+- available equipment
+- injuries
+- workout consistency
+- recovery status
+
+WORKOUT TYPES:
+Include:
+- gym workouts
+- home workouts
+- bodyweight workouts
+- cardio sessions
+- HIIT training
+- sports training
+- stretching
+- yoga
+- mobility
+- recovery sessions
+
+WORKOUT XP SYSTEM:
+Completing workouts rewards:
+- XP
+- coins
+- evolution energy
+- stat boosts
+- hatch acceleration
+- rare drops
+- streak multipliers
+
+Different workout types boost different creature stats.
+
+Examples:
+- weight lifting boosts Strength
+- cardio boosts Speed
+- long sessions boost Endurance
+- recovery boosts Aura
+- consistency boosts Discipline
+
+MEAL PLAN SYSTEM:
+Create AI-generated meal plans personalized to user goals.
+
+Meal plans should support:
+- weight loss
+- muscle gain
+- high protein
+- healthy eating
+- athletic performance
+- budget meals
+- vegan
+- vegetarian
+- keto
+- beginner nutrition
+- family meal plans
+
+Features:
+- calorie tracking
+- macro tracking
+- hydration reminders
+- grocery lists
+- meal prep guides
+- healthy snack suggestions
+
+The app should recommend:
+- breakfast
+- lunch
+- dinner
+- snacks
+- hydration goals
+
+MEAL GAMIFICATION:
+Healthy eating should impact gameplay.
+
+Examples:
+- protein goals boost Strength XP
+- hydration boosts Recovery
+- balanced meals improve evolution odds
+- consistency unlocks bonuses
+
+This should encourage healthier habits without becoming stressful or obsessive.
+
+AI TRAINER:
+The AI coach should:
+- suggest workouts daily
+- suggest meals
+- adapt plans based on performance
+- motivate users
+- celebrate milestones
+- prevent burnout
+- track fatigue and recovery
+
+The AI should feel supportive and positive.
+
+BOTTOM NAVIGATION SYSTEM:
+Create a modern bottom tab navigation with:
+
+1. Home
+Main dashboard and creature overview
+
+2. Explore
+Real-world map, gyms, raids, creature discovery
+
+3. Hatch
+Eggs, creature collection, evolutions
+
+4. Training
+Meal plans, workouts, AI coaching, fitness goals
+
+5. Social
+Friends, clans, activity feed, rankings
+
+The UI should feel:
+- clean
+- premium
+- smooth
+- colorful
+- highly addictive
+- extremely easy to navigate
+
+FITNESS GOAL DASHBOARD:
+Allow users to set goals such as:
+- target weight
+- workout frequency
+- hydration goals
+- daily steps
+- muscle gain
+- sleep goals
+
+Track progress visually with:
+- bars
+- streaks
+- achievements
+- milestones
+- evolving creature indicators
+
+The goal system should constantly reward users for progress, consistency, and healthy habits.
