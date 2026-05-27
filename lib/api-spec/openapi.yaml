@@ -30,6 +30,8 @@ tags:
     description: Egg incubation and hatching
   - name: fitness
     description: Fitness tracking, quests, and realms
+  - name: training
+    description: AI workout plans, meal plans, and coaching
 
 paths:
   /healthz:
@@ -881,6 +883,132 @@ paths:
                 items:
                   $ref: "#/components/schemas/FitnessRealm"
 
+  # ── Training ─────────────────────────────────────────────────────────────
+  /training/workout-plan:
+    get:
+      operationId: getWorkoutPlan
+      tags: [training]
+      summary: Get active workout plan for a player
+      parameters:
+        - name: playerId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Workout plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkoutPlan"
+        "404":
+          description: No plan found
+
+  /training/generate-plan:
+    post:
+      operationId: generateWorkoutPlan
+      tags: [training]
+      summary: Generate a new AI workout plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeneratePlanInput"
+      responses:
+        "201":
+          description: Generated plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkoutPlan"
+
+  /training/log-session:
+    post:
+      operationId: logWorkoutSession
+      tags: [training]
+      summary: Log a completed workout session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogSessionInput"
+      responses:
+        "201":
+          description: Logged session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkoutSession"
+
+  /training/sessions:
+    get:
+      operationId: listWorkoutSessions
+      tags: [training]
+      summary: List recent workout sessions for a player
+      parameters:
+        - name: playerId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkoutSession"
+
+  /training/meal-plan:
+    get:
+      operationId: getMealPlan
+      tags: [training]
+      summary: Get active meal plan for a player
+      parameters:
+        - name: playerId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Meal plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MealPlan"
+        "404":
+          description: No plan found
+
+  /training/generate-meal-plan:
+    post:
+      operationId: generateMealPlan
+      tags: [training]
+      summary: Generate a personalized AI meal plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateMealPlanInput"
+      responses:
+        "201":
+          description: Generated meal plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MealPlan"
+
 components:
   schemas:
     HealthStatus:
@@ -1309,3 +1437,134 @@ components:
         evolutionBonus: { type: string }
         playerXp:      { type: ["integer", "null"] }
         isUnlocked:    { type: boolean }
+
+    # ── Training ──────────────────────────────────────────────────────────────
+    WorkoutDay:
+      type: object
+      required: [day, name, exercises, realm, durationMinutes, xpReward]
+      properties:
+        day:             { type: string }
+        name:            { type: string }
+        exercises:
+          type: array
+          items:
+            $ref: "#/components/schemas/Exercise"
+        realm:           { type: string }
+        durationMinutes: { type: integer }
+        xpReward:        { type: integer }
+        coinsReward:     { type: integer }
+
+    Exercise:
+      type: object
+      required: [name, sets, reps, rest]
+      properties:
+        name:   { type: string }
+        sets:   { type: integer }
+        reps:   { type: string }
+        rest:   { type: string }
+        tip:    { type: string }
+        muscle: { type: string }
+
+    WorkoutPlan:
+      type: object
+      required: [id, playerId, goal, fitnessLevel, equipment, weekNumber, isActive, createdAt, days]
+      properties:
+        id:             { type: integer }
+        playerId:       { type: integer }
+        goal:           { type: string }
+        fitnessLevel:   { type: string }
+        equipment:      { type: string }
+        weekNumber:     { type: integer }
+        isActive:       { type: boolean }
+        createdAt:      { type: string }
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkoutDay"
+
+    WorkoutSession:
+      type: object
+      required: [id, playerId, workoutType, durationMinutes, exercisesCompleted, xpEarned, coinsEarned, realm, createdAt]
+      properties:
+        id:                  { type: integer }
+        playerId:            { type: integer }
+        workoutType:         { type: string }
+        durationMinutes:     { type: integer }
+        exercisesCompleted:  { type: integer }
+        xpEarned:            { type: integer }
+        coinsEarned:         { type: integer }
+        realm:               { type: string }
+        notes:               { type: ["string", "null"] }
+        createdAt:           { type: string }
+
+    MealItem:
+      type: object
+      required: [name, calories, protein, carbs, fat]
+      properties:
+        name:     { type: string }
+        calories: { type: integer }
+        protein:  { type: integer }
+        carbs:    { type: integer }
+        fat:      { type: integer }
+        tip:      { type: string }
+
+    MealDay:
+      type: object
+      required: [day, breakfast, lunch, dinner, snacks, totalCalories, totalProtein]
+      properties:
+        day:           { type: string }
+        breakfast:     { $ref: "#/components/schemas/MealItem" }
+        lunch:         { $ref: "#/components/schemas/MealItem" }
+        dinner:        { $ref: "#/components/schemas/MealItem" }
+        snacks:
+          type: array
+          items:
+            $ref: "#/components/schemas/MealItem"
+        totalCalories: { type: integer }
+        totalProtein:  { type: integer }
+        hydrationGoal: { type: integer }
+
+    MealPlan:
+      type: object
+      required: [id, playerId, goal, calorieTarget, proteinTarget, carbTarget, fatTarget, isActive, createdAt, days]
+      properties:
+        id:             { type: integer }
+        playerId:       { type: integer }
+        goal:           { type: string }
+        calorieTarget:  { type: integer }
+        proteinTarget:  { type: integer }
+        carbTarget:     { type: integer }
+        fatTarget:      { type: integer }
+        isActive:       { type: boolean }
+        createdAt:      { type: string }
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/MealDay"
+
+    GeneratePlanInput:
+      type: object
+      required: [playerId, goal]
+      properties:
+        playerId:     { type: integer }
+        goal:         { type: string }
+        fitnessLevel: { type: string }
+        equipment:    { type: string }
+
+    LogSessionInput:
+      type: object
+      required: [playerId, workoutType, durationMinutes]
+      properties:
+        playerId:           { type: integer }
+        workoutType:        { type: string }
+        durationMinutes:    { type: integer }
+        exercisesCompleted: { type: integer }
+        notes:              { type: string }
+
+    GenerateMealPlanInput:
+      type: object
+      required: [playerId, goal]
+      properties:
+        playerId: { type: integer }
+        goal:     { type: string }
+        calories: { type: integer }

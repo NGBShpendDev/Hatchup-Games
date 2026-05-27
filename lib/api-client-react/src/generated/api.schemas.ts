@@ -395,6 +395,105 @@ export interface FitnessRealm {
   isUnlocked?: boolean;
 }
 
+export interface Exercise {
+  name: string;
+  sets: number;
+  reps: string;
+  rest: string;
+  tip?: string;
+  muscle?: string;
+}
+
+export interface WorkoutDay {
+  day: string;
+  name: string;
+  exercises: Exercise[];
+  realm: string;
+  durationMinutes: number;
+  xpReward: number;
+  coinsReward?: number;
+}
+
+export interface WorkoutPlan {
+  id: number;
+  playerId: number;
+  goal: string;
+  fitnessLevel: string;
+  equipment: string;
+  weekNumber: number;
+  isActive: boolean;
+  createdAt: string;
+  days: WorkoutDay[];
+}
+
+export interface WorkoutSession {
+  id: number;
+  playerId: number;
+  workoutType: string;
+  durationMinutes: number;
+  exercisesCompleted: number;
+  xpEarned: number;
+  coinsEarned: number;
+  realm: string;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+}
+
+export interface MealItem {
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  tip?: string;
+}
+
+export interface MealDay {
+  day: string;
+  breakfast: MealItem;
+  lunch: MealItem;
+  dinner: MealItem;
+  snacks: MealItem[];
+  totalCalories: number;
+  totalProtein: number;
+  hydrationGoal?: number;
+}
+
+export interface MealPlan {
+  id: number;
+  playerId: number;
+  goal: string;
+  calorieTarget: number;
+  proteinTarget: number;
+  carbTarget: number;
+  fatTarget: number;
+  isActive: boolean;
+  createdAt: string;
+  days: MealDay[];
+}
+
+export interface GeneratePlanInput {
+  playerId: number;
+  goal: string;
+  fitnessLevel?: string;
+  equipment?: string;
+}
+
+export interface LogSessionInput {
+  playerId: number;
+  workoutType: string;
+  durationMinutes: number;
+  exercisesCompleted?: number;
+  notes?: string;
+}
+
+export interface GenerateMealPlanInput {
+  playerId: number;
+  goal: string;
+  calories?: number;
+}
+
 export type ListHatchlingsParams = {
 playerId?: number;
 limit?: number;
@@ -462,5 +561,18 @@ limit?: number;
 
 export type ListRealmsParams = {
 playerId?: number;
+};
+
+export type GetWorkoutPlanParams = {
+playerId: number;
+};
+
+export type ListWorkoutSessionsParams = {
+playerId: number;
+limit?: number;
+};
+
+export type GetMealPlanParams = {
+playerId: number;
 };
 

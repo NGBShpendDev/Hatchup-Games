@@ -1,4 +1,5 @@
-import { Layout, PLAYER_ID } from "@/components/layout";
+import { Layout } from "@/components/layout";
+import { PLAYER_ID } from "@/lib/constants";
 import { HatchlingCard } from "@/components/hatchling-card";
 import { useListHatchlings, getListHatchlingsQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";

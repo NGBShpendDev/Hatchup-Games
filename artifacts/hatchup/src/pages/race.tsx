@@ -1,4 +1,5 @@
-import { Layout, PLAYER_ID } from "@/components/layout";
+import { Layout } from "@/components/layout";
+import { PLAYER_ID } from "@/lib/constants";
 import { useListHatchlings, getListHatchlingsQueryKey, useCreateCompetition } from "@workspace/api-client-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";

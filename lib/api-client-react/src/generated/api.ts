@@ -36,8 +36,12 @@ import type {
   FitnessRealm,
   FitnessStats,
   GameMode,
+  GenerateMealPlanInput,
+  GeneratePlanInput,
   GetGlobalLeaderboardParams,
+  GetMealPlanParams,
   GetModeLeaderboardParams,
+  GetWorkoutPlanParams,
   HatchEggInput,
   HatchResult,
   Hatchling,
@@ -56,14 +60,19 @@ import type {
   ListHatchlingsParams,
   ListItemsParams,
   ListRealmsParams,
+  ListWorkoutSessionsParams,
   LiveEvent,
   LogActivityInput,
+  LogSessionInput,
+  MealPlan,
   Player,
   PlayerDashboard,
   PlayerInput,
   PlayerUpdate,
   RankDistribution,
-  UseItemInput
+  UseItemInput,
+  WorkoutPlan,
+  WorkoutSession
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -3226,4 +3235,469 @@ export function useListRealms<TData = Awaited<ReturnType<typeof listRealms>>, TE
 
 
 
+
+export const getGetWorkoutPlanUrl = (params: GetWorkoutPlanParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/training/workout-plan?${stringifiedParams}` : `/api/training/workout-plan`
+}
+
+/**
+ * @summary Get active workout plan for a player
+ */
+export const getWorkoutPlan = async (params: GetWorkoutPlanParams, options?: RequestInit): Promise<WorkoutPlan> => {
+
+  return customFetch<WorkoutPlan>(getGetWorkoutPlanUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWorkoutPlanQueryKey = (params?: GetWorkoutPlanParams,) => {
+    return [
+    `/api/training/workout-plan`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetWorkoutPlanQueryOptions = <TData = Awaited<ReturnType<typeof getWorkoutPlan>>, TError = ErrorType<void>>(params: GetWorkoutPlanParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWorkoutPlan>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWorkoutPlanQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWorkoutPlan>>> = ({ signal }) => getWorkoutPlan(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWorkoutPlan>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWorkoutPlanQueryResult = NonNullable<Awaited<ReturnType<typeof getWorkoutPlan>>>
+export type GetWorkoutPlanQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get active workout plan for a player
+ */
+
+export function useGetWorkoutPlan<TData = Awaited<ReturnType<typeof getWorkoutPlan>>, TError = ErrorType<void>>(
+ params: GetWorkoutPlanParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWorkoutPlan>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWorkoutPlanQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGenerateWorkoutPlanUrl = () => {
+
+
+
+
+  return `/api/training/generate-plan`
+}
+
+/**
+ * @summary Generate a new AI workout plan
+ */
+export const generateWorkoutPlan = async (generatePlanInput: GeneratePlanInput, options?: RequestInit): Promise<WorkoutPlan> => {
+
+  return customFetch<WorkoutPlan>(getGenerateWorkoutPlanUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      generatePlanInput,)
+  }
+);}
+
+
+
+
+export const getGenerateWorkoutPlanMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateWorkoutPlan>>, TError,{data: BodyType<GeneratePlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateWorkoutPlan>>, TError,{data: BodyType<GeneratePlanInput>}, TContext> => {
+
+const mutationKey = ['generateWorkoutPlan'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateWorkoutPlan>>, {data: BodyType<GeneratePlanInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  generateWorkoutPlan(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateWorkoutPlanMutationResult = NonNullable<Awaited<ReturnType<typeof generateWorkoutPlan>>>
+    export type GenerateWorkoutPlanMutationBody = BodyType<GeneratePlanInput>
+    export type GenerateWorkoutPlanMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Generate a new AI workout plan
+ */
+export const useGenerateWorkoutPlan = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateWorkoutPlan>>, TError,{data: BodyType<GeneratePlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateWorkoutPlan>>,
+        TError,
+        {data: BodyType<GeneratePlanInput>},
+        TContext
+      > => {
+      return useMutation(getGenerateWorkoutPlanMutationOptions(options));
+    }
+
+export const getLogWorkoutSessionUrl = () => {
+
+
+
+
+  return `/api/training/log-session`
+}
+
+/**
+ * @summary Log a completed workout session
+ */
+export const logWorkoutSession = async (logSessionInput: LogSessionInput, options?: RequestInit): Promise<WorkoutSession> => {
+
+  return customFetch<WorkoutSession>(getLogWorkoutSessionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      logSessionInput,)
+  }
+);}
+
+
+
+
+export const getLogWorkoutSessionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logWorkoutSession>>, TError,{data: BodyType<LogSessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof logWorkoutSession>>, TError,{data: BodyType<LogSessionInput>}, TContext> => {
+
+const mutationKey = ['logWorkoutSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logWorkoutSession>>, {data: BodyType<LogSessionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  logWorkoutSession(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LogWorkoutSessionMutationResult = NonNullable<Awaited<ReturnType<typeof logWorkoutSession>>>
+    export type LogWorkoutSessionMutationBody = BodyType<LogSessionInput>
+    export type LogWorkoutSessionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Log a completed workout session
+ */
+export const useLogWorkoutSession = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logWorkoutSession>>, TError,{data: BodyType<LogSessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof logWorkoutSession>>,
+        TError,
+        {data: BodyType<LogSessionInput>},
+        TContext
+      > => {
+      return useMutation(getLogWorkoutSessionMutationOptions(options));
+    }
+
+export const getListWorkoutSessionsUrl = (params: ListWorkoutSessionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/training/sessions?${stringifiedParams}` : `/api/training/sessions`
+}
+
+/**
+ * @summary List recent workout sessions for a player
+ */
+export const listWorkoutSessions = async (params: ListWorkoutSessionsParams, options?: RequestInit): Promise<WorkoutSession[]> => {
+
+  return customFetch<WorkoutSession[]>(getListWorkoutSessionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListWorkoutSessionsQueryKey = (params?: ListWorkoutSessionsParams,) => {
+    return [
+    `/api/training/sessions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListWorkoutSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listWorkoutSessions>>, TError = ErrorType<unknown>>(params: ListWorkoutSessionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWorkoutSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWorkoutSessionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWorkoutSessions>>> = ({ signal }) => listWorkoutSessions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWorkoutSessions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListWorkoutSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof listWorkoutSessions>>>
+export type ListWorkoutSessionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List recent workout sessions for a player
+ */
+
+export function useListWorkoutSessions<TData = Awaited<ReturnType<typeof listWorkoutSessions>>, TError = ErrorType<unknown>>(
+ params: ListWorkoutSessionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWorkoutSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListWorkoutSessionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMealPlanUrl = (params: GetMealPlanParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/training/meal-plan?${stringifiedParams}` : `/api/training/meal-plan`
+}
+
+/**
+ * @summary Get active meal plan for a player
+ */
+export const getMealPlan = async (params: GetMealPlanParams, options?: RequestInit): Promise<MealPlan> => {
+
+  return customFetch<MealPlan>(getGetMealPlanUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMealPlanQueryKey = (params?: GetMealPlanParams,) => {
+    return [
+    `/api/training/meal-plan`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMealPlanQueryOptions = <TData = Awaited<ReturnType<typeof getMealPlan>>, TError = ErrorType<void>>(params: GetMealPlanParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMealPlan>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMealPlanQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMealPlan>>> = ({ signal }) => getMealPlan(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMealPlan>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMealPlanQueryResult = NonNullable<Awaited<ReturnType<typeof getMealPlan>>>
+export type GetMealPlanQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get active meal plan for a player
+ */
+
+export function useGetMealPlan<TData = Awaited<ReturnType<typeof getMealPlan>>, TError = ErrorType<void>>(
+ params: GetMealPlanParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMealPlan>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMealPlanQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGenerateMealPlanUrl = () => {
+
+
+
+
+  return `/api/training/generate-meal-plan`
+}
+
+/**
+ * @summary Generate a personalized AI meal plan
+ */
+export const generateMealPlan = async (generateMealPlanInput: GenerateMealPlanInput, options?: RequestInit): Promise<MealPlan> => {
+
+  return customFetch<MealPlan>(getGenerateMealPlanUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      generateMealPlanInput,)
+  }
+);}
+
+
+
+
+export const getGenerateMealPlanMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateMealPlan>>, TError,{data: BodyType<GenerateMealPlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateMealPlan>>, TError,{data: BodyType<GenerateMealPlanInput>}, TContext> => {
+
+const mutationKey = ['generateMealPlan'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateMealPlan>>, {data: BodyType<GenerateMealPlanInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  generateMealPlan(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateMealPlanMutationResult = NonNullable<Awaited<ReturnType<typeof generateMealPlan>>>
+    export type GenerateMealPlanMutationBody = BodyType<GenerateMealPlanInput>
+    export type GenerateMealPlanMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Generate a personalized AI meal plan
+ */
+export const useGenerateMealPlan = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateMealPlan>>, TError,{data: BodyType<GenerateMealPlanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateMealPlan>>,
+        TError,
+        {data: BodyType<GenerateMealPlanInput>},
+        TContext
+      > => {
+      return useMutation(getGenerateMealPlanMutationOptions(options));
+    }
 

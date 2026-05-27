@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable, eggsTable, fitnessActivitiesTable } from "@workspace/db";
+import { eq, desc, and, gte } from "drizzle-orm";
 import {
   CreatePlayerBody,
   UpdatePlayerBody,
@@ -49,31 +49,45 @@ router.get("/players/:id/dashboard", async (req, res) => {
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, params.data.id) });
   if (!player) { res.status(404).json({ error: "Player not found" }); return; }
 
-  const hatchlings = await db.query.hatchlingsTable.findMany({ where: eq(hatchlingsTable.playerId, params.data.id) });
-  const recentComps = await db.query.competitionsTable.findMany({
-    where: eq(competitionsTable.playerId, params.data.id),
-    orderBy: [desc(competitionsTable.createdAt)],
-    limit: 5,
-  });
-  const activeEvents = await db.query.liveEventsTable.findMany({
-    where: eq(liveEventsTable.status, "active"),
-    limit: 3,
-  });
+  const [hatchlings, recentComps, activeEvents, activeEggs, recentActivities] = await Promise.all([
+    db.query.hatchlingsTable.findMany({ where: eq(hatchlingsTable.playerId, params.data.id) }),
+    db.query.competitionsTable.findMany({
+      where: eq(competitionsTable.playerId, params.data.id),
+      orderBy: [desc(competitionsTable.createdAt)],
+      limit: 5,
+    }),
+    db.query.liveEventsTable.findMany({
+      where: eq(liveEventsTable.status, "active"),
+      limit: 3,
+    }),
+    db.query.eggsTable.findMany({
+      where: and(eq(eggsTable.playerId, params.data.id), eq(eggsTable.isHatched, false)),
+    }),
+    db.query.fitnessActivitiesTable.findMany({
+      where: eq(fitnessActivitiesTable.playerId, params.data.id),
+      orderBy: [desc(fitnessActivitiesTable.createdAt)],
+      limit: 5,
+    }),
+  ]);
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayActivities = recentActivities.filter(a => a.createdAt >= todayStart);
+  const todaySteps = todayActivities.filter(a => a.type === "steps").reduce((s, a) => s + a.value, 0);
+  const todayXp = todayActivities.reduce((s, a) => s + a.fitnessXpEarned, 0);
+  const dailyStepGoal = player.dailyStepGoal ?? 8000;
 
   const topHatchling = hatchlings.sort((a, b) => b.level - a.level)[0] ?? null;
   const wins = recentComps.filter(c => c.rank === 1).length;
   const winRate = recentComps.length > 0 ? wins / recentComps.length : 0;
 
-  const recentCompsWithNames = recentComps.map(c => ({
-    ...c,
-    playerName: player.username,
-    hatchlingName: hatchlings.find(h => h.id === c.hatchlingId)?.name ?? "Unknown",
-  }));
-
-  const activeEventsFormatted = activeEvents.map(e => ({
+  const readyEggs = activeEggs.filter(e => e.stepsProgress >= e.stepsRequired);
+  const eggsFormatted = activeEggs.map(e => ({
     ...e,
-    startsAt: e.startsAt.toISOString(),
-    endsAt: e.endsAt.toISOString(),
+    createdAt: e.createdAt.toISOString(),
+    hatchedAt: e.hatchedAt?.toISOString() ?? null,
+    progressPct: Math.min(100, Math.round((e.stepsProgress / e.stepsRequired) * 100)),
+    isReady: e.stepsProgress >= e.stepsRequired,
   }));
 
   res.json({
@@ -81,9 +95,35 @@ router.get("/players/:id/dashboard", async (req, res) => {
     hatchlingCount: hatchlings.length,
     totalWins: player.totalWins,
     winRate,
-    recentCompetitions: recentCompsWithNames,
-    activeEvents: activeEventsFormatted,
     topHatchling,
+    recentCompetitions: recentComps.map(c => ({
+      ...c,
+      playerName: player.username,
+      hatchlingName: hatchlings.find(h => h.id === c.hatchlingId)?.name ?? "Unknown",
+    })),
+    activeEvents: activeEvents.map(e => ({
+      ...e,
+      startsAt: e.startsAt.toISOString(),
+      endsAt: e.endsAt.toISOString(),
+    })),
+    // Fitness summary
+    fitness: {
+      currentStreak: player.currentStreak,
+      fitnessXp: player.fitnessXp,
+      totalSteps: player.totalSteps,
+      todaySteps,
+      todayXp,
+      dailyStepGoal,
+      stepGoalPct: Math.min(100, Math.round((todaySteps / dailyStepGoal) * 100)),
+      fitnessRealm: player.fitnessRealm,
+      waterCups: player.waterCups,
+    },
+    // Egg summary
+    eggs: {
+      active: eggsFormatted,
+      readyCount: readyEggs.length,
+      totalActive: activeEggs.length,
+    },
   });
 });
 

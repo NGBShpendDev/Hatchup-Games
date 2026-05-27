@@ -7,3 +7,4 @@ export * from "./events";
 export * from "./clubs";
 export * from "./eggs";
 export * from "./fitness";
+export * from "./training";

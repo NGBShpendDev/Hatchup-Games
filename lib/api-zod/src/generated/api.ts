@@ -1135,3 +1135,154 @@ export const ListRealmsResponseItem = zod.object({
 export const ListRealmsResponse = zod.array(ListRealmsResponseItem)
 
 
+/**
+ * @summary Get active workout plan for a player
+ */
+export const GetWorkoutPlanQueryParams = zod.object({
+  "playerId": zod.coerce.number()
+})
+
+export const GetWorkoutPlanResponse = zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "goal": zod.string(),
+  "fitnessLevel": zod.string(),
+  "equipment": zod.string(),
+  "weekNumber": zod.number(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.string(),
+  "days": zod.array(zod.object({
+  "day": zod.string(),
+  "name": zod.string(),
+  "exercises": zod.array(zod.object({
+  "name": zod.string(),
+  "sets": zod.number(),
+  "reps": zod.string(),
+  "rest": zod.string(),
+  "tip": zod.string().optional(),
+  "muscle": zod.string().optional()
+})),
+  "realm": zod.string(),
+  "durationMinutes": zod.number(),
+  "xpReward": zod.number(),
+  "coinsReward": zod.number().optional()
+}))
+})
+
+
+/**
+ * @summary Generate a new AI workout plan
+ */
+export const GenerateWorkoutPlanBody = zod.object({
+  "playerId": zod.number(),
+  "goal": zod.string(),
+  "fitnessLevel": zod.string().optional(),
+  "equipment": zod.string().optional()
+})
+
+
+/**
+ * @summary Log a completed workout session
+ */
+export const LogWorkoutSessionBody = zod.object({
+  "playerId": zod.number(),
+  "workoutType": zod.string(),
+  "durationMinutes": zod.number(),
+  "exercisesCompleted": zod.number().optional(),
+  "notes": zod.string().optional()
+})
+
+
+/**
+ * @summary List recent workout sessions for a player
+ */
+export const listWorkoutSessionsQueryLimitDefault = 10;
+
+export const ListWorkoutSessionsQueryParams = zod.object({
+  "playerId": zod.coerce.number(),
+  "limit": zod.coerce.number().default(listWorkoutSessionsQueryLimitDefault)
+})
+
+export const ListWorkoutSessionsResponseItem = zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "workoutType": zod.string(),
+  "durationMinutes": zod.number(),
+  "exercisesCompleted": zod.number(),
+  "xpEarned": zod.number(),
+  "coinsEarned": zod.number(),
+  "realm": zod.string(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const ListWorkoutSessionsResponse = zod.array(ListWorkoutSessionsResponseItem)
+
+
+/**
+ * @summary Get active meal plan for a player
+ */
+export const GetMealPlanQueryParams = zod.object({
+  "playerId": zod.coerce.number()
+})
+
+export const GetMealPlanResponse = zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "goal": zod.string(),
+  "calorieTarget": zod.number(),
+  "proteinTarget": zod.number(),
+  "carbTarget": zod.number(),
+  "fatTarget": zod.number(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.string(),
+  "days": zod.array(zod.object({
+  "day": zod.string(),
+  "breakfast": zod.object({
+  "name": zod.string(),
+  "calories": zod.number(),
+  "protein": zod.number(),
+  "carbs": zod.number(),
+  "fat": zod.number(),
+  "tip": zod.string().optional()
+}),
+  "lunch": zod.object({
+  "name": zod.string(),
+  "calories": zod.number(),
+  "protein": zod.number(),
+  "carbs": zod.number(),
+  "fat": zod.number(),
+  "tip": zod.string().optional()
+}),
+  "dinner": zod.object({
+  "name": zod.string(),
+  "calories": zod.number(),
+  "protein": zod.number(),
+  "carbs": zod.number(),
+  "fat": zod.number(),
+  "tip": zod.string().optional()
+}),
+  "snacks": zod.array(zod.object({
+  "name": zod.string(),
+  "calories": zod.number(),
+  "protein": zod.number(),
+  "carbs": zod.number(),
+  "fat": zod.number(),
+  "tip": zod.string().optional()
+})),
+  "totalCalories": zod.number(),
+  "totalProtein": zod.number(),
+  "hydrationGoal": zod.number().optional()
+}))
+})
+
+
+/**
+ * @summary Generate a personalized AI meal plan
+ */
+export const GenerateMealPlanBody = zod.object({
+  "playerId": zod.number(),
+  "goal": zod.string(),
+  "calories": zod.number().optional()
+})
+
+

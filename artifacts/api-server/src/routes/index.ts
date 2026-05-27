@@ -8,6 +8,9 @@ import leaderboardsRouter from "./leaderboards";
 import itemsRouter from "./items";
 import eventsRouter from "./events";
 import clubsRouter from "./clubs";
+import eggsRouter from "./eggs";
+import fitnessRouter from "./fitness";
+import trainingRouter from "./training";
 
 const router: IRouter = Router();
 
@@ -20,5 +23,8 @@ router.use(leaderboardsRouter);
 router.use(itemsRouter);
 router.use(eventsRouter);
 router.use(clubsRouter);
+router.use(eggsRouter);
+router.use(fitnessRouter);
+router.use(trainingRouter);
 
 export default router;
