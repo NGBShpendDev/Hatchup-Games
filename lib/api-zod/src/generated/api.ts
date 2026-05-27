@@ -1286,3 +1286,47 @@ export const GenerateMealPlanBody = zod.object({
 })
 
 
+/**
+ * @summary List the player's health platform connections
+ */
+export const ListHealthConnectionsResponseItem = zod.object({
+  "id": zod.number(),
+  "platform": zod.string(),
+  "isConnected": zod.boolean(),
+  "lastSyncedAt": zod.string().nullish(),
+  "consentGivenAt": zod.string().optional(),
+  "createdAt": zod.string()
+})
+export const ListHealthConnectionsResponse = zod.array(ListHealthConnectionsResponseItem)
+
+
+/**
+ * @summary Disconnect a health platform
+ */
+export const DisconnectHealthPlatformParams = zod.object({
+  "platform": zod.coerce.string()
+})
+
+export const DisconnectHealthPlatformResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Manually trigger a Google Fit sync for the current player
+ */
+export const TriggerHealthSyncResponse = zod.object({
+  "activitiesImported": zod.number(),
+  "xpEarned": zod.number(),
+  "lastSyncedAt": zod.string()
+})
+
+
+/**
+ * @summary Acknowledge and reset the passive XP counter
+ */
+export const AcknowledgePassiveXpResponse = zod.object({
+  "success": zod.boolean()
+})
+
+

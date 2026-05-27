@@ -17,6 +17,7 @@ import Training from "@/pages/training";
 import Social from "@/pages/social";
 import HatchlingDetail from "@/pages/hatchling-detail";
 import Race from "@/pages/race";
+import HealthSettings from "@/pages/health-settings";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -124,6 +125,21 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
+function PassiveXpNudge() {
+  const { player, acknowledgePassiveXp } = usePlayer();
+  const hasShownRef = useRef(false);
+
+  useEffect(() => {
+    if (!player || hasShownRef.current) return;
+    if ((player.passiveXpSinceLastVisit ?? 0) > 0) {
+      hasShownRef.current = true;
+      acknowledgePassiveXp();
+    }
+  }, [player?.id]);
+
+  return null;
+}
+
 function AppRoutes() {
   const { player, isLoading, needsProfile } = usePlayer();
 
@@ -140,16 +156,20 @@ function AppRoutes() {
   }
 
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/explore" component={Explore} />
-      <Route path="/hatch" component={Hatch} />
-      <Route path="/training" component={Training} />
-      <Route path="/social" component={Social} />
-      <Route path="/hatchlings/:id" component={HatchlingDetail} />
-      <Route path="/compete/race" component={Race} />
-      <Route component={NotFound} />
-    </Switch>
+    <>
+      <PassiveXpNudge />
+      <Switch>
+        <Route path="/" component={Home} />
+        <Route path="/explore" component={Explore} />
+        <Route path="/hatch" component={Hatch} />
+        <Route path="/training" component={Training} />
+        <Route path="/social" component={Social} />
+        <Route path="/health-settings" component={HealthSettings} />
+        <Route path="/hatchlings/:id" component={HatchlingDetail} />
+        <Route path="/compete/race" component={Race} />
+        <Route component={NotFound} />
+      </Switch>
+    </>
   );
 }
 

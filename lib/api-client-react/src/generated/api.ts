@@ -47,6 +47,7 @@ import type {
   Hatchling,
   HatchlingInput,
   HatchlingUpdate,
+  HealthConnection,
   HealthStatus,
   Item,
   JoinClubInput,
@@ -70,6 +71,8 @@ import type {
   PlayerInput,
   PlayerUpdate,
   RankDistribution,
+  SuccessResult,
+  SyncResult,
   UseItemInput,
   WorkoutPlan,
   WorkoutSession
@@ -3699,5 +3702,292 @@ export const useGenerateMealPlan = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getGenerateMealPlanMutationOptions(options));
+    }
+
+export const getListHealthConnectionsUrl = () => {
+
+
+
+
+  return `/api/health/connections`
+}
+
+/**
+ * @summary List the player's health platform connections
+ */
+export const listHealthConnections = async ( options?: RequestInit): Promise<HealthConnection[]> => {
+
+  return customFetch<HealthConnection[]>(getListHealthConnectionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListHealthConnectionsQueryKey = () => {
+    return [
+    `/api/health/connections`
+    ] as const;
+    }
+
+
+export const getListHealthConnectionsQueryOptions = <TData = Awaited<ReturnType<typeof listHealthConnections>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHealthConnections>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListHealthConnectionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listHealthConnections>>> = ({ signal }) => listHealthConnections({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listHealthConnections>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListHealthConnectionsQueryResult = NonNullable<Awaited<ReturnType<typeof listHealthConnections>>>
+export type ListHealthConnectionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the player's health platform connections
+ */
+
+export function useListHealthConnections<TData = Awaited<ReturnType<typeof listHealthConnections>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listHealthConnections>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListHealthConnectionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDisconnectHealthPlatformUrl = (platform: string,) => {
+
+
+
+
+  return `/api/health/connections/${platform}`
+}
+
+/**
+ * @summary Disconnect a health platform
+ */
+export const disconnectHealthPlatform = async (platform: string, options?: RequestInit): Promise<SuccessResult> => {
+
+  return customFetch<SuccessResult>(getDisconnectHealthPlatformUrl(platform),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDisconnectHealthPlatformMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disconnectHealthPlatform>>, TError,{platform: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof disconnectHealthPlatform>>, TError,{platform: string}, TContext> => {
+
+const mutationKey = ['disconnectHealthPlatform'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof disconnectHealthPlatform>>, {platform: string}> = (props) => {
+          const {platform} = props ?? {};
+
+          return  disconnectHealthPlatform(platform,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DisconnectHealthPlatformMutationResult = NonNullable<Awaited<ReturnType<typeof disconnectHealthPlatform>>>
+
+    export type DisconnectHealthPlatformMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Disconnect a health platform
+ */
+export const useDisconnectHealthPlatform = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disconnectHealthPlatform>>, TError,{platform: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof disconnectHealthPlatform>>,
+        TError,
+        {platform: string},
+        TContext
+      > => {
+      return useMutation(getDisconnectHealthPlatformMutationOptions(options));
+    }
+
+export const getTriggerHealthSyncUrl = () => {
+
+
+
+
+  return `/api/health/sync`
+}
+
+/**
+ * @summary Manually trigger a Google Fit sync for the current player
+ */
+export const triggerHealthSync = async ( options?: RequestInit): Promise<SyncResult> => {
+
+  return customFetch<SyncResult>(getTriggerHealthSyncUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getTriggerHealthSyncMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof triggerHealthSync>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof triggerHealthSync>>, TError,void, TContext> => {
+
+const mutationKey = ['triggerHealthSync'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof triggerHealthSync>>, void> = () => {
+
+
+          return  triggerHealthSync(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TriggerHealthSyncMutationResult = NonNullable<Awaited<ReturnType<typeof triggerHealthSync>>>
+
+    export type TriggerHealthSyncMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Manually trigger a Google Fit sync for the current player
+ */
+export const useTriggerHealthSync = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof triggerHealthSync>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof triggerHealthSync>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getTriggerHealthSyncMutationOptions(options));
+    }
+
+export const getAcknowledgePassiveXpUrl = () => {
+
+
+
+
+  return `/api/health/acknowledge-passive-xp`
+}
+
+/**
+ * @summary Acknowledge and reset the passive XP counter
+ */
+export const acknowledgePassiveXp = async ( options?: RequestInit): Promise<SuccessResult> => {
+
+  return customFetch<SuccessResult>(getAcknowledgePassiveXpUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getAcknowledgePassiveXpMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acknowledgePassiveXp>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof acknowledgePassiveXp>>, TError,void, TContext> => {
+
+const mutationKey = ['acknowledgePassiveXp'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof acknowledgePassiveXp>>, void> = () => {
+
+
+          return  acknowledgePassiveXp(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AcknowledgePassiveXpMutationResult = NonNullable<Awaited<ReturnType<typeof acknowledgePassiveXp>>>
+
+    export type AcknowledgePassiveXpMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Acknowledge and reset the passive XP counter
+ */
+export const useAcknowledgePassiveXp = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acknowledgePassiveXp>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof acknowledgePassiveXp>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getAcknowledgePassiveXpMutationOptions(options));
     }
 

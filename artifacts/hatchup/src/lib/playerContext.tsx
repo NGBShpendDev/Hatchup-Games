@@ -19,6 +19,7 @@ export type PlayerProfile = {
   fitnessRealm: string;
   waterCups: number;
   dailyStepGoal: number;
+  passiveXpSinceLastVisit: number;
   clerkId: string | null;
 };
 
@@ -29,6 +30,7 @@ type PlayerContextValue = {
   needsProfile: boolean;
   createProfile: (username: string, displayName: string) => Promise<void>;
   refetch: () => Promise<void>;
+  acknowledgePassiveXp: () => Promise<void>;
 };
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -85,6 +87,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setNeedsProfile(false);
   };
 
+  const acknowledgePassiveXp = async () => {
+    if (!player) return;
+    await fetch("/api/health/acknowledge-passive-xp", {
+      method: "POST",
+      credentials: "include",
+    });
+    setPlayer(prev => prev ? { ...prev, passiveXpSinceLastVisit: 0 } : null);
+  };
+
   return (
     <PlayerContext.Provider
       value={{
@@ -94,6 +105,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         needsProfile,
         createProfile,
         refetch: fetchPlayer,
+        acknowledgePassiveXp,
       }}
     >
       {children}

@@ -494,6 +494,26 @@ export interface GenerateMealPlanInput {
   calories?: number;
 }
 
+export interface HealthConnection {
+  id: number;
+  platform: string;
+  isConnected: boolean;
+  /** @nullable */
+  lastSyncedAt?: string | null;
+  consentGivenAt?: string;
+  createdAt: string;
+}
+
+export interface SyncResult {
+  activitiesImported: number;
+  xpEarned: number;
+  lastSyncedAt: string;
+}
+
+export interface SuccessResult {
+  success: boolean;
+}
+
 export type ListHatchlingsParams = {
 playerId?: number;
 limit?: number;

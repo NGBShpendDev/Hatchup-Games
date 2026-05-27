@@ -32,6 +32,8 @@ tags:
     description: Fitness tracking, quests, and realms
   - name: training
     description: AI workout plans, meal plans, and coaching
+  - name: health-sync
+    description: Health platform connections and passive fitness sync
 
 paths:
   /healthz:
@@ -1009,6 +1011,67 @@ paths:
               schema:
                 $ref: "#/components/schemas/MealPlan"
 
+  # ── Health Sync ───────────────────────────────────────────────────────────
+  /health/connections:
+    get:
+      operationId: listHealthConnections
+      tags: [health-sync]
+      summary: List the player's health platform connections
+      responses:
+        "200":
+          description: List of connections
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HealthConnection"
+
+  /health/connections/{platform}:
+    delete:
+      operationId: disconnectHealthPlatform
+      tags: [health-sync]
+      summary: Disconnect a health platform
+      parameters:
+        - name: platform
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Disconnected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResult"
+
+  /health/sync:
+    post:
+      operationId: triggerHealthSync
+      tags: [health-sync]
+      summary: Manually trigger a Google Fit sync for the current player
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncResult"
+
+  /health/acknowledge-passive-xp:
+    post:
+      operationId: acknowledgePassiveXp
+      tags: [health-sync]
+      summary: Acknowledge and reset the passive XP counter
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResult"
+
 components:
   schemas:
     HealthStatus:
@@ -1568,3 +1631,29 @@ components:
         playerId: { type: integer }
         goal:     { type: string }
         calories: { type: integer }
+
+    # ── Health Sync ──────────────────────────────────────────────────────────
+    HealthConnection:
+      type: object
+      required: [id, platform, isConnected, createdAt]
+      properties:
+        id:             { type: integer }
+        platform:       { type: string }
+        isConnected:    { type: boolean }
+        lastSyncedAt:   { type: ["string", "null"] }
+        consentGivenAt: { type: string }
+        createdAt:      { type: string }
+
+    SyncResult:
+      type: object
+      required: [activitiesImported, xpEarned, lastSyncedAt]
+      properties:
+        activitiesImported: { type: integer }
+        xpEarned:           { type: integer }
+        lastSyncedAt:       { type: string }
+
+    SuccessResult:
+      type: object
+      required: [success]
+      properties:
+        success: { type: boolean }

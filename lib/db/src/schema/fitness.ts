@@ -11,6 +11,7 @@ export const fitnessActivitiesTable = pgTable("fitness_activities", {
   fitnessXpEarned: integer("fitness_xp_earned").notNull().default(0),
   realm: text("realm").notNull().default("strength"),
   note: text("note"),
+  externalId: text("external_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

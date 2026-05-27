@@ -1,0 +1,178 @@
+GROUP WORKOUT + TEAM ENERGY SYSTEM:
+
+Create a highly social cooperative fitness system where users can group together in real life or virtually to complete workouts, challenges, raids, and events with their HatchUp Pals.
+
+The group system should make fitness feel:
+- social
+- fun
+- motivating
+- rewarding
+- community-driven
+- competitive in a healthy way
+
+WORKOUT PARTY SYSTEM:
+Allow users to create or join workout groups called:
+- Fitness Parties
+- Hatch Crews
+- Pal Squads
+- Evolution Teams
+- Training Crews
+
+Groups can:
+- workout together
+- complete challenges
+- earn team XP
+- unlock shared rewards
+- battle bosses
+- compete on leaderboards
+
+GROUP BONUS XP:
+Users earn bonus rewards when exercising with friends.
+
+Examples:
+- +10% XP for 2 players
+- +25% XP for 4 players
+- combo streak multipliers
+- shared evolution boosts
+- raid energy bonuses
+- faster egg hatching
+
+The game should encourage teamwork and accountability.
+
+LIVE GROUP WORKOUTS:
+Users can host:
+- walking groups
+- gym sessions
+- running clubs
+- cycling events
+- fitness classes
+- park workouts
+- raid meetups
+
+The app should use:
+- GPS verification
+- proximity detection
+- activity syncing
+
+to confirm users are participating together.
+
+TEAM ENERGY SYSTEM:
+When groups workout together they generate:
+- Team Energy
+- Evolution Aura
+- Raid Power
+- Clan XP
+
+This energy powers:
+- special evolutions
+- rare events
+- giant boss raids
+- team unlocks
+- community rewards
+
+GROUP CREATURE BONUSES:
+Creatures become stronger when training socially.
+
+Examples:
+- team workouts unlock fusion boosts
+- creatures gain friendship bonds
+- coordinated workouts unlock combo evolutions
+- squad streaks unlock aura effects
+
+The creatures should visibly react positively during group sessions.
+
+GROUP CHALLENGES:
+Create cooperative goals such as:
+- 50,000 group steps
+- 10 workouts this week
+- group hydration goals
+- raid victories
+- endurance challenges
+
+Completing challenges rewards:
+- XP
+- cosmetics
+- eggs
+- titles
+- legendary shards
+- group badges
+
+LOCAL COMMUNITY SYSTEM:
+Allow users to discover nearby:
+- workout groups
+- raid parties
+- walking clubs
+- gym crews
+- local events
+
+The app should help build real-world fitness communities safely.
+
+GROUP VOICE + CHAT:
+Allow:
+- team chat
+- workout coordination
+- raid communication
+- encouragement systems
+- motivational messages
+
+The communication system should remain:
+- positive
+- safe
+- beginner-friendly
+- community-focused
+
+FRIENDSHIP LEVEL SYSTEM:
+Users who consistently train together build:
+- friendship levels
+- synergy bonuses
+- shared boosts
+- exclusive evolutions
+
+Long-term workout partners unlock:
+- special creature interactions
+- duo evolutions
+- team cosmetics
+- friendship auras
+
+This creates emotional attachment and long-term retention.
+
+GROUP RAID BOSSES:
+Large groups can challenge giant world bosses together.
+
+Raid bosses should require:
+- teamwork
+- movement
+- coordinated fitness goals
+- community participation
+
+Examples:
+- global raids
+- city raids
+- park events
+- gym invasions
+
+These events should feel:
+- cinematic
+- social
+- exciting
+- viral
+
+SOCIAL MOTIVATION SYSTEM:
+Groups should motivate users naturally.
+
+Examples:
+- “Your squad is active nearby.”
+- “Your team is waiting for you.”
+- “Complete today’s squad challenge.”
+- “Your Hatch Crew is close to unlocking a legendary egg.”
+
+The game should create healthy accountability without guilt or negativity.
+
+GOAL:
+The group system should transform fitness from a lonely activity into:
+- a social adventure
+- a team experience
+- a community lifestyle
+- a real-world cooperative game
+
+The app should make users more likely to stay consistent because their friends, teams, and creature pals depend on them.
