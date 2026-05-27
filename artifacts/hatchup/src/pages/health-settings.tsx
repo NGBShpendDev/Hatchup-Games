@@ -261,7 +261,7 @@ export default function HealthSettings() {
               </div>
             </div>
             <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-              Full Apple Health and Apple Watch support is coming in the HatchUp mobile app. Steps, workouts, sleep, and heart rate will all sync to power your Pals.
+              Full Apple Health and Apple Watch support is coming in the HatchUp Fitness Pals mobile app. Steps, workouts, sleep, and heart rate will all sync to power your Pals.
             </p>
             {appleNotifyRequested ? (
               <div className="flex items-center gap-2 text-sm text-green-400 bg-green-400/10 border border-green-400/20 rounded-xl px-4 py-2.5">
@@ -341,7 +341,7 @@ export default function HealthSettings() {
                 className="overflow-hidden"
               >
                 <div className="px-5 pb-5 border-t border-border/30 pt-4 space-y-3 text-sm text-muted-foreground">
-                  <p>HatchUp reads the following data from Google Fit — <strong className="text-foreground">read-only, never written back</strong>:</p>
+                  <p>HatchUp Fitness Pals reads the following data from Google Fit — <strong className="text-foreground">read-only, never written back</strong>:</p>
                   <ul className="space-y-1.5 list-none">
                     {["Step count & distance", "Workout sessions & type", "Active minutes", "Sleep duration", "Calories burned"].map(item => (
                       <li key={item} className="flex items-center gap-2">
@@ -381,7 +381,7 @@ export default function HealthSettings() {
               </div>
               <h2 className="text-xl font-black text-center mb-1">Connect Google Fit</h2>
               <p className="text-sm text-muted-foreground text-center mb-5">
-                HatchUp will read the following data to reward your Pals for your real-world activity:
+                HatchUp Fitness Pals will read the following data to reward your Pals for your real-world activity:
               </p>
               <div className="space-y-2 mb-6">
                 {[

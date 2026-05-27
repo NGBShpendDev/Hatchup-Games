@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 const features = [
   { icon: Egg, title: "Hatch Your Pals", desc: "Walk, run, and train to hatch unique Fitness Pals from eggs powered by your real activity." },
   { icon: Activity, title: "Real Fitness Goals", desc: "Log steps, workouts, sleep, and nutrition — every rep evolves your Pals and unlocks new abilities." },
-  { icon: Heart, title: "Fitness Is Better With Pals", desc: "Your creatures cheer you on, grow stronger when you do, and need you to keep moving." },
+  { icon: Heart, title: "Fitness Is Better With Pals", desc: "Your Pals cheer you on, grow stronger when you do, and need you to keep moving." },
   { icon: Trophy, title: "Compete & Rank", desc: "Battle other Trainers, climb leaderboards, and win exclusive rewards with your Pals." },
   { icon: Users, title: "Train Together. Evolve Together.", desc: "Join clubs, tackle events, and grow stronger as a community." },
 ];
@@ -20,7 +20,7 @@ export default function Landing() {
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#ff2d55] to-[#bf00ff] flex items-center justify-center">
             <Egg size={16} className="text-white" />
           </div>
-          <span className="font-black text-lg tracking-tight">HatchUp</span>
+          <span className="font-black text-lg tracking-tight">HatchUp Fitness Pals</span>
         </div>
         <div className="flex items-center gap-3">
           <Link href="/sign-in">
@@ -52,7 +52,7 @@ export default function Landing() {
             </span>
           </h1>
           <p className="text-white/60 text-lg mb-3 leading-relaxed">
-            HatchUp Fitness Pals is the fitness RPG where your real workouts hatch and evolve your creature companions.
+            HatchUp Fitness Pals is the fitness RPG where your real workouts hatch and evolve your Pals.
             Walk to hatch eggs. Train to evolve. Compete to become legend.
           </p>
           <p className="text-white/40 text-sm mb-8 font-medium">Fitness Is Better With Pals.</p>

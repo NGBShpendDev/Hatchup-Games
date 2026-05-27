@@ -246,7 +246,7 @@ function ClerkProviderWithRoutes() {
       localization={{
         signIn: {
           start: {
-            title: "Welcome back, Trainer",
+            title: "Welcome back to HatchUp Fitness Pals",
             subtitle: "Sign in to continue your fitness journey",
           },
         },
