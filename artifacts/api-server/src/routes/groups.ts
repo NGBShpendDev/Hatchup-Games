@@ -21,6 +21,7 @@ import {
 import { logFitnessActivity } from "../services/fitnessLog";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
 import { blockMinorSocialWrite } from "../middlewares/minorGuard";
+import { blockSuspendedSocialWrite } from "../middlewares/suspendedGuard";
 
 const router = Router();
 
@@ -457,7 +458,7 @@ router.get("/groups/:id/messages", requireAuth, attachPlayer, async (req, res) =
 });
 
 // POST /groups/:id/messages — membership required
-router.post("/groups/:id/messages", requireAuth, attachPlayer, blockMinorSocialWrite, async (req, res) => {
+router.post("/groups/:id/messages", requireAuth, attachPlayer, blockSuspendedSocialWrite, blockMinorSocialWrite, async (req, res) => {
   const params = GetGroupParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const body = SendGroupMessageBody.safeParse(req.body);

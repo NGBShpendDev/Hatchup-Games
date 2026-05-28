@@ -9,7 +9,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Shield, Flag, CheckCircle, X, AlertTriangle, User } from "lucide-react";
+import { Shield, Flag, CheckCircle, X, AlertTriangle, User, Ban } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface AdminReport {
@@ -69,6 +69,32 @@ export default function AdminReports() {
     if (res.ok) {
       toast({ title: action === "resolved" ? "Report resolved" : "Report dismissed" });
       qc.invalidateQueries({ queryKey: ["admin-reports"] });
+    }
+  };
+
+  const handleSuspend = async (reportedUserId: number, reportId: number) => {
+    if (!confirm(`Suspend account #${reportedUserId}? They will be blocked from posting, commenting, reacting, and following until you unsuspend them.`)) {
+      return;
+    }
+    const res = await fetch(`/api/admin/players/${reportedUserId}/suspend`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isSuspended: true }),
+    });
+    if (res.ok) {
+      toast({ title: `Account #${reportedUserId} suspended` });
+      // Auto-resolve the report once the author is suspended.
+      await fetch(`/api/admin/reports/${reportId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "resolved" }),
+      });
+      qc.invalidateQueries({ queryKey: ["admin-reports"] });
+    } else {
+      const err = await res.json().catch(() => ({}));
+      toast({ title: "Failed to suspend", description: err.error ?? "Try again later", variant: "destructive" });
     }
   };
 
@@ -167,22 +193,35 @@ export default function AdminReports() {
                     )}
 
                     {report.status === "open" && (
-                      <div className="flex gap-2">
-                        <NeonButton
-                          size="sm"
-                          onClick={() => handleAction(report.id, "resolved")}
-                          className="flex-1"
-                        >
-                          <CheckCircle className="w-3 h-3 mr-1" /> Resolve
-                        </NeonButton>
-                        <NeonButton
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => handleAction(report.id, "dismissed")}
-                          className="flex-1"
-                        >
-                          <X className="w-3 h-3 mr-1" /> Dismiss
-                        </NeonButton>
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <NeonButton
+                            size="sm"
+                            onClick={() => handleAction(report.id, "resolved")}
+                            className="flex-1"
+                          >
+                            <CheckCircle className="w-3 h-3 mr-1" /> Resolve
+                          </NeonButton>
+                          <NeonButton
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleAction(report.id, "dismissed")}
+                            className="flex-1"
+                          >
+                            <X className="w-3 h-3 mr-1" /> Dismiss
+                          </NeonButton>
+                        </div>
+                        {report.reportedUserId && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleSuspend(report.reportedUserId!, report.id)}
+                            className="w-full"
+                            data-testid={`button-suspend-${report.reportedUserId}`}
+                          >
+                            <Ban className="w-3 h-3 mr-1" /> Suspend author #{report.reportedUserId}
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>

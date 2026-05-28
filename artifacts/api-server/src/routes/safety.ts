@@ -329,6 +329,52 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
   });
 });
 
+// ── Admin: suspend / unsuspend account ──────────────────────────────────────
+
+// PATCH /api/admin/players/:id/suspend
+// body: { isSuspended: boolean }
+router.patch("/admin/players/:id/suspend", requireAuth, attachPlayer, async (req, res) => {
+  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!caller?.isAdmin) {
+    res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+  const targetId = Number(req.params.id);
+  if (isNaN(targetId)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  if (targetId === caller.id) {
+    res.status(400).json({ error: "Admins cannot suspend themselves" });
+    return;
+  }
+  const body = req.body as { isSuspended?: unknown };
+  if (typeof body.isSuspended !== "boolean") {
+    res.status(400).json({ error: "isSuspended (boolean) is required" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(playersTable)
+    .set({ isSuspended: body.isSuspended })
+    .where(eq(playersTable.id, targetId))
+    .returning({
+      id: playersTable.id,
+      username: playersTable.username,
+      isSuspended: playersTable.isSuspended,
+    });
+  if (!updated) {
+    res.status(404).json({ error: "Player not found" });
+    return;
+  }
+
+  req.log.info(
+    { adminId: caller.id, targetId, isSuspended: body.isSuspended },
+    "admin toggled account suspension",
+  );
+  res.json({ success: true, player: updated });
+});
+
 // ── Admin: approve profile verification ─────────────────────────────────────
 
 // POST /api/admin/players/:id/verify
