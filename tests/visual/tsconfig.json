@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["es2022", "dom"],
+    "types": ["node"],
+    "noEmit": true,
+    "allowImportingTsExtensions": false
+  },
+  "include": ["playwright.config.ts", "tests/**/*.ts"]
+}
