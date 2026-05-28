@@ -18,7 +18,7 @@ import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Bell, CheckCheck, Mail, Trophy, Clock, Sparkles, Users, Swords, Check, X, Loader2 } from "lucide-react";
+import { Bell, CheckCheck, Mail, Trophy, Clock, Sparkles, Users, Swords, Check, X, Loader2, ShieldAlert, ShieldCheck, BadgeCheck, Apple, Crown, Medal } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
@@ -66,6 +66,13 @@ const TYPE_META: Record<string, { icon: typeof Bell; color: string }> = {
   club_invite:        { icon: Users,     color: "from-indigo-500 to-violet-500" },
   artifact_unlock:    { icon: Sparkles,  color: "from-fuchsia-500 to-purple-500" },
   rematch_invite:     { icon: Swords,    color: "from-red-500 to-pink-600" },
+  account_suspended:  { icon: ShieldAlert, color: "from-red-600 to-rose-700" },
+  account_restored:   { icon: ShieldCheck, color: "from-emerald-500 to-green-600" },
+  account_verified:   { icon: BadgeCheck,  color: "from-sky-500 to-cyan-500" },
+  nutrition_recap:    { icon: Apple,       color: "from-lime-500 to-emerald-500" },
+  tournament_advanced:  { icon: Medal,  color: "from-yellow-500 to-amber-500" },
+  tournament_eliminated:{ icon: Swords, color: "from-zinc-500 to-slate-600" },
+  tournament_champion:  { icon: Crown,  color: "from-amber-400 to-yellow-500" },
 };
 
 function iconFor(type: string) {
