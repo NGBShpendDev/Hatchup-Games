@@ -1,18 +1,28 @@
 /**
- * Artifact catalog seed — run once at bootstrap.
- * Safe to re-run (ON CONFLICT DO NOTHING).
+ * Artifact catalog seed — run with: pnpm --filter @workspace/db seed:artifacts
+ * Safe to re-run: uses ON CONFLICT DO NOTHING (idempotent by name).
  *
  * 20 artifacts across 7 rarity tiers:
  * Common → Rare → Epic → Legendary → Mythic → Ancient → Celestial
  *
- * Trigger keys:
+ * Trigger keys (maps to artifactService.ts BAR_ACTIVITY_MAP / fitness columns):
  *   streak_days, total_steps, total_workouts,
  *   lifetime_pushups, lifetime_squats,
  *   strength_bar_level, speed_bar_level, endurance_bar_level,
  *   discipline_bar_level, agility_bar_level
  */
 
-export const ARTIFACT_CATALOG = [
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
+import * as schema from "../schema/index.js";
+
+const { Pool } = pg;
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const db = drizzle(pool, { schema });
+
+type ArtifactInsert = typeof schema.artifactsTable.$inferInsert;
+
+const CATALOG: ArtifactInsert[] = [
   // ── Common ────────────────────────────────────────────────────────────────
   {
     name: "Ember Spark",
@@ -146,6 +156,20 @@ export const ARTIFACT_CATALOG = [
     triggerKey: "lifetime_squats",
     triggerValue: 1000,
   },
+  {
+    name: "Agile Phantom",
+    lore: "Speed Bar level 10. Faster than thought, lighter than breath.",
+    rarity: "Epic",
+    type: "bar_level",
+    imageSlug: "agile_phantom",
+    isHidden: false,
+    abilities: [
+      { name: "Phantom Step", description: "+30% speed bar XP", value: 30 },
+      { name: "Blur", description: "+10% XP from agility activities", value: 10 },
+    ],
+    triggerKey: "speed_bar_level",
+    triggerValue: 10,
+  },
   // ── Legendary ─────────────────────────────────────────────────────────────
   {
     name: "Marathon Spirit",
@@ -260,18 +284,21 @@ export const ARTIFACT_CATALOG = [
     triggerKey: "total_steps",
     triggerValue: 10000000,
   },
-  {
-    name: "Agile Phantom",
-    lore: "Speed Bar level 10. Faster than thought, lighter than breath.",
-    rarity: "Epic",
-    type: "bar_level",
-    imageSlug: "agile_phantom",
-    isHidden: false,
-    abilities: [
-      { name: "Phantom Step", description: "+30% speed bar XP", value: 30 },
-      { name: "Blur", description: "+10% XP from agility activities", value: 10 },
-    ],
-    triggerKey: "speed_bar_level",
-    triggerValue: 10,
-  },
-] as const;
+];
+
+async function main() {
+  console.log(`Seeding ${CATALOG.length} artifacts…`);
+  for (const artifact of CATALOG) {
+    await db
+      .insert(schema.artifactsTable)
+      .values(artifact)
+      .onConflictDoNothing({ target: schema.artifactsTable.name });
+  }
+  console.log("Done. Artifact catalog seeded (duplicates skipped).");
+  await pool.end();
+}
+
+main().catch((err) => {
+  console.error("Seed failed:", err);
+  process.exit(1);
+});

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { artifactsTable, playerArtifactsTable, playersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
 import {
   getPlayerFitnessBars,

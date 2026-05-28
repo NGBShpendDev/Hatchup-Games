@@ -5,7 +5,7 @@ import { z } from "zod/v4";
 // ── Artifact catalog ──────────────────────────────────────────────────────────
 export const artifactsTable = pgTable("artifacts", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull(),
+  name: text("name").notNull().unique(),
   lore: text("lore").notNull(),
   rarity: text("rarity").notNull(), // Common | Rare | Epic | Legendary | Mythic | Ancient | Celestial
   type: text("type").notNull(),     // fitness_streak | steps_milestone | workout_count | bar_level | special
