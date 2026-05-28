@@ -18,6 +18,7 @@ import { logger } from "./lib/logger.ts";
 import { startPassiveSyncJob } from "./services/passiveSyncJob.ts";
 import { startWeeklyNutritionRecapJob } from "./services/weeklyNutritionRecapJob.ts";
 import { startPostPurgeJob } from "./services/postPurgeJob.ts";
+import { startEmailVerificationSweepJob } from "./services/emailVerificationSweepJob.ts";
 import { WebhookHandlers } from "./webhookHandlers.ts";
 
 const app: Express = express();
@@ -143,5 +144,6 @@ app.use(ogClubRouter);
 startPassiveSyncJob();
 startWeeklyNutritionRecapJob();
 startPostPurgeJob();
+startEmailVerificationSweepJob();
 
 export default app;
