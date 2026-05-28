@@ -10,6 +10,8 @@ import {
 } from "@workspace/db";
 import { eq, desc, and, gt, lt, sql, inArray } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { awardBadge } from "../services/badgeService";
+import { computeChallengeReward } from "../services/challengeRewards";
 
 const router = Router();
 
@@ -109,16 +111,22 @@ async function finalizeChallenge(challengeId: number) {
       .set({ rank })
       .where(eq(challengeParticipantsTable.id, participants[i].id));
 
-    // Grant rewards to top 3
+    // Grant rewards to top 3. Elimination tournament champions (sole
+    // survivor at rank 1) get a 2× boost on top of normal first-place pay
+    // and a Tournament Champion badge that surfaces on their profile.
     if (rank <= 3) {
-      const xpGrant = rank === 1 ? challenge.rewardXp : rank === 2 ? Math.floor(challenge.rewardXp * 0.6) : Math.floor(challenge.rewardXp * 0.3);
-      const coinsGrant = rank === 1 ? challenge.rewardCoins : rank === 2 ? Math.floor(challenge.rewardCoins * 0.6) : Math.floor(challenge.rewardCoins * 0.3);
-      await db.update(playersTable)
-        .set({
-          xp: sql`${playersTable.xp} + ${xpGrant}`,
-          coins: sql`${playersTable.coins} + ${coinsGrant}`,
-        })
-        .where(eq(playersTable.id, participants[i].playerId));
+      const grant = computeChallengeReward(rank, challenge.rewardXp, challenge.rewardCoins, challenge.isElimination);
+      if (grant.xp > 0 || grant.coins > 0) {
+        await db.update(playersTable)
+          .set({
+            xp: sql`${playersTable.xp} + ${grant.xp}`,
+            coins: sql`${playersTable.coins} + ${grant.coins}`,
+          })
+          .where(eq(playersTable.id, participants[i].playerId));
+      }
+      if (grant.isChampion) {
+        await awardBadge(participants[i].playerId, "TOURNAMENT_CHAMPION");
+      }
     }
   }
 

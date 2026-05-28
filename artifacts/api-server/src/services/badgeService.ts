@@ -50,6 +50,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
   { key: "PRESTIGE_ONE",     name: "Prestige I",        description: "Complete your first prestige",          tier: "Mythic",    category: "achievement", icon: "🌈", isSecret: false, xpReward: 10000, coinsReward: 5000 },
   { key: "CHAMPION",         name: "Champion",          description: "Win your first competition",            tier: "Common",    category: "achievement", icon: "🥇", isSecret: false, xpReward: 100,   coinsReward: 50   },
   { key: "TOURNAMENT_KING",  name: "Tournament King",   description: "Win 10 competitions",                   tier: "Rare",      category: "achievement", icon: "👑", isSecret: false, xpReward: 500,   coinsReward: 250  },
+  { key: "TOURNAMENT_CHAMPION", name: "Tournament Champion", description: "Survive every round of an elimination tournament and claim the crown", tier: "Legendary", category: "achievement", icon: "🏆", isSecret: false, xpReward: 1500, coinsReward: 750 },
   { key: "DAILY_DEVOTEE",    name: "Daily Devotee",     description: "Claim daily reward 7 days in a row",    tier: "Rare",      category: "achievement", icon: "📅", isSecret: false, xpReward: 300,   coinsReward: 150  },
 
   // Event / special
