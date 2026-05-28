@@ -96,7 +96,7 @@ function StreakProtectionCard({ coins }: { coins: number }) {
           </Text>
         </View>
         <View style={[shieldStyles.countBadge, { backgroundColor: "#22d3ee18" }]}>
-          <Text style={shieldStyles.countText}>{shieldCount}</Text>
+          <Text testID="streak-shield-count" style={shieldStyles.countText}>{shieldCount}</Text>
           <Text style={shieldStyles.countLabel}>{shieldCount === 1 ? "shield" : "shields"}</Text>
         </View>
       </View>
@@ -117,7 +117,7 @@ function StreakProtectionCard({ coins }: { coins: number }) {
 
       {message && (
         <View style={[shieldStyles.message, { backgroundColor: message.ok ? "#22d3ee18" : "#ef444418", borderColor: message.ok ? "#22d3ee44" : "#ef444444" }]}>
-          <Text style={[shieldStyles.messageText, { color: message.ok ? "#22d3ee" : "#ef4444" }]}>{message.text}</Text>
+          <Text testID="shield-buy-message" style={[shieldStyles.messageText, { color: message.ok ? "#22d3ee" : "#ef4444" }]}>{message.text}</Text>
         </View>
       )}
 
