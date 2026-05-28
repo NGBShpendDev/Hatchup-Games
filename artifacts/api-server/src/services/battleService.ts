@@ -1,4 +1,19 @@
 import type { Hatchling, Player } from "@workspace/db";
+import type {
+  BattleState,
+  BattleTurnResult,
+  BattleTurnResultMove,
+  EquippedArtifactSlot,
+  FighterState,
+} from "@workspace/api-client-react";
+
+// Re-export the contract-driven shapes so existing consumers (e.g.
+// matchmakingQueue) can keep importing them from this module. The
+// canonical definitions live in `lib/api-spec/openapi.yaml` and any
+// field added there is automatically reflected here via codegen.
+export type { BattleState, EquippedArtifactSlot, FighterState };
+export type TurnResult = BattleTurnResult;
+export type MoveType = BattleTurnResultMove;
 
 // ── Elemental advantage map ────────────────────────────────────────────────
 // Strength > Balance > Cardio > Beast > Strength (rock-paper-scissors cycle)
@@ -16,8 +31,6 @@ export function getElementalMod(attackerRealm: string, defenderRealm: string): n
 }
 
 // ── Move definitions ──────────────────────────────────────────────────────
-export type MoveType = "basic_attack" | "special_move" | "defend" | "use_item";
-
 export interface MoveResult {
   move: MoveType;
   damage: number;
@@ -26,65 +39,6 @@ export interface MoveResult {
   isCrit: boolean;
   isSuper: boolean;
   energyCost: number;
-}
-
-export interface TurnResult {
-  turnNumber: number;
-  actingSlot: 1 | 2;
-  move: MoveType;
-  damage: number;
-  healing: number;
-  isCrit: boolean;
-  isSuper: boolean;
-  p1HpAfter: number;
-  p2HpAfter: number;
-  p1EnergyAfter: number;
-  p2EnergyAfter: number;
-}
-
-// ── Artifact slot info (for display and effects) ──────────────────────────
-export interface EquippedArtifactSlot {
-  id: number;
-  name: string;
-  rarity: string;
-  imageSlug: string;
-  slot: "major" | "minor";
-  isPowered: boolean;   // false = fitness-streak not met (dormant)
-  evolutionStage: number;
-}
-
-// ── Fighter state ─────────────────────────────────────────────────────────
-export interface FighterState {
-  playerId: number;  // 0 = bot
-  playerUsername: string | null;     // null for bots
-  playerDisplayName: string | null;  // null for bots
-  hatchlingId: number;
-  hatchlingName: string;
-  hatchlingLevel: number;
-  realm: string;
-  maxHp: number;
-  currentHp: number;
-  maxEnergy: number;
-  energy: number;
-  speed: number;
-  defenseBonus: number;   // flat damage reduction while defending
-  specialCooldown: number; // turns remaining before special available again
-  itemUsed: boolean;
-  isBot: boolean;
-  equippedArtifacts: EquippedArtifactSlot[];
-  artifactPowerScore: number;
-}
-
-export interface BattleState {
-  battleId: number;
-  mode: "casual" | "ranked";
-  fighter1: FighterState;
-  fighter2: FighterState;
-  currentSlot: 1 | 2;  // whose turn it is
-  turnNumber: number;   // 0-based total turns elapsed
-  phase: "lobby" | "active" | "ended";
-  winner: 0 | 1 | 2 | null;  // slot that won (1 or 2), 0 = draw, null = ongoing
-  turns: TurnResult[];
 }
 
 // ── Stat derivation ──────────────────────────────────────────────────────

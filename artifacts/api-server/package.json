@@ -35,6 +35,7 @@
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
+    "@workspace/api-client-react": "workspace:*",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "catalog:",
