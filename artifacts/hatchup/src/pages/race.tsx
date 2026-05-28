@@ -1,7 +1,13 @@
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
-import { useListHatchlings, getListHatchlingsQueryKey, useCreateCompetition } from "@workspace/api-client-react";
+import {
+  useListHatchlings,
+  getListHatchlingsQueryKey,
+  useCreateCompetition,
+  getGetHatchlingQueryKey,
+} from "@workspace/api-client-react";
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -31,6 +37,7 @@ export default function Race() {
   );
 
   const startMutation = useCreateCompetition();
+  const queryClient = useQueryClient();
 
   const startRace = () => {
     if (!selectedHatchlingId) return;
@@ -61,6 +68,19 @@ export default function Race() {
                 energyDelta,
               });
             }
+            // Refetch authoritative hatchling state so the centralized
+            // EvolutionShareProvider watcher sees the post-race level/stage
+            // (the server is the source of truth for XP grants). If the
+            // server's reward crosses an evolution threshold, the watcher
+            // fires the evolve mutation and surfaces the share prompt.
+            if (selectedHatchlingId) {
+              queryClient.invalidateQueries({
+                queryKey: getGetHatchlingQueryKey(selectedHatchlingId),
+              });
+            }
+            queryClient.invalidateQueries({
+              queryKey: getListHatchlingsQueryKey({ playerId: pid }),
+            });
           },
           onError: () => {
             toast({ title: "Error", description: "Failed to complete race.", variant: "destructive" });

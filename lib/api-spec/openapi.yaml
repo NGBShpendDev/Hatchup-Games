@@ -1112,6 +1112,46 @@ paths:
               schema:
                 $ref: "#/components/schemas/LiveEvent"
 
+  /events/{id}/join:
+    post:
+      operationId: joinLiveEvent
+      tags: [events]
+      summary: Join a live event and claim entry rewards
+      description: |
+        Records the authenticated player's participation in the given live
+        event. The server is the source of truth for any XP/reward granted —
+        the client must refetch hatchling state afterward. The centralized
+        evolution share prompt fires automatically if a Pal's post-join
+        level crosses an evolution threshold.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Join acknowledged
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [eventId, joinedAt]
+                properties:
+                  eventId:
+                    type: integer
+                  joinedAt:
+                    type: string
+                    format: date-time
+                  xpEarned:
+                    type: integer
+                  coinsEarned:
+                    type: integer
+        "404":
+          description: Event not found
+        "409":
+          description: Event not currently active
+
   # ── Clubs ─────────────────────────────────────────────────────────────────
   /clubs:
     get:

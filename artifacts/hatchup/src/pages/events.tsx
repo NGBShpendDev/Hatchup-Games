@@ -1,6 +1,14 @@
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
-import { useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
+import {
+  useListEvents,
+  getListEventsQueryKey,
+  useListHatchlings,
+  getListHatchlingsQueryKey,
+  useJoinLiveEvent,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,11 +21,61 @@ import { SafetyBanner } from "@/components/safety-banner";
 import { ErrorCard } from "@/components/error-card";
 
 export default function Events() {
-  const { player } = usePlayer();
+  const { player, playerId } = usePlayer();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const pid = playerId ?? 0;
   const { data: events, isLoading, isError, refetch } = useListEvents(
     {},
     { query: { queryKey: getListEventsQueryKey({}) } }
   );
+  const { data: playerHatchlings } = useListHatchlings(
+    { playerId: pid },
+    { query: { enabled: !!playerId, queryKey: getListHatchlingsQueryKey({ playerId: pid }) } },
+  );
+  const joinEventMutation = useJoinLiveEvent();
+
+  // Joining an event hits the server-authoritative POST /events/:id/join
+  // endpoint, then refetches the player's hatchling roster ONLY after a
+  // successful response. Any XP/level-up that the server grants as part of
+  // the event reward will surface to the centralized EvolutionShareProvider
+  // watcher via the refetched data — so when a Pal's post-event level
+  // crosses an evolution threshold, the share prompt fires automatically.
+  // The UI click itself never grants an evolution.
+  const handleJoinEvent = (eventId: number, eventName: string) => {
+    joinEventMutation.mutate(
+      { id: eventId },
+      {
+        onSuccess: () => {
+          const activeId = player?.activeHatchlingId ?? null;
+          const target =
+            (playerHatchlings && playerHatchlings.length > 0)
+              ? ((activeId != null ? playerHatchlings.find(h => h.id === activeId) : null) ??
+                 playerHatchlings.find(h => (h.evolutionStage ?? 1) < 3) ??
+                 playerHatchlings[0])
+              : null;
+          toast({
+            title: "Joined event!",
+            description: target
+              ? `${target.name} is ready to earn ${eventName} rewards.`
+              : `You're in for ${eventName}. Hatch a Pal to earn evolution rewards.`,
+          });
+          if (pid) {
+            queryClient.invalidateQueries({
+              queryKey: getListHatchlingsQueryKey({ playerId: pid }),
+            });
+          }
+        },
+        onError: () => {
+          toast({
+            title: "Couldn't join event",
+            description: `${eventName} is not accepting entries right now.`,
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
 
   const hasActiveEvent = events?.some(e => e.status === "active");
   const hasEmergencyContact =
@@ -139,7 +197,13 @@ export default function Events() {
                           )}
                         </div>
                         {event.status === "active" ? (
-                          <NeonButton size="lg" className="w-full md:w-auto">
+                          <NeonButton
+                            size="lg"
+                            className="w-full md:w-auto"
+                            onClick={() => handleJoinEvent(event.id, event.name)}
+                            disabled={joinEventMutation.isPending}
+                            data-testid={`button-join-event-${event.id}`}
+                          >
                             Join Event
                           </NeonButton>
                         ) : (

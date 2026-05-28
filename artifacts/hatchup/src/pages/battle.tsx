@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -25,6 +25,8 @@ import {
   declineBattleRematch,
   useListBattleHistory,
   useListBattleRivals,
+  getListHatchlingsQueryKey,
+  getGetHatchlingQueryKey,
 } from "@workspace/api-client-react";
 import type {
   BattleState,
@@ -53,6 +55,7 @@ interface Hatchling {
   species: string;
   rarity: string;
   color?: string;
+  evolutionStage?: number;
 }
 
 interface OwnedArtifact {
@@ -373,6 +376,7 @@ export default function BattlePage() {
   const [artifactXpGains, setArtifactXpGains] = useState<ArtifactXpGain[]>([]);
   const [queueSecs, setQueueSecs] = useState(0);
   const [rewardSummary, setRewardSummary] = useState<{ open: boolean; entries: RewardEntry[]; title?: string }>({ open: false, entries: [] });
+  const queryClient = useQueryClient();
 
   // Rematch invite state — when set, join_queue carries this id and the server
   // pairs the two invite parties directly instead of generic matchmaking.
@@ -576,6 +580,21 @@ export default function BattlePage() {
         if (stageUps > 0) entries.push({ kind: "hatchling", label: `${stageUps} artifact stage-up${stageUps === 1 ? "" : "s"}`, detail: "Power scaled up." });
         if (entries.length === 0) entries.push({ kind: "xp", label: "Victory!", detail: "GG — keep the streak alive." });
         setRewardSummary({ open: true, entries, title: "Victory Rewards" });
+        // Refetch authoritative hatchling state so the centralized
+        // EvolutionShareProvider watcher sees the post-battle level/stage
+        // (the server is the source of truth for XP grants). If the
+        // server's reward crosses an evolution threshold, the watcher
+        // fires the evolve mutation and surfaces the share prompt.
+        if (selectedHatchling) {
+          queryClient.invalidateQueries({
+            queryKey: getGetHatchlingQueryKey(selectedHatchling.id),
+          });
+        }
+        if (pid) {
+          queryClient.invalidateQueries({
+            queryKey: getListHatchlingsQueryKey({ playerId: pid }),
+          });
+        }
       }
     }
     if (msg.type === "error") {

@@ -3453,6 +3453,13 @@ export const ListEventsStatus = {
   past: 'past',
 } as const;
 
+export type JoinLiveEvent200 = {
+  eventId: number;
+  joinedAt: string;
+  xpEarned?: number;
+  coinsEarned?: number;
+};
+
 export type ListClubsParams = {
 limit?: number;
 };

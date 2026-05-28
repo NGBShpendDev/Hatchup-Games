@@ -139,6 +139,7 @@ import type {
   JoinFamilyGroupInput,
   JoinGroupByCodeInput,
   JoinGroupInput,
+  JoinLiveEvent200,
   JoinLocalChallenge200,
   KickClubMember200,
   LeaderboardEntry,
@@ -4148,6 +4149,82 @@ export function useGetLiveEvent<TData = Awaited<ReturnType<typeof getLiveEvent>>
 
 
 
+
+export const getJoinLiveEventUrl = (id: number,) => {
+
+
+
+
+  return `/api/events/${id}/join`
+}
+
+/**
+ * Records the authenticated player's participation in the given live
+event. The server is the source of truth for any XP/reward granted —
+the client must refetch hatchling state afterward. The centralized
+evolution share prompt fires automatically if a Pal's post-join
+level crosses an evolution threshold.
+
+ * @summary Join a live event and claim entry rewards
+ */
+export const joinLiveEvent = async (id: number, options?: RequestInit): Promise<JoinLiveEvent200> => {
+
+  return customFetch<JoinLiveEvent200>(getJoinLiveEventUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getJoinLiveEventMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinLiveEvent>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof joinLiveEvent>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['joinLiveEvent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof joinLiveEvent>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  joinLiveEvent(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type JoinLiveEventMutationResult = NonNullable<Awaited<ReturnType<typeof joinLiveEvent>>>
+
+    export type JoinLiveEventMutationError = ErrorType<void>
+
+    /**
+ * @summary Join a live event and claim entry rewards
+ */
+export const useJoinLiveEvent = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinLiveEvent>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof joinLiveEvent>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getJoinLiveEventMutationOptions(options));
+    }
 
 export const getListClubsUrl = (params?: ListClubsParams,) => {
   const normalizedParams = new URLSearchParams();

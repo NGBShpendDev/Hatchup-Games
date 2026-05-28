@@ -1,8 +1,18 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { liveEventsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { liveEventsTable, hatchlingsTable, playersTable, eventParticipantsTable } from "@workspace/db";
+import { and, eq, sql } from "drizzle-orm";
 import { ListEventsQueryParams, GetLiveEventParams } from "@workspace/api-zod";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+
+// Live event entry-reward XP grant. Kept small and flat so it can't replace
+// real progression — it exists so a level-up that crosses an evolution
+// threshold can actually be triggered by an event entry.
+const EVENT_JOIN_XP = 100;
+// Simple, monotonic leveling rule used wherever the server bumps hatchling
+// XP outside of the dedicated evolve flow. 100 XP per level keeps the
+// math obvious and matches the entry-reward grant size.
+const XP_PER_LEVEL = 100;
 
 const router = Router();
 
@@ -23,6 +33,95 @@ router.get("/events/:id", async (req, res) => {
   const event = await db.query.liveEventsTable.findFirst({ where: eq(liveEventsTable.id, params.data.id) });
   if (!event) { res.status(404).json({ error: "Event not found" }); return; }
   res.json({ ...event, startsAt: event.startsAt.toISOString(), endsAt: event.endsAt.toISOString() });
+});
+
+// Server-side event join. Idempotent — uses the unique
+// (event_id, player_id) constraint on `event_participants` to guarantee
+// that XP grants and the participant counter bump fire exactly once per
+// player per event. Repeated calls return 200 with xpEarned=0.
+//
+// On first join the route grants a flat EVENT_JOIN_XP bump to the
+// player's active hatchling (or first owned Pal), bumps level via
+// XP_PER_LEVEL, and increments the event's participant counter. The
+// frontend refetches hatchling state on success so the centralized
+// EvolutionShareProvider watcher can surface the share prompt when this
+// entry pushes a Pal across an evolution threshold.
+router.post("/events/:id/join", requireAuth, attachPlayer, async (req, res) => {
+  const params = GetLiveEventParams.safeParse({ id: Number(req.params.id) });
+  if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const event = await db.query.liveEventsTable.findFirst({ where: eq(liveEventsTable.id, params.data.id) });
+  if (!event) { res.status(404).json({ error: "Event not found" }); return; }
+  if (event.status !== "active") { res.status(409).json({ error: "Event not currently active" }); return; }
+
+  // Idempotency gate: insert the participant row first. If a row already
+  // exists for (event, player), onConflictDoNothing returns no rows and
+  // we skip XP grants + the participants bump entirely.
+  const inserted = await db
+    .insert(eventParticipantsTable)
+    .values({ eventId: event.id, playerId: req.playerId! })
+    .onConflictDoNothing({
+      target: [eventParticipantsTable.eventId, eventParticipantsTable.playerId],
+    })
+    .returning();
+
+  if (inserted.length === 0) {
+    res.json({
+      eventId: event.id,
+      joinedAt: new Date().toISOString(),
+      xpEarned: 0,
+      coinsEarned: 0,
+    });
+    return;
+  }
+
+  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!player) { res.status(404).json({ error: "Player not found" }); return; }
+
+  // Pick the target Pal — active hatchling first, otherwise the player's
+  // first owned hatchling. If they have none, the join still succeeds
+  // (no XP applied) so the UI can show the join confirmation.
+  let target = player.activeHatchlingId
+    ? await db.query.hatchlingsTable.findFirst({
+        where: and(
+          eq(hatchlingsTable.id, player.activeHatchlingId),
+          eq(hatchlingsTable.playerId, player.id),
+        ),
+      })
+    : undefined;
+  if (!target) {
+    target = await db.query.hatchlingsTable.findFirst({
+      where: eq(hatchlingsTable.playerId, player.id),
+    });
+  }
+
+  if (target) {
+    const newXp = target.xp + EVENT_JOIN_XP;
+    const newLevel = Math.max(target.level, 1 + Math.floor(newXp / XP_PER_LEVEL));
+    await db
+      .update(hatchlingsTable)
+      .set({ xp: newXp, level: newLevel })
+      .where(eq(hatchlingsTable.id, target.id));
+  }
+
+  // Derive the participant counter from the dedup table to keep it
+  // race-safe under concurrent first-joins.
+  await db
+    .update(liveEventsTable)
+    .set({
+      participants: sql<number>`(
+        select count(*)::int from ${eventParticipantsTable}
+        where ${eventParticipantsTable.eventId} = ${event.id}
+      )`,
+    })
+    .where(eq(liveEventsTable.id, event.id));
+
+  res.json({
+    eventId: event.id,
+    joinedAt: inserted[0].joinedAt.toISOString(),
+    xpEarned: target ? EVENT_JOIN_XP : 0,
+    coinsEarned: 0,
+  });
 });
 
 export default router;

@@ -1389,6 +1389,27 @@ export const GetLiveEventResponse = zod.object({
 
 
 /**
+ * Records the authenticated player's participation in the given live
+event. The server is the source of truth for any XP/reward granted —
+the client must refetch hatchling state afterward. The centralized
+evolution share prompt fires automatically if a Pal's post-join
+level crosses an evolution threshold.
+
+ * @summary Join a live event and claim entry rewards
+ */
+export const JoinLiveEventParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const JoinLiveEventResponse = zod.object({
+  "eventId": zod.number(),
+  "joinedAt": zod.coerce.date(),
+  "xpEarned": zod.number().optional(),
+  "coinsEarned": zod.number().optional()
+})
+
+
+/**
  * @summary List clubs/guilds
  */
 export const listClubsQueryLimitDefault = 20;
