@@ -15,7 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import {
   Heart, Flame, Zap, Dumbbell, MessageCircle, Share2, Trash2,
-  Send, ChevronDown, ChevronUp, Award, Sparkles,
+  Send, ChevronDown, ChevronUp, Award, Sparkles, Eye,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -260,6 +260,16 @@ export function PostCard({
               {post.commentCount > 0 && post.commentCount}
               {showComments ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             </button>
+            {((post as any).viewCount ?? 0) > 0 && (
+              <div
+                className="flex items-center gap-1 px-2 py-1 rounded-full text-xs text-muted-foreground font-bold"
+                title={`${(post as any).viewCount} ${(post as any).viewCount === 1 ? "view" : "views"}`}
+                data-testid={`text-view-count-${post.id}`}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>{(post as any).viewCount}</span>
+              </div>
+            )}
           </div>
 
           {/* Comments */}

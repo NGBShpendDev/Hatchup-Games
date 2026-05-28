@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useRoute, useLocation, Link } from "wouter";
 import { Show, useClerk } from "@clerk/react";
 import { Layout } from "@/components/layout";
@@ -15,6 +16,7 @@ import {
   getGetSocialFeedQueryKey,
   useReactToPost,
   useDeletePost,
+  useRecordPostView,
 } from "@workspace/api-client-react";
 
 function PostBody({ postId, viewerId }: { postId: number; viewerId: number | null }) {
@@ -37,6 +39,28 @@ function PostBody({ postId, viewerId }: { postId: number; viewerId: number | nul
 
   const reactToPost = useReactToPost();
   const deletePost = useDeletePost();
+  const recordView = useRecordPostView();
+  const viewedRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!Number.isFinite(postId) || postId <= 0) return;
+    if (viewedRef.current === postId) return;
+    viewedRef.current = postId;
+    recordView.mutate(
+      { id: postId },
+      {
+        onSuccess: (data) => {
+          if (data?.counted) {
+            qc.invalidateQueries({
+              queryKey: getGetPostQueryKey(postId, viewerId != null ? { playerId: viewerId } : undefined),
+            });
+          }
+        },
+      },
+    );
+    // recordView is a stable mutation; we intentionally only re-run when postId/viewer changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postId, viewerId]);
 
   async function handleReact(id: number, reactionType: string) {
     if (viewerId == null) return;

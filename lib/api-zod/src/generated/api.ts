@@ -2106,6 +2106,7 @@ export const GetSocialFeedResponse = zod.object({
   "energyEarned": zod.number(),
   "isFlagged": zod.boolean(),
   "engagementScore": zod.number(),
+  "viewCount": zod.number(),
   "createdAt": zod.string(),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),
@@ -2173,6 +2174,7 @@ export const GetPostResponse = zod.object({
   "energyEarned": zod.number(),
   "isFlagged": zod.boolean(),
   "engagementScore": zod.number(),
+  "viewCount": zod.number(),
   "createdAt": zod.string(),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),
@@ -2204,6 +2206,19 @@ export const DeletePostParams = zod.object({
 
 export const DeletePostQueryParams = zod.object({
   "playerId": zod.coerce.number()
+})
+
+
+/**
+ * @summary Record a view on a post (deduped per viewer per day)
+ */
+export const RecordPostViewParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RecordPostViewResponse = zod.object({
+  "viewCount": zod.number(),
+  "counted": zod.boolean()
 })
 
 
@@ -2403,6 +2418,7 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "energyEarned": zod.number(),
   "isFlagged": zod.boolean(),
   "engagementScore": zod.number(),
+  "viewCount": zod.number(),
   "createdAt": zod.string(),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),
@@ -2442,6 +2458,7 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "energyEarned": zod.number(),
   "isFlagged": zod.boolean(),
   "engagementScore": zod.number(),
+  "viewCount": zod.number(),
   "createdAt": zod.string(),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),
@@ -2538,6 +2555,7 @@ export const GetDailyMemoryResponse = zod.union([zod.object({
   "energyEarned": zod.number(),
   "isFlagged": zod.boolean(),
   "engagementScore": zod.number(),
+  "viewCount": zod.number(),
   "createdAt": zod.string(),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),

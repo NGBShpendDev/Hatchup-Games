@@ -1199,6 +1199,7 @@ export interface FeedPost {
   energyEarned: number;
   isFlagged: boolean;
   engagementScore: number;
+  viewCount: number;
   createdAt: string;
   reactionCounts: FeedPostReactionCounts;
   commentCount: number;
@@ -1266,6 +1267,11 @@ export interface PlayerSocialProfile {
   mutualFollowersTotal: number;
   /** Groups that both the viewer and this player are members of. */
   sharedGroups: SharedGroup[];
+}
+
+export interface ViewResult {
+  viewCount: number;
+  counted: boolean;
 }
 
 export interface RepostInput {

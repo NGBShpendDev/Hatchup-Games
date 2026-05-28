@@ -172,6 +172,7 @@ import type {
   UploadUrlResponse,
   UpsertNotificationBody,
   UseItemInput,
+  ViewResult,
   WorkoutGroupDetail,
   WorkoutGroupSummary,
   WorkoutPlan,
@@ -6477,6 +6478,76 @@ export const useDeletePost = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeletePostMutationOptions(options));
+    }
+
+export const getRecordPostViewUrl = (id: number,) => {
+
+
+
+
+  return `/api/social/posts/${id}/view`
+}
+
+/**
+ * @summary Record a view on a post (deduped per viewer per day)
+ */
+export const recordPostView = async (id: number, options?: RequestInit): Promise<ViewResult> => {
+
+  return customFetch<ViewResult>(getRecordPostViewUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRecordPostViewMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordPostView>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordPostView>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['recordPostView'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordPostView>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  recordPostView(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordPostViewMutationResult = NonNullable<Awaited<ReturnType<typeof recordPostView>>>
+
+    export type RecordPostViewMutationError = ErrorType<void>
+
+    /**
+ * @summary Record a view on a post (deduped per viewer per day)
+ */
+export const useRecordPostView = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordPostView>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordPostView>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getRecordPostViewMutationOptions(options));
     }
 
 export const getReactToPostUrl = (id: number,) => {

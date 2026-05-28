@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   postsTable,
+  postViewsTable,
   postReactionsTable,
   postCommentsTable,
   playerFollowsTable,
@@ -147,6 +148,7 @@ async function enrichPost(
     energyEarned: post.energyEarned,
     isFlagged: post.isFlagged,
     engagementScore: post.engagementScore,
+    viewCount: post.viewCount,
     createdAt: post.createdAt.toISOString(),
     reactionCounts,
     commentCount,
@@ -311,6 +313,55 @@ router.get("/social/posts/:id", async (req, res) => {
 
   const enriched = await enrichPost(post, viewerId);
   res.json(enriched);
+});
+
+// ── POST /social/posts/:id/view ─────────────────────────────────────────────
+// Public — anyone (logged in or anonymous) opening the permalink counts as a
+// view. Dedup is per (post, viewerKey, day) so spamming refresh doesn't inflate
+// the number. viewerKey = playerId for signed-in viewers; otherwise the request
+// IP. Always returns the current viewCount so the client can render it.
+
+router.post("/social/posts/:id/view", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) { res.status(404).json({ error: "Post not found" }); return; }
+
+  const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, id) });
+  if (!post) { res.status(404).json({ error: "Post not found" }); return; }
+
+  let viewerKey = `ip:${req.ip ?? "unknown"}`;
+  try {
+    const { getAuth } = await import("@clerk/express");
+    const auth = getAuth(req);
+    if (auth?.userId) {
+      const player = await db.query.playersTable.findFirst({
+        where: eq(playersTable.clerkId, auth.userId),
+      });
+      if (player) viewerKey = `player:${player.id}`;
+    }
+  } catch {
+    // fall back to IP-based dedup
+  }
+
+  const viewDate = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+
+  const inserted = await db
+    .insert(postViewsTable)
+    .values({ postId: id, viewerKey, viewDate })
+    .onConflictDoNothing({ target: [postViewsTable.postId, postViewsTable.viewerKey, postViewsTable.viewDate] })
+    .returning({ id: postViewsTable.id });
+
+  let viewCount = post.viewCount;
+  const counted = inserted.length > 0;
+  if (counted) {
+    const [updated] = await db
+      .update(postsTable)
+      .set({ viewCount: sql`${postsTable.viewCount} + 1` })
+      .where(eq(postsTable.id, id))
+      .returning({ viewCount: postsTable.viewCount });
+    viewCount = updated?.viewCount ?? viewCount + 1;
+  }
+
+  res.json({ viewCount, counted });
 });
 
 // ── DELETE /social/posts/:id ────────────────────────────────────────────────

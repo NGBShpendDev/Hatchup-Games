@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -13,8 +13,17 @@ export const postsTable = pgTable("posts", {
   energyEarned: integer("energy_earned").notNull().default(0),
   isFlagged: boolean("is_flagged").notNull().default(false),
   engagementScore: integer("engagement_score").notNull().default(0),
+  viewCount: integer("view_count").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const postViewsTable = pgTable("post_views", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").notNull(),
+  viewerKey: text("viewer_key").notNull(),
+  viewDate: text("view_date").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique("post_views_post_viewer_day_unique").on(t.postId, t.viewerKey, t.viewDate)]);
 
 export const postReactionsTable = pgTable("post_reactions", {
   id: serial("id").primaryKey(),

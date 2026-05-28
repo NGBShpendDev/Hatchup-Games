@@ -1797,6 +1797,27 @@ paths:
         "204":
           description: Deleted
 
+  /social/posts/{id}/view:
+    post:
+      operationId: recordPostView
+      tags: [social]
+      summary: Record a view on a post (deduped per viewer per day)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: View recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ViewResult"
+        "404":
+          description: Not found
+
   /social/posts/{id}/react:
     post:
       operationId: reactToPost
@@ -4120,7 +4141,7 @@ components:
     # ── Social ────────────────────────────────────────────────────────────────
     FeedPost:
       type: object
-      required: [id, playerId, content, postType, xpEarned, energyEarned, isFlagged, engagementScore, createdAt, authorName, reactionCounts, commentCount, myReaction]
+      required: [id, playerId, content, postType, xpEarned, energyEarned, isFlagged, engagementScore, viewCount, createdAt, authorName, reactionCounts, commentCount, myReaction]
       properties:
         id:              { type: integer }
         playerId:        { type: integer }
@@ -4136,6 +4157,7 @@ components:
         energyEarned:    { type: integer }
         isFlagged:       { type: boolean }
         engagementScore: { type: integer }
+        viewCount:       { type: integer }
         createdAt:       { type: string }
         reactionCounts:
           type: object
@@ -4254,6 +4276,13 @@ components:
         memoryType: { type: string }
         yearsAgo:   { type: integer }
         label:      { type: string }
+
+    ViewResult:
+      type: object
+      required: [viewCount, counted]
+      properties:
+        viewCount: { type: integer }
+        counted:   { type: boolean }
 
     RepostInput:
       type: object
