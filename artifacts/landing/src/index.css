@@ -1,0 +1,164 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --font-sans: var(--app-font-sans);
+  --font-display: var(--app-font-display);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --background: 240 18% 6%;
+  --foreground: 0 0% 98%;
+
+  --card: 240 15% 10%;
+  --card-foreground: 0 0% 98%;
+
+  --popover: 240 15% 10%;
+  --popover-foreground: 0 0% 98%;
+
+  --primary: 330 85% 55%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 240 12% 18%;
+  --secondary-foreground: 0 0% 98%;
+
+  --muted: 240 10% 14%;
+  --muted-foreground: 240 5% 70%;
+
+  --accent: 280 80% 60%;
+  --accent-foreground: 0 0% 98%;
+
+  --destructive: 0 85% 60%;
+  --destructive-foreground: 0 0% 98%;
+
+  --border: 240 15% 16%;
+  --input: 240 15% 16%;
+  --ring: 330 85% 55%;
+
+  --app-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --app-font-display: 'Space Grotesk', 'Inter', sans-serif;
+
+  --radius: 1rem;
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    @apply antialiased;
+    font-family: var(--app-font-sans);
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Aurora background */
+.aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.aurora::before,
+.aurora::after {
+  content: "";
+  position: absolute;
+  width: 60rem;
+  height: 60rem;
+  border-radius: 9999px;
+  filter: blur(120px);
+  opacity: 0.45;
+}
+.aurora::before {
+  top: -20rem;
+  left: -10rem;
+  background: radial-gradient(circle, hsl(330 85% 55% / 0.65), transparent 60%);
+  animation: aurora-drift-1 18s ease-in-out infinite alternate;
+}
+.aurora::after {
+  bottom: -25rem;
+  right: -15rem;
+  background: radial-gradient(circle, hsl(280 80% 60% / 0.55), transparent 60%);
+  animation: aurora-drift-2 22s ease-in-out infinite alternate;
+}
+@keyframes aurora-drift-1 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(8rem, 4rem) scale(1.1); }
+}
+@keyframes aurora-drift-2 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-6rem, -3rem) scale(1.15); }
+}
+
+.neon-text {
+  background: linear-gradient(135deg, hsl(330 90% 65%), hsl(280 85% 70%), hsl(200 90% 65%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.neon-glow {
+  box-shadow: 0 0 30px hsl(330 85% 55% / 0.5), 0 0 80px hsl(280 80% 60% / 0.25);
+}
+
+.card-glass {
+  background: linear-gradient(180deg, hsl(240 15% 12% / 0.7), hsl(240 18% 8% / 0.6));
+  border: 1px solid hsl(240 15% 20% / 0.7);
+  backdrop-filter: blur(12px);
+}
+
+.float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+}
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-12px); }
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(hsl(240 15% 18% / 0.4) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(240 15% 18% / 0.4) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
