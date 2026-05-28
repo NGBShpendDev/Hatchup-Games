@@ -232,6 +232,28 @@ router.get("/admin/audit", requireAuth, attachPlayer, async (req, res) => {
     ? await db.select().from(moderationAuditLogTable).where(and(...filters)).orderBy(desc(moderationAuditLogTable.createdAt)).limit(limit)
     : await db.select().from(moderationAuditLogTable).orderBy(desc(moderationAuditLogTable.createdAt)).limit(limit);
 
+  // Resolve actor + target player usernames in a single round-trip so admins
+  // see who did what without having to cross-reference IDs.
+  const playerIdSet = new Set<number>();
+  for (const r of rows) {
+    playerIdSet.add(r.actorId);
+    if (r.targetPlayerId != null) playerIdSet.add(r.targetPlayerId);
+  }
+  const playerLookup = new Map<number, { username: string; displayName: string | null }>();
+  if (playerIdSet.size > 0) {
+    const players = await db
+      .select({
+        id: playersTable.id,
+        username: playersTable.username,
+        displayName: playersTable.displayName,
+      })
+      .from(playersTable)
+      .where(inArray(playersTable.id, Array.from(playerIdSet)));
+    for (const p of players) {
+      playerLookup.set(p.id, { username: p.username, displayName: p.displayName });
+    }
+  }
+
   // Determine which of these entries have already been undone by a later
   // entry whose metadata.undoOf points back at them. We grab every audit row
   // whose metadata mentions undoOf and project that into a set of original
@@ -258,10 +280,16 @@ router.get("/admin/audit", requireAuth, attachPlayer, async (req, res) => {
       parsedMeta != null &&
       typeof parsedMeta === "object" &&
       Number.isFinite(Number((parsedMeta as { undoOf?: unknown }).undoOf));
+    const actor = playerLookup.get(r.actorId);
+    const target = r.targetPlayerId != null ? playerLookup.get(r.targetPlayerId) : undefined;
     return {
       ...r,
       createdAt: r.createdAt.toISOString(),
       metadata: parsedMeta,
+      actorUsername: actor?.username ?? null,
+      actorDisplayName: actor?.displayName ?? null,
+      targetUsername: target?.username ?? null,
+      targetDisplayName: target?.displayName ?? null,
       isUndoable: UNDOABLE_ACTIONS.has(r.action as AuditAction)
         && !isUndoEntry
         && !undoneIds.has(r.id)

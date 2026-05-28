@@ -19,11 +19,21 @@ interface AuditEntry {
   reason: string | null;
   metadata: unknown;
   createdAt: string;
+  actorUsername?: string | null;
+  actorDisplayName?: string | null;
+  targetUsername?: string | null;
+  targetDisplayName?: string | null;
   isUndoable?: boolean;
   isUndone?: boolean;
   isUndoEntry?: boolean;
   undoOfId?: number | null;
   undoneByEntryId?: number | null;
+}
+
+function nameOf(username: string | null | undefined, displayName: string | null | undefined, id: number): string {
+  if (displayName && displayName.trim()) return displayName;
+  if (username) return `@${username}`;
+  return `#${id}`;
 }
 
 const ACTION_LABELS: Record<string, string> = {
@@ -216,14 +226,18 @@ export default function AdminAudit() {
                       </GlowBadge>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5" data-testid={`text-actor-${e.id}`}>
                         <Shield className="w-3 h-3" />
-                        <span className="font-medium">Actor: #{e.actorId}</span>
+                        <span className="font-medium">
+                          Actor: {nameOf(e.actorUsername, e.actorDisplayName, e.actorId)}
+                        </span>
                       </div>
                       {e.targetPlayerId != null && (
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5" data-testid={`text-target-${e.id}`}>
                           <User className="w-3 h-3" />
-                          <span className="font-medium">Target: #{e.targetPlayerId}</span>
+                          <span className="font-medium">
+                            Target: {nameOf(e.targetUsername, e.targetDisplayName, e.targetPlayerId)}
+                          </span>
                         </div>
                       )}
                       {e.targetReportId != null && (

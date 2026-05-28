@@ -153,31 +153,6 @@ export default function AdminReports() {
     enabled: isAdmin && !!playerId && tab === "appeals",
   });
 
-  const { data: frozenData, isLoading: frozenLoading } = useQuery<{ posts: FrozenPost[] }>({
-    queryKey: ["admin-frozen-posts", playerId],
-    queryFn: async () => {
-      const res = await fetch(`/api/admin/social/frozen-posts`, { credentials: "include" });
-      if (!res.ok) throw new Error("Unauthorized");
-      return res.json();
-    },
-    enabled: isAdmin && !!playerId && tab === "frozen",
-  });
-
-  const handleUnfreeze = async (postId: number) => {
-    if (!confirm(`Unfreeze post #${postId}? Views will start accruing again.`)) return;
-    const res = await fetch(`/api/admin/social/posts/${postId}/unfreeze`, {
-      method: "POST",
-      credentials: "include",
-    });
-    if (res.ok) {
-      toast({ title: `Post #${postId} unfrozen`, description: "View counter is live again." });
-      qc.invalidateQueries({ queryKey: ["admin-frozen-posts"] });
-    } else {
-      const err = await res.json().catch(() => ({}));
-      toast({ title: "Failed to unfreeze", description: err.error ?? "Try again later", variant: "destructive" });
-    }
-  };
-
   const handleAppealAction = async (appealId: number, status: "approved" | "denied", playerId: number) => {
     const note = window.prompt(
       status === "approved"

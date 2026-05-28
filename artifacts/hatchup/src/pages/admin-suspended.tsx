@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GlassCard } from "@/components/ui/glass-card";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Shield, Ban, RotateCcw, User as UserIcon, Flag } from "lucide-react";
+import { Shield, Ban, RotateCcw, User as UserIcon, Flag, ScrollText } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface SuspendedPlayer {
@@ -83,6 +83,11 @@ export default function AdminSuspended() {
             <h1 className="font-black text-2xl">Suspended Accounts</h1>
             <p className="text-xs text-muted-foreground font-medium">Review and restore suspended players</p>
           </div>
+          <Link href="/admin/audit">
+            <Button variant="ghost" size="sm" data-testid="link-admin-audit">
+              <ScrollText className="w-3.5 h-3.5 mr-1" /> Audit
+            </Button>
+          </Link>
           <Link href="/admin/reports">
             <Button variant="ghost" size="sm" data-testid="link-admin-reports">
               <Flag className="w-3.5 h-3.5 mr-1" /> Reports
