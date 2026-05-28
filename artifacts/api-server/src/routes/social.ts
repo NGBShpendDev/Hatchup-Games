@@ -21,6 +21,7 @@ import { detectViewAbuse } from "../services/viewAbuseDetection.ts";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { getHiddenPlayerIds } from "./safety.ts";
+import { buildPeopleDiscoveryFilter } from "./peopleDiscovery.ts";
 import { attachEntitlement, requirePremium } from "../services/subscriptionGuards.ts";
 import { blockMinorSocialWrite } from "../middlewares/minorGuard.ts";
 import { blockSuspendedSocialWrite } from "../middlewares/suspendedGuard.ts";
@@ -1757,10 +1758,12 @@ router.get("/social/discover", requireAuth, attachPlayer, async (req, res) => {
   const viewerId = req.playerId!;
   const limit = Math.min(Number(req.query.limit) || 20, 50);
 
-  // Privacy filter shared with /players/search and /players/nearby:
-  // exclude block-list (either direction), visibility=hidden, and minors from
-  // people-discovery surfaces.
-  const hiddenIds = new Set(await getHiddenPlayerIds(viewerId));
+  // Privacy filter shared with /players/search, /players/nearby,
+  // /leaderboards/scoped, and /social/search via buildPeopleDiscoveryFilter
+  // in safety.ts: exclude block-list (either direction), visibility=hidden,
+  // and minors from people-discovery surfaces.
+  const discovery = await buildPeopleDiscoveryFilter(viewerId);
+  const hiddenIds = discovery.hiddenIds;
 
   // Who the viewer already follows
   const myFollows = await db.query.playerFollowsTable.findMany({
@@ -1851,8 +1854,7 @@ router.get("/social/discover", requireAuth, attachPlayer, async (req, res) => {
   const playerRows = await db.query.playersTable.findMany({
     where: and(
       inArray(playersTable.id, ranked.map(c => c.id)),
-      ne(playersTable.locationVisibility, "hidden"),
-      ne(playersTable.isMinor, true),
+      ...discovery.whereClauses,
     ),
   });
   const playerMap = new Map(playerRows.map(p => [p.id, p]));
@@ -1920,22 +1922,21 @@ router.get("/social/search", requireAuth, attachPlayer, async (req, res) => {
   if (q.length < 1) { res.json([]); return; }
   const pattern = `%${q.replace(/[%_]/g, m => "\\" + m)}%`;
 
-  // Privacy filter shared with /players/search and /social/discover: exclude
-  // block-list (either direction), visibility=hidden, and minors from
-  // people-discovery surfaces.
-  const hiddenIds = await getHiddenPlayerIds(viewerId);
+  // Privacy filter shared with /players/search, /players/nearby,
+  // /leaderboards/scoped, and /social/discover via buildPeopleDiscoveryFilter
+  // in safety.ts: exclude block-list (either direction), visibility=hidden,
+  // and minors from people-discovery surfaces.
+  const discovery = await buildPeopleDiscoveryFilter(viewerId);
 
   const rawMatches = await db.query.playersTable.findMany({
     where: and(
       ne(playersTable.id, viewerId),
       or(ilike(playersTable.username, pattern), ilike(playersTable.displayName, pattern)),
-      ne(playersTable.locationVisibility, "hidden"),
-      ne(playersTable.isMinor, true),
+      ...discovery.whereClauses,
     ),
     limit: limit * 4,
   });
-  const hiddenSet = new Set(hiddenIds);
-  const matches = rawMatches.filter(p => !hiddenSet.has(p.id)).slice(0, limit);
+  const matches = rawMatches.slice(0, limit);
 
   if (matches.length === 0) { res.json([]); return; }
   const ids = matches.map(m => m.id);
@@ -1959,7 +1960,7 @@ router.get("/social/search", requireAuth, attachPlayer, async (req, res) => {
   // (reuses the hiddenIds set computed above for the candidate filter).
   const [sharedGroupsByPlayer, mutualWorkoutPartnersByPlayer] = await Promise.all([
     loadSharedGroupsForViewer(viewerId, ids),
-    loadMutualWorkoutPartnersForViewer(viewerId, ids, hiddenIds),
+    loadMutualWorkoutPartnersForViewer(viewerId, ids, [...discovery.hiddenIds]),
   ]);
 
   // Rank: username prefix match first, then displayName prefix, then others

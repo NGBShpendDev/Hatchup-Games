@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { userReportsTable, blockedUsersTable, playersTable, moderationAuditLogTable, notificationsTable, accountAppealsTable } from "@workspace/db";
-import { eq, and, desc, or, notInArray, inArray } from "drizzle-orm";
+import { eq, and, desc, or, ne, notInArray, inArray } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { emailResendLimiter, consumeEmailResendBudget } from "../middlewares/rateLimiters.ts";
@@ -1018,19 +1018,14 @@ export async function getHiddenPlayerIds(viewerId: number): Promise<number[]> {
 }
 
 /**
- * Canonical people-discovery exclusion rule. Used by /players/nearby,
- * /players/search, and /leaderboards/scoped so the safety policy lives in
- * exactly one place.
- *
- * Drops any player who:
- *   - is blocked by the viewer or has blocked the viewer (`getHiddenPlayerIds`)
- *   - fails the visibility predicate (default: `locationVisibility === "hidden"`
- *     is excluded; pass a custom predicate for scope-aware boards)
- *   - is flagged as a minor account
- *
- * The viewer themselves is NOT removed — leaderboard surfaces need the viewer
- * row in the result set to compute "my position / my entry". Callers that want
- * to exclude self should do so at the query layer (e.g. `ne(players.id, me)`).
+ * Post-filter form of the canonical people-discovery rule, kept here for
+ * callers (`/players/search`, `/players/nearby`, `/leaderboards/scoped`)
+ * that fetch via `db.query.playersTable.findMany` and then apply the rule
+ * to the resulting array. The query+set form lives in `./peopleDiscovery.ts`
+ * (`buildPeopleDiscoveryFilter`); both implementations share the same three
+ * rules — blocked / hidden-visibility / minor. We keep this wrapper as its
+ * own self-contained function (rather than delegating) so the existing
+ * test suites that mock `safety.ts` directly continue to work unchanged.
  */
 export async function filterDiscoverableCandidates<
   T extends { id: number; locationVisibility: string | null; isMinor: boolean | null },
