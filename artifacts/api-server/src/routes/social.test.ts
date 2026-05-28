@@ -368,7 +368,7 @@ mock.module("./sharedGroups.ts", {
   namedExports: {
     groupSharedGroupRows: (rows: unknown[]) => rows,
     groupMutualWorkoutPartnerRows: () => new Map(),
-    MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT: 3,
+    MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT: 50,
     loadSharedGroupsForViewer: async () => new Map(),
     loadMutualWorkoutPartnersForViewer: async () => new Map(),
   },

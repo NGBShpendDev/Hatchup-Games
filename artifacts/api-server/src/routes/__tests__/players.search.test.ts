@@ -26,7 +26,24 @@ interface PlayerRow {
   isMinor: boolean;
 }
 
-interface MutualPartner { id: number; displayName: string }
+interface MutualPartner {
+  id: number;
+  displayName: string;
+  username: string | null;
+  avatarUrl: string | null;
+  creatorBadge: string | null;
+}
+
+function mkPartner(id: number, displayName: string, extra: Partial<MutualPartner> = {}): MutualPartner {
+  return {
+    id,
+    displayName,
+    username: null,
+    avatarUrl: null,
+    creatorBadge: null,
+    ...extra,
+  };
+}
 
 const state = {
   viewerClerkId: "u_viewer",
@@ -364,10 +381,10 @@ describe("GET /players/search — mutualWorkoutPartners signal", () => {
     // mutual-partner helper at all.
     state.groupMemberships.set(1, [100]);
     state.mutualWorkoutPartnersFixture = new Map([
-      [2, [{ id: 9, displayName: "Coach Casey" }]],
+      [2, [mkPartner(9, "Coach Casey", { username: "casey", avatarUrl: "https://a.example/casey.png" })]],
       [3, [
-        { id: 9, displayName: "Coach Casey" },
-        { id: 10, displayName: "Trainer Tess" },
+        mkPartner(9, "Coach Casey", { username: "casey", avatarUrl: "https://a.example/casey.png" }),
+        mkPartner(10, "Trainer Tess", { username: "tess", creatorBadge: "PRO" }),
       ]],
     ]);
 
@@ -375,11 +392,11 @@ describe("GET /players/search — mutualWorkoutPartners signal", () => {
     assert.equal(status, 200);
     const byId = new Map<number, any>(body.map((r: any) => [r.id, r]));
     assert.deepEqual(byId.get(2).mutualWorkoutPartners, [
-      { id: 9, displayName: "Coach Casey" },
+      mkPartner(9, "Coach Casey", { username: "casey", avatarUrl: "https://a.example/casey.png" }),
     ]);
     assert.deepEqual(byId.get(3).mutualWorkoutPartners, [
-      { id: 9, displayName: "Coach Casey" },
-      { id: 10, displayName: "Trainer Tess" },
+      mkPartner(9, "Coach Casey", { username: "casey", avatarUrl: "https://a.example/casey.png" }),
+      mkPartner(10, "Trainer Tess", { username: "tess", creatorBadge: "PRO" }),
     ]);
 
     // Helper must be called with viewerId + the match ids (in any order), so
@@ -396,7 +413,7 @@ describe("GET /players/search — mutualWorkoutPartners signal", () => {
     // No viewer group memberships — fixture would have data, but the route
     // must short-circuit and never call the helper.
     state.mutualWorkoutPartnersFixture = new Map([
-      [2, [{ id: 9, displayName: "Coach Casey" }]],
+      [2, [mkPartner(9, "Coach Casey")]],
     ]);
 
     const { status, body } = await search("nogroup");
@@ -415,8 +432,8 @@ describe("GET /players/search — mutualWorkoutPartners signal", () => {
     // themselves (2/3), the route's contract guarantees they are excluded.
     // Lock that with a fixture containing only "safe" third-party partners.
     state.mutualWorkoutPartnersFixture = new Map([
-      [2, [{ id: 7, displayName: "Third Person" }]],
-      [3, [{ id: 7, displayName: "Third Person" }]],
+      [2, [mkPartner(7, "Third Person")]],
+      [3, [mkPartner(7, "Third Person")]],
     ]);
 
     const { body } = await search("selfcheck");

@@ -758,7 +758,7 @@ describe("mutualWorkoutPartners on GET /social/players/:id/followers", () => {
     assert.equal(body.players.length, 1);
     assert.equal(body.players[0].id, 2);
     assert.deepEqual(body.players[0].mutualWorkoutPartners, [
-      { id: 3, displayName: "Partner Pat" },
+      { id: 3, displayName: "Partner Pat", username: "partner", avatarUrl: null, creatorBadge: null },
     ]);
   });
 
@@ -839,7 +839,7 @@ describe("mutualWorkoutPartners on GET /social/players/:id/followers", () => {
     const { res, body } = await getJson("/social/players/99/followers");
     assert.equal(res.status, 200);
     const partners = body.players[0].mutualWorkoutPartners as Array<{ id: number; displayName: string }>;
-    assert.equal(partners.length, 3, "list capped at MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT");
+    assert.equal(partners.length, 5, "every legitimate partner is returned (cap is 50)");
     // Dedup: each id appears at most once even though every partner shows up
     // through both shared groups.
     assert.equal(new Set(partners.map(p => p.id)).size, partners.length);
@@ -863,7 +863,7 @@ describe("mutualWorkoutPartners on GET /social/players/:id/following", () => {
     assert.equal(body.players.length, 1);
     assert.equal(body.players[0].id, 2);
     assert.deepEqual(body.players[0].mutualWorkoutPartners, [
-      { id: 3, displayName: "Partner Pat" },
+      { id: 3, displayName: "Partner Pat", username: "partner", avatarUrl: null, creatorBadge: null },
     ]);
   });
 });
@@ -876,11 +876,11 @@ describe("mutualWorkoutPartners on GET /social/players/:id/profile", () => {
     const { res, body } = await getJson("/social/players/2/profile");
     assert.equal(res.status, 200);
     assert.deepEqual(body.mutualWorkoutPartners, [
-      { id: 3, displayName: "Partner Pat" },
+      { id: 3, displayName: "Partner Pat", username: "partner", avatarUrl: null, creatorBadge: null },
     ]);
   });
 
-  it("caps mutualWorkoutPartners at the preview limit (3) and dedups across groups", async () => {
+  it("dedups partners surfaced through multiple shared groups and returns all of them", async () => {
     // Viewer (1) and profile (2) share two groups (100, 101) with five other
     // members who all logged co-workouts in BOTH groups. The profile preview
     // must dedup repeats and cap the list at 3.
@@ -901,7 +901,7 @@ describe("mutualWorkoutPartners on GET /social/players/:id/profile", () => {
     const { res, body } = await getJson("/social/players/2/profile");
     assert.equal(res.status, 200);
     const partners = body.mutualWorkoutPartners as Array<{ id: number; displayName: string }>;
-    assert.equal(partners.length, 3, "preview capped at MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT");
+    assert.equal(partners.length, 5, "every legitimate partner is returned (cap is 50)");
     assert.equal(new Set(partners.map(p => p.id)).size, partners.length, "no dupes across shared groups");
     for (const p of partners) {
       assert.ok([10, 11, 12, 13, 14].includes(p.id));
@@ -942,7 +942,9 @@ describe("mutualWorkoutPartners on GET /social/players/:id/profile", () => {
     const { res, body } = await getJson("/social/players/2/profile");
     assert.equal(res.status, 200);
     const partners = body.mutualWorkoutPartners as Array<{ id: number; displayName: string }>;
-    assert.deepEqual(partners, [{ id: 6, displayName: "Ok O" }]);
+    assert.deepEqual(partners, [
+      { id: 6, displayName: "Ok O", username: "ok", avatarUrl: null, creatorBadge: null },
+    ]);
     const partnerIds = partners.map(p => p.id);
     assert.ok(!partnerIds.includes(3), "minor must be filtered");
     assert.ok(!partnerIds.includes(4), "location-hidden must be filtered");
@@ -960,7 +962,7 @@ describe("mutualWorkoutPartners on GET /social/search", () => {
     const candidateRow = (body as any[]).find(r => r.id === 2);
     assert.ok(candidateRow, "candidate must appear in search results");
     assert.deepEqual(candidateRow.mutualWorkoutPartners, [
-      { id: 3, displayName: "Partner Pat" },
+      { id: 3, displayName: "Partner Pat", username: "partner", avatarUrl: null, creatorBadge: null },
     ]);
   });
 });

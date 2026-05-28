@@ -1450,6 +1450,12 @@ export interface SharedGroup {
 export interface MutualWorkoutPartner {
   id: number;
   displayName: string;
+  /** @nullable */
+  username: string | null;
+  /** @nullable */
+  avatarUrl: string | null;
+  /** @nullable */
+  creatorBadge: string | null;
 }
 
 export interface PlayerStub {

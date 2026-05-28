@@ -110,7 +110,7 @@ mock.module("drizzle-orm/pg-core", {
 mock.module("../sharedGroups.ts", {
   namedExports: {
     groupMutualWorkoutPartnerRows: () => new Map(),
-    MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT: 3,
+    MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT: 50,
     loadSharedGroupsForViewer: async () => new Map(),
     loadMutualWorkoutPartnersForViewer: async () => new Map(),
   },

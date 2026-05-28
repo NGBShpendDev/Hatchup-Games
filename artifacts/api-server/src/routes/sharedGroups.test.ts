@@ -66,58 +66,70 @@ describe("groupSharedGroupRows", () => {
 });
 
 describe("groupMutualWorkoutPartnerRows", () => {
+  const partnerRow = (
+    candidateId: number,
+    partnerId: number,
+    displayName: string,
+    extra: { username?: string | null; avatarUrl?: string | null; creatorBadge?: string | null } = {},
+  ) => ({
+    candidateId,
+    partnerId,
+    partnerDisplayName: displayName,
+    partnerUsername: extra.username ?? null,
+    partnerAvatarUrl: extra.avatarUrl ?? null,
+    partnerCreatorBadge: extra.creatorBadge ?? null,
+  });
+
   it("returns an empty map for no rows", () => {
     const result = groupMutualWorkoutPartnerRows([]);
     assert.equal(result.size, 0);
   });
 
-  it("groups partners per candidate", () => {
+  it("groups partners per candidate and carries through identity fields", () => {
     const result = groupMutualWorkoutPartnerRows([
-      { candidateId: 10, partnerId: 1, partnerDisplayName: "Alex" },
-      { candidateId: 10, partnerId: 2, partnerDisplayName: "Sam" },
-      { candidateId: 11, partnerId: 1, partnerDisplayName: "Alex" },
+      partnerRow(10, 1, "Alex", { username: "alex", avatarUrl: "https://a.example/x.png", creatorBadge: "PRO" }),
+      partnerRow(10, 2, "Sam", { username: "sam" }),
+      partnerRow(11, 1, "Alex", { username: "alex", avatarUrl: "https://a.example/x.png", creatorBadge: "PRO" }),
     ]);
     assert.deepEqual(result.get(10), [
-      { id: 1, displayName: "Alex" },
-      { id: 2, displayName: "Sam" },
+      { id: 1, displayName: "Alex", username: "alex", avatarUrl: "https://a.example/x.png", creatorBadge: "PRO" },
+      { id: 2, displayName: "Sam", username: "sam", avatarUrl: null, creatorBadge: null },
     ]);
-    assert.deepEqual(result.get(11), [{ id: 1, displayName: "Alex" }]);
+    assert.deepEqual(result.get(11), [
+      { id: 1, displayName: "Alex", username: "alex", avatarUrl: "https://a.example/x.png", creatorBadge: "PRO" },
+    ]);
   });
 
   it("dedups the same partner appearing across multiple shared groups", () => {
-    // A partner can join the viewer+candidate twice if they share two groups
-    // where everyone has co-workouted. We want one entry per partner per row.
     const result = groupMutualWorkoutPartnerRows([
-      { candidateId: 10, partnerId: 1, partnerDisplayName: "Alex" },
-      { candidateId: 10, partnerId: 1, partnerDisplayName: "Alex" },
-      { candidateId: 10, partnerId: 2, partnerDisplayName: "Sam" },
+      partnerRow(10, 1, "Alex"),
+      partnerRow(10, 1, "Alex"),
+      partnerRow(10, 2, "Sam"),
     ]);
     assert.deepEqual(result.get(10), [
-      { id: 1, displayName: "Alex" },
-      { id: 2, displayName: "Sam" },
+      { id: 1, displayName: "Alex", username: null, avatarUrl: null, creatorBadge: null },
+      { id: 2, displayName: "Sam", username: null, avatarUrl: null, creatorBadge: null },
     ]);
   });
 
   it("caps each candidate's list at the preview limit", () => {
-    const rows = Array.from({ length: 10 }, (_, i) => ({
-      candidateId: 10,
-      partnerId: i + 1,
-      partnerDisplayName: `Buddy ${i + 1}`,
-    }));
+    const rows = Array.from({ length: MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT + 5 }, (_, i) =>
+      partnerRow(10, i + 1, `Buddy ${i + 1}`),
+    );
     const result = groupMutualWorkoutPartnerRows(rows);
     assert.equal(result.get(10)!.length, MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT);
   });
 
   it("respects a custom limit", () => {
     const rows = [
-      { candidateId: 10, partnerId: 1, partnerDisplayName: "A" },
-      { candidateId: 10, partnerId: 2, partnerDisplayName: "B" },
-      { candidateId: 10, partnerId: 3, partnerDisplayName: "C" },
+      partnerRow(10, 1, "A"),
+      partnerRow(10, 2, "B"),
+      partnerRow(10, 3, "C"),
     ];
     const result = groupMutualWorkoutPartnerRows(rows, 2);
     assert.deepEqual(result.get(10), [
-      { id: 1, displayName: "A" },
-      { id: 2, displayName: "B" },
+      { id: 1, displayName: "A", username: null, avatarUrl: null, creatorBadge: null },
+      { id: 2, displayName: "B", username: null, avatarUrl: null, creatorBadge: null },
     ]);
   });
 });

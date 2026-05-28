@@ -6,10 +6,16 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 
-export type MutualPartner = { id: number; displayName: string };
+export type MutualPartner = {
+  id: number;
+  displayName: string;
+  username?: string | null;
+  avatarUrl?: string | null;
+  creatorBadge?: string | null;
+};
 
 const PREVIEW_LIMIT = 2;
 
@@ -137,12 +143,28 @@ function MutualWorkoutPartnersSheet({
               data-testid={`row-${testIdPrefix}-mutual-partner-${p.id}`}
             >
               <Avatar className="h-10 w-10 border border-emerald-500/40">
+                {p.avatarUrl ? (
+                  <AvatarImage src={p.avatarUrl} alt={p.displayName} />
+                ) : null}
                 <AvatarFallback className="font-black text-xs bg-emerald-500/15 text-emerald-200">
                   {initialsOf(p.displayName)}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="font-black text-sm truncate">{p.displayName}</p>
+                <p className="font-black text-sm truncate flex items-center gap-1.5">
+                  <span className="truncate">{p.displayName}</span>
+                  {p.creatorBadge ? (
+                    <span
+                      className="text-[10px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-200 border border-emerald-500/30 shrink-0"
+                      data-testid={`badge-${testIdPrefix}-mutual-partner-${p.id}-creator`}
+                    >
+                      {p.creatorBadge}
+                    </span>
+                  ) : null}
+                </p>
+                {p.username ? (
+                  <p className="text-xs text-muted-foreground truncate">@{p.username}</p>
+                ) : null}
               </div>
               <Button
                 size="sm"

@@ -6072,10 +6072,13 @@ components:
 
     MutualWorkoutPartner:
       type: object
-      required: [id, displayName]
+      required: [id, displayName, username, avatarUrl, creatorBadge]
       properties:
-        id:          { type: integer }
-        displayName: { type: string }
+        id:           { type: integer }
+        displayName:  { type: string }
+        username:     { type: ["string", "null"] }
+        avatarUrl:    { type: ["string", "null"] }
+        creatorBadge: { type: ["string", "null"] }
 
     NearbyPlayer:
       type: object

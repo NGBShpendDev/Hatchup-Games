@@ -126,7 +126,10 @@ export const SearchPlayersResponseItem = zod.object({
 })).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n'),
   "mutualWorkoutPartners": zod.array(zod.object({
   "id": zod.number(),
-  "displayName": zod.string()
+  "displayName": zod.string(),
+  "username": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
 })).optional().describe('Up to a small number of third players who have actually worked out\n(logged a co-workout in a shared group) with BOTH the viewer and\nthis player. Optional — only populated on people-discovery surfaces\n(invite picker, social search, followers, following). Strengthens\nthe trust signal beyond raw shared-group overlap: \"you\'ve both\nsweated with X\" is a stronger reason to trust an unfamiliar profile.\n')
 })
 export const SearchPlayersResponse = zod.array(SearchPlayersResponseItem)
@@ -2718,7 +2721,10 @@ export const DiscoverPlayersResponseItem = zod.object({
 })).describe('Groups that both the viewer and this player are members of.'),
   "mutualWorkoutPartners": zod.array(zod.object({
   "id": zod.number(),
-  "displayName": zod.string()
+  "displayName": zod.string(),
+  "username": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
 })).optional().describe('Up to a small number of third players who have actually worked out\n(logged a co-workout in a shared group) with BOTH the viewer and\nthis player. Optional — only populated on people-discovery surfaces.\n')
 })
 export const DiscoverPlayersResponse = zod.array(DiscoverPlayersResponseItem)
@@ -2749,7 +2755,10 @@ export const SearchDiscoverablePlayersResponseItem = zod.object({
 })).describe('Groups that both the viewer and this player are members of.'),
   "mutualWorkoutPartners": zod.array(zod.object({
   "id": zod.number(),
-  "displayName": zod.string()
+  "displayName": zod.string(),
+  "username": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
 })).optional().describe('Up to a small number of third players who have actually worked out\n(logged a co-workout in a shared group) with BOTH the viewer and\nthis player. Optional — only populated on people-discovery surfaces.\n')
 })
 export const SearchDiscoverablePlayersResponse = zod.array(SearchDiscoverablePlayersResponseItem)
@@ -2779,7 +2788,10 @@ export const GetPlayerSocialProfileResponse = zod.object({
 })).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n'),
   "mutualWorkoutPartners": zod.array(zod.object({
   "id": zod.number(),
-  "displayName": zod.string()
+  "displayName": zod.string(),
+  "username": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
 })).optional().describe('Up to a small number of third players who have actually worked out\n(logged a co-workout in a shared group) with BOTH the viewer and\nthis player. Optional — only populated on people-discovery surfaces\n(invite picker, social search, followers, following). Strengthens\nthe trust signal beyond raw shared-group overlap: \"you\'ve both\nsweated with X\" is a stronger reason to trust an unfamiliar profile.\n')
 }),
   "posts": zod.array(zod.object({
@@ -2886,7 +2898,10 @@ export const GetPlayerSocialProfileResponse = zod.object({
 })).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n'),
   "mutualWorkoutPartners": zod.array(zod.object({
   "id": zod.number(),
-  "displayName": zod.string()
+  "displayName": zod.string(),
+  "username": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
 })).optional().describe('Up to a small number of third players who have actually worked out\n(logged a co-workout in a shared group) with BOTH the viewer and\nthis player. Optional — only populated on people-discovery surfaces\n(invite picker, social search, followers, following). Strengthens\nthe trust signal beyond raw shared-group overlap: \"you\'ve both\nsweated with X\" is a stronger reason to trust an unfamiliar profile.\n')
 })).describe('Up to 3 followers of this player that the viewer also follows.'),
   "mutualFollowersTotal": zod.number().describe('Total number of mutual followers (not limited to the preview list).'),
@@ -2902,7 +2917,10 @@ export const GetPlayerSocialProfileResponse = zod.object({
 })).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n'),
   "mutualWorkoutPartners": zod.array(zod.object({
   "id": zod.number(),
-  "displayName": zod.string()
+  "displayName": zod.string(),
+  "username": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
 })).optional().describe('Up to a small number of third players who have actually worked out\n(logged a co-workout in a shared group) with BOTH the viewer and\nthis player. Optional — only populated on people-discovery surfaces\n(invite picker, social search, followers, following). Strengthens\nthe trust signal beyond raw shared-group overlap: \"you\'ve both\nsweated with X\" is a stronger reason to trust an unfamiliar profile.\n')
 })).describe('Up to 3 accounts that both the viewer and this player follow.'),
   "mutualFollowingTotal": zod.number().describe('Total number of accounts both the viewer and this player follow (not limited to the preview list).'),
@@ -2912,7 +2930,10 @@ export const GetPlayerSocialProfileResponse = zod.object({
 })).describe('Groups that both the viewer and this player are members of.'),
   "mutualWorkoutPartners": zod.array(zod.object({
   "id": zod.number(),
-  "displayName": zod.string()
+  "displayName": zod.string(),
+  "username": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
 })).describe('Up to 3 third players who have actually logged a co-workout with\nBOTH the viewer and this profile. Same trust signal surfaced on\nfollower\/following lists, social search, and the invite picker.\n')
 })
 
@@ -2945,7 +2966,10 @@ export const ListFollowersResponse = zod.object({
 })).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n'),
   "mutualWorkoutPartners": zod.array(zod.object({
   "id": zod.number(),
-  "displayName": zod.string()
+  "displayName": zod.string(),
+  "username": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
 })).optional().describe('Up to a small number of third players who have actually worked out\n(logged a co-workout in a shared group) with BOTH the viewer and\nthis player. Optional — only populated on people-discovery surfaces\n(invite picker, social search, followers, following). Strengthens\nthe trust signal beyond raw shared-group overlap: \"you\'ve both\nsweated with X\" is a stronger reason to trust an unfamiliar profile.\n')
 })),
   "total": zod.number(),
@@ -2982,7 +3006,10 @@ export const ListMutualFollowersResponse = zod.object({
 })).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n'),
   "mutualWorkoutPartners": zod.array(zod.object({
   "id": zod.number(),
-  "displayName": zod.string()
+  "displayName": zod.string(),
+  "username": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
 })).optional().describe('Up to a small number of third players who have actually worked out\n(logged a co-workout in a shared group) with BOTH the viewer and\nthis player. Optional — only populated on people-discovery surfaces\n(invite picker, social search, followers, following). Strengthens\nthe trust signal beyond raw shared-group overlap: \"you\'ve both\nsweated with X\" is a stronger reason to trust an unfamiliar profile.\n')
 })),
   "total": zod.number(),
@@ -3019,7 +3046,10 @@ export const ListMutualFollowingResponse = zod.object({
 })).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n'),
   "mutualWorkoutPartners": zod.array(zod.object({
   "id": zod.number(),
-  "displayName": zod.string()
+  "displayName": zod.string(),
+  "username": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
 })).optional().describe('Up to a small number of third players who have actually worked out\n(logged a co-workout in a shared group) with BOTH the viewer and\nthis player. Optional — only populated on people-discovery surfaces\n(invite picker, social search, followers, following). Strengthens\nthe trust signal beyond raw shared-group overlap: \"you\'ve both\nsweated with X\" is a stronger reason to trust an unfamiliar profile.\n')
 })),
   "total": zod.number(),
@@ -3055,7 +3085,10 @@ export const ListFollowingResponse = zod.object({
 })).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n'),
   "mutualWorkoutPartners": zod.array(zod.object({
   "id": zod.number(),
-  "displayName": zod.string()
+  "displayName": zod.string(),
+  "username": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
 })).optional().describe('Up to a small number of third players who have actually worked out\n(logged a co-workout in a shared group) with BOTH the viewer and\nthis player. Optional — only populated on people-discovery surfaces\n(invite picker, social search, followers, following). Strengthens\nthe trust signal beyond raw shared-group overlap: \"you\'ve both\nsweated with X\" is a stronger reason to trust an unfamiliar profile.\n')
 })),
   "total": zod.number(),

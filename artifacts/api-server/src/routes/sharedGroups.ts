@@ -57,13 +57,25 @@ export type MutualWorkoutPartnerRow = {
   candidateId: number;
   partnerId: number;
   partnerDisplayName: string;
+  partnerUsername: string | null;
+  partnerAvatarUrl: string | null;
+  partnerCreatorBadge: string | null;
 };
 
-export type MutualWorkoutPartner = { id: number; displayName: string };
+export type MutualWorkoutPartner = {
+  id: number;
+  displayName: string;
+  username: string | null;
+  avatarUrl: string | null;
+  creatorBadge: string | null;
+};
 
-// How many partners to surface per row. Mirrors the "preview" cap used for
-// mutual followers — enough signal without overwhelming the row.
-export const MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT = 3;
+// How many partners to surface per row. The inline "Workouts with X & Y +N more"
+// line only shows the first two by name; the rest are surfaced in a bottom sheet
+// that lists every partner with their real avatar. We cap at 50 so the sheet
+// truly shows "every partner" for normal users without ever returning an
+// unbounded payload to the client.
+export const MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT = 50;
 
 // Group raw join rows (candidateId × partnerId × partnerDisplayName) into a
 // map keyed by candidateId. Dedups partners per candidate (a shared partner
@@ -85,7 +97,13 @@ export function groupMutualWorkoutPartnerRows(
       seen.set(r.candidateId, seenForCandidate);
       continue;
     }
-    list.push({ id: r.partnerId, displayName: r.partnerDisplayName });
+    list.push({
+      id: r.partnerId,
+      displayName: r.partnerDisplayName,
+      username: r.partnerUsername,
+      avatarUrl: r.partnerAvatarUrl,
+      creatorBadge: r.partnerCreatorBadge,
+    });
     seenForCandidate.add(r.partnerId);
     out.set(r.candidateId, list);
     seen.set(r.candidateId, seenForCandidate);
@@ -138,6 +156,8 @@ export async function loadMutualWorkoutPartnersForViewer(
       partnerId: partnerInViewerGroup.playerId,
       partnerDisplayName: playersTable.displayName,
       partnerUsername: playersTable.username,
+      partnerAvatarUrl: playersTable.avatarUrl,
+      partnerCreatorBadge: playersTable.creatorBadge,
     })
     .from(viewerGm)
     .innerJoin(
@@ -171,6 +191,9 @@ export async function loadMutualWorkoutPartnersForViewer(
       candidateId: r.candidateId,
       partnerId: r.partnerId,
       partnerDisplayName: r.partnerDisplayName ?? r.partnerUsername ?? "Trainer",
+      partnerUsername: r.partnerUsername,
+      partnerAvatarUrl: r.partnerAvatarUrl,
+      partnerCreatorBadge: r.partnerCreatorBadge,
     })),
   );
 }
