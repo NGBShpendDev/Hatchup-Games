@@ -1,19 +1,16 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
-import { liveEventsTable, hatchlingsTable, playersTable, eventParticipantsTable } from "@workspace/db";
+import { liveEventsTable, playersTable, eventParticipantsTable } from "@workspace/db";
 import { and, eq, inArray, sql, desc } from "drizzle-orm";
 import { ListEventsQueryParams, GetLiveEventParams } from "@workspace/api-zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { applyHatchlingXp, getActivePalId } from "../services/hatchlingXp.ts";
 
 // Live event entry-reward XP grant. Kept small and flat so it can't replace
 // real progression — it exists so a level-up that crosses an evolution
 // threshold can actually be triggered by an event entry.
 const EVENT_JOIN_XP = 100;
-// Simple, monotonic leveling rule used wherever the server bumps hatchling
-// XP outside of the dedicated evolve flow. 100 XP per level keeps the
-// math obvious and matches the entry-reward grant size.
-const XP_PER_LEVEL = 100;
 
 const router = Router();
 
@@ -145,8 +142,8 @@ router.get("/events/:id", async (req, res) => {
 // player per event. Repeated calls return 200 with xpEarned=0.
 //
 // On first join the route grants a flat EVENT_JOIN_XP bump to the
-// player's active hatchling (or first owned Pal), bumps level via
-// XP_PER_LEVEL, and increments the event's participant counter. The
+// player's active hatchling (or first owned Pal) via applyHatchlingXp,
+// and increments the event's participant counter. The
 // frontend refetches hatchling state on success so the centralized
 // EvolutionShareProvider watcher can surface the share prompt when this
 // entry pushes a Pal across an evolution threshold.
@@ -179,34 +176,11 @@ router.post("/events/:id/join", requireAuth, attachPlayer, async (req, res) => {
     return;
   }
 
-  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
-  if (!player) { res.status(404).json({ error: "Player not found" }); return; }
-
   // Pick the target Pal — active hatchling first, otherwise the player's
   // first owned hatchling. If they have none, the join still succeeds
   // (no XP applied) so the UI can show the join confirmation.
-  let target = player.activeHatchlingId
-    ? await db.query.hatchlingsTable.findFirst({
-        where: and(
-          eq(hatchlingsTable.id, player.activeHatchlingId),
-          eq(hatchlingsTable.playerId, player.id),
-        ),
-      })
-    : undefined;
-  if (!target) {
-    target = await db.query.hatchlingsTable.findFirst({
-      where: eq(hatchlingsTable.playerId, player.id),
-    });
-  }
-
-  if (target) {
-    const newXp = target.xp + EVENT_JOIN_XP;
-    const newLevel = Math.max(target.level, 1 + Math.floor(newXp / XP_PER_LEVEL));
-    await db
-      .update(hatchlingsTable)
-      .set({ xp: newXp, level: newLevel })
-      .where(eq(hatchlingsTable.id, target.id));
-  }
+  const palId = await getActivePalId(req.playerId!);
+  const xpResult = palId ? await applyHatchlingXp(palId, EVENT_JOIN_XP) : null;
 
   // Derive the participant counter from the dedup table to keep it
   // race-safe under concurrent first-joins.
@@ -223,7 +197,7 @@ router.post("/events/:id/join", requireAuth, attachPlayer, async (req, res) => {
   res.json({
     eventId: event.id,
     joinedAt: inserted[0].joinedAt.toISOString(),
-    xpEarned: target ? EVENT_JOIN_XP : 0,
+    xpEarned: xpResult ? xpResult.xpDelta : 0,
     coinsEarned: 0,
   });
 });
