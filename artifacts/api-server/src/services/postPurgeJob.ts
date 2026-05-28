@@ -8,7 +8,7 @@ import {
   postViewsTable,
 } from "@workspace/db";
 import { and, lt, isNotNull, inArray, eq } from "drizzle-orm";
-import { logger } from "../lib/logger";
+import { logger } from "../lib/logger.ts";
 
 const RETENTION_DAYS = 30;
 const TICK_INTERVAL_MS = 6 * 60 * 60 * 1000;
