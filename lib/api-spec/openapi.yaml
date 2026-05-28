@@ -6720,7 +6720,7 @@ components:
 
     NutritionStreak:
       type: object
-      required: [currentStreak, longestStreak, lastHitDate, hitToday, today]
+      required: [currentStreak, longestStreak, lastHitDate, hitToday, today, weekly]
       properties:
         currentStreak: { type: integer }
         longestStreak: { type: integer }
@@ -6728,6 +6728,38 @@ components:
         hitToday:      { type: boolean }
         today:
           $ref: "#/components/schemas/NutritionStreakToday"
+        weekly:
+          $ref: "#/components/schemas/NutritionWeeklyStreak"
+
+    NutritionWeeklyStreak:
+      type: object
+      description: |
+        Per-day hit/miss history for the last 7 UTC days (oldest first, today last)
+        plus a summary of bond/XP/coins earned from daily macro-target hits this week.
+      required: [days, rewards]
+      properties:
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/NutritionWeeklyDay"
+        rewards:
+          $ref: "#/components/schemas/NutritionWeeklyRewards"
+
+    NutritionWeeklyDay:
+      type: object
+      required: [date, status]
+      properties:
+        date:   { type: string, description: "UTC date in YYYY-MM-DD." }
+        status: { type: string, enum: [hit, miss, no_data] }
+
+    NutritionWeeklyRewards:
+      type: object
+      required: [hitCount, xp, coins, bond]
+      properties:
+        hitCount: { type: integer, description: "Number of macro-target hit days in the last 7 UTC days." }
+        xp:       { type: integer, description: "Total bonus player XP earned from macro-target hits this week." }
+        coins:    { type: integer, description: "Total bonus coins earned from macro-target hits this week." }
+        bond:     { type: integer, description: "Total Hatchling bond/friendship gained from macro-target hits this week." }
 
     NutritionRecapSendResult:
       type: object

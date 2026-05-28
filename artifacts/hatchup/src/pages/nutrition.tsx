@@ -511,6 +511,8 @@ export default function Nutrition() {
         )}
         {streak && <TodayProgressStrip today={streak.today} />}
 
+        {streak && <WeekStreakCalendar weekly={streak.weekly} />}
+
         {/* Daily macro-target streak */}
         {streak && (
           <div className={`rounded-2xl border p-3 mb-4 flex items-center justify-between ${
@@ -1071,6 +1073,61 @@ function TodayProgressStrip({ today }: { today: NutritionStreak["today"] }) {
           );
         })}
       </div>
+    </motion.div>
+  );
+}
+
+function WeekStreakCalendar({ weekly }: { weekly: NutritionStreak["weekly"] }) {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const dayLabels = ["S", "M", "T", "W", "T", "F", "S"];
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl border border-border bg-card p-4 mb-4"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Macro Streak · Last 7 Days</p>
+          <p className="font-black text-sm">{weekly.rewards.hitCount}/7 days on target</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[9px] uppercase font-bold text-muted-foreground">Earned this week</p>
+          <p className="font-black text-sm text-primary">
+            +{weekly.rewards.xp} XP · +{weekly.rewards.coins}🪙 · +{weekly.rewards.bond}❤
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1.5">
+        {weekly.days.map((d) => {
+          const dt = new Date(d.date + "T00:00:00Z");
+          const dow = dt.getUTCDay();
+          const isToday = d.date === todayIso;
+          const cellBg =
+            d.status === "hit"
+              ? "bg-gradient-to-br from-green-500/30 to-emerald-500/15 ring-1 ring-green-500/50 text-green-200"
+              : d.status === "miss"
+                ? "bg-muted/30 ring-1 ring-orange-500/30 text-orange-300/80"
+                : "bg-muted/20 ring-1 ring-border text-muted-foreground";
+          const marker = d.status === "hit" ? "✓" : d.status === "miss" ? "·" : "–";
+          return (
+            <div
+              key={d.date}
+              className={`rounded-xl p-2 text-center ${cellBg} ${isToday ? "outline outline-2 outline-primary/70" : ""}`}
+              title={`${d.date}: ${d.status}`}
+            >
+              <p className="text-[9px] font-bold uppercase opacity-70">{dayLabels[dow]}</p>
+              <p className="font-black text-lg leading-none my-0.5">{marker}</p>
+              <p className="text-[9px] font-bold opacity-70">{dt.getUTCDate()}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-[10px] text-muted-foreground font-medium mt-2.5">
+        Each hit day rewards +200 XP, +50 coins, and +1 Hatchling bond. Days with no logged meals show as a dash.
+      </p>
     </motion.div>
   );
 }

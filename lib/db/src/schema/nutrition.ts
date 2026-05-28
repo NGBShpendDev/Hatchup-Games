@@ -76,3 +76,21 @@ export const nutritionDailyStreaksTable = pgTable("nutrition_daily_streaks", {
 });
 
 export type NutritionDailyStreak = typeof nutritionDailyStreaksTable.$inferSelect;
+
+// Per-day ledger of macro-target hits. One row is inserted each time
+// checkAndRewardDailyMacroTarget grants a reward, recording the reward amounts.
+// This is the source of truth for the weekly recap calendar — it's not
+// recomputable from meal_posts because a reward, once granted for the day,
+// stays granted even if the player logs additional meals that push the day's
+// totals back out of tolerance.
+export const nutritionStreakHitsTable = pgTable("nutrition_streak_hits", {
+  id: serial("id").primaryKey(),
+  playerId: integer("player_id").notNull(),
+  hitDate: date("hit_date").notNull(),
+  rewardedXp: integer("rewarded_xp").notNull().default(0),
+  rewardedCoins: integer("rewarded_coins").notNull().default(0),
+  rewardedBond: integer("rewarded_bond").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.playerId, t.hitDate)]);
+
+export type NutritionStreakHit = typeof nutritionStreakHitsTable.$inferSelect;

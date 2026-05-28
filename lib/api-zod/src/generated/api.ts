@@ -4305,7 +4305,19 @@ export const GetNutritionStreakResponse = zod.object({
   "fat": zod.number()
 }),
   "tolerance": zod.number()
+}),
+  "weekly": zod.object({
+  "days": zod.array(zod.object({
+  "date": zod.string().describe('UTC date in YYYY-MM-DD.'),
+  "status": zod.enum(['hit', 'miss', 'no_data'])
+})),
+  "rewards": zod.object({
+  "hitCount": zod.number().describe('Number of macro-target hit days in the last 7 UTC days.'),
+  "xp": zod.number().describe('Total bonus player XP earned from macro-target hits this week.'),
+  "coins": zod.number().describe('Total bonus coins earned from macro-target hits this week.'),
+  "bond": zod.number().describe('Total Hatchling bond\/friendship gained from macro-target hits this week.')
 })
+}).describe('Per-day hit\/miss history for the last 7 UTC days (oldest first, today last)\nplus a summary of bond\/XP\/coins earned from daily macro-target hits this week.\n')
 })
 
 

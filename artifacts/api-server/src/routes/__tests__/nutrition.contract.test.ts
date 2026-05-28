@@ -281,6 +281,7 @@ mock.module("@workspace/db", {
     mealCommentsTable: {},
     nutritionChallengeProgressTable: {},
     nutritionDailyStreaksTable: {},
+    nutritionStreakHitsTable: { id: {}, playerId: {}, hitDate: {}, rewardedXp: {}, rewardedCoins: {}, rewardedBond: {} },
     playersTable: {},
     groupMembersTable: {},
     hatchlingsTable: {},
@@ -549,6 +550,29 @@ describe("nutrition contract — responses parse against generated Zod", () => {
     const parsed = GetNutritionStreakResponse.parse(body);
     assert.equal(parsed.currentStreak, 4);
     assert.equal(parsed.hitToday, true);
+    // Weekly window: 4-day active streak ending today, backfilled from the
+    // streak record because the ledger mock returns no rows. All four days
+    // should appear in the last 7-day window as `hit` and rewards should
+    // sum from the per-day constants.
+    assert.equal(parsed.weekly.rewards.hitCount, 4);
+    assert.equal(parsed.weekly.rewards.xp, 4 * 200);
+    assert.equal(parsed.weekly.rewards.coins, 4 * 50);
+    assert.equal(parsed.weekly.rewards.bond, 4);
+    assert.equal(parsed.weekly.days.length, 7);
+    assert.equal(parsed.weekly.days[6]!.date, today);
+    assert.equal(parsed.weekly.days[6]!.status, "hit");
+    // Reward stickiness: even if the player later logs an extra meal that
+    // pushes today's totals back out of tolerance, today must still report
+    // as `hit` and the earned-this-week recap must not shrink. The endpoint
+    // never re-derives today's hit/miss from current macro totals — it
+    // trusts the persisted streak/ledger state instead.
+    state.sumRow = { calories: 99999, protein: 0, carbs: 0, fat: 0, cnt: 1 };
+    const after = await getJson("/nutrition/streak");
+    const reparsed = GetNutritionStreakResponse.parse(after.body);
+    assert.equal(reparsed.hitToday, true);
+    assert.equal(reparsed.weekly.days[6]!.status, "hit");
+    assert.equal(reparsed.weekly.rewards.hitCount, 4);
+    assert.equal(reparsed.weekly.rewards.xp, 4 * 200);
   });
 
   it("GET /nutrition/summary matches GetNutritionSummaryResponse", async () => {

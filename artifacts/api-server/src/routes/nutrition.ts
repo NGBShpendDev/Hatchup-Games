@@ -6,6 +6,7 @@ import {
   mealCommentsTable,
   nutritionChallengeProgressTable,
   nutritionDailyStreaksTable,
+  nutritionStreakHitsTable,
   playersTable,
   groupMembersTable,
   hatchlingsTable,
@@ -260,6 +261,19 @@ async function checkAndRewardDailyMacroTarget(playerId: number, player: typeof p
     });
   }
 
+  // Append to per-day ledger — source of truth for the weekly recap calendar.
+  // ON CONFLICT DO NOTHING because the (player_id, hit_date) unique index
+  // already prevents double-reward, but a concurrent write could race.
+  await db.insert(nutritionStreakHitsTable)
+    .values({
+      playerId,
+      hitDate: today,
+      rewardedXp: STREAK_PLAYER_XP,
+      rewardedCoins: STREAK_PLAYER_COINS,
+      rewardedBond: STREAK_HATCHLING_BOND,
+    })
+    .onConflictDoNothing();
+
   // Reward player.
   await db.update(playersTable)
     .set({
@@ -446,6 +460,82 @@ router.get("/nutrition/streak", requireAuth, attachPlayer, async (req, res) => {
   const stillActive = lastHit === today || lastHit === yesterday;
   const displayedCurrent = stillActive ? (streak?.currentStreak ?? 0) : 0;
 
+  // Per-day hit history for the last 7 UTC days (oldest → today).
+  // Sources, in order of authority:
+  //   1) nutrition_streak_hits ledger → authoritative "this day was rewarded"
+  //      (and includes the actual reward amounts granted that day).
+  //   2) For legacy days predating the ledger, backfill from
+  //      nutritionDailyStreaksTable.lastHitDate + currentStreak (we know the
+  //      streak's tail N days ending at lastHitDate were all hits).
+  //   3) For miss vs no_data, consult meal_posts: any row that day → miss.
+  const sevenDaysAgoIso = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const [ledgerRows, mealsRows] = await Promise.all([
+    db.select().from(nutritionStreakHitsTable).where(
+      and(
+        eq(nutritionStreakHitsTable.playerId, playerId),
+        sql`${nutritionStreakHitsTable.hitDate} >= ${sevenDaysAgoIso}::date`,
+      ),
+    ),
+    db.execute(sql`
+      SELECT (date_trunc('day', created_at AT TIME ZONE 'UTC'))::date AS day
+      FROM meal_posts
+      WHERE player_id = ${playerId}
+        AND created_at >= (CURRENT_DATE AT TIME ZONE 'UTC') - INTERVAL '6 days'
+        AND created_at <  (CURRENT_DATE AT TIME ZONE 'UTC') + INTERVAL '1 day'
+      GROUP BY day
+    `),
+  ]);
+
+  const ledgerByDate = new Map<string, { xp: number; coins: number; bond: number }>();
+  for (const r of ledgerRows) {
+    const key = r.hitDate.toString().slice(0, 10);
+    ledgerByDate.set(key, { xp: r.rewardedXp, coins: r.rewardedCoins, bond: r.rewardedBond });
+  }
+
+  // Backfill: if the player has a current streak ending recently but ledger
+  // rows are missing (predate the ledger feature), infer hits from
+  // lastHitDate going back currentStreak days.
+  if (streak?.lastHitDate && streak.currentStreak > 0) {
+    const lastHitMs = Date.parse(streak.lastHitDate.toString().slice(0, 10) + "T00:00:00Z");
+    for (let i = 0; i < streak.currentStreak; i++) {
+      const d = new Date(lastHitMs - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      if (d < sevenDaysAgoIso) break;
+      if (!ledgerByDate.has(d)) {
+        ledgerByDate.set(d, { xp: STREAK_PLAYER_XP, coins: STREAK_PLAYER_COINS, bond: STREAK_HATCHLING_BOND });
+      }
+    }
+  }
+
+  const mealDates = new Set<string>();
+  for (const r of mealsRows.rows as Array<{ day?: string | Date }>) {
+    if (!r.day) continue;
+    mealDates.add(typeof r.day === "string" ? r.day.slice(0, 10) : r.day.toISOString().slice(0, 10));
+  }
+
+  const days: Array<{ date: string; status: "hit" | "miss" | "no_data" }> = [];
+  let hitCount = 0;
+  let xpEarned = 0;
+  let coinsEarned = 0;
+  let bondEarned = 0;
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const reward = ledgerByDate.get(date);
+    let status: "hit" | "miss" | "no_data";
+    if (reward) {
+      status = "hit";
+      hitCount++;
+      xpEarned    += reward.xp;
+      coinsEarned += reward.coins;
+      bondEarned  += reward.bond;
+    } else if (mealDates.has(date)) {
+      status = "miss";
+    } else {
+      status = "no_data";
+    }
+    days.push({ date, status });
+  }
+
   res.json({
     currentStreak: displayedCurrent,
     longestStreak: streak?.longestStreak ?? 0,
@@ -455,6 +545,15 @@ router.get("/nutrition/streak", requireAuth, attachPlayer, async (req, res) => {
       totals,
       target: { calories: target.calories, protein: target.protein, carbs: target.carbs, fat: target.fat },
       tolerance: MACRO_TOLERANCE,
+    },
+    weekly: {
+      days,
+      rewards: {
+        hitCount,
+        xp:    xpEarned,
+        coins: coinsEarned,
+        bond:  bondEarned,
+      },
     },
   });
 });

@@ -2367,6 +2367,42 @@ export interface NutritionStreakToday {
   tolerance: number;
 }
 
+export type NutritionWeeklyDayStatus = typeof NutritionWeeklyDayStatus[keyof typeof NutritionWeeklyDayStatus];
+
+
+export const NutritionWeeklyDayStatus = {
+  hit: 'hit',
+  miss: 'miss',
+  no_data: 'no_data',
+} as const;
+
+export interface NutritionWeeklyDay {
+  /** UTC date in YYYY-MM-DD. */
+  date: string;
+  status: NutritionWeeklyDayStatus;
+}
+
+export interface NutritionWeeklyRewards {
+  /** Number of macro-target hit days in the last 7 UTC days. */
+  hitCount: number;
+  /** Total bonus player XP earned from macro-target hits this week. */
+  xp: number;
+  /** Total bonus coins earned from macro-target hits this week. */
+  coins: number;
+  /** Total Hatchling bond/friendship gained from macro-target hits this week. */
+  bond: number;
+}
+
+/**
+ * Per-day hit/miss history for the last 7 UTC days (oldest first, today last)
+plus a summary of bond/XP/coins earned from daily macro-target hits this week.
+
+ */
+export interface NutritionWeeklyStreak {
+  days: NutritionWeeklyDay[];
+  rewards: NutritionWeeklyRewards;
+}
+
 export interface NutritionStreak {
   currentStreak: number;
   longestStreak: number;
@@ -2374,6 +2410,7 @@ export interface NutritionStreak {
   lastHitDate: string | null;
   hitToday: boolean;
   today: NutritionStreakToday;
+  weekly: NutritionWeeklyStreak;
 }
 
 export interface NutritionRecapSendResult {
