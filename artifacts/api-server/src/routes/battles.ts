@@ -1,11 +1,35 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { battlesTable, hatchlingsTable, playersTable } from "@workspace/db";
+import { battlesTable, hatchlingsTable, notificationsTable, playersTable } from "@workspace/db";
 import { eq, desc, or } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
 import { attachEntitlement, enforceBattleDailyCap } from "../services/subscriptionGuards";
-import { issueWsToken } from "../services/matchmakingQueue";
+import {
+  issueWsToken,
+  createRematchInvite,
+  getRematchInvite,
+  listPendingRematchInvitesFor,
+  setRematchInviteStatus,
+  type RematchInvite,
+} from "../services/matchmakingQueue";
+
+function serializeInvite(inv: RematchInvite, fromName: string | null, toName: string | null) {
+  return {
+    id: inv.id,
+    fromPlayerId: inv.fromPlayerId,
+    toPlayerId: inv.toPlayerId,
+    fromDisplayName: fromName,
+    toDisplayName: toName,
+    mode: inv.mode,
+    fromHatchlingId: inv.fromHatchlingId,
+    fromHatchlingName: inv.fromHatchlingName,
+    fromBattleId: inv.fromBattleId,
+    status: inv.status,
+    createdAt: new Date(inv.createdAt).toISOString(),
+    expiresAt: new Date(inv.expiresAt).toISOString(),
+  };
+}
 
 const router = Router();
 
@@ -101,6 +125,153 @@ router.get("/battles/:id", requireAuth, attachPlayer, async (req, res) => {
   }
 
   res.json({ ...battle, createdAt: battle.createdAt.toISOString() });
+});
+
+// ── POST /battles/rematch — send a rematch challenge to a previous opponent ─
+router.post("/battles/rematch", requireAuth, attachPlayer, async (req, res) => {
+  const parsed = z.object({
+    battleId: z.number().int().positive(),
+    hatchlingId: z.number().int().positive(),
+  }).safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "Invalid input" }); return; }
+
+  const me = req.playerId!;
+  const { battleId, hatchlingId } = parsed.data;
+
+  const battle = await db.query.battlesTable.findFirst({ where: eq(battlesTable.id, battleId) });
+  if (!battle) { res.status(404).json({ error: "Battle not found" }); return; }
+  if (battle.player1Id !== me && battle.player2Id !== me) {
+    res.status(403).json({ error: "Not a participant in that battle" });
+    return;
+  }
+  const opponentId = battle.player1Id === me ? battle.player2Id : battle.player1Id;
+  if (!opponentId) { res.status(400).json({ error: "Cannot rematch a bot" }); return; }
+
+  // Verify the chosen hatchling belongs to the caller.
+  const hatchling = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, hatchlingId) });
+  if (!hatchling || hatchling.playerId !== me) {
+    res.status(403).json({ error: "Invalid hatchling" });
+    return;
+  }
+
+  const [me_, opp] = await Promise.all([
+    db.query.playersTable.findFirst({ where: eq(playersTable.id, me) }),
+    db.query.playersTable.findFirst({ where: eq(playersTable.id, opponentId) }),
+  ]);
+  if (!opp) { res.status(404).json({ error: "Opponent not found" }); return; }
+
+  const mode = (battle.battleMode === "ranked" ? "ranked" : "casual") as "casual" | "ranked";
+
+  const invite = createRematchInvite({
+    fromPlayerId: me,
+    toPlayerId: opponentId,
+    mode,
+    fromHatchlingId: hatchlingId,
+    fromHatchlingName: hatchling.name,
+    fromBattleId: battleId,
+  });
+
+  const fromName = me_?.displayName ?? me_?.username ?? `Player #${me}`;
+  // Drop a persistent in-app notification so the opponent sees it in their inbox.
+  try {
+    await db.insert(notificationsTable).values({
+      playerId: opponentId,
+      type: "rematch_invite",
+      title: `${fromName} wants a rematch!`,
+      body: `${mode === "ranked" ? "Ranked" : "Casual"} battle · expires in 5 minutes`,
+      link: `/compete/battle?rematch=${invite.id}`,
+      sourceId: battleId,
+    });
+  } catch {
+    // Non-fatal: invite still exists and can be polled from the pending list.
+  }
+
+  res.status(201).json(serializeInvite(invite, fromName, opp.displayName ?? opp.username ?? null));
+});
+
+// ── GET /battles/rematch/pending — pending rematch invites involving me ──────
+router.get("/battles/rematch/pending", requireAuth, attachPlayer, async (req, res) => {
+  const me = req.playerId!;
+  const invites = listPendingRematchInvitesFor(me);
+  const playerIds = [...new Set(invites.flatMap(i => [i.fromPlayerId, i.toPlayerId]))];
+  const players = playerIds.length
+    ? await db.query.playersTable.findMany({ where: (t, { inArray }) => inArray(t.id, playerIds) })
+    : [];
+  const nameById = new Map(players.map(p => [p.id, p.displayName ?? p.username ?? `Player #${p.id}`]));
+  res.json(invites.map(i => serializeInvite(i, nameById.get(i.fromPlayerId) ?? null, nameById.get(i.toPlayerId) ?? null)));
+});
+
+// ── GET /battles/rematch/:id — fetch a single invite by id ───────────────────
+router.get("/battles/rematch/:id", requireAuth, attachPlayer, async (req, res) => {
+  const me = req.playerId!;
+  const inv = getRematchInvite(String(req.params.id ?? ""));
+  if (!inv) { res.status(404).json({ error: "Invite not found or expired" }); return; }
+  if (inv.fromPlayerId !== me && inv.toPlayerId !== me) {
+    res.status(403).json({ error: "Not a participant" });
+    return;
+  }
+  const players = await db.query.playersTable.findMany({
+    where: (t, { inArray }) => inArray(t.id, [inv.fromPlayerId, inv.toPlayerId]),
+  });
+  const nameById = new Map(players.map(p => [p.id, p.displayName ?? p.username ?? `Player #${p.id}`]));
+  res.json(serializeInvite(inv, nameById.get(inv.fromPlayerId) ?? null, nameById.get(inv.toPlayerId) ?? null));
+});
+
+// ── POST /battles/rematch/:id/accept ─────────────────────────────────────────
+router.post("/battles/rematch/:id/accept", requireAuth, attachPlayer, async (req, res) => {
+  const me = req.playerId!;
+  const inv = getRematchInvite(String(req.params.id ?? ""));
+  if (!inv) { res.status(404).json({ error: "Invite not found or expired" }); return; }
+  if (inv.toPlayerId !== me) { res.status(403).json({ error: "Only the recipient can accept" }); return; }
+  if (inv.status !== "pending") { res.status(409).json({ error: `Invite is ${inv.status}` }); return; }
+
+  setRematchInviteStatus(inv.id, "accepted");
+
+  // Notify the inviter so they can hop into the queue.
+  const me_ = await db.query.playersTable.findFirst({ where: eq(playersTable.id, me) });
+  const acceptorName = me_?.displayName ?? me_?.username ?? `Player #${me}`;
+  try {
+    await db.insert(notificationsTable).values({
+      playerId: inv.fromPlayerId,
+      type: "rematch_invite",
+      title: `${acceptorName} accepted your rematch!`,
+      body: "Tap to enter the arena.",
+      link: `/compete/battle?rematch=${inv.id}`,
+      sourceId: inv.fromBattleId,
+    });
+  } catch { /* non-fatal */ }
+
+  res.json({ ok: true, inviteId: inv.id });
+});
+
+// ── POST /battles/rematch/:id/decline ────────────────────────────────────────
+router.post("/battles/rematch/:id/decline", requireAuth, attachPlayer, async (req, res) => {
+  const me = req.playerId!;
+  const inv = getRematchInvite(String(req.params.id ?? ""));
+  if (!inv) { res.status(404).json({ error: "Invite not found or expired" }); return; }
+  if (inv.toPlayerId !== me && inv.fromPlayerId !== me) {
+    res.status(403).json({ error: "Not a participant" });
+    return;
+  }
+  if (inv.status === "pending" || inv.status === "accepted") {
+    setRematchInviteStatus(inv.id, "declined");
+    if (inv.toPlayerId === me) {
+      // Tell the inviter their challenge was declined.
+      const me_ = await db.query.playersTable.findFirst({ where: eq(playersTable.id, me) });
+      const declinerName = me_?.displayName ?? me_?.username ?? `Player #${me}`;
+      try {
+        await db.insert(notificationsTable).values({
+          playerId: inv.fromPlayerId,
+          type: "rematch_invite",
+          title: `${declinerName} declined your rematch`,
+          body: "Maybe next time.",
+          link: `/compete`,
+          sourceId: inv.fromBattleId,
+        });
+      } catch { /* non-fatal */ }
+    }
+  }
+  res.json({ ok: true });
 });
 
 // ── GET /leaderboards/battle-elo ─────────────────────────────────────────────

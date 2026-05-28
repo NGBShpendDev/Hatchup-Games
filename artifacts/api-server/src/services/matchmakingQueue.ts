@@ -6,6 +6,7 @@ import { db } from "@workspace/db";
 import {
   battlesTable,
   hatchlingsTable,
+  notificationsTable,
   playersTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
@@ -32,6 +33,81 @@ interface QueueEntry {
   ws: WebSocket;
   joinedAt: number;
   artifactPowerScore: number;  // used for matchmaking tier balance
+  rematchInviteId?: string;    // when set, only pairs with the other party of the same invite
+}
+
+// ── Rematch invites (in-memory, 5 min TTL) ───────────────────────────────────
+export interface RematchInvite {
+  id: string;
+  fromPlayerId: number;
+  toPlayerId: number;
+  mode: "casual" | "ranked";
+  fromHatchlingId: number;
+  fromHatchlingName: string;
+  fromBattleId: number;
+  createdAt: number;
+  expiresAt: number;
+  status: "pending" | "accepted" | "declined" | "consumed" | "expired";
+}
+
+const REMATCH_TTL_MS = 5 * 60 * 1000;
+const rematchInvites = new Map<string, RematchInvite>();
+
+function purgeExpiredRematches() {
+  const now = Date.now();
+  for (const [id, inv] of rematchInvites) {
+    if (inv.expiresAt < now && inv.status === "pending") {
+      inv.status = "expired";
+    }
+    // Drop fully terminal invites after TTL
+    if (inv.expiresAt + 60_000 < now) rematchInvites.delete(id);
+  }
+}
+
+export function createRematchInvite(input: {
+  fromPlayerId: number;
+  toPlayerId: number;
+  mode: "casual" | "ranked";
+  fromHatchlingId: number;
+  fromHatchlingName: string;
+  fromBattleId: number;
+}): RematchInvite {
+  purgeExpiredRematches();
+  const now = Date.now();
+  const invite: RematchInvite = {
+    id: randomUUID(),
+    fromPlayerId: input.fromPlayerId,
+    toPlayerId: input.toPlayerId,
+    mode: input.mode,
+    fromHatchlingId: input.fromHatchlingId,
+    fromHatchlingName: input.fromHatchlingName,
+    fromBattleId: input.fromBattleId,
+    createdAt: now,
+    expiresAt: now + REMATCH_TTL_MS,
+    status: "pending",
+  };
+  rematchInvites.set(invite.id, invite);
+  return invite;
+}
+
+export function getRematchInvite(id: string): RematchInvite | null {
+  purgeExpiredRematches();
+  return rematchInvites.get(id) ?? null;
+}
+
+export function listPendingRematchInvitesFor(playerId: number): RematchInvite[] {
+  purgeExpiredRematches();
+  return [...rematchInvites.values()].filter(i =>
+    (i.toPlayerId === playerId || i.fromPlayerId === playerId) &&
+    (i.status === "pending" || i.status === "accepted")
+  );
+}
+
+export function setRematchInviteStatus(id: string, status: RematchInvite["status"]): RematchInvite | null {
+  const inv = rematchInvites.get(id);
+  if (!inv) return null;
+  inv.status = status;
+  return inv;
 }
 
 interface ActiveBattle {
@@ -238,10 +314,37 @@ async function tryMatch() {
 
   const now = Date.now();
 
+  // First pass: pair rematch-invite buddies regardless of power/level checks
+  for (let i = 0; i < queue.length; i++) {
+    const a = queue[i]!;
+    if (!a.rematchInviteId) continue;
+    for (let j = i + 1; j < queue.length; j++) {
+      const b = queue[j]!;
+      if (a.rematchInviteId !== b.rematchInviteId) continue;
+      if (a.mode !== b.mode) continue;
+      const inv = rematchInvites.get(a.rematchInviteId);
+      if (!inv) continue;
+      const validPair =
+        (inv.fromPlayerId === a.playerId && inv.toPlayerId === b.playerId) ||
+        (inv.fromPlayerId === b.playerId && inv.toPlayerId === a.playerId);
+      if (!validPair) continue;
+      queue.splice(j, 1);
+      queue.splice(i, 1);
+      queuedPlayers.delete(a.playerId);
+      queuedPlayers.delete(b.playerId);
+      inv.status = "consumed";
+      await startBattle(a, b);
+      return;
+    }
+  }
+
   for (let i = 0; i < queue.length; i++) {
     for (let j = i + 1; j < queue.length; j++) {
       const a = queue[i]!;
       const b = queue[j]!;
+      // Skip rematch-tagged entries from generic matchmaking — they only pair
+      // with the specific opponent of their invite.
+      if (a.rematchInviteId || b.rematchInviteId) continue;
       if (a.mode !== b.mode) continue;
       if (Math.abs(a.hatchlingLevel - b.hatchlingLevel) > 20) continue;
 
@@ -380,7 +483,28 @@ async function handleMessage(ws: WebSocket, playerId: number, raw: string) {
       return;
     }
     const hatchlingId = Number(msg.hatchlingId);
-    const mode = (msg.mode === "ranked" ? "ranked" : "casual") as "casual" | "ranked";
+    const rawMode = msg.mode === "ranked" ? "ranked" : "casual";
+    const rematchInviteId = typeof msg.rematchInviteId === "string" ? msg.rematchInviteId : undefined;
+
+    // Validate rematch invite if supplied: caller must be a participant and
+    // status must still be pending/accepted (not consumed/declined/expired).
+    let invite: RematchInvite | null = null;
+    if (rematchInviteId) {
+      invite = getRematchInvite(rematchInviteId);
+      if (!invite) {
+        send(ws, { type: "error", message: "Rematch invite not found or expired" });
+        return;
+      }
+      if (invite.fromPlayerId !== playerId && invite.toPlayerId !== playerId) {
+        send(ws, { type: "error", message: "Not a participant in this rematch invite" });
+        return;
+      }
+      if (invite.status !== "pending" && invite.status !== "accepted") {
+        send(ws, { type: "error", message: "Rematch invite is no longer active" });
+        return;
+      }
+    }
+    const mode = (invite?.mode ?? rawMode) as "casual" | "ranked";
 
     const [hatchling, player] = await Promise.all([
       db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, hatchlingId) }),
@@ -409,11 +533,17 @@ async function handleMessage(ws: WebSocket, playerId: number, raw: string) {
     const loadoutMods = await loadActiveLoadoutModifiers(playerId, hatchlingId).catch(() => null);
     const artifactPowerScore = loadoutMods?.powerScore ?? 0;
 
-    const entry: QueueEntry = { playerId, hatchlingId, hatchlingLevel: hatchling.level, mode, ws, joinedAt: Date.now(), artifactPowerScore };
+    const entry: QueueEntry = {
+      playerId, hatchlingId, hatchlingLevel: hatchling.level, mode, ws,
+      joinedAt: Date.now(), artifactPowerScore,
+      ...(rematchInviteId ? { rematchInviteId } : {}),
+    };
     queue.push(entry);
     queuedPlayers.add(playerId);
-    send(ws, { type: "queue_joined", position: queue.length, mode });
-    scheduleBotFallback(entry);
+    send(ws, { type: "queue_joined", position: queue.length, mode, rematchInviteId: rematchInviteId ?? null });
+    // Skip generic-bot fallback for rematch entries — they wait for the
+    // specific invite partner instead.
+    if (!rematchInviteId) scheduleBotFallback(entry);
     await tryMatch();
     return;
   }

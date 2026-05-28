@@ -12,7 +12,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Bell, CheckCheck, Mail, Trophy, Clock, Sparkles, Users } from "lucide-react";
+import { Bell, CheckCheck, Mail, Trophy, Clock, Sparkles, Users, Swords } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 
@@ -24,6 +24,7 @@ const TYPE_META: Record<string, { icon: typeof Bell; color: string }> = {
   challenge_complete: { icon: Trophy,    color: "from-emerald-500 to-teal-500" },
   club_mention:       { icon: Users,     color: "from-indigo-500 to-violet-500" },
   artifact_unlock:    { icon: Sparkles,  color: "from-fuchsia-500 to-purple-500" },
+  rematch_invite:     { icon: Swords,    color: "from-red-500 to-pink-600" },
 };
 
 function iconFor(type: string) {

@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation, Link } from "wouter";
 import {
   Swords, Zap, Shield, Sparkles, Trophy, RotateCcw, ChevronLeft,
-  Share2, Bookmark, Trash2, Star, Plus, X,
+  Share2, Bookmark, Trash2, Star, Plus, X, Send,
 } from "lucide-react";
 import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
 import type {
@@ -359,6 +359,18 @@ export default function BattlePage() {
   const [queueSecs, setQueueSecs] = useState(0);
   const [rewardSummary, setRewardSummary] = useState<{ open: boolean; entries: RewardEntry[]; title?: string }>({ open: false, entries: [] });
 
+  // Rematch invite state — when set, join_queue carries this id and the server
+  // pairs the two invite parties directly instead of generic matchmaking.
+  const [rematchInviteId, setRematchInviteId] = useState<string | null>(null);
+  interface RematchInviteDto {
+    id: string; fromPlayerId: number; toPlayerId: number;
+    fromDisplayName: string | null; toDisplayName: string | null;
+    mode: "casual" | "ranked"; fromHatchlingId: number; fromHatchlingName: string;
+    fromBattleId: number; status: string; createdAt: string; expiresAt: string;
+  }
+  const [incomingInvite, setIncomingInvite] = useState<RematchInviteDto | null>(null);
+  const [sendingRematch, setSendingRematch] = useState(false);
+
   // Loadout state
   const [loadoutSlots, setLoadoutSlots] = useState<LoadoutSlots>({ major: null, minor1: null, minor2: null });
   const [selectingSlot, setSelectingSlot] = useState<"major" | "minor1" | "minor2" | null>(null);
@@ -454,7 +466,12 @@ export default function BattlePage() {
 
         ws.onopen = () => {
           if (selectedHatchling) {
-            ws.send(JSON.stringify({ type: "join_queue", hatchlingId: selectedHatchling.id, mode }));
+            ws.send(JSON.stringify({
+              type: "join_queue",
+              hatchlingId: selectedHatchling.id,
+              mode,
+              ...(rematchInviteId ? { rematchInviteId } : {}),
+            }));
           }
         };
 
@@ -478,7 +495,7 @@ export default function BattlePage() {
         toast({ title: "Connection error", description: "Could not authenticate battle session.", variant: "destructive" });
         setPhase("select");
       });
-  }, [pid, selectedHatchling, mode]);
+  }, [pid, selectedHatchling, mode, rematchInviteId]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   function handleWsMessage(msg: { type: string; [k: string]: unknown }) {
@@ -556,6 +573,145 @@ export default function BattlePage() {
 
   useEffect(() => { return () => { wsRef.current?.close(); }; }, []);
 
+  // ── Detect ?rematch=<id> in URL and fetch the invite ───────────────────────
+  useEffect(() => {
+    if (!pid) return;
+    const params = new URLSearchParams(window.location.search);
+    const inviteIdParam = params.get("rematch");
+    if (!inviteIdParam) return;
+    fetch(`${BASE}/api/battles/rematch/${inviteIdParam}`, { credentials: "include" })
+      .then(async r => {
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err.error ?? "Invite unavailable");
+        }
+        return r.json() as Promise<RematchInviteDto>;
+      })
+      .then((inv) => {
+        setIncomingInvite(inv);
+        setMode(inv.mode);
+        // If the current user is the inviter and the invite is already accepted,
+        // jump straight to the queue with the invite tagged so the server pairs
+        // them with the recipient.
+        if (inv.fromPlayerId === pid && inv.status === "accepted") {
+          setRematchInviteId(inv.id);
+        }
+      })
+      .catch(err => {
+        toast({ title: "Rematch invite", description: String(err.message ?? err), variant: "destructive" });
+      });
+  }, [pid, toast]);
+
+  // ── Recipient: accept the incoming rematch invite ──────────────────────────
+  async function acceptRematch() {
+    if (!incomingInvite) return;
+    try {
+      const res = await fetch(`${BASE}/api/battles/rematch/${incomingInvite.id}/accept`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "Could not accept");
+      }
+      setRematchInviteId(incomingInvite.id);
+      toast({
+        title: "Rematch accepted!",
+        description: `Pick your Hatchling to face ${incomingInvite.fromDisplayName ?? "your opponent"}.`,
+      });
+      // Keep the banner visible so the user knows mode is locked to the invite's mode.
+    } catch (err) {
+      toast({ title: "Could not accept", description: String((err as Error).message), variant: "destructive" });
+    }
+  }
+
+  // ── Decline a rematch invite (recipient or inviter cancel) ─────────────────
+  async function declineRematch() {
+    if (!incomingInvite) return;
+    try {
+      await fetch(`${BASE}/api/battles/rematch/${incomingInvite.id}/decline`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch { /* non-fatal */ }
+    setIncomingInvite(null);
+    setRematchInviteId(null);
+    // Strip ?rematch=... from the URL so refresh doesn't re-prompt.
+    if (typeof window !== "undefined" && window.history?.replaceState) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    toast({ title: "Rematch declined" });
+  }
+
+  // ── Inviter: send a rematch challenge from the result screen ───────────────
+  async function sendRematch() {
+    if (!battleState || !myFighter || sendingRematch) return;
+    setSendingRematch(true);
+    try {
+      const res = await fetch(`${BASE}/api/battles/rematch`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          battleId: battleState.battleId,
+          hatchlingId: myFighter.hatchlingId,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.error ?? "Could not send");
+      const invite = body as RematchInviteDto;
+      setRematchInviteId(invite.id);
+      toast({
+        title: "Rematch sent!",
+        description: `Waiting for ${invite.toDisplayName ?? "your opponent"}…`,
+      });
+      // Reuse the just-played hatchling and drop straight back into the queue
+      // with the invite id so the server pairs us with the recipient when they accept.
+      setSelectedHatchling({
+        id: myFighter.hatchlingId,
+        name: myFighter.hatchlingName,
+        level: myFighter.hatchlingLevel,
+        realm: myFighter.realm,
+        species: "",
+        rarity: "",
+      });
+      setMode(invite.mode);
+      // Close any prior WS, then re-enter queue phase. connectWs() reads the
+      // updated state via its useCallback closure on next render.
+      wsRef.current?.close();
+      wsRef.current = null;
+      setBattleState(null);
+      setLastTurn(null);
+      setRewards(null);
+      setArtifactXpGains([]);
+      setPhase("queue");
+    } catch (err) {
+      toast({ title: "Could not send rematch", description: String((err as Error).message), variant: "destructive" });
+    } finally {
+      setSendingRematch(false);
+    }
+  }
+
+  // After phase becomes "queue" with rematchInviteId set, connectWs() will
+  // pick up the latest state on the next render. We trigger it from an effect
+  // so it runs after React has applied the queue phase transition.
+  const queueEntryRef = useRef<{ inviteId: string | null; hatchlingId: number | null }>({ inviteId: null, hatchlingId: null });
+  useEffect(() => {
+    if (phase !== "queue") return;
+    const desiredInvite = rematchInviteId ?? null;
+    const desiredHatchling = selectedHatchling?.id ?? null;
+    const prev = queueEntryRef.current;
+    // Auto-connect only once per (invite,hatchling) combination so the standard
+    // confirmLoadout / skipLoadout paths that already call connectWs() are untouched.
+    if (desiredInvite && desiredHatchling && (prev.inviteId !== desiredInvite || prev.hatchlingId !== desiredHatchling) && !wsRef.current) {
+      queueEntryRef.current = { inviteId: desiredInvite, hatchlingId: desiredHatchling };
+      connectWs();
+    }
+    if (phase !== "queue") {
+      queueEntryRef.current = { inviteId: null, hatchlingId: null };
+    }
+  }, [phase, rematchInviteId, selectedHatchling, connectWs]);
+
   // ── Phase navigation ──────────────────────────────────────────────────────
   function goToLoadout() {
     if (!selectedHatchling || !pid) return;
@@ -592,6 +748,19 @@ export default function BattlePage() {
     wsRef.current?.send(JSON.stringify({ type: "leave_queue" }));
     wsRef.current?.close();
     wsRef.current = null;
+    // If we were waiting on a rematch, cancel it so the other side doesn't
+    // hang on a stale invite.
+    if (rematchInviteId) {
+      fetch(`${BASE}/api/battles/rematch/${rematchInviteId}/decline`, {
+        method: "POST",
+        credentials: "include",
+      }).catch(() => {});
+      setRematchInviteId(null);
+      setIncomingInvite(null);
+      if (typeof window !== "undefined" && window.history?.replaceState && window.location.search.includes("rematch=")) {
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    }
     setPhase("select");
   }
 
@@ -610,6 +779,11 @@ export default function BattlePage() {
     setSelectedHatchling(null);
     setLoadoutSlots({ major: null, minor1: null, minor2: null });
     setSelectingSlot(null);
+    setRematchInviteId(null);
+    setIncomingInvite(null);
+    if (typeof window !== "undefined" && window.history?.replaceState && window.location.search.includes("rematch=")) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
     setPhase("select");
   }
 
@@ -735,6 +909,48 @@ export default function BattlePage() {
           {/* ── SELECT HATCHLING ── */}
           {phase === "select" && (
             <motion.div key="select" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-5">
+              {/* Rematch invite banner — appears when ?rematch=<id> is in the URL */}
+              {incomingInvite && incomingInvite.toPlayerId === pid && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-2xl border-2 border-primary/60 bg-gradient-to-r from-red-500/15 to-pink-500/15 p-4 shadow-[0_0_24px_-6px_hsl(var(--primary)/0.6)]"
+                  data-testid="rematch-invite-banner"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Swords className="w-4 h-4 text-primary" />
+                    <p className="font-black text-sm">Rematch challenge!</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    <span className="font-bold text-white">{incomingInvite.fromDisplayName ?? "An opponent"}</span> wants
+                    a rematch with their <span className="font-medium">{incomingInvite.fromHatchlingName}</span> · {incomingInvite.mode} battle
+                  </p>
+                  {rematchInviteId === incomingInvite.id ? (
+                    <p className="text-xs text-green-400 font-bold">✓ Accepted — pick your Hatchling below.</p>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={acceptRematch}
+                        className="flex-1 bg-primary font-bold rounded-xl"
+                        data-testid="button-accept-rematch"
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={declineRematch}
+                        className="flex-1 font-bold rounded-xl"
+                        data-testid="button-decline-rematch"
+                      >
+                        Decline
+                      </Button>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
               <div className="flex gap-2">
                 {(["casual", "ranked"] as const).map(m => (
                   <button
@@ -961,17 +1177,25 @@ export default function BattlePage() {
                 className="w-20 h-20 border-4 border-primary border-t-transparent rounded-full mx-auto"
               />
               <div>
-                <p className="font-black text-2xl mb-1">Finding opponent…</p>
-                <p className="text-muted-foreground text-sm">
-                  {queueSecs < 30 ? `Searching… ${queueSecs}s` : "Matched with a bot opponent!"}
+                <p className="font-black text-2xl mb-1">
+                  {rematchInviteId ? "Awaiting your rival…" : "Finding opponent…"}
                 </p>
-                {powerScore > 0 && (
+                <p className="text-muted-foreground text-sm">
+                  {rematchInviteId
+                    ? `Rematch sent · ${queueSecs}s`
+                    : (queueSecs < 30 ? `Searching… ${queueSecs}s` : "Matched with a bot opponent!")}
+                </p>
+                {powerScore > 0 && !rematchInviteId && (
                   <p className="text-xs text-muted-foreground mt-1">
                     Loadout power: <span className="text-purple-400 font-bold">{powerScore.toFixed(0)}</span>
                   </p>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">You'll be matched with a bot if no one is found in 30 seconds.</p>
+              <p className="text-xs text-muted-foreground">
+                {rematchInviteId
+                  ? "Your opponent has 5 minutes to accept — cancel anytime."
+                  : "You'll be matched with a bot if no one is found in 30 seconds."}
+              </p>
               <Button variant="outline" onClick={leaveQueue} className="rounded-full">Cancel</Button>
             </motion.div>
           )}
@@ -1216,6 +1440,18 @@ export default function BattlePage() {
               </motion.div>
 
               <div className="flex gap-3 flex-wrap">
+                {opponentFighter && !opponentFighter.isBot && opponentFighter.playerId > 0 && (
+                  <Button
+                    onClick={sendRematch}
+                    disabled={sendingRematch}
+                    className="flex-1 font-bold rounded-2xl bg-gradient-to-r from-primary to-pink-600"
+                    size="lg"
+                    data-testid="button-send-rematch"
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    {sendingRematch ? "Sending…" : "Rematch"}
+                  </Button>
+                )}
                 <Button onClick={resetBattle} className="flex-1 font-bold rounded-2xl" size="lg">
                   <RotateCcw className="w-4 h-4 mr-2" /> Battle Again
                 </Button>
