@@ -660,11 +660,15 @@ function PlayerDiscoverCard({
 
   const reasonLabel: Record<string, { text: string; icon: React.ReactNode; color: string }> = {
     shared_group: { text: "In a group with you", icon: <Users2 className="w-3 h-3" />, color: "text-purple-400" },
+    similar_goals: { text: "Similar goals", icon: <Dumbbell className="w-3 h-3" />, color: "text-emerald-400" },
     top_creator: { text: "Top creator", icon: <Award className="w-3 h-3" />, color: "text-yellow-400" },
     recently_active: { text: "Recently active", icon: <Sparkles className="w-3 h-3" />, color: "text-cyan-400" },
     search: { text: "", icon: null, color: "" },
   };
   const reason = reasonLabel[player.reason] ?? reasonLabel.recently_active;
+  const reasonText = player.reason === "similar_goals" && player.reasonDetail
+    ? player.reasonDetail
+    : reason.text;
 
   async function handleFollow() {
     if (optimisticFollow) return;
@@ -709,10 +713,10 @@ function PlayerDiscoverCard({
           <p className="text-[11px] text-muted-foreground truncate">
             @{player.username} · {player.followerCount} {player.followerCount === 1 ? "follower" : "followers"}
           </p>
-          {reason.text && (
+          {reasonText && (
             <p className={`text-[10px] font-bold mt-0.5 flex items-center gap-1 ${reason.color}`}>
               {reason.icon}
-              {reason.text}
+              {reasonText}
             </p>
           )}
         </div>

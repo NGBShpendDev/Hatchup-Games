@@ -674,6 +674,44 @@ router.get("/social/discover", requireAuth, attachPlayer, async (req, res) => {
     for (const m of sharedMembers) consider(m.playerId, "shared_group", "In a group with you", 100);
   }
 
+  // Similar goals: same fitness realm, physique goal, or fitness level
+  const viewer = await db.query.playersTable.findFirst({ where: eq(playersTable.id, viewerId) });
+  if (viewer) {
+    const goalPeers = await db.query.playersTable.findMany({
+      where: and(
+        ne(playersTable.id, viewerId),
+        or(
+          eq(playersTable.fitnessRealm, viewer.fitnessRealm),
+          viewer.physiqueGoal ? eq(playersTable.physiqueGoal, viewer.physiqueGoal) : undefined,
+          eq(playersTable.fitnessLevel, viewer.fitnessLevel),
+        ),
+      ),
+      limit: 60,
+    });
+    const realmLabels: Record<string, string> = {
+      strength: "strength", endurance: "endurance", flexibility: "flexibility",
+      power: "power", agility: "agility",
+    };
+    for (const peer of goalPeers) {
+      const matched: string[] = [];
+      if (peer.fitnessRealm === viewer.fitnessRealm) {
+        matched.push(`${realmLabels[viewer.fitnessRealm] ?? viewer.fitnessRealm} realm`);
+      }
+      if (viewer.physiqueGoal && peer.physiqueGoal === viewer.physiqueGoal) {
+        matched.push(viewer.physiqueGoal.replace(/_/g, " "));
+      }
+      if (peer.fitnessLevel === viewer.fitnessLevel) {
+        matched.push(`${viewer.fitnessLevel} level`);
+      }
+      if (matched.length === 0) continue;
+      // Base 70 + 5 per extra match keeps similar-goals above recently-active (30)
+      // and top-creator (60), but still below shared-group cohort (100).
+      const weight = 70 + (matched.length - 1) * 5;
+      const detail = `Similar goals · ${matched.slice(0, 2).join(" & ")}`;
+      consider(peer.id, "similar_goals", detail, weight);
+    }
+  }
+
   // Top creators by creator badge / total engagement (proxy via posts engagementScore sum)
   const creators = await db.query.playersTable.findMany({
     where: and(ne(playersTable.id, viewerId), sql`${playersTable.creatorBadge} IS NOT NULL`),
