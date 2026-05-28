@@ -64,6 +64,7 @@ export default function SettingsPrivacy() {
   const [emailVerifiedAt, setEmailVerifiedAt] = useState<string | null>(null);
   const [resendingVerification, setResendingVerification] = useState(false);
   const [notifyRecapEmail, setNotifyRecapEmail] = useState(true);
+  const [notifyChampionEmail, setNotifyChampionEmail] = useState(true);
   const [notifyRecapPush, setNotifyRecapPush] = useState(true);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -134,6 +135,7 @@ export default function SettingsPrivacy() {
         setSavedEmail(typeof data.email === "string" ? data.email : null);
         setEmailVerifiedAt(typeof data.emailVerifiedAt === "string" ? data.emailVerifiedAt : null);
         if (typeof data.notifyRecapEmail === "boolean") setNotifyRecapEmail(data.notifyRecapEmail);
+        if (typeof data.notifyChampionEmail === "boolean") setNotifyChampionEmail(data.notifyChampionEmail);
         if (typeof data.notifyRecapPush === "boolean") setNotifyRecapPush(data.notifyRecapPush);
         setLoaded(true);
       })
@@ -268,6 +270,7 @@ export default function SettingsPrivacy() {
           weeklyRecapTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           email: recapEmail.trim() === "" ? null : recapEmail.trim(),
           notifyRecapEmail,
+          notifyChampionEmail,
           notifyRecapPush,
         }),
       });
@@ -777,6 +780,19 @@ export default function SettingsPrivacy() {
               <Switch
                 checked={notifyRecapEmail}
                 onCheckedChange={setNotifyRecapEmail}
+                disabled={recapEmail.trim() === ""}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4 border-t border-emerald-500/10 pt-3">
+              <div className="min-w-0">
+                <p className="font-bold text-sm">Tournament champion emails</p>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Get a celebratory email whenever you win a tournament bracket.
+                </p>
+              </div>
+              <Switch
+                checked={notifyChampionEmail}
+                onCheckedChange={setNotifyChampionEmail}
                 disabled={recapEmail.trim() === ""}
               />
             </div>

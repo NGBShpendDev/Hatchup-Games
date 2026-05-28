@@ -105,6 +105,7 @@ export const playersTable = pgTable("players", {
   emailVerificationToken: text("email_verification_token").unique(),
   emailVerificationExpiresAt: timestamp("email_verification_expires_at", { withTimezone: true }),
   notifyRecapEmail: boolean("notify_recap_email").notNull().default(true),
+  notifyChampionEmail: boolean("notify_champion_email").notNull().default(true),
   recapEmailLastSentWeek: integer("recap_email_last_sent_week"),
   notifyRecapPush: boolean("notify_recap_push").notNull().default(true),
   recapPushLastSentWeek: integer("recap_push_last_sent_week"),

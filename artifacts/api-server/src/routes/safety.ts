@@ -167,6 +167,7 @@ router.get("/players/:id/privacy-settings", requireAuth, attachPlayer, async (re
     weeklyRecapTimezone: player.weeklyRecapTimezone,
     email: player.email,
     notifyRecapEmail: player.notifyRecapEmail,
+    notifyChampionEmail: player.notifyChampionEmail,
     notifyRecapPush: player.notifyRecapPush,
   });
 });
@@ -194,6 +195,7 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     weeklyRecapTimezone?: unknown;
     email?: unknown;
     notifyRecapEmail?: unknown;
+    notifyChampionEmail?: unknown;
     notifyRecapPush?: unknown;
   };
 
@@ -300,6 +302,9 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
   if (typeof body.notifyRecapEmail === "boolean") {
     updates.notifyRecapEmail = body.notifyRecapEmail;
   }
+  if (typeof body.notifyChampionEmail === "boolean") {
+    updates.notifyChampionEmail = body.notifyChampionEmail;
+  }
   if (typeof body.notifyRecapPush === "boolean") {
     updates.notifyRecapPush = body.notifyRecapPush;
   }
@@ -365,6 +370,7 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     emailVerifiedAt: updated.emailVerifiedAt?.toISOString() ?? null,
     emailVerificationSent: verificationSent,
     notifyRecapEmail: updated.notifyRecapEmail,
+    notifyChampionEmail: updated.notifyChampionEmail,
     notifyRecapPush: updated.notifyRecapPush,
   });
 });

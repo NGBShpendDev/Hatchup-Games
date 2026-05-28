@@ -324,7 +324,7 @@ export async function finalizeChallenge(challengeId: number) {
 // Fires exactly once per challenge because it lives inside the
 // `!completedPushSentAt` gate in `finalizeChallenge` (markCompleted flips
 // that flag as part of reward distribution). Honors existing opt-in prefs:
-// push respects `notifyCompletedPush`, email respects `notifyRecapEmail`
+// push respects `notifyCompletedPush`, email respects `notifyChampionEmail`
 // and only fires when the player has an email on file and an email
 // provider is configured.
 function escapeHtml(s: string): string {
@@ -373,12 +373,12 @@ async function notifyTournamentChampion(
       where: eq(playersTable.id, playerId),
       columns: {
         email: true,
-        notifyRecapEmail: true,
+        notifyChampionEmail: true,
         displayName: true,
         username: true,
       },
     });
-    if (!player || !player.email || !player.notifyRecapEmail) return;
+    if (!player || !player.email || !player.notifyChampionEmail) return;
 
     const name = player.displayName ?? player.username;
     const safeTitle = escapeHtml(challengeTitle);
