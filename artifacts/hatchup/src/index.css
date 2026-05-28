@@ -166,3 +166,22 @@
 .pal-aura-rare      { box-shadow: 0 0 0 2px rgba(59,130,246,0.35), 0 0 12px rgba(59,130,246,0.15); }
 .pal-aura-uncommon  { box-shadow: 0 0 0 1px rgba(16,185,129,0.3), 0 0 8px rgba(16,185,129,0.12); }
 .pal-aura-common    { box-shadow: 0 0 0 1px rgba(107,114,128,0.2); }
+
+/* ── Legendary hatch cinematic screen shake ───────────────────────────────── */
+@keyframes hatch-screen-shake {
+  0%   { transform: translate(0, 0) rotate(0deg); }
+  10%  { transform: translate(-9px, -5px) rotate(-1.2deg); }
+  20%  { transform: translate(9px, -5px) rotate(1.2deg); }
+  30%  { transform: translate(-12px, 4px) rotate(-1.8deg); }
+  40%  { transform: translate(12px, 4px) rotate(1.8deg); }
+  50%  { transform: translate(-9px, -7px) rotate(-1.2deg); }
+  60%  { transform: translate(9px, 7px) rotate(1.2deg); }
+  70%  { transform: translate(-7px, 5px) rotate(-0.7deg); }
+  80%  { transform: translate(7px, -5px) rotate(0.7deg); }
+  90%  { transform: translate(-3px, 2px) rotate(-0.3deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+.hatch-screen-shake {
+  animation: hatch-screen-shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}

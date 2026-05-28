@@ -7,10 +7,6 @@ import {
   useAddEgg,
   useListHatchlings, getListHatchlingsQueryKey
 } from "@workspace/api-client-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
 import { GlowBadge } from "@/components/ui/glow-badge";
@@ -25,7 +21,8 @@ import { ToastAction } from "@/components/ui/toast";
 import { Link, useLocation } from "wouter";
 import { ApiError } from "@workspace/api-client-react";
 import { ErrorCard } from "@/components/error-card";
-import { useEpicMomentQueue } from "@/components/epic-moment-overlay";
+import { Input } from "@/components/ui/input";
+import { LegendaryCinematic, type LegendaryRarity } from "@/components/legendary-hatch-cinematic";
 
 // ── Realm visual config ────────────────────────────────────────────────────────
 const REALM_EGG_STYLES: Record<string, {
@@ -166,18 +163,31 @@ export default function Hatch() {
 
   const hatchMutation = useHatchEgg();
   const addEggMutation = useAddEgg();
-  const { enqueue: enqueueEpicMoment } = useEpicMomentQueue();
 
   const [selectedEgg, setSelectedEgg] = useState<number | null>(null);
   const [selectedEggRealm, setSelectedEggRealm] = useState<string>("balance");
+  const [selectedEggSteps, setSelectedEggSteps] = useState<number>(0);
   const [hatchName, setHatchName] = useState("");
   const [showHatchModal, setShowHatchModal] = useState(false);
   const [hatchResult, setHatchResult] = useState<any>(null);
   const [hatchPhase, setHatchPhase] = useState<HatchPhase>("idle");
 
-  const handleHatchClick = (eggId: number, eggType: string) => {
+  const [cinematicData, setCinematicData] = useState<{
+    species: string;
+    name: string;
+    rarity: LegendaryRarity;
+    realmColor: string;
+    realmEmoji: string;
+    steps: number;
+    hatchlingId: number;
+  } | null>(null);
+
+  const LEGENDARY_RARITIES = new Set(["Legendary", "Mythic", "Ancient", "Celestial"]);
+
+  const handleHatchClick = (eggId: number, eggType: string, steps: number) => {
     setSelectedEgg(eggId);
     setSelectedEggRealm(getRealm(eggType));
+    setSelectedEggSteps(steps);
     setHatchName("");
     setShowHatchModal(true);
     setHatchResult(null);
@@ -195,25 +205,36 @@ export default function Hatch() {
         { id: selectedEgg, data: { playerId: pid, name: hatchName || "Mystery Pal" } },
         {
           onSuccess: (res) => {
-            setHatchResult(res);
-            setHatchPhase("reveal");
+            const rarity: string = (res as any)?.hatchling?.rarity ?? "Common";
             queryClient.invalidateQueries({ queryKey: getListEggsQueryKey({ playerId: pid, hatched: false }) });
             queryClient.invalidateQueries({ queryKey: getListHatchlingsQueryKey({ playerId: pid }) });
 
-            // Mythic+ hatches get the full-screen epic moment. We let the
-            // reveal modal play first so the two celebrations don't fight.
-            const rarity = (res as any)?.hatchling?.rarity;
-            if (rarity === "Celestial" || rarity === "Ancient" || rarity === "Mythic" || rarity === "Legendary") {
+            if (LEGENDARY_RARITIES.has(rarity)) {
+              // Close the basic modal and hand off to the full-screen cinematic
               const style = REALM_EGG_STYLES[selectedEggRealm] ?? REALM_EGG_STYLES["balance"];
+              const realmColor =
+                rarity === "Celestial" ? "#22d3ee"
+                : rarity === "Ancient"  ? "#14b8a6"
+                : style.crackColor;
+              const realmEmoji =
+                rarity === "Celestial" ? "🌌"
+                : rarity === "Ancient"  ? "🏺"
+                : style.emoji;
+              setShowHatchModal(false);
               setTimeout(() => {
-                enqueueEpicMoment({
-                  kind: "hatch",
+                setCinematicData({
                   species: (res as any)?.hatchling?.species ?? "Mystery Pal",
-                  rarity: rarity as "Celestial" | "Ancient" | "Mythic" | "Legendary",
-                  realmColor: rarity === "Celestial" ? "#22d3ee" : rarity === "Ancient" ? "#14b8a6" : style.crackColor,
-                  realmEmoji: rarity === "Celestial" ? "🌌" : rarity === "Ancient" ? "🏺" : style.emoji,
+                  name:    ((res as any)?.hatchling?.name ?? hatchName) || "Mystery Pal",
+                  rarity:  rarity as LegendaryRarity,
+                  realmColor,
+                  realmEmoji,
+                  steps: selectedEggSteps,
+                  hatchlingId: (res as any)?.hatchling?.id ?? 0,
                 });
-              }, 2000);
+              }, 350);
+            } else {
+              setHatchResult(res);
+              setHatchPhase("reveal");
             }
           },
           onError: (err: unknown) => {
@@ -348,7 +369,7 @@ export default function Hatch() {
                           <motion.div className="w-full mt-4" whileTap={{ scale: 0.97 }}>
                             <NeonButton
                               className="w-full text-lg h-12"
-                              onClick={() => handleHatchClick(egg.id, egg.eggType)}
+                              onClick={() => handleHatchClick(egg.id, egg.eggType, egg.stepsProgress)}
                             >
                               {style.emoji} HATCH NOW!
                             </NeonButton>
@@ -409,6 +430,32 @@ export default function Hatch() {
           )}
         </div>
       </div>
+
+      {/* ── Legendary+ Cinematic (full-screen, outside modal) ───────────────── */}
+      <AnimatePresence>
+        {cinematicData && (
+          <LegendaryCinematic
+            key="legendary-cinematic"
+            species={cinematicData.species}
+            name={cinematicData.name}
+            rarity={cinematicData.rarity}
+            realmColor={cinematicData.realmColor}
+            realmEmoji={cinematicData.realmEmoji}
+            steps={cinematicData.steps}
+            onClose={() => {
+              setCinematicData(null);
+              setHatchResult(null);
+              setHatchPhase("idle");
+            }}
+            onViewPal={() => {
+              setCinematicData(null);
+              setHatchResult(null);
+              setHatchPhase("idle");
+              setLocation(`/hatchlings/${cinematicData.hatchlingId}`);
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── Hatch Modal ─────────────────────────────────────────────────────────── */}
       <Dialog open={showHatchModal} onOpenChange={setShowHatchModal}>
