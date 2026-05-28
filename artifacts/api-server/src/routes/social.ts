@@ -7,6 +7,7 @@ import {
   postCommentsTable,
   postCommentRevisionsTable,
   postCommentReactionsTable,
+  postNotificationMutesTable,
   playerFollowsTable,
   postRepostsTable,
   playersTable,
@@ -119,6 +120,19 @@ async function maybeGrantCreatorBadge(playerId: number) {
 
 // ── Post enrichment helper ──────────────────────────────────────────────────
 
+// Returns true if `recipientId` has muted notifications for `postId`. Used to
+// suppress post_reaction, post_comment, and comment_like notifications when
+// the recipient has silenced a noisy thread.
+async function isPostMutedFor(recipientId: number, postId: number): Promise<boolean> {
+  const row = await db.query.postNotificationMutesTable.findFirst({
+    where: and(
+      eq(postNotificationMutesTable.playerId, recipientId),
+      eq(postNotificationMutesTable.postId, postId),
+    ),
+  });
+  return !!row;
+}
+
 async function enrichPost(
   post: typeof postsTable.$inferSelect,
   viewerPlayerId?: number | null,
@@ -210,6 +224,10 @@ async function enrichPost(
       }))
     : false;
 
+  const notificationsMuted = viewerPlayerId
+    ? await isPostMutedFor(viewerPlayerId, post.id)
+    : false;
+
   return {
     id: post.id,
     playerId: post.playerId,
@@ -233,6 +251,7 @@ async function enrichPost(
     repostCount,
     myReaction,
     myRepost,
+    notificationsMuted,
     comments: enrichedComments,
   };
 }
@@ -889,7 +908,7 @@ router.post("/social/posts/:id/react", requireAuth, attachPlayer, socialWriteLim
   // Notify the post author when someone else reacts. Dedupe per (author,
   // post, reactor) so flipping between reaction types or quickly toggling
   // doesn't spam the bell.
-  if (added && targetPost.playerId !== playerId) {
+  if (added && targetPost.playerId !== playerId && !(await isPostMutedFor(targetPost.playerId, postId))) {
     const link = `/post/${postId}?reactFrom=${playerId}`;
     const duplicate = await db.query.notificationsTable.findFirst({
       where: and(
@@ -1103,7 +1122,7 @@ router.post("/social/posts/:id/comments", requireAuth, attachPlayer, socialWrite
     ? `${comment.content.slice(0, 77)}…`
     : comment.content;
   const commenterName = author?.displayName ?? author?.username ?? "Someone";
-  if (parentPost.playerId !== playerId) {
+  if (parentPost.playerId !== playerId && !(await isPostMutedFor(parentPost.playerId, postId))) {
     const replyTitle = "New reply on your post";
     const replyBody = `${commenterName}: "${snippet}"`;
     await db.insert(notificationsTable).values({
@@ -1128,6 +1147,7 @@ router.post("/social/posts/:id/comments", requireAuth, attachPlayer, socialWrite
   const mentioned = await resolveMentionedPlayers(comment.content, playerId);
   for (const m of mentioned) {
     if (m.id === parentPost.playerId) continue;
+    if (await isPostMutedFor(m.id, postId)) continue;
     const mTitle = "You were mentioned";
     const mBody = `${commenterName} mentioned you in a comment: "${snippet}"`;
     await db.insert(notificationsTable).values({
@@ -1295,7 +1315,7 @@ router.post(
     // Notify the comment author when someone else likes their comment.
     // Skip self-likes and dedupe per (author, comment, liker) so rapid toggling
     // doesn't spam the notifications feed.
-    if (liked && comment.playerId !== playerId) {
+    if (liked && comment.playerId !== playerId && !(await isPostMutedFor(comment.playerId, comment.postId))) {
       const link = `/post/${comment.postId}?commentLikeFrom=${playerId}`;
       const duplicate = await db.query.notificationsTable.findFirst({
         where: and(
@@ -1361,6 +1381,70 @@ router.delete("/social/posts/:id/comments/:commentId", requireAuth, attachPlayer
   await db.delete(postCommentsTable).where(eq(postCommentsTable.id, commentId));
   res.status(204).send();
 });
+
+// ── POST /social/posts/:id/mute ─────────────────────────────────────────────
+// Let a viewer silence reaction/comment/comment-like notifications for a
+// specific post (typically their own, when a popular thread is flooding the
+// notifications feed). Idempotent — re-muting an already-muted post is a no-op.
+
+router.post(
+  "/social/posts/:id/mute",
+  requireAuth,
+  attachPlayer,
+  socialWriteLimiter,
+  async (req, res) => {
+    const postId = Number(req.params.id);
+    const playerId = req.playerId!;
+    if (!Number.isFinite(postId)) {
+      res.status(404).json({ error: "Post not found" });
+      return;
+    }
+
+    const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) });
+    if (!post || post.deletedAt != null) {
+      res.status(404).json({ error: "Post not found" });
+      return;
+    }
+
+    const existing = await db.query.postNotificationMutesTable.findFirst({
+      where: and(
+        eq(postNotificationMutesTable.playerId, playerId),
+        eq(postNotificationMutesTable.postId, postId),
+      ),
+    });
+    if (!existing) {
+      await db.insert(postNotificationMutesTable).values({ playerId, postId });
+    }
+
+    res.json({ muted: true });
+  },
+);
+
+// ── DELETE /social/posts/:id/mute ───────────────────────────────────────────
+
+router.delete(
+  "/social/posts/:id/mute",
+  requireAuth,
+  attachPlayer,
+  socialWriteLimiter,
+  async (req, res) => {
+    const postId = Number(req.params.id);
+    const playerId = req.playerId!;
+    if (!Number.isFinite(postId)) {
+      res.status(404).json({ error: "Post not found" });
+      return;
+    }
+
+    await db.delete(postNotificationMutesTable).where(
+      and(
+        eq(postNotificationMutesTable.playerId, playerId),
+        eq(postNotificationMutesTable.postId, postId),
+      ),
+    );
+
+    res.json({ muted: false });
+  },
+);
 
 // ── POST /social/follow ─────────────────────────────────────────────────────
 

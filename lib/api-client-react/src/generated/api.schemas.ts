@@ -1377,6 +1377,10 @@ export interface FeedPost {
   commentCount: number;
   /** @nullable */
   myReaction: string | null;
+  /** True when the viewer has muted reaction/comment/comment-like
+  notifications for this post. Null/false for anonymous viewers.
+   */
+  notificationsMuted?: boolean;
   comments?: PostComment[];
 }
 
@@ -1642,6 +1646,10 @@ export interface RepostInput {
 export interface RepostResult {
   reposted: boolean;
   repostCount: number;
+}
+
+export interface PostMuteResult {
+  muted: boolean;
 }
 
 export type ReactionResultReactionCounts = {

@@ -203,6 +203,7 @@ import type {
   PostComment,
   PostCommentRevision,
   PostInsightsResponse,
+  PostMuteResult,
   PostViewSeries,
   PushPreferences,
   PushPreferencesUpdate,
@@ -7781,6 +7782,146 @@ export const useRepostPost = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRepostPostMutationOptions(options));
+    }
+
+export const getMuteNotificationsForPostUrl = (id: number,) => {
+
+
+
+
+  return `/api/social/posts/${id}/mute`
+}
+
+/**
+ * @summary Mute reaction/comment/comment-like notifications for this post
+ */
+export const muteNotificationsForPost = async (id: number, options?: RequestInit): Promise<PostMuteResult> => {
+
+  return customFetch<PostMuteResult>(getMuteNotificationsForPostUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getMuteNotificationsForPostMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof muteNotificationsForPost>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof muteNotificationsForPost>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['muteNotificationsForPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof muteNotificationsForPost>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  muteNotificationsForPost(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MuteNotificationsForPostMutationResult = NonNullable<Awaited<ReturnType<typeof muteNotificationsForPost>>>
+
+    export type MuteNotificationsForPostMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Mute reaction/comment/comment-like notifications for this post
+ */
+export const useMuteNotificationsForPost = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof muteNotificationsForPost>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof muteNotificationsForPost>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getMuteNotificationsForPostMutationOptions(options));
+    }
+
+export const getUnmuteNotificationsForPostUrl = (id: number,) => {
+
+
+
+
+  return `/api/social/posts/${id}/mute`
+}
+
+/**
+ * @summary Re-enable reaction/comment/comment-like notifications for this post
+ */
+export const unmuteNotificationsForPost = async (id: number, options?: RequestInit): Promise<PostMuteResult> => {
+
+  return customFetch<PostMuteResult>(getUnmuteNotificationsForPostUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getUnmuteNotificationsForPostMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unmuteNotificationsForPost>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unmuteNotificationsForPost>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['unmuteNotificationsForPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unmuteNotificationsForPost>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  unmuteNotificationsForPost(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnmuteNotificationsForPostMutationResult = NonNullable<Awaited<ReturnType<typeof unmuteNotificationsForPost>>>
+
+    export type UnmuteNotificationsForPostMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Re-enable reaction/comment/comment-like notifications for this post
+ */
+export const useUnmuteNotificationsForPost = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unmuteNotificationsForPost>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unmuteNotificationsForPost>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getUnmuteNotificationsForPostMutationOptions(options));
     }
 
 export const getFollowPlayerUrl = () => {

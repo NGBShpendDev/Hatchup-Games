@@ -11,9 +11,19 @@ import {
   useGetPostViewSeries,
   getGetSocialFeedQueryKey,
   getGetPostViewSeriesQueryKey,
+  getGetPostQueryKey,
+  useMuteNotificationsForPost,
+  useUnmuteNotificationsForPost,
   type FeedPost,
   type PostComment,
 } from "@workspace/api-client-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 // Note: useEditPostComment / useDeletePostComment are consumed by CommentRow below.
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,6 +37,7 @@ import { Input } from "@/components/ui/input";
 import {
   Heart, Flame, Zap, Dumbbell, MessageCircle, Share2, Trash2,
   Send, ChevronDown, ChevronUp, Award, Sparkles, Eye, Crown, Coins, Users, MoreHorizontal, Trophy,
+  BellOff, Bell,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
@@ -456,6 +467,86 @@ function ViewSparkline({
 
 export const viewedPostIds = new Set<number>();
 
+function PostHeaderMenu({
+  post,
+  isOwner,
+  onDelete,
+}: {
+  post: FeedPost;
+  isOwner: boolean;
+  onDelete?: (postId: number) => void;
+}) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const muted = post.notificationsMuted ?? false;
+  const mute = useMuteNotificationsForPost();
+  const unmute = useUnmuteNotificationsForPost();
+
+  const refreshPostQueries = () => {
+    qc.invalidateQueries({ queryKey: getGetPostQueryKey(post.id) });
+    qc.invalidateQueries({ queryKey: ["/api/social/feed"] });
+  };
+
+  const handleToggleMute = async () => {
+    try {
+      if (muted) {
+        await unmute.mutateAsync({ id: post.id });
+        toast({ title: "Notifications on", description: "You'll get pings for this post again." });
+      } else {
+        await mute.mutateAsync({ id: post.id });
+        toast({
+          title: "Notifications muted",
+          description: "Reactions, comments, and comment-likes on this post won't notify you.",
+        });
+      }
+      refreshPostQueries();
+    } catch {
+      toast({ title: "Could not update notifications", variant: "destructive" });
+    }
+  };
+
+  const showDelete = isOwner && !!onDelete;
+  const pending = mute.isPending || unmute.isPending;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full"
+          aria-label="Post options"
+          data-testid={`button-post-menu-${post.id}`}
+        >
+          <MoreHorizontal className="w-4 h-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="bg-card border-border w-56">
+        <DropdownMenuItem
+          onClick={handleToggleMute}
+          disabled={pending}
+          className="flex items-center gap-2 cursor-pointer"
+          data-testid={`button-toggle-mute-post-${post.id}`}
+        >
+          {muted ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+          {muted ? "Unmute notifications" : "Mute notifications for this post"}
+        </DropdownMenuItem>
+        {showDelete && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => onDelete?.(post.id)}
+              className="flex items-center gap-2 text-red-400 focus:text-red-400 cursor-pointer"
+              data-testid={`button-delete-post-${post.id}`}
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete post
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function PostCard({
   post,
   playerId,
@@ -678,11 +769,7 @@ export function PostCard({
               </div>
               <p className="text-[11px] text-muted-foreground">{timeAgo(post.createdAt)}</p>
             </div>
-            {!isAnonymous && post.playerId === playerId && onDelete && (
-              <button onClick={() => onDelete(post.id)} className="text-muted-foreground hover:text-destructive transition-colors p-1">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )}
+            {!isAnonymous && <PostHeaderMenu post={post} isOwner={post.playerId === playerId} onDelete={onDelete} />}
           </div>
 
           {/* Content */}

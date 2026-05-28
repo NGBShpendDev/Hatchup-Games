@@ -92,6 +92,20 @@ export const playerMemoriesTable = pgTable("player_memories", {
   surfacedAt: timestamp("surfaced_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const postNotificationMutesTable = pgTable("post_notification_mutes", {
+  id: serial("id").primaryKey(),
+  playerId: integer("player_id").notNull(),
+  postId: integer("post_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  unique("post_notification_mutes_player_post_unique").on(t.playerId, t.postId),
+  index("post_notification_mutes_post_idx").on(t.postId),
+]);
+
+export const insertPostNotificationMuteSchema = createInsertSchema(postNotificationMutesTable).omit({ id: true, createdAt: true });
+export type InsertPostNotificationMute = z.infer<typeof insertPostNotificationMuteSchema>;
+export type PostNotificationMute = typeof postNotificationMutesTable.$inferSelect;
+
 export const postRepostsTable = pgTable("post_reposts", {
   id: serial("id").primaryKey(),
   postId: integer("post_id").notNull(),

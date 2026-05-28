@@ -2272,6 +2272,7 @@ export const GetSocialFeedResponse = zod.object({
 }),
   "commentCount": zod.number(),
   "myReaction": zod.string().nullable(),
+  "notificationsMuted": zod.boolean().optional().describe('True when the viewer has muted reaction\/comment\/comment-like\nnotifications for this post. Null\/false for anonymous viewers.\n'),
   "comments": zod.array(zod.object({
   "id": zod.number(),
   "postId": zod.number(),
@@ -2334,6 +2335,7 @@ export const GetTrendingPostsResponse = zod.object({
 }),
   "commentCount": zod.number(),
   "myReaction": zod.string().nullable(),
+  "notificationsMuted": zod.boolean().optional().describe('True when the viewer has muted reaction\/comment\/comment-like\nnotifications for this post. Null\/false for anonymous viewers.\n'),
   "comments": zod.array(zod.object({
   "id": zod.number(),
   "postId": zod.number(),
@@ -2409,6 +2411,7 @@ export const GetPostResponse = zod.object({
 }),
   "commentCount": zod.number(),
   "myReaction": zod.string().nullable(),
+  "notificationsMuted": zod.boolean().optional().describe('True when the viewer has muted reaction\/comment\/comment-like\nnotifications for this post. Null\/false for anonymous viewers.\n'),
   "comments": zod.array(zod.object({
   "id": zod.number(),
   "postId": zod.number(),
@@ -2641,6 +2644,30 @@ export const RepostPostResponse = zod.object({
 
 
 /**
+ * @summary Mute reaction/comment/comment-like notifications for this post
+ */
+export const MuteNotificationsForPostParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const MuteNotificationsForPostResponse = zod.object({
+  "muted": zod.boolean()
+})
+
+
+/**
+ * @summary Re-enable reaction/comment/comment-like notifications for this post
+ */
+export const UnmuteNotificationsForPostParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UnmuteNotificationsForPostResponse = zod.object({
+  "muted": zod.boolean()
+})
+
+
+/**
  * @summary Follow a player
  */
 export const FollowPlayerBody = zod.object({
@@ -2781,6 +2808,7 @@ export const GetPlayerSocialProfileResponse = zod.object({
 }),
   "commentCount": zod.number(),
   "myReaction": zod.string().nullable(),
+  "notificationsMuted": zod.boolean().optional().describe('True when the viewer has muted reaction\/comment\/comment-like\nnotifications for this post. Null\/false for anonymous viewers.\n'),
   "comments": zod.array(zod.object({
   "id": zod.number(),
   "postId": zod.number(),
@@ -2826,6 +2854,7 @@ export const GetPlayerSocialProfileResponse = zod.object({
 }),
   "commentCount": zod.number(),
   "myReaction": zod.string().nullable(),
+  "notificationsMuted": zod.boolean().optional().describe('True when the viewer has muted reaction\/comment\/comment-like\nnotifications for this post. Null\/false for anonymous viewers.\n'),
   "comments": zod.array(zod.object({
   "id": zod.number(),
   "postId": zod.number(),
@@ -3102,6 +3131,7 @@ export const GetDailyMemoryResponse = zod.union([zod.object({
 }),
   "commentCount": zod.number(),
   "myReaction": zod.string().nullable(),
+  "notificationsMuted": zod.boolean().optional().describe('True when the viewer has muted reaction\/comment\/comment-like\nnotifications for this post. Null\/false for anonymous viewers.\n'),
   "comments": zod.array(zod.object({
   "id": zod.number(),
   "postId": zod.number(),

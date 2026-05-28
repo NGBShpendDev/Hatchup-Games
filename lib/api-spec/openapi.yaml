@@ -2274,6 +2274,42 @@ paths:
               schema:
                 $ref: "#/components/schemas/RepostResult"
 
+  /social/posts/{id}/mute:
+    post:
+      operationId: muteNotificationsForPost
+      tags: [social]
+      summary: Mute reaction/comment/comment-like notifications for this post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Mute toggled on
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostMuteResult"
+    delete:
+      operationId: unmuteNotificationsForPost
+      tags: [social]
+      summary: Re-enable reaction/comment/comment-like notifications for this post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Mute toggled off
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostMuteResult"
+
   /social/follow:
     post:
       operationId: followPlayer
@@ -5759,6 +5795,11 @@ components:
             flex:      { type: integer }
         commentCount:   { type: integer }
         myReaction:     { type: ["string", "null"] }
+        notificationsMuted:
+          type: boolean
+          description: |
+            True when the viewer has muted reaction/comment/comment-like
+            notifications for this post. Null/false for anonymous viewers.
         comments:
           type: array
           items:
@@ -6116,6 +6157,12 @@ components:
       properties:
         reposted:    { type: boolean }
         repostCount: { type: integer }
+
+    PostMuteResult:
+      type: object
+      required: [muted]
+      properties:
+        muted: { type: boolean }
 
     ReactionResult:
       type: object
