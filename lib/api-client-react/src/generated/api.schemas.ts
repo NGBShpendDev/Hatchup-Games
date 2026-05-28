@@ -408,6 +408,14 @@ export interface UpdateClubMemberRoleInput {
   clubRole: UpdateClubMemberRoleInputClubRole;
 }
 
+export interface TransferClubOwnershipInput {
+  /**
+     * Player ID of the member who should become the new owner.
+     * @minimum 1
+     */
+  newOwnerId: number;
+}
+
 export interface ClubInput {
   /**
      * @minLength 2
@@ -3417,6 +3425,11 @@ export const ListEventsStatus = {
 
 export type ListClubsParams = {
 limit?: number;
+};
+
+export type TransferClubOwnership200 = {
+  success: boolean;
+  newOwnerId: number;
 };
 
 export type LeaveClub200 = {

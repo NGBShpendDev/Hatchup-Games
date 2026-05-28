@@ -10,6 +10,8 @@ import {
   JoinClubBody,
   UpdateClubMemberRoleParams,
   UpdateClubMemberRoleBody,
+  TransferClubOwnershipParams,
+  TransferClubOwnershipBody,
 } from "@workspace/api-zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { sendPushToPlayer } from "../services/pushNotifications.ts";
@@ -354,6 +356,66 @@ router.get("/club-invites", requireAuth, attachPlayer, async (req, res) => {
   }));
 
   res.json(enriched);
+});
+
+// ── Transfer ownership to another member (owner only) ─────────────────────
+router.post("/clubs/:id/transfer-ownership", requireAuth, attachPlayer, async (req, res) => {
+  const params = TransferClubOwnershipParams.safeParse({ id: Number(req.params.id) });
+  if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
+  const body = TransferClubOwnershipBody.safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
+
+  const club = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, params.data.id) });
+  if (!club) { res.status(404).json({ error: "Club not found" }); return; }
+
+  const viewer = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!viewer || viewer.clubId !== params.data.id || (viewer.clubRole ?? "").toLowerCase() !== "owner") {
+    res.status(403).json({ error: "Only the current owner can transfer ownership" });
+    return;
+  }
+
+  if (body.data.newOwnerId === viewer.id) {
+    res.status(400).json({ error: "You are already the owner" });
+    return;
+  }
+
+  const target = await db.query.playersTable.findFirst({
+    where: eq(playersTable.id, body.data.newOwnerId),
+  });
+  if (!target || target.clubId !== params.data.id) {
+    res.status(404).json({ error: "Member not found in this club" });
+    return;
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.update(playersTable)
+      .set({ clubRole: "officer" })
+      .where(eq(playersTable.id, viewer.id));
+    await tx.update(playersTable)
+      .set({ clubRole: "owner" })
+      .where(eq(playersTable.id, target.id));
+  });
+
+  const noteTitle = `You're now an Owner`;
+  const noteBody = `You're now an Owner of ${club.name}.`;
+  const noteLink = `/club/${club.id}`;
+  const [note] = await db.insert(notificationsTable).values({
+    playerId: target.id,
+    type: "club_role_promoted",
+    title: noteTitle,
+    body: noteBody,
+    link: noteLink,
+    sourceId: club.id,
+  }).returning();
+  void sendPushToPlayer(target.id, {
+    title: noteTitle,
+    body: noteBody,
+    link: noteLink,
+    category: "invites",
+    tag: `club-role-${club.id}-${note?.id ?? ""}`,
+  });
+
+  res.json({ success: true, newOwnerId: target.id });
 });
 
 // ── Promote / demote / transfer ownership of a club member (owner only) ───

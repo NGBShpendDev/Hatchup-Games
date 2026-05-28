@@ -247,6 +247,8 @@ import type {
   SyncResult,
   TodayGoalProgress,
   ToggleOwnedArtifactBody,
+  TransferClubOwnership200,
+  TransferClubOwnershipInput,
   TrendingPage,
   UnsubscribePushBody,
   UpdateClubMemberRoleInput,
@@ -4429,6 +4431,82 @@ export const useUpdateClubMemberRole = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateClubMemberRoleMutationOptions(options));
+    }
+
+export const getTransferClubOwnershipUrl = (id: number,) => {
+
+
+
+
+  return `/api/clubs/${id}/transfer-ownership`
+}
+
+/**
+ * Promotes the chosen member to "owner" and demotes the current owner to
+"officer". Only the current owner can call this. After a successful
+transfer the former owner can leave the club using POST /clubs/{id}/leave.
+
+ * @summary Transfer club ownership to another member (owner only)
+ */
+export const transferClubOwnership = async (id: number,
+    transferClubOwnershipInput: TransferClubOwnershipInput, options?: RequestInit): Promise<TransferClubOwnership200> => {
+
+  return customFetch<TransferClubOwnership200>(getTransferClubOwnershipUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      transferClubOwnershipInput,)
+  }
+);}
+
+
+
+
+export const getTransferClubOwnershipMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferClubOwnership>>, TError,{id: number;data: BodyType<TransferClubOwnershipInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof transferClubOwnership>>, TError,{id: number;data: BodyType<TransferClubOwnershipInput>}, TContext> => {
+
+const mutationKey = ['transferClubOwnership'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transferClubOwnership>>, {id: number;data: BodyType<TransferClubOwnershipInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  transferClubOwnership(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TransferClubOwnershipMutationResult = NonNullable<Awaited<ReturnType<typeof transferClubOwnership>>>
+    export type TransferClubOwnershipMutationBody = BodyType<TransferClubOwnershipInput>
+    export type TransferClubOwnershipMutationError = ErrorType<void>
+
+    /**
+ * @summary Transfer club ownership to another member (owner only)
+ */
+export const useTransferClubOwnership = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferClubOwnership>>, TError,{id: number;data: BodyType<TransferClubOwnershipInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof transferClubOwnership>>,
+        TError,
+        {id: number;data: BodyType<TransferClubOwnershipInput>},
+        TContext
+      > => {
+      return useMutation(getTransferClubOwnershipMutationOptions(options));
     }
 
 export const getJoinClubUrl = (id: number,) => {

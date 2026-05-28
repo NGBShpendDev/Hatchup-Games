@@ -1195,6 +1195,47 @@ paths:
         "404":
           description: Club or member not found
 
+  /clubs/{id}/transfer-ownership:
+    post:
+      operationId: transferClubOwnership
+      tags: [clubs]
+      summary: Transfer club ownership to another member (owner only)
+      description: |
+        Promotes the chosen member to "owner" and demotes the current owner to
+        "officer". Only the current owner can call this. After a successful
+        transfer the former owner can leave the club using POST /clubs/{id}/leave.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferClubOwnershipInput"
+      responses:
+        "200":
+          description: Ownership transferred
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, newOwnerId]
+                properties:
+                  success:
+                    type: boolean
+                  newOwnerId:
+                    type: integer
+        "400":
+          description: Invalid input
+        "403":
+          description: Only the current owner can transfer ownership
+        "404":
+          description: Club or member not found
+
   /clubs/{id}/join:
     post:
       operationId: joinClub
@@ -4908,6 +4949,15 @@ components:
         clubRole:
           type: string
           enum: [owner, officer, member]
+
+    TransferClubOwnershipInput:
+      type: object
+      required: [newOwnerId]
+      properties:
+        newOwnerId:
+          type: integer
+          minimum: 1
+          description: Player ID of the member who should become the new owner.
 
     ClubInput:
       type: object

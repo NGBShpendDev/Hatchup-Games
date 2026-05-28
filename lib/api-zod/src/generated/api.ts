@@ -1447,6 +1447,30 @@ export const UpdateClubMemberRoleResponse = zod.object({
 
 
 /**
+ * Promotes the chosen member to "owner" and demotes the current owner to
+"officer". Only the current owner can call this. After a successful
+transfer the former owner can leave the club using POST /clubs/{id}/leave.
+
+ * @summary Transfer club ownership to another member (owner only)
+ */
+export const TransferClubOwnershipParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const TransferClubOwnershipBody = zod.object({
+  "newOwnerId": zod.number().min(1).describe('Player ID of the member who should become the new owner.')
+})
+
+export const TransferClubOwnershipResponse = zod.object({
+  "success": zod.boolean(),
+  "newOwnerId": zod.number()
+})
+
+
+/**
  * @summary Join a club
  */
 export const JoinClubParams = zod.object({

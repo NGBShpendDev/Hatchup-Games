@@ -15,6 +15,7 @@ import {
   useCancelClubInvite,
   useUpdateClubMemberRole,
   useLeaveClub,
+  useTransferClubOwnership,
 } from "@workspace/api-client-react";
 import {
   AlertDialog,
@@ -75,6 +76,9 @@ export default function ClubDetail() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferTargetId, setTransferTargetId] = useState<number | null>(null);
+  const [confirmTransferId, setConfirmTransferId] = useState<number | null>(null);
   const [inviteSearch, setInviteSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [invitedIds, setInvitedIds] = useState<Set<number>>(new Set());
@@ -149,6 +153,28 @@ export default function ClubDetail() {
           variant: "destructive",
         });
         setLeaveOpen(false);
+      },
+    },
+  });
+
+  const transferOwnership = useTransferClubOwnership({
+    mutation: {
+      onSuccess: () => {
+        toast({
+          title: "Ownership transferred",
+          description: "You're now an Officer. You can leave the club if you'd like.",
+        });
+        queryClient.invalidateQueries({ queryKey: getListClubMembersQueryKey(id) });
+        setConfirmTransferId(null);
+        setTransferTargetId(null);
+        setTransferOpen(false);
+      },
+      onError: (err: { response?: { data?: { error?: string } } }) => {
+        toast({
+          title: "Could not transfer ownership",
+          description: err?.response?.data?.error ?? "Try again",
+          variant: "destructive",
+        });
       },
     },
   });
@@ -244,6 +270,19 @@ export default function ClubDetail() {
                   </div>
                   <div className="text-xs text-muted-foreground font-bold uppercase tracking-wide">Total XP</div>
                 </div>
+                {isOwner && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setTransferTargetId(null);
+                      setTransferOpen(true);
+                    }}
+                    className="font-bold gap-2 border-2 hover:border-primary hover:text-primary"
+                    data-testid="button-open-transfer-ownership"
+                  >
+                    <Crown className="w-4 h-4" /> Transfer ownership
+                  </Button>
+                )}
                 {isMember && (
                   <Button
                     variant="outline"
@@ -265,6 +304,113 @@ export default function ClubDetail() {
             )}
           </div>
         )}
+
+        <Sheet open={transferOpen} onOpenChange={setTransferOpen}>
+          <SheetContent side="bottom" className="max-h-[85vh] flex flex-col">
+            <SheetHeader className="text-left">
+              <SheetTitle className="flex items-center gap-2 text-foreground">
+                <Crown className="w-5 h-5 text-yellow-400" /> Transfer ownership
+              </SheetTitle>
+              <SheetDescription>
+                Pick a member to become the new owner of {club?.name ?? "this club"}. You'll be demoted to Officer and can then leave the club if you'd like.
+              </SheetDescription>
+            </SheetHeader>
+            <ScrollArea className="flex-1 mt-3 px-4 pb-4">
+              {(() => {
+                const candidates = sortedMembers.filter((m) => m.id !== player?.id);
+                if (candidates.length === 0) {
+                  return (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                      <p className="font-bold">No other members yet</p>
+                      <p className="text-xs mt-1">Invite someone to your club before transferring ownership.</p>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="space-y-2 py-2">
+                    {candidates.map((m) => {
+                      const name = m.displayName || m.username;
+                      const selected = transferTargetId === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setTransferTargetId(m.id)}
+                          className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-colors text-left ${
+                            selected
+                              ? "border-primary bg-primary/10"
+                              : "border-border hover:bg-muted/30"
+                          }`}
+                          data-testid={`button-pick-new-owner-${m.id}`}
+                        >
+                          <Avatar className="h-10 w-10 border-2 border-border">
+                            {m.avatarUrl && <AvatarImage src={m.avatarUrl} alt={name} />}
+                            <AvatarFallback className="font-bold">{initials(name)}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-bold truncate">{name}</div>
+                            <div className="text-xs text-muted-foreground font-bold mt-0.5">
+                              Lvl {m.level} • {m.clubRole === "officer" ? "Officer" : "Member"}
+                            </div>
+                          </div>
+                          {selected && <Check className="w-5 h-5 text-primary shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </ScrollArea>
+            <div className="flex justify-end gap-2 px-4 pb-4 pt-2 border-t border-border">
+              <Button variant="outline" onClick={() => setTransferOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={transferTargetId === null || transferOwnership.isPending}
+                onClick={() => setConfirmTransferId(transferTargetId)}
+                className="bg-primary hover:bg-primary/90 font-bold"
+                data-testid="button-transfer-ownership"
+              >
+                Transfer ownership
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        <AlertDialog
+          open={confirmTransferId !== null}
+          onOpenChange={(open) => { if (!open) setConfirmTransferId(null); }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Transfer ownership?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {(() => {
+                  const t = sortedMembers.find((m) => m.id === confirmTransferId);
+                  const name = t ? (t.displayName || t.username) : "this member";
+                  return `${name} will become the new owner of ${club?.name ?? "this club"}. You'll be demoted to Officer and won't be able to undo this on your own.`;
+                })()}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={transferOwnership.isPending}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (confirmTransferId !== null) {
+                    transferOwnership.mutate({ id, data: { newOwnerId: confirmTransferId } });
+                  }
+                }}
+                disabled={transferOwnership.isPending}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                data-testid="button-confirm-transfer-ownership"
+              >
+                {transferOwnership.isPending ? "Transferring…" : "Yes, transfer"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
           <AlertDialogContent>
