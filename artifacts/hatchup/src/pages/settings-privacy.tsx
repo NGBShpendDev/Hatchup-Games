@@ -36,6 +36,7 @@ import {
   Baby,
   Bell,
   CalendarClock,
+  Mail,
 } from "lucide-react";
 import { usePushSubscription } from "@/hooks/use-push-subscription";
 
@@ -58,6 +59,9 @@ export default function SettingsPrivacy() {
   const [recapEnabled, setRecapEnabled] = useState(true);
   const [recapDay, setRecapDay] = useState(0);
   const [recapHour, setRecapHour] = useState(9);
+  const [recapEmail, setRecapEmail] = useState("");
+  const [notifyRecapEmail, setNotifyRecapEmail] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [recapPreviewSending, setRecapPreviewSending] = useState(false);
@@ -122,6 +126,8 @@ export default function SettingsPrivacy() {
         if (typeof data.weeklyRecapEnabled === "boolean") setRecapEnabled(data.weeklyRecapEnabled);
         if (typeof data.weeklyRecapDayOfWeek === "number") setRecapDay(data.weeklyRecapDayOfWeek);
         if (typeof data.weeklyRecapHourLocal === "number") setRecapHour(data.weeklyRecapHourLocal);
+        setRecapEmail(typeof data.email === "string" ? data.email : "");
+        setNotifyRecapEmail(Boolean(data.notifyRecapEmail));
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
@@ -189,6 +195,7 @@ export default function SettingsPrivacy() {
   const handleSave = async () => {
     if (!playerId) return;
     setSaving(true);
+    setEmailError(null);
     try {
       const res = await fetch(`/api/players/${playerId}/privacy-settings`, {
         method: "PATCH",
@@ -205,10 +212,20 @@ export default function SettingsPrivacy() {
           weeklyRecapHourLocal: recapHour,
           weeklyRecapTzOffsetMinutes: -new Date().getTimezoneOffset(),
           weeklyRecapTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          email: recapEmail.trim() === "" ? null : recapEmail.trim(),
+          notifyRecapEmail,
         }),
       });
       if (res.ok) {
         toast({ title: "Privacy settings saved", description: "Your safety preferences have been updated." });
+      } else if (res.status === 400) {
+        const data = await res.json().catch(() => null);
+        if (data?.error === "Invalid email") {
+          setEmailError("Please enter a valid email address.");
+          toast({ title: "Invalid email", description: "Please enter a valid email address.", variant: "destructive" });
+        } else {
+          toast({ title: "Error", description: data?.message ?? data?.error ?? "Could not save settings.", variant: "destructive" });
+        }
       } else {
         toast({ title: "Error", description: "Could not save settings.", variant: "destructive" });
       }
@@ -585,6 +602,57 @@ export default function SettingsPrivacy() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Email recap */}
+        <GlassCard glow="accent" className="p-4">
+          <div className="relative z-10 space-y-3">
+            <div>
+              <div className="text-base font-black flex items-center gap-2">
+                <Mail className="w-4 h-4 text-emerald-400" />
+                Email recap
+              </div>
+              <p className="text-xs text-muted-foreground font-medium mt-1">
+                Add an email to receive your weekly recap and other important summaries.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="recap-email" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                Email address
+              </Label>
+              <Input
+                id="recap-email"
+                type="email"
+                placeholder="you@example.com"
+                value={recapEmail}
+                onChange={(e) => {
+                  setRecapEmail(e.target.value);
+                  if (emailError) setEmailError(null);
+                }}
+                className={`h-10 ${emailError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                aria-invalid={emailError ? true : undefined}
+                aria-describedby={emailError ? "recap-email-error" : undefined}
+              />
+              {emailError && (
+                <p id="recap-email-error" className="text-xs font-bold text-red-400">
+                  {emailError}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-4 border-t border-emerald-500/10 pt-3">
+              <div className="min-w-0">
+                <p className="font-bold text-sm">Send recap by email</p>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Opt in to receive the weekly recap at the email above.
+                </p>
+              </div>
+              <Switch
+                checked={notifyRecapEmail}
+                onCheckedChange={setNotifyRecapEmail}
+                disabled={recapEmail.trim() === ""}
+              />
+            </div>
+          </div>
+        </GlassCard>
 
         {/* MFA / account security pointer */}
         <GlassCard interactive className="p-4">
