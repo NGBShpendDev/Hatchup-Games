@@ -3171,6 +3171,111 @@ export interface BattleWsErrorMessage {
 
 export type BattleWsServerMessage = BattleWsQueueJoinedMessage | BattleWsQueueLeftMessage | BattleWsBattleStartMessage | BattleWsBattleStateMessage | BattleWsBattleEndMessage | BattleWsReconnectedMessage | BattleWsErrorMessage;
 
+export type AppealStatus = typeof AppealStatus[keyof typeof AppealStatus];
+
+
+export const AppealStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  denied: 'denied',
+} as const;
+
+export interface Appeal {
+  id: number;
+  playerId: number;
+  message: string;
+  status: AppealStatus;
+  /** @nullable */
+  reviewerId?: number | null;
+  /** @nullable */
+  reviewerNote: string | null;
+  createdAt: string;
+  /** @nullable */
+  resolvedAt: string | null;
+}
+
+export interface MyAppealResponse {
+  appeal: Appeal | null;
+}
+
+export interface AppealSubmitBody {
+  /**
+     * Why the suspension should be reconsidered.
+     * @minLength 10
+     * @maxLength 1000
+     */
+  message: string;
+}
+
+export interface AppealEnvelope {
+  appeal: Appeal;
+}
+
+export interface AppealErrorEnvelope {
+  /** Machine-readable error code (e.g. `not_suspended`,
+  `invalid_message`, `appeal_already_resolved`).
+   */
+  error: string;
+  message?: string;
+}
+
+export type AppealConflictEnvelopeError = typeof AppealConflictEnvelopeError[keyof typeof AppealConflictEnvelopeError];
+
+
+export const AppealConflictEnvelopeError = {
+  appeal_already_open: 'appeal_already_open',
+} as const;
+
+export interface AppealConflictEnvelope {
+  error: AppealConflictEnvelopeError;
+  message?: string;
+  appeal?: Appeal;
+}
+
+export interface AdminAppealPlayer {
+  id: number;
+  username: string;
+  /** @nullable */
+  displayName: string | null;
+  /** @nullable */
+  avatarUrl: string | null;
+  isSuspended: boolean;
+  /** @nullable */
+  suspendedAt: string | null;
+}
+
+export type AdminAppeal = Appeal & ({
+  player: AdminAppealPlayer | null;
+});
+
+export type AppealResolveBodyStatus = typeof AppealResolveBodyStatus[keyof typeof AppealResolveBodyStatus];
+
+
+export const AppealResolveBodyStatus = {
+  approved: 'approved',
+  denied: 'denied',
+} as const;
+
+export interface AppealResolveBody {
+  status: AppealResolveBodyStatus;
+  /**
+     * Optional note shown to the player on the suspended banner.
+     * @maxLength 1000
+     * @nullable
+     */
+  reviewerNote?: string | null;
+  /** Defaults to `true` when approving. Set to `false` to approve the
+  appeal without lifting the suspension (e.g. partial resolutions).
+  Ignored when denying.
+   */
+  unsuspend?: boolean;
+}
+
+export interface AppealResolveResponse {
+  appeal: Appeal;
+  unsuspended: boolean;
+}
+
 export type SearchPlayersParams = {
 /**
  * @minLength 1
@@ -3617,4 +3722,20 @@ export type GetBattleEloLeaderboardParams = {
  */
 limit?: number;
 };
+
+export type ListAdminAppealsParams = {
+/**
+ * Filter by appeal status (`pending`, `approved`, `denied`)
+ */
+status?: ListAdminAppealsStatus;
+};
+
+export type ListAdminAppealsStatus = typeof ListAdminAppealsStatus[keyof typeof ListAdminAppealsStatus];
+
+
+export const ListAdminAppealsStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  denied: 'denied',
+} as const;
 

@@ -10,6 +10,11 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useListAdminAppeals,
+  useResolveAdminAppeal,
+  getListAdminAppealsQueryKey,
+} from "@workspace/api-client-react";
 import { Shield, Flag, CheckCircle, X, AlertTriangle, User, Ban, Trash2, RotateCcw, Clock, ScrollText, Snowflake, MessageSquare, ThumbsUp, ThumbsDown } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -50,24 +55,6 @@ interface DeletedPost {
   engagementScore: number;
   viewCount: number;
   reports: DeletedPostReport[];
-}
-
-interface AdminAppeal {
-  id: number;
-  playerId: number;
-  message: string;
-  status: "pending" | "approved" | "denied" | string;
-  reviewerNote: string | null;
-  createdAt: string;
-  resolvedAt: string | null;
-  player: {
-    id: number;
-    username: string;
-    displayName: string | null;
-    avatarUrl: string | null;
-    isSuspended: boolean;
-    suspendedAt: string | null;
-  } | null;
 }
 
 interface DeletedPostsResponse {
@@ -144,39 +131,38 @@ function AdminReportsInner() {
     enabled: isAdmin && !!playerId && tab === "reports",
   });
 
-  const { data: appeals, isLoading: appealsLoading } = useQuery<AdminAppeal[]>({
-    queryKey: ["admin-appeals", playerId],
-    queryFn: async () => {
-      const res = await fetch(`/api/admin/appeals?status=pending`, { credentials: "include" });
-      if (!res.ok) throw new Error("Unauthorized");
-      return res.json();
+  const { data: appeals, isLoading: appealsLoading } = useListAdminAppeals(
+    { status: "pending" },
+    {
+      query: {
+        enabled: isAdmin && !!playerId && tab === "appeals",
+        queryKey: getListAdminAppealsQueryKey({ status: "pending" }),
+      },
     },
-    enabled: isAdmin && !!playerId && tab === "appeals",
-  });
+  );
+  const resolveAppealMutation = useResolveAdminAppeal();
 
-  const handleAppealAction = async (appealId: number, status: "approved" | "denied", playerId: number) => {
+  const handleAppealAction = async (appealId: number, status: "approved" | "denied", appealPlayerId: number) => {
     const note = window.prompt(
       status === "approved"
-        ? `Approve appeal #${appealId} and unsuspend player #${playerId}? Optional reviewer note:`
+        ? `Approve appeal #${appealId} and unsuspend player #${appealPlayerId}? Optional reviewer note:`
         : `Deny appeal #${appealId}? Optional reviewer note shown to the user:`,
       "",
     );
     if (note === null) return; // user cancelled
-    const res = await fetch(`/api/admin/appeals/${appealId}`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, reviewerNote: note }),
-    });
-    if (res.ok) {
+    try {
+      await resolveAppealMutation.mutateAsync({
+        id: appealId,
+        data: { status, reviewerNote: note },
+      });
       toast({
         title: status === "approved" ? "Appeal approved" : "Appeal denied",
-        description: status === "approved" ? `Player #${playerId} unsuspended.` : undefined,
+        description: status === "approved" ? `Player #${appealPlayerId} unsuspended.` : undefined,
       });
-      qc.invalidateQueries({ queryKey: ["admin-appeals"] });
-    } else {
-      const err = await res.json().catch(() => ({}));
-      toast({ title: "Action failed", description: err.error ?? "Try again later", variant: "destructive" });
+      qc.invalidateQueries({ queryKey: getListAdminAppealsQueryKey() });
+    } catch (err) {
+      const data = (err as { data?: { error?: string } } | null)?.data;
+      toast({ title: "Action failed", description: data?.error ?? "Try again later", variant: "destructive" });
     }
   };
 

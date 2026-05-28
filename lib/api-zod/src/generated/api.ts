@@ -5172,3 +5172,113 @@ export const UpdatePhysiqueGoalBody = zod.object({
 export const UpdatePhysiqueGoalResponse = zod.object({
   "physiqueGoal": zod.string()
 })
+
+
+/**
+ * Returns the current player's latest appeal (any status) or `null` if
+they have never filed one. Used by the suspended-account banner to
+decide whether to show the submit form, a pending-review notice, or a
+resolved-decision notice.
+
+ * @summary Get the current player's most recent suspension appeal
+ */
+export const GetMyAppealResponse = zod.object({
+  "appeal": zod.union([zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "message": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'denied']),
+  "reviewerId": zod.number().nullish(),
+  "reviewerNote": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "resolvedAt": zod.coerce.date().nullable()
+}),zod.null()])
+})
+
+
+/**
+ * Suspended players can submit one short message explaining why they
+think the suspension is a mistake. Only one appeal can be `pending` at
+a time per player; further submissions return `409 appeal_already_open`
+until an admin resolves the existing one.
+
+ * @summary Submit a suspension appeal
+ */
+export const submitAppealBodyMessageMin = 10;
+export const submitAppealBodyMessageMax = 1000;
+
+
+
+export const SubmitAppealBody = zod.object({
+  "message": zod.string().min(submitAppealBodyMessageMin).max(submitAppealBodyMessageMax).describe('Why the suspension should be reconsidered.')
+})
+
+
+/**
+ * Admin-only. Returns appeals (optionally filtered by status), each
+hydrated with a minimal player summary so the moderation UI can show
+who submitted the appeal without firing N follow-up requests.
+
+ * @summary List suspension appeals (admin)
+ */
+export const ListAdminAppealsQueryParams = zod.object({
+  "status": zod.enum(['pending', 'approved', 'denied']).optional().describe('Filter by appeal status (`pending`, `approved`, `denied`)')
+})
+
+export const ListAdminAppealsResponseItem = zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "message": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'denied']),
+  "reviewerId": zod.number().nullish(),
+  "reviewerNote": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "resolvedAt": zod.coerce.date().nullable()
+}).and(zod.object({
+  "player": zod.union([zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "isSuspended": zod.boolean(),
+  "suspendedAt": zod.coerce.date().nullable()
+}),zod.null()])
+}))
+export const ListAdminAppealsResponse = zod.array(ListAdminAppealsResponseItem)
+
+
+/**
+ * Admin-only. Approving an appeal also unsuspends the player by default
+(set `unsuspend=false` to approve without lifting the suspension, e.g.
+for partial resolutions). Denying never changes suspension state.
+Both outcomes write an audit-log entry.
+
+ * @summary Approve or deny a suspension appeal (admin)
+ */
+export const ResolveAdminAppealParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const resolveAdminAppealBodyReviewerNoteMax = 1000;
+
+
+
+export const ResolveAdminAppealBody = zod.object({
+  "status": zod.enum(['approved', 'denied']),
+  "reviewerNote": zod.string().max(resolveAdminAppealBodyReviewerNoteMax).nullish().describe('Optional note shown to the player on the suspended banner.'),
+  "unsuspend": zod.boolean().optional().describe('Defaults to `true` when approving. Set to `false` to approve the\nappeal without lifting the suspension (e.g. partial resolutions).\nIgnored when denying.\n')
+})
+
+export const ResolveAdminAppealResponse = zod.object({
+  "appeal": zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "message": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'denied']),
+  "reviewerId": zod.number().nullish(),
+  "reviewerNote": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "resolvedAt": zod.coerce.date().nullable()
+}),
+  "unsuspended": zod.boolean()
+})

@@ -25,6 +25,13 @@ import type {
   AddCommentInput,
   AddEggInput,
   AddMealCommentInput,
+  AdminAppeal,
+  AppealConflictEnvelope,
+  AppealEnvelope,
+  AppealErrorEnvelope,
+  AppealResolveBody,
+  AppealResolveResponse,
+  AppealSubmitBody,
   ArtifactBattleXpEntry,
   ArtifactCollectorEntry,
   ArtifactLoadout,
@@ -136,6 +143,7 @@ import type {
   LeaveClub200,
   LeaveFamilyGroup200,
   LeaveGroupInput,
+  ListAdminAppealsParams,
   ListBattleHistoryParams,
   ListBattleRivalsParams,
   ListChallengesParams,
@@ -175,6 +183,7 @@ import type {
   ModerationError,
   MutualFollowersPage,
   MutualFollowingPage,
+  MyAppealResponse,
   Notification,
   NutritionAnalyzeImageInput,
   NutritionAnalyzeImageResult,
@@ -14598,5 +14607,328 @@ export const useUpdatePhysiqueGoal = <TError = ErrorType<StorageErrorEnvelope>,
         TContext
       > => {
       return useMutation(getUpdatePhysiqueGoalMutationOptions(options));
+    }
+
+export const getGetMyAppealUrl = () => {
+
+
+
+
+  return `/api/account/appeals/mine`
+}
+
+/**
+ * Returns the current player's latest appeal (any status) or `null` if
+they have never filed one. Used by the suspended-account banner to
+decide whether to show the submit form, a pending-review notice, or a
+resolved-decision notice.
+
+ * @summary Get the current player's most recent suspension appeal
+ */
+export const getMyAppeal = async ( options?: RequestInit): Promise<MyAppealResponse> => {
+
+  return customFetch<MyAppealResponse>(getGetMyAppealUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyAppealQueryKey = () => {
+    return [
+    `/api/account/appeals/mine`
+    ] as const;
+    }
+
+
+export const getGetMyAppealQueryOptions = <TData = Awaited<ReturnType<typeof getMyAppeal>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyAppeal>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyAppealQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyAppeal>>> = ({ signal }) => getMyAppeal({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyAppeal>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyAppealQueryResult = NonNullable<Awaited<ReturnType<typeof getMyAppeal>>>
+export type GetMyAppealQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the current player's most recent suspension appeal
+ */
+
+export function useGetMyAppeal<TData = Awaited<ReturnType<typeof getMyAppeal>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyAppeal>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyAppealQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSubmitAppealUrl = () => {
+
+
+
+
+  return `/api/account/appeals`
+}
+
+/**
+ * Suspended players can submit one short message explaining why they
+think the suspension is a mistake. Only one appeal can be `pending` at
+a time per player; further submissions return `409 appeal_already_open`
+until an admin resolves the existing one.
+
+ * @summary Submit a suspension appeal
+ */
+export const submitAppeal = async (appealSubmitBody: AppealSubmitBody, options?: RequestInit): Promise<AppealEnvelope> => {
+
+  return customFetch<AppealEnvelope>(getSubmitAppealUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      appealSubmitBody,)
+  }
+);}
+
+
+
+
+export const getSubmitAppealMutationOptions = <TError = ErrorType<AppealErrorEnvelope | AppealConflictEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitAppeal>>, TError,{data: BodyType<AppealSubmitBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitAppeal>>, TError,{data: BodyType<AppealSubmitBody>}, TContext> => {
+
+const mutationKey = ['submitAppeal'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitAppeal>>, {data: BodyType<AppealSubmitBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitAppeal(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitAppealMutationResult = NonNullable<Awaited<ReturnType<typeof submitAppeal>>>
+    export type SubmitAppealMutationBody = BodyType<AppealSubmitBody>
+    export type SubmitAppealMutationError = ErrorType<AppealErrorEnvelope | AppealConflictEnvelope>
+
+    /**
+ * @summary Submit a suspension appeal
+ */
+export const useSubmitAppeal = <TError = ErrorType<AppealErrorEnvelope | AppealConflictEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitAppeal>>, TError,{data: BodyType<AppealSubmitBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitAppeal>>,
+        TError,
+        {data: BodyType<AppealSubmitBody>},
+        TContext
+      > => {
+      return useMutation(getSubmitAppealMutationOptions(options));
+    }
+
+export const getListAdminAppealsUrl = (params?: ListAdminAppealsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/appeals?${stringifiedParams}` : `/api/admin/appeals`
+}
+
+/**
+ * Admin-only. Returns appeals (optionally filtered by status), each
+hydrated with a minimal player summary so the moderation UI can show
+who submitted the appeal without firing N follow-up requests.
+
+ * @summary List suspension appeals (admin)
+ */
+export const listAdminAppeals = async (params?: ListAdminAppealsParams, options?: RequestInit): Promise<AdminAppeal[]> => {
+
+  return customFetch<AdminAppeal[]>(getListAdminAppealsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminAppealsQueryKey = (params?: ListAdminAppealsParams,) => {
+    return [
+    `/api/admin/appeals`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListAdminAppealsQueryOptions = <TData = Awaited<ReturnType<typeof listAdminAppeals>>, TError = ErrorType<unknown>>(params?: ListAdminAppealsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminAppeals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminAppealsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminAppeals>>> = ({ signal }) => listAdminAppeals(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminAppeals>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminAppealsQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminAppeals>>>
+export type ListAdminAppealsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List suspension appeals (admin)
+ */
+
+export function useListAdminAppeals<TData = Awaited<ReturnType<typeof listAdminAppeals>>, TError = ErrorType<unknown>>(
+ params?: ListAdminAppealsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminAppeals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminAppealsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getResolveAdminAppealUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/appeals/${id}`
+}
+
+/**
+ * Admin-only. Approving an appeal also unsuspends the player by default
+(set `unsuspend=false` to approve without lifting the suspension, e.g.
+for partial resolutions). Denying never changes suspension state.
+Both outcomes write an audit-log entry.
+
+ * @summary Approve or deny a suspension appeal (admin)
+ */
+export const resolveAdminAppeal = async (id: number,
+    appealResolveBody: AppealResolveBody, options?: RequestInit): Promise<AppealResolveResponse> => {
+
+  return customFetch<AppealResolveResponse>(getResolveAdminAppealUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      appealResolveBody,)
+  }
+);}
+
+
+
+
+export const getResolveAdminAppealMutationOptions = <TError = ErrorType<AppealErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveAdminAppeal>>, TError,{id: number;data: BodyType<AppealResolveBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resolveAdminAppeal>>, TError,{id: number;data: BodyType<AppealResolveBody>}, TContext> => {
+
+const mutationKey = ['resolveAdminAppeal'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resolveAdminAppeal>>, {id: number;data: BodyType<AppealResolveBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  resolveAdminAppeal(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResolveAdminAppealMutationResult = NonNullable<Awaited<ReturnType<typeof resolveAdminAppeal>>>
+    export type ResolveAdminAppealMutationBody = BodyType<AppealResolveBody>
+    export type ResolveAdminAppealMutationError = ErrorType<AppealErrorEnvelope>
+
+    /**
+ * @summary Approve or deny a suspension appeal (admin)
+ */
+export const useResolveAdminAppeal = <TError = ErrorType<AppealErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resolveAdminAppeal>>, TError,{id: number;data: BodyType<AppealResolveBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resolveAdminAppeal>>,
+        TError,
+        {id: number;data: BodyType<AppealResolveBody>},
+        TContext
+      > => {
+      return useMutation(getResolveAdminAppealMutationOptions(options));
     }
 

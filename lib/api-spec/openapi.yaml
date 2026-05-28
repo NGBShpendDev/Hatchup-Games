@@ -50,6 +50,8 @@ tags:
     description: In-app notifications (challenge invites, etc.)
   - name: nutrition
     description: Meal logging, macro tracking, and weekly nutrition rollups
+  - name: appeals
+    description: Account suspension appeals (player-facing and admin moderation)
 
 paths:
   /storage/uploads/request-url:
@@ -4375,6 +4377,148 @@ paths:
               schema:
                 $ref: "#/components/schemas/StorageErrorEnvelope"
 
+  # ── Appeals ──────────────────────────────────────────────────────────────
+  /account/appeals/mine:
+    get:
+      operationId: getMyAppeal
+      tags: [appeals]
+      summary: Get the current player's most recent suspension appeal
+      description: |
+        Returns the current player's latest appeal (any status) or `null` if
+        they have never filed one. Used by the suspended-account banner to
+        decide whether to show the submit form, a pending-review notice, or a
+        resolved-decision notice.
+      responses:
+        "200":
+          description: Latest appeal (or null)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyAppealResponse"
+
+  /account/appeals:
+    post:
+      operationId: submitAppeal
+      tags: [appeals]
+      summary: Submit a suspension appeal
+      description: |
+        Suspended players can submit one short message explaining why they
+        think the suspension is a mistake. Only one appeal can be `pending` at
+        a time per player; further submissions return `409 appeal_already_open`
+        until an admin resolves the existing one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppealSubmitBody"
+      responses:
+        "201":
+          description: Appeal created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppealEnvelope"
+        "400":
+          description: Invalid message (too short or too long)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppealErrorEnvelope"
+        "403":
+          description: Caller is not suspended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppealErrorEnvelope"
+        "404":
+          description: Player not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppealErrorEnvelope"
+        "409":
+          description: An appeal is already pending for this player
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppealConflictEnvelope"
+
+  /admin/appeals:
+    get:
+      operationId: listAdminAppeals
+      tags: [appeals]
+      summary: List suspension appeals (admin)
+      description: |
+        Admin-only. Returns appeals (optionally filtered by status), each
+        hydrated with a minimal player summary so the moderation UI can show
+        who submitted the appeal without firing N follow-up requests.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter by appeal status (`pending`, `approved`, `denied`)
+          schema:
+            type: string
+            enum: [pending, approved, denied]
+      responses:
+        "200":
+          description: Appeals list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminAppeal"
+
+  /admin/appeals/{id}:
+    patch:
+      operationId: resolveAdminAppeal
+      tags: [appeals]
+      summary: Approve or deny a suspension appeal (admin)
+      description: |
+        Admin-only. Approving an appeal also unsuspends the player by default
+        (set `unsuspend=false` to approve without lifting the suspension, e.g.
+        for partial resolutions). Denying never changes suspension state.
+        Both outcomes write an audit-log entry.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppealResolveBody"
+      responses:
+        "200":
+          description: Appeal resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppealResolveResponse"
+        "400":
+          description: Invalid id or status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppealErrorEnvelope"
+        "404":
+          description: Appeal not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppealErrorEnvelope"
+        "409":
+          description: Appeal has already been resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppealErrorEnvelope"
+
 components:
   schemas:
     UploadUrlRequest:
@@ -7583,3 +7727,104 @@ components:
           battle_end:   "#/components/schemas/BattleWsBattleEndMessage"
           reconnected:  "#/components/schemas/BattleWsReconnectedMessage"
           error:        "#/components/schemas/BattleWsErrorMessage"
+
+    # ── Appeals ─────────────────────────────────────────────────────────────
+    Appeal:
+      type: object
+      required: [id, playerId, message, status, reviewerNote, createdAt, resolvedAt]
+      properties:
+        id:           { type: integer }
+        playerId:     { type: integer }
+        message:      { type: string }
+        status:
+          type: string
+          enum: [pending, approved, denied]
+        reviewerId:   { type: ["integer", "null"] }
+        reviewerNote: { type: ["string", "null"] }
+        createdAt:    { type: string, format: date-time }
+        resolvedAt:   { type: ["string", "null"], format: date-time }
+    MyAppealResponse:
+      type: object
+      required: [appeal]
+      properties:
+        appeal:
+          oneOf:
+            - $ref: "#/components/schemas/Appeal"
+            - type: "null"
+    AppealSubmitBody:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          minLength: 10
+          maxLength: 1000
+          description: Why the suspension should be reconsidered.
+    AppealEnvelope:
+      type: object
+      required: [appeal]
+      properties:
+        appeal:
+          $ref: "#/components/schemas/Appeal"
+    AppealErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: |
+            Machine-readable error code (e.g. `not_suspended`,
+            `invalid_message`, `appeal_already_resolved`).
+        message: { type: string }
+    AppealConflictEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:   { type: string, enum: [appeal_already_open] }
+        message: { type: string }
+        appeal:
+          $ref: "#/components/schemas/Appeal"
+    AdminAppealPlayer:
+      type: object
+      required: [id, username, displayName, avatarUrl, isSuspended, suspendedAt]
+      properties:
+        id:            { type: integer }
+        username:      { type: string }
+        displayName:   { type: ["string", "null"] }
+        avatarUrl:     { type: ["string", "null"] }
+        isSuspended:   { type: boolean }
+        suspendedAt:   { type: ["string", "null"], format: date-time }
+    AdminAppeal:
+      allOf:
+        - $ref: "#/components/schemas/Appeal"
+        - type: object
+          required: [player]
+          properties:
+            player:
+              oneOf:
+                - $ref: "#/components/schemas/AdminAppealPlayer"
+                - type: "null"
+    AppealResolveBody:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [approved, denied]
+        reviewerNote:
+          type: ["string", "null"]
+          maxLength: 1000
+          description: Optional note shown to the player on the suspended banner.
+        unsuspend:
+          type: boolean
+          description: |
+            Defaults to `true` when approving. Set to `false` to approve the
+            appeal without lifting the suspension (e.g. partial resolutions).
+            Ignored when denying.
+    AppealResolveResponse:
+      type: object
+      required: [appeal, unsuspended]
+      properties:
+        appeal:
+          $ref: "#/components/schemas/Appeal"
+        unsuspended: { type: boolean }

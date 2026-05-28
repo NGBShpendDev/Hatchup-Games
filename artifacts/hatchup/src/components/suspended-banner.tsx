@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { ShieldAlert, Send, Clock, CheckCircle2, XCircle } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useGetMyAppeal,
+  useSubmitAppeal,
+  getGetMyAppealQueryKey,
+} from "@workspace/api-client-react";
 import { usePlayer } from "@/lib/playerContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -29,16 +34,6 @@ export const SUSPENDED_COPY = {
   deniedBody: "Your appeal was reviewed and the suspension was upheld. You can file a new appeal with additional context.",
 } as const;
 
-interface AppealRow {
-  id: number;
-  playerId: number;
-  message: string;
-  status: "pending" | "approved" | "denied" | string;
-  reviewerNote: string | null;
-  createdAt: string;
-  resolvedAt: string | null;
-}
-
 export function formatSuspendedSince(suspendedAt: string | null | undefined): string | null {
   if (!suspendedAt) return null;
   const d = new Date(suspendedAt);
@@ -60,15 +55,10 @@ export function SuspendedBanner({ className = "" }: { className?: string }) {
 
   const isSuspended = !!player?.isSuspended;
 
-  const { data: appealData } = useQuery<{ appeal: AppealRow | null }>({
-    queryKey: ["my-appeal"],
-    queryFn: async () => {
-      const res = await fetch("/api/account/appeals/mine", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load appeal");
-      return res.json();
-    },
-    enabled: isSuspended,
+  const { data: appealData } = useGetMyAppeal({
+    query: { enabled: isSuspended, queryKey: getGetMyAppealQueryKey() },
   });
+  const submitAppealMutation = useSubmitAppeal();
 
   if (!isSuspended) return null;
 
@@ -89,21 +79,18 @@ export function SuspendedBanner({ className = "" }: { className?: string }) {
     }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/account/appeals", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
+      try {
+        await submitAppealMutation.mutateAsync({ data: { message: trimmed } });
+      } catch (err) {
+        const status = (err as { status?: number } | null)?.status;
+        const data = (err as { data?: { message?: string } } | null)?.data;
         toast({
-          title: res.status === 409 ? "Appeal already submitted" : "Couldn't submit appeal",
-          description: body?.message ?? "Please try again later.",
+          title: status === 409 ? "Appeal already submitted" : "Couldn't submit appeal",
+          description: data?.message ?? "Please try again later.",
           variant: "destructive",
         });
-        if (res.status === 409) {
-          await qc.invalidateQueries({ queryKey: ["my-appeal"] });
+        if (status === 409) {
+          await qc.invalidateQueries({ queryKey: getGetMyAppealQueryKey() });
           setOpen(false);
           setMessage("");
         }
@@ -113,7 +100,7 @@ export function SuspendedBanner({ className = "" }: { className?: string }) {
         title: "Appeal submitted",
         description: "A moderator will review it and get back to you.",
       });
-      await qc.invalidateQueries({ queryKey: ["my-appeal"] });
+      await qc.invalidateQueries({ queryKey: getGetMyAppealQueryKey() });
       setOpen(false);
       setMessage("");
     } finally {
