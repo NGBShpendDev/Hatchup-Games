@@ -114,6 +114,8 @@ export default function Home() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { playerId, player } = usePlayer();
+  const isSuspended = !!player?.isSuspended;
+  const suspendedTitle = "Your account is suspended. You can't create posts.";
   const pid = playerId ?? 0;
   const activeHatchlingId = player?.activeHatchlingId ?? null;
   const { data: activePartner } = useGetHatchling(activeHatchlingId ?? 0, {
@@ -973,7 +975,10 @@ export default function Home() {
               </button>
               <button
                 onClick={() => setComposeOpen(true)}
-                className="text-xs font-bold text-primary flex items-center gap-1 hover:underline"
+                disabled={isSuspended}
+                aria-disabled={isSuspended}
+                title={isSuspended ? suspendedTitle : undefined}
+                className="text-xs font-bold text-primary flex items-center gap-1 hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:no-underline"
                 data-testid="button-home-compose"
                 aria-label="Share an update"
               >
@@ -988,14 +993,17 @@ export default function Home() {
           {/* Inline compose entry */}
           <button
             onClick={() => setComposeOpen(true)}
-            className="w-full text-left mb-2 flex items-center gap-3 bg-card/60 hover:bg-card border border-border hover:border-primary/40 rounded-2xl p-3 transition-colors"
+            disabled={isSuspended}
+            aria-disabled={isSuspended}
+            title={isSuspended ? suspendedTitle : undefined}
+            className="w-full text-left mb-2 flex items-center gap-3 bg-card/60 hover:bg-card border border-border hover:border-primary/40 rounded-2xl p-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-card/60 disabled:hover:border-border"
             data-testid="button-home-compose-inline"
           >
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/20 border border-primary/40 flex items-center justify-center font-black text-sm text-primary shrink-0">
               {(dashboard.player.displayName || dashboard.player.username || "?")[0]?.toUpperCase()}
             </div>
             <span className="text-sm text-muted-foreground font-medium flex-1">
-              Share an update with the community...
+              {isSuspended ? "Your account is suspended. You can't post." : "Share an update with the community..."}
             </span>
             <PlusCircle className="w-4 h-4 text-primary shrink-0" />
           </button>

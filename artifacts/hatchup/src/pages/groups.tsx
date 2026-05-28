@@ -137,8 +137,10 @@ function RaidBossCard({ raid }: { raid: WorkoutGroupDetail["raid"] }) {
 }
 
 function GroupDetail({ groupId, onBack }: { groupId: number; onBack: () => void }) {
-  const { playerId } = usePlayer();
+  const { playerId, player } = usePlayer();
   const pid = playerId ?? 0;
+  const isSuspended = !!player?.isSuspended;
+  const suspendedTitle = "Your account is suspended. Contact support to appeal.";
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -494,20 +496,35 @@ function GroupDetail({ groupId, onBack }: { groupId: number; onBack: () => void 
             ))}
           </div>
 
+          {isSuspended && (
+            <div
+              className="mx-2 mt-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-[11px] font-bold text-destructive"
+              data-testid="text-group-chat-suspended-notice"
+            >
+              Your account is suspended. You can't send messages. Contact support to appeal.
+            </div>
+          )}
           <div className="p-2 border-t border-border flex gap-2">
             <Input
               value={msgText}
               onChange={e => setMsgText(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleSendMessage()}
-              placeholder="Cheer on your squad..."
-              className="flex-1 h-9 text-sm"
+              placeholder={isSuspended ? "Account suspended" : "Cheer on your squad..."}
+              className="flex-1 h-9 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               maxLength={280}
+              disabled={isSuspended}
+              aria-disabled={isSuspended}
+              title={isSuspended ? suspendedTitle : undefined}
+              data-testid="input-group-chat-message"
             />
             <Button
               size="sm"
               onClick={handleSendMessage}
-              disabled={!msgText.trim() || sendMsg.isPending}
+              disabled={!msgText.trim() || sendMsg.isPending || isSuspended}
+              aria-disabled={isSuspended}
+              title={isSuspended ? suspendedTitle : undefined}
               className="h-9 px-3"
+              data-testid="button-group-chat-send"
             >
               <Send className="w-4 h-4" />
             </Button>

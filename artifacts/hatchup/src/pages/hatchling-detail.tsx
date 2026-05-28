@@ -637,11 +637,15 @@ export default function HatchlingDetail() {
             <NeonButton
               size="lg"
               variant="secondary"
-              className="w-full"
+              className="w-full disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={() => setComposeOpen(true)}
+              disabled={!!player?.isSuspended}
+              aria-disabled={!!player?.isSuspended}
+              title={player?.isSuspended ? "Your account is suspended. You can't create posts." : undefined}
               data-testid="button-share-hatchling"
             >
-              <Share2 className="w-4 h-4 mr-2" /> Share {hatchling.name}
+              <Share2 className="w-4 h-4 mr-2" />
+              {player?.isSuspended ? "Suspended" : `Share ${hatchling.name}`}
             </NeonButton>
 
             <div className="flex justify-end">

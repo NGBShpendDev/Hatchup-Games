@@ -1024,8 +1024,10 @@ export function PostCard({
             <div className="flex-1" />
             <button
               onClick={handleRepost}
-              disabled={repost.isPending}
-              className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold transition-all ${
+              disabled={repost.isPending || isSuspended}
+              aria-disabled={isSuspended}
+              title={isSuspended ? suspendedTitle : undefined}
+              className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent ${
                 (post as any).myRepost
                   ? "bg-green-500/20 text-green-500 scale-105"
                   : "text-muted-foreground hover:text-green-500 hover:bg-muted/50"
