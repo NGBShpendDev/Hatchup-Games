@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { useGetPlayerDashboard, getGetPlayerDashboardQueryKey, useLogActivity, useGetSocialFeed, getGetSocialFeedQueryKey, useReactToPost, useAddPostComment } from "@workspace/api-client-react";
-import type { PostComment } from "@workspace/api-client-react";
+import type { PostComment, ActivityLogResult, BadgeDefinition, ArtifactUnlock } from "@workspace/api-client-react";
 import { ComposeSheet } from "@/components/compose-sheet";
 import { REACTION_ICONS, CommentRow } from "@/components/post-card";
 import { Card, CardContent } from "@/components/ui/card";
@@ -183,20 +183,20 @@ export default function Home() {
             variant: "destructive",
           });
         },
-        onSuccess: (res) => {
-          const xpEarned = (res as any).xpEarned ?? (res as any).fitnessXpEarned ?? 0;
+        onSuccess: (res: ActivityLogResult) => {
+          const xpEarned = res.fitnessXpEarned ?? 0;
           spawnXpPopup(xpEarned);
           setLogModalOpen(false);
           setActivityValue("");
           setRepCount(10);
           setDistanceMiles("");
 
-          const prResult = (res as any).prResult;
-          const newArtifacts: Array<{ id: number; name: string; rarity: string; lore?: string }> = (res as any).newArtifacts ?? [];
-          const newBadges: Array<{ id?: number; name?: string; rarity?: string }> = (res as any).newBadges ?? [];
-          const groupBonusXp = (res as any).groupBonusXp ?? 0;
-          const eggsUpdated = (res as any).eggsUpdated ?? 0;
-          const streakAfter = (res as any).player?.currentStreak ?? null;
+          const prResult = res.prResult;
+          const newArtifacts: ArtifactUnlock[] = res.newArtifacts ?? [];
+          const newBadges: BadgeDefinition[] = res.newBadges ?? [];
+          const groupBonusXp = res.groupBonusXp ?? 0;
+          const eggsUpdated = res.eggsUpdated ?? 0;
+          const streakAfter = res.player?.currentStreak ?? null;
           const prevBars: FitnessBar[] = queryClient.getQueryData<FitnessBar[]>(["fitness-bars", pid]) ?? [];
 
           // Epic artifact unlocks get the dedicated celebratory overlay;
@@ -237,7 +237,7 @@ export default function Home() {
             entries.push({ kind: "artifact", label: artifact.name, value: artifact.rarity, detail: "Equip it from the Museum." });
           }
           for (const badge of newBadges) {
-            if (badge?.name) entries.push({ kind: "challenge", label: `Badge: ${badge.name}`, detail: badge.rarity ?? "" });
+            if (badge?.name) entries.push({ kind: "challenge", label: `Badge: ${badge.name}`, detail: badge.tier ?? "" });
           }
           if (entries.length === 0) {
             entries.push({ kind: "xp", label: "Activity logged", detail: "Your Pals are thriving!" });

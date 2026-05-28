@@ -428,11 +428,60 @@ export interface LogActivityInput {
 }
 
 export type ActivityLogResultPrResult = {
-  activityType?: string;
-  metric?: string;
-  value?: number;
-  isNew?: boolean;
+  activityType: string;
+  metric: string;
+  value: number;
+  isNew: boolean;
 } | null;
+
+export type BadgeDefinitionTier = typeof BadgeDefinitionTier[keyof typeof BadgeDefinitionTier];
+
+
+export const BadgeDefinitionTier = {
+  Common: 'Common',
+  Rare: 'Rare',
+  Epic: 'Epic',
+  Legendary: 'Legendary',
+  Mythic: 'Mythic',
+} as const;
+
+export type BadgeDefinitionCategory = typeof BadgeDefinitionCategory[keyof typeof BadgeDefinitionCategory];
+
+
+export const BadgeDefinitionCategory = {
+  fitness: 'fitness',
+  streak: 'streak',
+  hatchling: 'hatchling',
+  social: 'social',
+  achievement: 'achievement',
+  event: 'event',
+  secret: 'secret',
+  strength: 'strength',
+  speed: 'speed',
+  nutrition: 'nutrition',
+} as const;
+
+export interface BadgeDefinition {
+  key: string;
+  name: string;
+  description: string;
+  tier: BadgeDefinitionTier;
+  category: BadgeDefinitionCategory;
+  icon: string;
+  isSecret: boolean;
+  xpReward: number;
+  coinsReward: number;
+  /** Optional hint about a special creature ability unlocked alongside this badge. */
+  creatureAbilityHint?: string;
+}
+
+export interface ArtifactUnlock {
+  id: number;
+  name: string;
+  rarity: string;
+  lore: string;
+  imageSlug: string;
+}
 
 export interface ActivityLogResult {
   activity: FitnessActivity;
@@ -442,6 +491,10 @@ export interface ActivityLogResult {
   groupBonusXp?: number;
   groupXpBonusPct?: number;
   prResult?: ActivityLogResultPrResult;
+  /** Badges newly awarded to the player as a result of this activity log. */
+  newBadges?: BadgeDefinition[];
+  /** Artifact rewards newly unlocked by this activity log. */
+  newArtifacts?: ArtifactUnlock[];
 }
 
 export interface FitnessQuest {

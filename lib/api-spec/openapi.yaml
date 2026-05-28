@@ -4679,11 +4679,45 @@ components:
         prResult:
           nullable: true
           type: object
+          required: [activityType, metric, value, isNew]
           properties:
             activityType: { type: string }
             metric:       { type: string }
             value:        { type: integer }
             isNew:        { type: boolean }
+        newBadges:
+          type: array
+          description: "Badges newly awarded to the player as a result of this activity log."
+          items: { $ref: "#/components/schemas/BadgeDefinition" }
+        newArtifacts:
+          type: array
+          description: "Artifact rewards newly unlocked by this activity log."
+          items: { $ref: "#/components/schemas/ArtifactUnlock" }
+
+    BadgeDefinition:
+      type: object
+      required: [key, name, description, tier, category, icon, isSecret, xpReward, coinsReward]
+      properties:
+        key:                  { type: string }
+        name:                 { type: string }
+        description:          { type: string }
+        tier:                 { type: string, enum: [Common, Rare, Epic, Legendary, Mythic] }
+        category:             { type: string, enum: [fitness, streak, hatchling, social, achievement, event, secret, strength, speed, nutrition] }
+        icon:                 { type: string }
+        isSecret:             { type: boolean }
+        xpReward:             { type: integer }
+        coinsReward:          { type: integer }
+        creatureAbilityHint:  { type: string, description: "Optional hint about a special creature ability unlocked alongside this badge." }
+
+    ArtifactUnlock:
+      type: object
+      required: [id, name, rarity, lore, imageSlug]
+      properties:
+        id:        { type: integer }
+        name:      { type: string }
+        rarity:    { type: string }
+        lore:      { type: string }
+        imageSlug: { type: string }
 
     FitnessQuest:
       type: object
