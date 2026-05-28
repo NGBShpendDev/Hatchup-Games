@@ -14,6 +14,7 @@ export const postsTable = pgTable("posts", {
   isFlagged: boolean("is_flagged").notNull().default(false),
   engagementScore: integer("engagement_score").notNull().default(0),
   viewCount: integer("view_count").notNull().default(0),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -55,12 +55,30 @@ export interface OgPostInput {
   content: string;
   mediaUrl: string | null;
   isFlagged: boolean;
+  // Soft-delete marker. When set, the post should be treated as hidden — the
+  // OG preview collapses to the neutral default so link unfurls in
+  // WhatsApp/Slack/Discord can't leak content the author already removed.
+  deletedAt?: Date | string | null;
 }
 
 export interface OgAuthorInput {
   displayName?: string | null;
   username?: string | null;
   avatarUrl?: string | null;
+  // Platform-level account states. When true, the author is not allowed to
+  // appear in public surfaces; the OG preview must collapse to the neutral
+  // default so suspended/blocked accounts can't keep getting impressions via
+  // already-pasted share links.
+  isSuspended?: boolean | null;
+}
+
+/** True when the post or its author is in a state that must not be publicly previewed. */
+export function isOgHidden(post: OgPostInput | null, author: OgAuthorInput | null): boolean {
+  if (!post) return false;
+  if (post.isFlagged) return true;
+  if (post.deletedAt != null) return true;
+  if (author?.isSuspended) return true;
+  return false;
 }
 
 export interface RenderOgArgs {
@@ -76,8 +94,9 @@ export interface RenderOgArgs {
  * Pure function so it can be unit tested without a database. The route handler
  * is responsible for looking up `post` + `author` and passing them in.
  *
- * Flagged or missing posts collapse to the neutral default preview so we never
- * leak moderated content into WhatsApp / Slack / Discord unfurls.
+ * Flagged, soft-deleted, suspended-author, or missing posts collapse to the
+ * neutral default preview so we never leak moderated, removed, or otherwise
+ * non-public content into WhatsApp / Slack / Discord unfurls.
  */
 export function renderOgHtml({ baseUrl, id, post, author }: RenderOgArgs): string {
   const fallbackImage = `${baseUrl}/opengraph.jpg`;
@@ -94,7 +113,7 @@ export function renderOgHtml({ baseUrl, id, post, author }: RenderOgArgs): strin
   let description = "HatchUp Fitness Pals — the fitness RPG where every step hatches a creature.";
   let imageUrl = fallbackImage;
 
-  if (post && !post.isFlagged) {
+  if (post && !isOgHidden(post, author)) {
     const authorName = author?.displayName || author?.username || "A HatchUp player";
     const tag = POST_TYPE_TAGS[post.postType] ?? POST_TYPE_TAGS.general;
     title = `${tag} — ${authorName} on HatchUp`;

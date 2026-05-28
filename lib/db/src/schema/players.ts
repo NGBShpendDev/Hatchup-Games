@@ -52,6 +52,7 @@ export const playersTable = pgTable("players", {
   isAdmin: boolean("is_admin").notNull().default(false),
   isVerified: boolean("is_verified").notNull().default(false),
   isMinor: boolean("is_minor").notNull().default(false),
+  isSuspended: boolean("is_suspended").notNull().default(false),
   // Nutrition / body goal
   physiqueGoal: text("physique_goal"),
   // Battle Arena

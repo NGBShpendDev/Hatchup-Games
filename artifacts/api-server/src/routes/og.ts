@@ -12,8 +12,11 @@ const defaultLoader: OgPostLoader = async (id: number): Promise<OgLoadResult> =>
     content: row.content,
     mediaUrl: row.mediaUrl,
     isFlagged: row.isFlagged,
+    deletedAt: row.deletedAt,
   };
-  if (row.isFlagged) return { post, author: null };
+  // Posts that are flagged or soft-deleted must never expose their content
+  // or author through link unfurls. Skip the author lookup entirely.
+  if (row.isFlagged || row.deletedAt != null) return { post, author: null };
   // Author lookup is best-effort — if the player row can't be read (e.g.
   // unrelated schema drift on a column we don't care about) we still want
   // to render a card with fallback author info.
@@ -26,6 +29,7 @@ const defaultLoader: OgPostLoader = async (id: number): Promise<OgLoadResult> =>
           displayName: authorRow.displayName,
           username: authorRow.username,
           avatarUrl: authorRow.avatarUrl,
+          isSuspended: authorRow.isSuspended,
         }
       : null;
     return { post, author };

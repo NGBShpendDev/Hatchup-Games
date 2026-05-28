@@ -9,6 +9,7 @@ import {
   buildOgSvg,
   postTypeLabel,
   ogTruncate,
+  isOgHidden,
   type OgPostInput,
   type OgAuthorInput,
 } from "./og-render.ts";
@@ -97,7 +98,7 @@ export function createOgRouter(loader: OgPostLoader): Router {
 
     try {
       const { post, author } = await loader(id);
-      if (!post || post.isFlagged) {
+      if (!post || isOgHidden(post, author)) {
         res.status(404).json({ error: "Post not found" });
         return;
       }

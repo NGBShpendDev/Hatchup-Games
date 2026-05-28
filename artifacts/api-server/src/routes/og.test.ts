@@ -156,6 +156,92 @@ describe("renderOgHtml — flagged posts do not leak content", () => {
   });
 });
 
+describe("renderOgHtml — soft-deleted posts do not leak content", () => {
+  const sensitive = "SECRET-DELETED-CONTENT-DEF456";
+
+  it("omits content from a post with deletedAt set (Date)", () => {
+    const html = renderOgHtml({
+      baseUrl: BASE_URL,
+      id: 21,
+      post: basicPost({
+        content: sensitive,
+        mediaUrl: "https://cdn.example.com/deleted.jpg",
+        deletedAt: new Date(),
+      }),
+      author: basicAuthor({ displayName: "Removed Author" }),
+    });
+    assert.ok(!html.includes(sensitive), "deleted content must not appear in HTML");
+    assert.ok(!html.includes("deleted.jpg"), "deleted media must not be used as og:image");
+    assert.ok(!html.includes("Removed Author"), "deleted post's author must not appear in preview");
+    assert.match(html, /og:title" content="HatchUp"/);
+    assert.match(html, /og:image" content="https:\/\/hatchup\.example\.com\/opengraph\.jpg"/);
+  });
+
+  it("omits content from a post with deletedAt set (ISO string)", () => {
+    const html = renderOgHtml({
+      baseUrl: BASE_URL,
+      id: 22,
+      post: basicPost({ content: sensitive, deletedAt: "2026-05-01T12:00:00.000Z" }),
+      author: basicAuthor(),
+    });
+    assert.ok(!html.includes(sensitive));
+    assert.match(html, /og:title" content="HatchUp"/);
+  });
+
+  it("still renders normally when deletedAt is null or undefined", () => {
+    const nullDeleted = renderOgHtml({
+      baseUrl: BASE_URL,
+      id: 23,
+      post: basicPost({ content: "Still here", deletedAt: null }),
+      author: basicAuthor(),
+    });
+    assert.match(nullDeleted, /Still here/);
+    assert.doesNotMatch(nullDeleted, /og:title" content="HatchUp"\s/);
+
+    const undef = renderOgHtml({
+      baseUrl: BASE_URL,
+      id: 24,
+      post: basicPost({ content: "Also here" }),
+      author: basicAuthor(),
+    });
+    assert.match(undef, /Also here/);
+  });
+});
+
+describe("renderOgHtml — suspended/blocked authors do not leak content", () => {
+  const sensitive = "SECRET-SUSPENDED-AUTHOR-GHI789";
+
+  it("collapses to the neutral default when the author is suspended", () => {
+    const html = renderOgHtml({
+      baseUrl: BASE_URL,
+      id: 31,
+      post: basicPost({
+        content: sensitive,
+        mediaUrl: "https://cdn.example.com/banned.jpg",
+      }),
+      author: basicAuthor({ displayName: "Suspended Person", isSuspended: true }),
+    });
+    assert.ok(!html.includes(sensitive), "suspended author's post content must not appear");
+    assert.ok(!html.includes("banned.jpg"), "suspended author's media must not appear");
+    assert.ok(!html.includes("Suspended Person"), "suspended author name must not appear");
+    assert.match(html, /og:title" content="HatchUp"/);
+    assert.match(html, /og:image" content="https:\/\/hatchup\.example\.com\/opengraph\.jpg"/);
+  });
+
+  it("still renders normally when isSuspended is false / null / undefined", () => {
+    for (const isSuspended of [false, null, undefined] as const) {
+      const html = renderOgHtml({
+        baseUrl: BASE_URL,
+        id: 32,
+        post: basicPost({ content: "Visible" }),
+        author: basicAuthor({ displayName: "Normal User", isSuspended }),
+      });
+      assert.match(html, /Visible/, `isSuspended=${String(isSuspended)} should not hide post`);
+      assert.match(html, /Normal User/);
+    }
+  });
+});
+
 describe("renderOgHtml — escaping", () => {
   it("escapes HTML-sensitive characters in post content", () => {
     const html = renderOgHtml({
