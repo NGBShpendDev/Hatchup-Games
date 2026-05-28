@@ -162,6 +162,10 @@ Across 6 metrics — xp, steps, workouts, battle_wins, streaks, artifacts — if
 - `<SubscriptionChip />` in `home.tsx` header — shows Premium / Trial Xd / Top-10 / Upgrade.
 - New players are auto-seeded with `subscriptionTier="premium"`, `subscriptionSource="trial"`, `trialEndsAt=now+7d`.
 
+## Operator signals
+
+- **Distinct-posts-per-hour cap hits**: when the per-viewer post-view cap (env `VIEW_DISTINCT_POSTS_PER_HOUR`, default 60) rejects a view, the server emits a structured warn log with `event="view_distinct_posts_cap_hit"`, `viewerKeyType` (`player` or `ip`), `postId`, `distinctPostsThisHour`, and `cap`. Query that event in log search to see baseline hit rate (and the player-vs-ip split) before/after tuning the env var. An in-process counter `viewDistinctPostsCapHits` is also exported from `artifacts/api-server/src/routes/social.ts` for quick snapshots (resets on restart).
+
 ## Gotchas
 
 - Vite `strictPort: true` was removed — it caused the workflow restart tool to fail with DIDNT_OPEN_A_PORT even though the server was running

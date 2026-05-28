@@ -50,7 +50,6 @@ import {
   FollowPlayerBody,
   RepostPostBody,
 } from "@workspace/api-zod";
-import { z } from "zod/v4";
 
 // ── Per-postType metadata validation ──────────────────────────────────────
 // `CreatePostBody.metadata` is intentionally an open record at the OpenAPI
@@ -772,6 +771,17 @@ export function resolveViewDistinctPostsPerHour(
 
 export const VIEW_DISTINCT_POSTS_PER_HOUR = resolveViewDistinctPostsPerHour();
 
+// In-process counter for distinct-posts cap rejections, split by viewerKey
+// type. Mirrors what we log so operators can also pull a quick snapshot via
+// any debug surface that imports it without having to parse logs. Reset on
+// process restart — for long-term trends, rely on the structured log event
+// `view_distinct_posts_cap_hit` instead.
+export const viewDistinctPostsCapHits = {
+  total: 0,
+  player: 0,
+  ip: 0,
+};
+
 logger.info(
   {
     cap: VIEW_DISTINCT_POSTS_PER_HOUR,
@@ -848,6 +858,25 @@ router.post("/social/posts/:id/view", postViewLimiter, async (req, res) => {
     );
   const distinctPostsThisHour = distinctRow?.count ?? 0;
   if (distinctPostsThisHour >= VIEW_DISTINCT_POSTS_PER_HOUR) {
+    // Tunable cap fired — emit a structured signal so operators can measure
+    // how often legitimate-looking viewers hit it before lowering/raising the
+    // env var. viewerKey is prefixed with its type (`player:` vs `ip:`), so we
+    // split the type out for easy grouping/aggregation in log search. We
+    // intentionally do NOT log the full viewerKey (it contains a hashed IP
+    // for anonymous viewers); only the type and the post being blocked.
+    const viewerKeyType: "player" | "ip" = viewerKey.startsWith("player:") ? "player" : "ip";
+    viewDistinctPostsCapHits.total += 1;
+    viewDistinctPostsCapHits[viewerKeyType] += 1;
+    req.log?.warn?.(
+      {
+        event: "view_distinct_posts_cap_hit",
+        viewerKeyType,
+        postId: id,
+        distinctPostsThisHour,
+        cap: VIEW_DISTINCT_POSTS_PER_HOUR,
+      },
+      "view_distinct_posts_cap_hit",
+    );
     res.json({ viewCount: post.viewCount, counted: false });
     return;
   }
