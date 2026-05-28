@@ -28,6 +28,7 @@ import { awardBadge } from "./badgeService.ts";
 import {
   distributeChallengeRewards,
   type RewardStore,
+  type RewardStoreTx,
 } from "./challengeRewards.ts";
 import {
   advanceEliminationRound as advanceEliminationRoundCore,
@@ -228,11 +229,14 @@ function truncateForName(s: string, max: number): string {
   return trimmed.slice(0, max - 1).trimEnd() + "…";
 }
 
+type FinalizeDbHandle = Pick<typeof db, "query" | "insert" | "update">;
+
 async function awardChampionArtifact(
   playerId: number,
   challengeId: number,
   challengeTitle: string,
   earnedAt: Date,
+  dbHandle: FinalizeDbHandle = db,
 ): Promise<void> {
   const slug = `${CHAMPION_ARTIFACT_SLUG_PREFIX}__c${challengeId}`;
   const season = seasonLabel(earnedAt);
@@ -248,12 +252,12 @@ async function awardChampionArtifact(
     `Worn by the sole survivor of the bracket on ${earnedDateStr} — ` +
     `every contender they outlasted is etched into its rim.`;
 
-  let artifact = await db.query.artifactsTable.findFirst({
+  let artifact = await dbHandle.query.artifactsTable.findFirst({
     where: eq(artifactsTable.imageSlug, slug),
   });
 
   if (!artifact) {
-    const [inserted] = await db.insert(artifactsTable).values({
+    const [inserted] = await dbHandle.insert(artifactsTable).values({
       name: truncateForName(name, 200),
       lore,
       rarity: "Legendary",
@@ -268,100 +272,116 @@ async function awardChampionArtifact(
       triggerValue: null,
     }).onConflictDoNothing({ target: artifactsTable.imageSlug }).returning();
 
-    artifact = inserted ?? await db.query.artifactsTable.findFirst({
+    artifact = inserted ?? await dbHandle.query.artifactsTable.findFirst({
       where: eq(artifactsTable.imageSlug, slug),
     });
   }
 
   if (!artifact) return;
 
-  await db.insert(playerArtifactsTable).values({
+  await dbHandle.insert(playerArtifactsTable).values({
     playerId,
     artifactId: artifact.id,
   }).onConflictDoNothing();
 }
 
 // ── Reward distribution helper ─────────────────────────────────────────────
+// All finalization writes ride a single `db.transaction(...)`. If any step
+// throws (DB drop, awardChampion failing, etc.) the transaction rolls back
+// the status flip together with every preceding rank/grant write, leaving
+// the challenge in `status='active'` so a retry can re-claim it and pay
+// every participant correctly. Without this, a mid-flight crash would
+// leave `status='completed'` with only some players paid AND no retry
+// path (subsequent attempts would noop on `status='not_active'`).
+function makeTxRewardStore(tx: FinalizeDbHandle): RewardStoreTx {
+  return {
+    async claimChallengeForFinalization(id, now) {
+      // Single conditional UPDATE: only the caller whose row matches
+      // `status='active' AND endAt <= now` actually flips the row and
+      // receives the returning payload. Any concurrent caller that arrives
+      // after the flip sees zero rows back and we fall through to the
+      // disambiguating read below to report the correct noop reason.
+      // `completedPushSentAt` is intentionally NOT set here — the push
+      // fan-out in `finalizeChallenge` keys off its absence to ensure the
+      // completion push is sent exactly once by the winning caller.
+      const [claimed] = await tx.update(challengesTable)
+        .set({ status: "completed" })
+        .where(and(
+          eq(challengesTable.id, id),
+          eq(challengesTable.status, "active"),
+          lte(challengesTable.endAt, now),
+        ))
+        .returning();
+      if (claimed) {
+        return {
+          kind: "claimed",
+          challenge: {
+            id: claimed.id,
+            status: "active", // pre-claim status — distributeChallengeRewards expects this
+            endAt: new Date(claimed.endAt),
+            isElimination: claimed.isElimination,
+            rewardXp: claimed.rewardXp,
+            rewardCoins: claimed.rewardCoins,
+          },
+        };
+      }
+      const existing = await tx.query.challengesTable.findFirst({
+        where: eq(challengesTable.id, id),
+        columns: { id: true, status: true, endAt: true },
+      });
+      if (!existing) return { kind: "noop", reason: "not_found" };
+      if (existing.status !== "active") return { kind: "noop", reason: "not_active" };
+      if (now < new Date(existing.endAt)) return { kind: "noop", reason: "not_ended" };
+      // Race: row was active+ended at read time but flipped between the
+      // UPDATE and the disambiguating SELECT. Treat as "not_active" — the
+      // sibling caller already won the claim and will pay rewards.
+      return { kind: "noop", reason: "not_active" };
+    },
+    async getParticipants(challengeId) {
+      const rows = await tx.query.challengeParticipantsTable.findMany({
+        where: eq(challengeParticipantsTable.challengeId, challengeId),
+      });
+      return rows.map(r => ({
+        id: r.id,
+        playerId: r.playerId,
+        currentValue: r.currentValue,
+        eliminated: r.eliminated,
+        eliminatedRound: r.eliminatedRound,
+      }));
+    },
+    async setParticipantRank(participantId, rank) {
+      await tx.update(challengeParticipantsTable)
+        .set({ rank })
+        .where(eq(challengeParticipantsTable.id, participantId));
+    },
+    async grantPlayerReward(playerId, xp, coins) {
+      await tx.update(playersTable)
+        .set({
+          xp: sql`${playersTable.xp} + ${xp}`,
+          coins: sql`${playersTable.coins} + ${coins}`,
+        })
+        .where(eq(playersTable.id, playerId));
+    },
+    async awardChampion(playerId, challengeId) {
+      await awardBadge(playerId, "TOURNAMENT_CHAMPION", tx);
+      const challenge = await tx.query.challengesTable.findFirst({
+        where: eq(challengesTable.id, challengeId),
+        columns: { title: true },
+      });
+      await awardChampionArtifact(
+        playerId,
+        challengeId,
+        challenge?.title ?? `Tournament #${challengeId}`,
+        new Date(),
+        tx,
+      );
+    },
+  };
+}
+
 const dbRewardStore: RewardStore = {
-  async claimChallengeForFinalization(id, now) {
-    // Single conditional UPDATE: only the caller whose row matches
-    // `status='active' AND endAt <= now` actually flips the row and
-    // receives the returning payload. Any concurrent caller that arrives
-    // after the flip sees zero rows back and we fall through to the
-    // disambiguating read below to report the correct noop reason.
-    // `completedPushSentAt` is intentionally NOT set here — the push
-    // fan-out in `finalizeChallenge` keys off its absence to ensure the
-    // completion push is sent exactly once by the winning caller.
-    const [claimed] = await db.update(challengesTable)
-      .set({ status: "completed" })
-      .where(and(
-        eq(challengesTable.id, id),
-        eq(challengesTable.status, "active"),
-        lte(challengesTable.endAt, now),
-      ))
-      .returning();
-    if (claimed) {
-      return {
-        kind: "claimed",
-        challenge: {
-          id: claimed.id,
-          status: "active", // pre-claim status — distributeChallengeRewards expects this
-          endAt: new Date(claimed.endAt),
-          isElimination: claimed.isElimination,
-          rewardXp: claimed.rewardXp,
-          rewardCoins: claimed.rewardCoins,
-        },
-      };
-    }
-    const existing = await db.query.challengesTable.findFirst({
-      where: eq(challengesTable.id, id),
-      columns: { id: true, status: true, endAt: true },
-    });
-    if (!existing) return { kind: "noop", reason: "not_found" };
-    if (existing.status !== "active") return { kind: "noop", reason: "not_active" };
-    if (now < new Date(existing.endAt)) return { kind: "noop", reason: "not_ended" };
-    // Race: row was active+ended at read time but flipped between the
-    // UPDATE and the disambiguating SELECT. Treat as "not_active" — the
-    // sibling caller already won the claim and will pay rewards.
-    return { kind: "noop", reason: "not_active" };
-  },
-  async getParticipants(challengeId) {
-    const rows = await db.query.challengeParticipantsTable.findMany({
-      where: eq(challengeParticipantsTable.challengeId, challengeId),
-    });
-    return rows.map(r => ({
-      id: r.id,
-      playerId: r.playerId,
-      currentValue: r.currentValue,
-      eliminated: r.eliminated,
-      eliminatedRound: r.eliminatedRound,
-    }));
-  },
-  async setParticipantRank(participantId, rank) {
-    await db.update(challengeParticipantsTable)
-      .set({ rank })
-      .where(eq(challengeParticipantsTable.id, participantId));
-  },
-  async grantPlayerReward(playerId, xp, coins) {
-    await db.update(playersTable)
-      .set({
-        xp: sql`${playersTable.xp} + ${xp}`,
-        coins: sql`${playersTable.coins} + ${coins}`,
-      })
-      .where(eq(playersTable.id, playerId));
-  },
-  async awardChampion(playerId, challengeId) {
-    await awardBadge(playerId, "TOURNAMENT_CHAMPION");
-    const challenge = await db.query.challengesTable.findFirst({
-      where: eq(challengesTable.id, challengeId),
-      columns: { title: true },
-    });
-    await awardChampionArtifact(
-      playerId,
-      challengeId,
-      challenge?.title ?? `Tournament #${challengeId}`,
-      new Date(),
-    );
+  async runFinalization(fn) {
+    return db.transaction(async (tx) => fn(makeTxRewardStore(tx)));
   },
 };
 

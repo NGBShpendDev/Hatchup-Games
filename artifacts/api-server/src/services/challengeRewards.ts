@@ -69,7 +69,17 @@ export type ClaimOutcome =
   | { kind: "claimed"; challenge: RewardChallenge }
   | { kind: "noop"; reason: "not_found" | "not_active" | "not_ended" };
 
-export interface RewardStore {
+/**
+ * The transaction-bound operations passed to the callback in
+ * `RewardStore.runFinalization`. All work performed via these methods
+ * MUST run inside the same DB transaction so that a mid-flight failure
+ * (process crash, dropped connection, awardChampion throwing, etc.) rolls
+ * back the status flip and every preceding rank/grant write together.
+ * Without that guarantee the challenge could be left marked `completed`
+ * with only some participants paid and no retry path (subsequent finalize
+ * attempts would noop on `status='not_active'`).
+ */
+export interface RewardStoreTx {
   /**
    * Atomically transition the challenge from `status="active"` to
    * `status="completed"` iff the challenge exists, is still active, and its
@@ -96,6 +106,18 @@ export interface RewardStore {
   awardChampion(playerId: number, challengeId: number): Promise<void>;
 }
 
+export interface RewardStore {
+  /**
+   * Run the entire finalization flow — claim, rank updates, grants, and
+   * champion awards — inside a single DB transaction. If `fn` throws or
+   * the underlying connection drops mid-flight, the transaction MUST roll
+   * back so the status flip is reverted along with any participant writes.
+   * This leaves the challenge in `status="active"` and a retry can re-run
+   * `distributeChallengeRewards` to pay everyone correctly.
+   */
+  runFinalization<T>(fn: (tx: RewardStoreTx) => Promise<T>): Promise<T>;
+}
+
 export type DistributionRanking = {
   participantId: number;
   playerId: number;
@@ -112,53 +134,65 @@ export async function distributeChallengeRewards(
   challengeId: number,
   now: Date = new Date(),
 ): Promise<DistributionOutcome> {
-  // Concurrency: rather than read-then-write (which can race when two
-  // requests both auto-finalize the same expired challenge), the store
-  // performs a single conditional write that transitions
-  // `status: "active" -> "completed"` and returns the row only if it won
-  // the claim. Losers receive a "not_active" noop and skip every payout
-  // side effect below, so rewards can never double-pay even if multiple
-  // callers reach `distributeChallengeRewards` at the same instant.
-  const claim = await store.claimChallengeForFinalization(challengeId, now);
-  if (claim.kind === "noop") return claim;
-  const challenge = claim.challenge;
+  // The entire flow — atomic claim, per-participant rank persistence,
+  // top-3 reward grants, and the champion badge/artifact award — runs in a
+  // single transaction. If anything inside throws (process crash, dropped
+  // DB connection, awardChampion failing, etc.) the transaction rolls
+  // back the status flip along with any partial writes, so a subsequent
+  // finalize attempt can re-claim the challenge and pay everyone
+  // correctly. Without this we could be left with `status='completed'`
+  // and only some participants paid — and no retry path, because future
+  // attempts would noop on `status='not_active'`.
+  //
+  // Concurrency is still preserved: `claimChallengeForFinalization` is a
+  // single conditional write that flips `status: "active" -> "completed"`
+  // and returns the row only if it won the claim. Losers receive a
+  // "not_active" noop and skip every payout side effect below, so rewards
+  // can never double-pay even if multiple callers reach
+  // `distributeChallengeRewards` at the same instant.
+  return store.runFinalization(async (tx) => {
+    const claim = await tx.claimChallengeForFinalization(challengeId, now);
+    if (claim.kind === "noop") return claim;
+    const challenge = claim.challenge;
 
-  // Rank every participant — survivors first, then eliminated players by
-  // `eliminatedRound` desc, ties broken by `currentValue` desc. This is the
-  // same helper the public leaderboard endpoint uses, so the ordering shown
-  // to players matches the order in which rewards get paid out. In a
-  // single-survivor elimination tournament that means the survivor is 1st,
-  // the last-eliminated rival is 2nd, etc., even when stale `currentValue`
-  // on eliminated rows is numerically higher.
-  const all = await store.getParticipants(challengeId);
-  const ranked = rankChallengeParticipants(all);
+    // Rank every participant — survivors first, then eliminated players by
+    // `eliminatedRound` desc, ties broken by `currentValue` desc. This is the
+    // same helper the public leaderboard endpoint uses, so the ordering shown
+    // to players matches the order in which rewards get paid out. In a
+    // single-survivor elimination tournament that means the survivor is 1st,
+    // the last-eliminated rival is 2nd, etc., even when stale `currentValue`
+    // on eliminated rows is numerically higher.
+    const all = await tx.getParticipants(challengeId);
+    const ranked = rankChallengeParticipants(all);
 
-  const rankings: DistributionRanking[] = [];
-  for (let i = 0; i < ranked.length; i++) {
-    const rank = i + 1;
-    const p = ranked[i];
-    await store.setParticipantRank(p.id, rank);
-    // The champion-tier 2× boost + badge is reserved for a tournament
-    // survivor. In the (defensive) edge case where the rank-1 row is itself
-    // eliminated (e.g. bracket finalized with no survivors), treat it as a
-    // non-champion finish so we never crown an eliminated player.
-    const grant = computeChallengeReward(
-      rank,
-      challenge.rewardXp,
-      challenge.rewardCoins,
-      challenge.isElimination && !p.eliminated,
-    );
-    if (grant.xp > 0 || grant.coins > 0) {
-      await store.grantPlayerReward(p.playerId, grant.xp, grant.coins);
+    const rankings: DistributionRanking[] = [];
+    for (let i = 0; i < ranked.length; i++) {
+      const rank = i + 1;
+      const p = ranked[i];
+      await tx.setParticipantRank(p.id, rank);
+      // The champion-tier 2× boost + badge is reserved for a tournament
+      // survivor. In the (defensive) edge case where the rank-1 row is itself
+      // eliminated (e.g. bracket finalized with no survivors), treat it as a
+      // non-champion finish so we never crown an eliminated player.
+      const grant = computeChallengeReward(
+        rank,
+        challenge.rewardXp,
+        challenge.rewardCoins,
+        challenge.isElimination && !p.eliminated,
+      );
+      if (grant.xp > 0 || grant.coins > 0) {
+        await tx.grantPlayerReward(p.playerId, grant.xp, grant.coins);
+      }
+      if (grant.isChampion) {
+        await tx.awardChampion(p.playerId, challengeId);
+      }
+      rankings.push({ participantId: p.id, playerId: p.playerId, rank, grant });
     }
-    if (grant.isChampion) {
-      await store.awardChampion(p.playerId, challengeId);
-    }
-    rankings.push({ participantId: p.id, playerId: p.playerId, rank, grant });
-  }
 
-  // No explicit markCompleted: the atomic claim above already flipped
-  // `status` to `"completed"`. That ordering is what gives us idempotency
-  // under concurrent finalize attempts.
-  return { kind: "completed", rankings };
+    // No explicit markCompleted: the atomic claim above already flipped
+    // `status` to `"completed"` (inside this transaction). That ordering
+    // gives us idempotency under concurrent finalize attempts and lets
+    // the rollback path revert the flip if anything below fails.
+    return { kind: "completed", rankings };
+  });
 }

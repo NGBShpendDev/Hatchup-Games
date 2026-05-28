@@ -6,6 +6,7 @@ import {
   type RewardChallenge,
   type RewardParticipant,
   type RewardStore,
+  type RewardStoreTx,
 } from "./challengeRewards.ts";
 
 describe("computeChallengeReward", () => {
@@ -72,8 +73,24 @@ type RewardStoreHooks = {
    * actually atomic.
    */
   beforeClaimCommit?: () => Promise<void>;
+  /**
+   * Optional hook called inside `grantPlayerReward` with the current
+   * grant count (1 = first call). Lets the rollback test force a
+   * mid-flight failure after some grants have already been written but
+   * before all of them complete.
+   */
+  onGrantPlayerReward?: (callIndex: number, playerId: number) => Promise<void> | void;
+  /** Optional hook to force `awardChampion` to throw. */
+  onAwardChampion?: (playerId: number) => Promise<void> | void;
 };
 
+/**
+ * In-memory fake of the DB-backed `RewardStore`. `runFinalization`
+ * simulates a transaction: it snapshots all mutable state up-front and,
+ * if the callback throws, restores the snapshot before rethrowing. This
+ * mirrors `db.transaction(...)`'s rollback-on-throw behavior so tests
+ * can assert that a mid-flight failure leaves no partial state behind.
+ */
 function makeRewardStore(
   initial: RewardChallenge,
   participants: RewardParticipant[],
@@ -87,7 +104,27 @@ function makeRewardStore(
     champions: [],
     markCompletedCalls: 0,
   };
-  const store: RewardStore = {
+
+  function snapshotState(): FakeState {
+    return {
+      challenge: { ...state.challenge },
+      participants: state.participants.map(p => ({ ...p })),
+      ranksSet: state.ranksSet.map(r => ({ ...r })),
+      grants: state.grants.map(g => ({ ...g })),
+      champions: [...state.champions],
+      markCompletedCalls: state.markCompletedCalls,
+    };
+  }
+  function restoreState(snap: FakeState): void {
+    state.challenge = { ...snap.challenge };
+    state.participants = snap.participants.map(p => ({ ...p }));
+    state.ranksSet = snap.ranksSet.map(r => ({ ...r }));
+    state.grants = snap.grants.map(g => ({ ...g }));
+    state.champions = [...snap.champions];
+    state.markCompletedCalls = snap.markCompletedCalls;
+  }
+
+  const tx: RewardStoreTx = {
     async claimChallengeForFinalization(_id, now) {
       // Snapshot the pre-claim row, run the optional interleave hook,
       // then perform the status flip as a single "atomic" step on the
@@ -125,9 +162,27 @@ function makeRewardStore(
     },
     async grantPlayerReward(playerId, xp, coins) {
       state.grants.push({ playerId, xp, coins });
+      if (hooks.onGrantPlayerReward) {
+        await hooks.onGrantPlayerReward(state.grants.length, playerId);
+      }
     },
     async awardChampion(playerId, _challengeId) {
+      if (hooks.onAwardChampion) {
+        await hooks.onAwardChampion(playerId);
+      }
       state.champions.push(playerId);
+    },
+  };
+
+  const store: RewardStore = {
+    async runFinalization(fn) {
+      const snap = snapshotState();
+      try {
+        return await fn(tx);
+      } catch (err) {
+        restoreState(snap);
+        throw err;
+      }
     },
   };
   return { store, state };
@@ -326,11 +381,15 @@ describe("distributeChallengeRewards", () => {
 
   it("is a no-op when the challenge does not exist", async () => {
     const store: RewardStore = {
-      async claimChallengeForFinalization() { return { kind: "noop", reason: "not_found" }; },
-      async getParticipants() { throw new Error("should not be called"); },
-      async setParticipantRank() { throw new Error("should not be called"); },
-      async grantPlayerReward() { throw new Error("should not be called"); },
-      async awardChampion() { throw new Error("should not be called"); },
+      async runFinalization(fn) {
+        return fn({
+          async claimChallengeForFinalization() { return { kind: "noop", reason: "not_found" }; },
+          async getParticipants() { throw new Error("should not be called"); },
+          async setParticipantRank() { throw new Error("should not be called"); },
+          async grantPlayerReward() { throw new Error("should not be called"); },
+          async awardChampion() { throw new Error("should not be called"); },
+        });
+      },
     };
     const outcome = await distributeChallengeRewards(store, 999, NOW);
     assert.equal(outcome.kind, "noop");
@@ -455,5 +514,92 @@ describe("distributeChallengeRewards", () => {
       state.ranksSet.map(r => r.participantId).sort((x, y) => x - y),
       [1, 2, 3],
     );
+  });
+
+  // Regression: pre-task #596 the claim flipped status="completed"
+  // up-front and then every rank/grant/champion write ran as an
+  // independent statement. If one of them failed (DB drop, awardChampion
+  // throw, etc.) the row was left "completed" with only some players
+  // paid, AND no retry path because future finalize attempts noop on
+  // `status='not_active'`. The fix runs the whole flow inside one
+  // transaction so the status flip rolls back along with any partial
+  // writes — these tests assert that.
+  it("rolls back the status flip and partial grants when a mid-flight grant fails", async () => {
+    const { store, state } = makeRewardStore(
+      { id: 200, status: "active", endAt: PAST, isElimination: false, rewardXp: 100, rewardCoins: 50 },
+      [
+        { id: 1, playerId: 10, currentValue: 90, eliminated: false, eliminatedRound: null },
+        { id: 2, playerId: 20, currentValue: 60, eliminated: false, eliminatedRound: null },
+        { id: 3, playerId: 30, currentValue: 30, eliminated: false, eliminatedRound: null },
+      ],
+      {
+        // Blow up AFTER the 2nd grant lands but BEFORE the 3rd — i.e.
+        // we're mid-flight with the status already flipped (inside the
+        // tx), the rank-1 and rank-2 players already paid, and rank-3
+        // about to be paid. Pre-fix this would have left the challenge
+        // permanently in a half-paid completed state.
+        async onGrantPlayerReward(callIndex) {
+          if (callIndex === 2) throw new Error("simulated DB drop after 2nd grant");
+        },
+      },
+    );
+
+    await assert.rejects(
+      () => distributeChallengeRewards(store, 200, NOW),
+      /simulated DB drop after 2nd grant/,
+    );
+
+    // Status flip MUST have been rolled back so a retry can re-claim.
+    assert.equal(state.challenge.status, "active");
+    assert.equal(state.markCompletedCalls, 0);
+    // No partial grants or rank persistence left behind.
+    assert.deepEqual(state.grants, []);
+    assert.deepEqual(state.ranksSet, []);
+    assert.deepEqual(state.champions, []);
+
+    // And the retry pays everyone correctly without the failure hook.
+    const retry = makeRewardStore(
+      state.challenge,
+      state.participants,
+    );
+    const outcome = await distributeChallengeRewards(retry.store, 200, NOW);
+    assert.equal(outcome.kind, "completed");
+    assert.equal(retry.state.challenge.status, "completed");
+    assert.equal(retry.state.markCompletedCalls, 1);
+    assert.deepEqual(retry.state.grants, [
+      { playerId: 10, xp: 100, coins: 50 },
+      { playerId: 20, xp: 60, coins: 30 },
+      { playerId: 30, xp: 30, coins: 15 },
+    ]);
+  });
+
+  it("rolls back the status flip when awardChampion throws after grants have landed", async () => {
+    // Elimination tournament: the survivor's grant lands first, then
+    // awardChampion throws (e.g. badge insert hit a constraint). The
+    // entire transaction — status flip, rank writes, the grant we just
+    // wrote — must roll back so a retry can pay and crown cleanly.
+    const { store, state } = makeRewardStore(
+      { id: 201, status: "active", endAt: PAST, isElimination: true, rewardXp: 100, rewardCoins: 50 },
+      [
+        { id: 1, playerId: 10, currentValue: 80, eliminated: false, eliminatedRound: null },
+        { id: 2, playerId: 20, currentValue: 60, eliminated: true, eliminatedRound: 1 },
+      ],
+      {
+        async onAwardChampion() {
+          throw new Error("simulated badge insert failure");
+        },
+      },
+    );
+
+    await assert.rejects(
+      () => distributeChallengeRewards(store, 201, NOW),
+      /simulated badge insert failure/,
+    );
+
+    assert.equal(state.challenge.status, "active");
+    assert.equal(state.markCompletedCalls, 0);
+    assert.deepEqual(state.grants, []);
+    assert.deepEqual(state.ranksSet, []);
+    assert.deepEqual(state.champions, []);
   });
 });

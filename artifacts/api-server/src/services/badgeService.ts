@@ -2,6 +2,14 @@ import { db } from "@workspace/db";
 import { playerBadgesTable, playersTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 
+/**
+ * Subset of the Drizzle `db` surface used by `awardBadge`. Lets callers pass
+ * either the global `db` handle or a `tx` from `db.transaction(...)` so the
+ * badge write can ride along inside a larger atomic operation (e.g. the
+ * tournament-finalize transaction in `challengeFinalize.ts`).
+ */
+type BadgeDbHandle = Pick<typeof db, "query" | "insert" | "update">;
+
 export type BadgeTier = "Common" | "Rare" | "Epic" | "Legendary" | "Mythic";
 export type BadgeCategory = "fitness" | "streak" | "hatchling" | "social" | "achievement" | "event" | "secret" | "strength" | "speed" | "nutrition";
 
@@ -128,18 +136,22 @@ export function getDailyReward(dayStreak: number) {
 }
 
 /** Award a badge if not already earned. Returns definition if newly awarded. */
-export async function awardBadge(playerId: number, badgeKey: string): Promise<BadgeDefinition | null> {
+export async function awardBadge(
+  playerId: number,
+  badgeKey: string,
+  dbHandle: BadgeDbHandle = db,
+): Promise<BadgeDefinition | null> {
   const def = BADGE_MAP[badgeKey];
   if (!def) return null;
 
-  const existing = await db.query.playerBadgesTable.findFirst({
+  const existing = await dbHandle.query.playerBadgesTable.findFirst({
     where: and(eq(playerBadgesTable.playerId, playerId), eq(playerBadgesTable.badgeKey, badgeKey)),
   });
   if (existing) return null;
 
-  await db.insert(playerBadgesTable).values({ playerId, badgeKey }).onConflictDoNothing();
+  await dbHandle.insert(playerBadgesTable).values({ playerId, badgeKey }).onConflictDoNothing();
 
-  await db.update(playersTable)
+  await dbHandle.update(playersTable)
     .set({
       xp: sql`${playersTable.xp} + ${def.xpReward}`,
       coins: sql`${playersTable.coins} + ${def.coinsReward}`,
