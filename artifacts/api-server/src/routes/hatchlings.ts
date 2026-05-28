@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { hatchlingsTable, evolutionTypesTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import {
   ListHatchlingsQueryParams,
   CreateHatchlingBody,
@@ -28,14 +28,64 @@ function computeMoodState(lastWorkoutAt: Date | null): string {
   return "happy";
 }
 
+// ── Passive decay ──────────────────────────────────────────────────────────────
+// Stats slowly fall over time. The decay rate is *halved* while a nutrition
+// buff is active (set by POST /nutrition/posts when a high-quality meal is
+// logged). This is what makes "eat well" feel like real care for the creature.
+//
+// Base rate: 1 point/hour off happiness, hunger, and energy.
+// Buffed rate (nutritionBuffExpiresAt > now): 0.5 point/hour.
+type DecayableHatchling = typeof hatchlingsTable.$inferSelect;
+
+async function applyPassiveDecay(h: DecayableHatchling): Promise<DecayableHatchling> {
+  const now = new Date();
+  // For legacy rows where `lastDecayAt` was never written, treat "now" as the
+  // baseline and persist it. This avoids zero-ing out long-lived hatchlings
+  // by retroactively applying days of decay on first read after rollout.
+  if (h.lastDecayAt == null) {
+    await db.update(hatchlingsTable)
+      .set({ lastDecayAt: now })
+      .where(eq(hatchlingsTable.id, h.id));
+    return { ...h, lastDecayAt: now };
+  }
+  const elapsedMs = now.getTime() - h.lastDecayAt.getTime();
+  if (elapsedMs <= 0) return h;
+
+  // Integrate decay across two segments so a buff that expires partway
+  // through the elapsed window still slows decay for its active portion.
+  //   buffed segment   (rate 0.5/hr): [lastDecayAt, min(now, buffExpiresAt)]
+  //   unbuffed segment (rate 1/hr):   remaining time after buff expires
+  const MS_PER_HOUR = 1000 * 60 * 60;
+  const buffEnd = h.nutritionBuffExpiresAt?.getTime() ?? 0;
+  const start = h.lastDecayAt.getTime();
+  const end = now.getTime();
+  const buffedMs   = Math.max(0, Math.min(end, buffEnd) - start);
+  const unbuffedMs = Math.max(0, end - Math.max(start, buffEnd));
+  const dropRaw = (buffedMs / MS_PER_HOUR) * 0.5 + (unbuffedMs / MS_PER_HOUR) * 1;
+  // Don't bother writing unless decay is at least 1 full point — avoids churn on every read.
+  if (dropRaw < 1) return h;
+  const drop = Math.floor(dropRaw);
+
+  const newHappiness = Math.max(0, h.happiness - drop);
+  const newHunger    = Math.max(0, h.hunger    - drop);
+  const newEnergy    = Math.max(0, h.energy    - drop);
+
+  await db.update(hatchlingsTable)
+    .set({ happiness: newHappiness, hunger: newHunger, energy: newEnergy, lastDecayAt: now })
+    .where(eq(hatchlingsTable.id, h.id));
+
+  return { ...h, happiness: newHappiness, hunger: newHunger, energy: newEnergy, lastDecayAt: now };
+}
+
 router.get("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const query = ListHatchlingsQueryParams.safeParse({ playerId: req.query.playerId ? Number(req.query.playerId) : undefined, limit: req.query.limit ? Number(req.query.limit) : 20 });
   if (!query.success) { res.status(400).json({ error: "Invalid query" }); return; }
-  const results = await db.query.hatchlingsTable.findMany({
+  const rawResults = await db.query.hatchlingsTable.findMany({
     where: query.data.playerId ? eq(hatchlingsTable.playerId, query.data.playerId) : undefined,
     limit: query.data.limit ?? 20,
     orderBy: [desc(hatchlingsTable.createdAt)],
   });
+  const results = await Promise.all(rawResults.map(applyPassiveDecay));
   res.json(results.map(h => ({
     ...h,
     moodState: computeMoodState(h.lastWorkoutAt),
@@ -87,10 +137,11 @@ router.post("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, at
 });
 
 router.get("/hatchlings/showcase", async (req, res) => {
-  const results = await db.query.hatchlingsTable.findMany({
+  const rawResults = await db.query.hatchlingsTable.findMany({
     orderBy: [desc(hatchlingsTable.level), desc(hatchlingsTable.xp)],
     limit: 8,
   });
+  const results = await Promise.all(rawResults.map(applyPassiveDecay));
   res.json(results.map(h => ({
     ...h,
     moodState: computeMoodState(h.lastWorkoutAt),
@@ -102,9 +153,10 @@ router.get("/hatchlings/showcase", async (req, res) => {
 router.get("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
   const params = GetHatchlingParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
-  const hatchling = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, params.data.id) });
-  if (!hatchling) { res.status(404).json({ error: "Hatchling not found" }); return; }
-  if (hatchling.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
+  const raw = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, params.data.id) });
+  if (!raw) { res.status(404).json({ error: "Hatchling not found" }); return; }
+  if (raw.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
+  const hatchling = await applyPassiveDecay(raw);
   res.json({
     ...hatchling,
     moodState: computeMoodState(hatchling.lastWorkoutAt),

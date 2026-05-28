@@ -32,6 +32,9 @@ export const hatchlingsTable = pgTable("hatchlings", {
   friendshipLevel: integer("friendship_level").notNull().default(0),
   moodState: text("mood_state").notNull().default("happy"),
   lastWorkoutAt: timestamp("last_workout_at", { withTimezone: true }),
+  // Passive decay accounting + nutrition buff modifier
+  lastDecayAt: timestamp("last_decay_at", { withTimezone: true }),
+  nutritionBuffExpiresAt: timestamp("nutrition_buff_expires_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

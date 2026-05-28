@@ -7,6 +7,7 @@ import {
   nutritionChallengeProgressTable,
   playersTable,
   groupMembersTable,
+  hatchlingsTable,
 } from "@workspace/db";
 import { eq, and, desc, sql, inArray, notInArray, or } from "drizzle-orm";
 import { z } from "zod";
@@ -75,13 +76,98 @@ const CreateMealPostBody = z.object({
   carbsG: z.number().optional(),
   fatG: z.number().optional(),
   aiAnalyzed: z.boolean().optional(),
+  qualityScore: z.number().int().min(1).max(10).optional(),
 });
+
+// ── Hatchling stat buffs from nutrition ───────────────────────────────────────
+// Closes the core loop: meal quality → creature health.
+// - quality >= 7 → +5 happiness, +5 energy (good fuel)
+// - quality <= 4 → -3 happiness (junk food)
+// - 5/6 → neutral
+// The "active" Hatchling is the most recently interacted (lastWorkoutAt desc,
+// then most-recently created) so feeding rewards the creature the player cares about.
+function statDeltaForQuality(qualityScore: number): { happiness: number; energy: number } | null {
+  if (qualityScore >= 7) return { happiness: 5, energy: 5 };
+  if (qualityScore <= 4) return { happiness: -3, energy: 0 };
+  return null;
+}
+
+async function applyNutritionStatBuff(playerId: number, qualityScore: number) {
+  const delta = statDeltaForQuality(qualityScore);
+  if (!delta) return null;
+
+  // NULLS LAST so a hatchling that was never worked out isn't preferred over
+  // one the player just trained with. createdAt is the secondary tiebreaker.
+  const active = await db.query.hatchlingsTable.findFirst({
+    where: eq(hatchlingsTable.playerId, playerId),
+    orderBy: [sql`${hatchlingsTable.lastWorkoutAt} DESC NULLS LAST`, desc(hatchlingsTable.createdAt)],
+  });
+  if (!active) return null;
+
+  const newHappiness = Math.max(0, Math.min(100, active.happiness + delta.happiness));
+  const newEnergy    = Math.max(0, Math.min(100, active.energy    + delta.energy));
+
+  // High-quality meals also extend a 24h "well-fed" buff that halves the
+  // passive decay rate (read by applyPassiveDecay in hatchlings.ts). This
+  // is the "buffs slow the decay rate for the day" part of the loop.
+  const buffPatch: { happiness: number; energy: number; nutritionBuffExpiresAt?: Date } =
+    { happiness: newHappiness, energy: newEnergy };
+  if (qualityScore >= 7) {
+    buffPatch.nutritionBuffExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  }
+
+  await db.update(hatchlingsTable)
+    .set(buffPatch)
+    .where(eq(hatchlingsTable.id, active.id));
+
+  return {
+    hatchlingId: active.id,
+    hatchlingName: active.name,
+    happinessDelta: newHappiness - active.happiness,
+    energyDelta: newEnergy - active.energy,
+    happiness: newHappiness,
+    energy: newEnergy,
+    buffActive: qualityScore >= 7,
+  };
+}
+
+// Server-side quality scoring from macros — used as a trusted fallback when
+// the client doesn't supply a score (or to validate when it does). Avoids
+// trusting a spoofable client field as the only source of stat buffs.
+// Heuristic: protein density and balanced macros score higher; very high
+// fat-only or empty submissions score lower. Returns null when there isn't
+// enough macro data to score.
+function deriveQualityScoreFromMacros(
+  calories: number | undefined,
+  proteinG: number | undefined,
+  carbsG: number | undefined,
+  fatG: number | undefined,
+): number | null {
+  if (calories == null || calories <= 0) return null;
+  if (proteinG == null && carbsG == null && fatG == null) return null;
+  const p = proteinG ?? 0;
+  const c = carbsG   ?? 0;
+  const f = fatG     ?? 0;
+  // Protein-per-100kcal — strong driver of "quality" in this app's framing.
+  const proteinDensity = (p * 100) / calories; // ~10 is great, ~2 is poor
+  // Fat ratio — penalize >50% calories from fat.
+  const fatCalRatio = (f * 9) / calories;
+  let score = 5;
+  if (proteinDensity >= 8) score += 3;
+  else if (proteinDensity >= 5) score += 2;
+  else if (proteinDensity >= 3) score += 1;
+  else if (proteinDensity < 1.5) score -= 2;
+  if (fatCalRatio > 0.55) score -= 2;
+  else if (fatCalRatio > 0.45) score -= 1;
+  if (calories > 1200) score -= 1; // single-meal megacaloric drag
+  return Math.max(1, Math.min(10, Math.round(score)));
+}
 
 router.post("/nutrition/posts", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const body = CreateMealPostBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
-  const { playerId, name, emoji, tag, description, calories, proteinG, carbsG, fatG, aiAnalyzed } = body.data;
+  const { playerId, name, emoji, tag, description, calories, proteinG, carbsG, fatG, aiAnalyzed, qualityScore } = body.data;
 
   const [post] = await db.insert(mealPostsTable).values({
     playerId,
@@ -128,7 +214,30 @@ router.post("/nutrition/posts", requireAuth, attachPlayer, requirePlayerOwnershi
     }
   }
 
-  res.status(201).json({ ...post, createdAt: post!.createdAt.toISOString(), newBadges });
+  // Apply meal-quality buff/debuff to the player's active Hatchling.
+  // This closes the nutrition → creature health loop.
+  // Trust order: server-derived score from macros > client-supplied qualityScore.
+  // If the client sends a score but it disagrees significantly with what the
+  // macros suggest, fall back to the server-derived value — prevents users
+  // from spamming "10/10" with a 200-cal salad and farming buffs.
+  let hatchlingStatChange: Awaited<ReturnType<typeof applyNutritionStatBuff>> = null;
+  const derived = deriveQualityScoreFromMacros(calories, proteinG, carbsG, fatG);
+  let effectiveScore: number | null = null;
+  if (derived != null && qualityScore != null) {
+    effectiveScore = Math.abs(derived - qualityScore) > 3 ? derived : qualityScore;
+  } else {
+    effectiveScore = derived ?? qualityScore ?? null;
+  }
+  if (effectiveScore != null) {
+    hatchlingStatChange = await applyNutritionStatBuff(playerId, effectiveScore);
+  }
+
+  res.status(201).json({
+    ...post,
+    createdAt: post!.createdAt.toISOString(),
+    newBadges,
+    hatchlingStatChange,
+  });
 });
 
 // ── GET /nutrition/posts ──────────────────────────────────────────────────────

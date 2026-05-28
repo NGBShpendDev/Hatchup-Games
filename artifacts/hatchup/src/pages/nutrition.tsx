@@ -186,15 +186,35 @@ export default function Nutrition() {
           carbsG: form.carbsG ? Number(form.carbsG) : undefined,
           fatG: form.fatG ? Number(form.fatG) : undefined,
           aiAnalyzed: !!aiResult,
+          qualityScore: aiResult?.quality_score,
         }),
       }).then(r => r.json()),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["nutrition-posts", pid] });
+      // Refresh hatchling stats since nutrition can buff/debuff the active Hatchling.
+      // Generated query keys are arrays starting with "/api/hatchlings" (list) or
+      // "/api/hatchlings/:id" (detail) — match either by prefix.
+      qc.invalidateQueries({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) &&
+          typeof q.queryKey[0] === "string" &&
+          q.queryKey[0].startsWith("/api/hatchlings"),
+      });
       setShowCreateSheet(false);
       setForm({ name: "", emoji: "🍽️", tag: "healthy-snack", description: "", calories: "", proteinG: "", carbsG: "", fatG: "" });
       setAiResult(null);
       if (data.newBadges?.length > 0) {
         toast({ title: "New badge unlocked! 🏅", description: data.newBadges.join(", ") });
+      } else if (data.hatchlingStatChange) {
+        const c = data.hatchlingStatChange;
+        const parts: string[] = [];
+        if (c.happinessDelta) parts.push(`${c.happinessDelta > 0 ? "+" : ""}${c.happinessDelta} happiness`);
+        if (c.energyDelta)    parts.push(`${c.energyDelta > 0 ? "+" : ""}${c.energyDelta} energy`);
+        const positive = (c.happinessDelta ?? 0) >= 0;
+        toast({
+          title: positive ? `${c.hatchlingName} loved it! 💖` : `${c.hatchlingName} isn't feeling great…`,
+          description: parts.join(" · ") || "Meal posted.",
+        });
       } else {
         toast({ title: "Meal posted!", description: "Your meal is on the feed." });
       }
