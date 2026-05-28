@@ -514,12 +514,13 @@ describe("GET /social/posts/:id/view-series", () => {
   });
 
   it("treats unknown window values as `day`", async () => {
-    // The route narrows `req.query.window === "week"` only; anything else
-    // (including typos like `month`) must fall back to the 24h daily view.
+    // The route only recognizes `week` and `month` as non-default windows;
+    // anything else (e.g. a typo like `year`) must fall back to the 24h
+    // daily view.
     state.posts.set(1, { id: 1, playerId: 1, viewCount: 0 });
     state.currentPlayerId = 1;
 
-    const res = await fetch(`${baseUrl}/social/posts/1/view-series?window=month`);
+    const res = await fetch(`${baseUrl}/social/posts/1/view-series?window=year`);
     const body = (await res.json()) as SeriesBody;
     assert.equal(res.status, 200);
     assert.equal(body.window, "day");

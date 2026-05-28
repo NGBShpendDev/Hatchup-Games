@@ -188,6 +188,7 @@ mock.module("drizzle-orm", {
     isNull: () => ({}),
     isNotNull: () => ({}),
     lt: () => ({}),
+    gt: () => ({}),
     gte: (_col: unknown, value: Date) => {
       lastWindowCutoff = value;
       return {};
@@ -230,7 +231,12 @@ const queryHandlers: Record<string, any> = {
   postsTable: {
     findFirst: async () => state.posts[0],
     findMany: async (_args?: any) =>
-      state.posts.filter(p => !p.isFlagged && p.deletedAt === null),
+      state.posts.filter(
+        p =>
+          !p.isFlagged &&
+          p.deletedAt === null &&
+          !state.hiddenPlayerIds.includes(p.playerId),
+      ),
   },
   postReactionsTable: { findMany: async () => [] },
   postCommentsTable: { findMany: async () => [] },
