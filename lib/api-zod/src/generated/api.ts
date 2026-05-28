@@ -2698,7 +2698,11 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "username": zod.string(),
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
-  "creatorBadge": zod.string().nullable()
+  "creatorBadge": zod.string().nullable(),
+  "sharedGroups": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string()
+})).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n')
 })).describe('Up to 3 accounts that both the viewer and this player follow.'),
   "mutualFollowingTotal": zod.number().describe('Total number of accounts both the viewer and this player follow (not limited to the preview list).'),
   "sharedGroups": zod.array(zod.object({
@@ -2784,7 +2788,11 @@ export const ListMutualFollowingResponse = zod.object({
   "username": zod.string(),
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
-  "creatorBadge": zod.string().nullable()
+  "creatorBadge": zod.string().nullable(),
+  "sharedGroups": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string()
+})).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n')
 })),
   "total": zod.number(),
   "nextCursor": zod.number().nullable()
@@ -2810,6 +2818,40 @@ export const ListFollowingResponseItem = zod.object({
 })).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n')
 })
 export const ListFollowingResponse = zod.array(ListFollowingResponseItem)
+
+
+/**
+ * @summary List the caller's posts with per-post performance metrics (Premium only)
+ */
+export const getMyPostInsightsQuerySortDefault = `recent`;
+export const getMyPostInsightsQueryLimitDefault = 50;
+
+export const GetMyPostInsightsQueryParams = zod.object({
+  "sort": zod.enum(['recent', 'views']).default(getMyPostInsightsQuerySortDefault).describe('Sort order — recency (default) or view count descending.'),
+  "limit": zod.coerce.number().default(getMyPostInsightsQueryLimitDefault)
+})
+
+export const GetMyPostInsightsResponse = zod.object({
+  "posts": zod.array(zod.object({
+  "id": zod.number(),
+  "content": zod.string(),
+  "mediaUrl": zod.string().nullable(),
+  "postType": zod.string(),
+  "createdAt": zod.string(),
+  "viewCount": zod.number(),
+  "reactionCount": zod.number(),
+  "commentCount": zod.number(),
+  "repostCount": zod.number(),
+  "engagementScore": zod.number()
+})),
+  "totals": zod.object({
+  "postCount": zod.number(),
+  "viewCount": zod.number(),
+  "reactionCount": zod.number(),
+  "commentCount": zod.number(),
+  "repostCount": zod.number()
+})
+})
 
 
 /**

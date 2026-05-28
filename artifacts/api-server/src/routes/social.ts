@@ -16,6 +16,7 @@ import {
 import { eq, and, desc, sql, or, ne, inArray, ilike, gte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { attachEntitlement, requirePremium } from "../services/subscriptionGuards";
 import { blockMinorSocialWrite } from "../middlewares/minorGuard";
 import { socialWriteLimiter, postViewLimiter } from "../middlewares/rateLimiters";
 import { createHmac } from "node:crypto";
@@ -1368,6 +1369,97 @@ router.get("/social/search", requireAuth, attachPlayer, async (req, res) => {
     sharedGroups: sharedGroupsByPlayer.get(p.id) ?? [],
   })));
 });
+
+// ── GET /social/me/post-insights ─────────────────────────────────────────────
+// Premium-only creator analytics: per-post views, reactions, comments, reposts.
+
+router.get(
+  "/social/me/post-insights",
+  requireAuth,
+  attachPlayer,
+  attachEntitlement,
+  requirePremium,
+  async (req, res) => {
+    const playerId = req.playerId!;
+    const sort = req.query.sort === "views" ? "views" : "recent";
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+
+    const orderBy =
+      sort === "views"
+        ? [desc(postsTable.viewCount), desc(postsTable.createdAt)]
+        : [desc(postsTable.createdAt)];
+
+    const posts = await db
+      .select({
+        id: postsTable.id,
+        content: postsTable.content,
+        mediaUrl: postsTable.mediaUrl,
+        postType: postsTable.postType,
+        createdAt: postsTable.createdAt,
+        viewCount: postsTable.viewCount,
+        engagementScore: postsTable.engagementScore,
+      })
+      .from(postsTable)
+      .where(eq(postsTable.playerId, playerId))
+      .orderBy(...orderBy)
+      .limit(limit);
+
+    const postIds = posts.map(p => p.id);
+
+    const reactionRows = postIds.length
+      ? await db
+          .select({ postId: postReactionsTable.postId, count: sql<number>`count(*)::int` })
+          .from(postReactionsTable)
+          .where(inArray(postReactionsTable.postId, postIds))
+          .groupBy(postReactionsTable.postId)
+      : [];
+    const commentRows = postIds.length
+      ? await db
+          .select({ postId: postCommentsTable.postId, count: sql<number>`count(*)::int` })
+          .from(postCommentsTable)
+          .where(inArray(postCommentsTable.postId, postIds))
+          .groupBy(postCommentsTable.postId)
+      : [];
+    const repostRows = postIds.length
+      ? await db
+          .select({ postId: postRepostsTable.postId, count: sql<number>`count(*)::int` })
+          .from(postRepostsTable)
+          .where(inArray(postRepostsTable.postId, postIds))
+          .groupBy(postRepostsTable.postId)
+      : [];
+
+    const reactionMap = new Map(reactionRows.map(r => [r.postId, r.count]));
+    const commentMap = new Map(commentRows.map(r => [r.postId, r.count]));
+    const repostMap = new Map(repostRows.map(r => [r.postId, r.count]));
+
+    const enriched = posts.map(p => ({
+      id: p.id,
+      content: p.content,
+      mediaUrl: p.mediaUrl ?? null,
+      postType: p.postType,
+      createdAt: p.createdAt.toISOString(),
+      viewCount: p.viewCount,
+      reactionCount: reactionMap.get(p.id) ?? 0,
+      commentCount: commentMap.get(p.id) ?? 0,
+      repostCount: repostMap.get(p.id) ?? 0,
+      engagementScore: p.engagementScore,
+    }));
+
+    const totals = enriched.reduce(
+      (acc, p) => {
+        acc.postCount += 1;
+        acc.viewCount += p.viewCount;
+        acc.reactionCount += p.reactionCount;
+        acc.commentCount += p.commentCount;
+        acc.repostCount += p.repostCount;
+        return acc;
+      },
+      { postCount: 0, viewCount: 0, reactionCount: 0, commentCount: 0, repostCount: 0 },
+    );
+
+    res.json({ posts: enriched, totals });
+  },
+);
 
 router.get("/social/memories", requireAuth, attachPlayer, async (req, res) => {
   const playerId = req.playerId!;

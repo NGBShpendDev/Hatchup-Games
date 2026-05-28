@@ -2336,6 +2336,42 @@ paths:
                 items:
                   $ref: "#/components/schemas/PlayerStub"
 
+  /social/me/post-insights:
+    get:
+      operationId: getMyPostInsights
+      tags: [social]
+      summary: List the caller's posts with per-post performance metrics (Premium only)
+      parameters:
+        - name: sort
+          in: query
+          description: Sort order — recency (default) or view count descending.
+          schema:
+            type: string
+            enum: [recent, views]
+            default: recent
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Player post insights
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostInsightsResponse"
+        "402":
+          description: Premium required
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error, message]
+                properties:
+                  error:   { type: string }
+                  message: { type: string }
+
   /social/memories:
     get:
       operationId: getDailyMemory
@@ -4989,6 +5025,39 @@ components:
       properties:
         viewCount: { type: integer }
         counted:   { type: boolean }
+
+    PostInsight:
+      type: object
+      required: [id, content, postType, createdAt, viewCount, reactionCount, commentCount, repostCount, engagementScore, mediaUrl]
+      properties:
+        id:              { type: integer }
+        content:         { type: string }
+        mediaUrl:        { type: ["string", "null"] }
+        postType:        { type: string }
+        createdAt:       { type: string }
+        viewCount:       { type: integer }
+        reactionCount:   { type: integer }
+        commentCount:    { type: integer }
+        repostCount:     { type: integer }
+        engagementScore: { type: integer }
+
+    PostInsightsResponse:
+      type: object
+      required: [posts, totals]
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostInsight"
+        totals:
+          type: object
+          required: [postCount, viewCount, reactionCount, commentCount, repostCount]
+          properties:
+            postCount:     { type: integer }
+            viewCount:     { type: integer }
+            reactionCount: { type: integer }
+            commentCount:  { type: integer }
+            repostCount:   { type: integer }
 
     RepostInput:
       type: object

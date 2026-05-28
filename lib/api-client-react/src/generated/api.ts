@@ -80,6 +80,8 @@ import type {
   GetGlobalLeaderboardParams,
   GetMealPlanParams,
   GetModeLeaderboardParams,
+  GetMyPostInsights402,
+  GetMyPostInsightsParams,
   GetPlayerSocialProfileParams,
   GetPostParams,
   GetScopedLeaderboardParams,
@@ -168,6 +170,7 @@ import type {
   PlayerStub,
   PlayerUpdate,
   PostComment,
+  PostInsightsResponse,
   PushPreferences,
   PushPreferencesUpdate,
   PushPublicKey,
@@ -8070,6 +8073,90 @@ export function useListFollowing<TData = Awaited<ReturnType<typeof listFollowing
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListFollowingQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMyPostInsightsUrl = (params?: GetMyPostInsightsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/social/me/post-insights?${stringifiedParams}` : `/api/social/me/post-insights`
+}
+
+/**
+ * @summary List the caller's posts with per-post performance metrics (Premium only)
+ */
+export const getMyPostInsights = async (params?: GetMyPostInsightsParams, options?: RequestInit): Promise<PostInsightsResponse> => {
+
+  return customFetch<PostInsightsResponse>(getGetMyPostInsightsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyPostInsightsQueryKey = (params?: GetMyPostInsightsParams,) => {
+    return [
+    `/api/social/me/post-insights`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMyPostInsightsQueryOptions = <TData = Awaited<ReturnType<typeof getMyPostInsights>>, TError = ErrorType<GetMyPostInsights402>>(params?: GetMyPostInsightsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyPostInsights>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyPostInsightsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyPostInsights>>> = ({ signal }) => getMyPostInsights(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyPostInsights>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyPostInsightsQueryResult = NonNullable<Awaited<ReturnType<typeof getMyPostInsights>>>
+export type GetMyPostInsightsQueryError = ErrorType<GetMyPostInsights402>
+
+
+/**
+ * @summary List the caller's posts with per-post performance metrics (Premium only)
+ */
+
+export function useGetMyPostInsights<TData = Awaited<ReturnType<typeof getMyPostInsights>>, TError = ErrorType<GetMyPostInsights402>>(
+ params?: GetMyPostInsightsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyPostInsights>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyPostInsightsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

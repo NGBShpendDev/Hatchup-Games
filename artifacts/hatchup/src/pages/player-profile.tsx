@@ -8,7 +8,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { motion, Reorder } from "framer-motion";
 import { usePlayer } from "@/lib/playerContext";
 import { toast } from "@/hooks/use-toast";
-import { BadgeCheck, Flame, Trophy, Sparkles, ArrowLeft, Settings, GripVertical, X, Plus, Lock } from "lucide-react";
+import { BadgeCheck, Flame, Trophy, Sparkles, ArrowLeft, Settings, GripVertical, X, Plus, Lock, BarChart3, Eye, Heart, MessageCircle, Repeat2, Crown } from "lucide-react";
+import { useGetMyPostInsights, getGetMyPostInsightsQueryKey } from "@workspace/api-client-react";
+import type { PostInsight } from "@workspace/api-client-react";
+import { useSubscription } from "@/lib/subscription";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 const MAX_FEATURED = 3;
@@ -191,6 +194,7 @@ export default function PlayerProfilePage() {
               onRemoveFeatured={handleRemoveFeatured}
               isToggling={toggleFeatured.isPending}
             />
+            {isOwnProfile && <PostInsightsSection />}
           </>
         )}
       </div>
@@ -584,6 +588,204 @@ function AddArtifactTile({
       </SheetContent>
     </Sheet>
   );
+}
+
+function PostInsightsSection() {
+  const [sort, setSort] = useState<"recent" | "views">("recent");
+  const { data: sub } = useSubscription();
+  const isPremium = sub?.tier === "premium";
+
+  const { data, isLoading, isError } = useGetMyPostInsights(
+    { sort, limit: 50 },
+    {
+      query: {
+        queryKey: getGetMyPostInsightsQueryKey({ sort, limit: 50 }),
+        enabled: isPremium,
+        staleTime: 30_000,
+      },
+    },
+  );
+
+  return (
+    <section className="space-y-3" data-testid="section-post-insights">
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="w-4 h-4 text-pink-400" />
+          <h2 className="font-black text-base text-white">My posts</h2>
+        </div>
+        {isPremium && (
+          <div className="flex items-center gap-1 bg-muted/30 rounded-full p-0.5">
+            <SortPill active={sort === "recent"} onClick={() => setSort("recent")} testId="sort-recent">
+              Recent
+            </SortPill>
+            <SortPill active={sort === "views"} onClick={() => setSort("views")} testId="sort-views">
+              Top views
+            </SortPill>
+          </div>
+        )}
+      </div>
+
+      {!isPremium ? (
+        <PremiumInsightsTeaser />
+      ) : isLoading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-20 rounded-2xl" />
+          <Skeleton className="h-20 rounded-2xl" />
+          <Skeleton className="h-20 rounded-2xl" />
+        </div>
+      ) : isError ? (
+        <div className="bg-card border border-dashed border-border rounded-3xl p-6 text-center text-sm text-muted-foreground">
+          Couldn't load your insights right now. Try again later.
+        </div>
+      ) : !data || data.posts.length === 0 ? (
+        <div className="bg-card border border-dashed border-border rounded-3xl p-8 text-center space-y-2">
+          <span className="text-3xl block">📣</span>
+          <p className="text-sm text-muted-foreground">No posts yet — share a workout or hatch to see insights here.</p>
+        </div>
+      ) : (
+        <>
+          <InsightsTotals totals={data.totals} />
+          <div className="space-y-2">
+            {data.posts.map((post) => (
+              <InsightRow key={post.id} post={post} />
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function SortPill({
+  active,
+  onClick,
+  testId,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  testId: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={`button-insights-${testId}`}
+      className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-colors ${
+        active ? "bg-pink-500 text-white" : "text-muted-foreground hover:text-white"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function InsightsTotals({
+  totals,
+}: {
+  totals: { postCount: number; viewCount: number; reactionCount: number; commentCount: number; repostCount: number };
+}) {
+  return (
+    <div className="grid grid-cols-4 gap-2" data-testid="insights-totals">
+      <TotalStat icon={<Eye className="w-3 h-3" />} label="Views" value={totals.viewCount} />
+      <TotalStat icon={<Heart className="w-3 h-3" />} label="Reactions" value={totals.reactionCount} />
+      <TotalStat icon={<MessageCircle className="w-3 h-3" />} label="Comments" value={totals.commentCount} />
+      <TotalStat icon={<Repeat2 className="w-3 h-3" />} label="Reposts" value={totals.repostCount} />
+    </div>
+  );
+}
+
+function TotalStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+  return (
+    <div className="bg-muted/30 rounded-2xl py-2 px-1.5 text-center">
+      <div className="flex items-center justify-center gap-1 text-muted-foreground mb-0.5">
+        {icon}
+        <span className="text-[9px] uppercase font-black tracking-wider">{label}</span>
+      </div>
+      <p className="text-sm font-black text-white">{formatCount(value)}</p>
+    </div>
+  );
+}
+
+function InsightRow({ post }: { post: PostInsight }) {
+  const preview = post.content.trim().length > 0 ? post.content.trim() : `(${post.postType} post)`;
+  return (
+    <Link href={`/social/posts/${post.id}`}>
+      <div
+        className="block bg-card border border-border rounded-2xl p-3 hover:border-primary/60 transition-colors cursor-pointer"
+        data-testid={`insight-row-${post.id}`}
+      >
+        <div className="flex items-start gap-3">
+          {post.mediaUrl ? (
+            <img src={post.mediaUrl} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+          ) : (
+            <div className="w-12 h-12 rounded-lg bg-muted/30 flex items-center justify-center text-lg flex-shrink-0">📝</div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-white line-clamp-2 leading-snug">{preview}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">{formatDate(post.createdAt)}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 mt-2.5 pt-2.5 border-t border-border/60 text-[11px] font-bold">
+          <Metric icon={<Eye className="w-3 h-3" />} value={post.viewCount} testId={`metric-views-${post.id}`} />
+          <Metric icon={<Heart className="w-3 h-3" />} value={post.reactionCount} testId={`metric-reactions-${post.id}`} />
+          <Metric icon={<MessageCircle className="w-3 h-3" />} value={post.commentCount} testId={`metric-comments-${post.id}`} />
+          <Metric icon={<Repeat2 className="w-3 h-3" />} value={post.repostCount} testId={`metric-reposts-${post.id}`} />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function Metric({ icon, value, testId }: { icon: React.ReactNode; value: number; testId: string }) {
+  return (
+    <div className="flex items-center gap-1 text-muted-foreground" data-testid={testId}>
+      {icon}
+      <span className="text-white">{formatCount(value)}</span>
+    </div>
+  );
+}
+
+function PremiumInsightsTeaser() {
+  return (
+    <Link href="/subscription">
+      <div
+        className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border border-pink-500/40 rounded-3xl p-5 text-center space-y-3 cursor-pointer hover:from-pink-500/15 hover:to-purple-500/15 transition-colors"
+        data-testid="insights-paywall"
+      >
+        <div className="flex items-center justify-center gap-2">
+          <Crown className="w-5 h-5 text-yellow-400" />
+          <span className="text-sm font-black uppercase tracking-wider text-white">Premium creators only</span>
+        </div>
+        <p className="text-xs text-muted-foreground leading-snug">
+          See views, reactions, comments, and reposts for every post you've shared — and find out which content resonates most.
+        </p>
+        <span className="inline-block text-[11px] font-black uppercase tracking-wider text-pink-300 hover:text-pink-200">
+          Upgrade to unlock →
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+function formatCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  const now = Date.now();
+  const diffMs = now - d.getTime();
+  const day = 86_400_000;
+  if (diffMs < day) {
+    const h = Math.max(1, Math.floor(diffMs / 3_600_000));
+    return `${h}h ago`;
+  }
+  if (diffMs < 7 * day) return `${Math.floor(diffMs / day)}d ago`;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function ProfileSkeleton() {

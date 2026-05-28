@@ -1371,6 +1371,33 @@ export interface ViewResult {
   counted: boolean;
 }
 
+export interface PostInsight {
+  id: number;
+  content: string;
+  /** @nullable */
+  mediaUrl: string | null;
+  postType: string;
+  createdAt: string;
+  viewCount: number;
+  reactionCount: number;
+  commentCount: number;
+  repostCount: number;
+  engagementScore: number;
+}
+
+export type PostInsightsResponseTotals = {
+  postCount: number;
+  viewCount: number;
+  reactionCount: number;
+  commentCount: number;
+  repostCount: number;
+};
+
+export interface PostInsightsResponse {
+  posts: PostInsight[];
+  totals: PostInsightsResponseTotals;
+}
+
 export interface RepostInput {
   playerId: number;
 }
@@ -2237,6 +2264,27 @@ viewerId: number;
  */
 cursor?: number;
 limit?: number;
+};
+
+export type GetMyPostInsightsParams = {
+/**
+ * Sort order — recency (default) or view count descending.
+ */
+sort?: GetMyPostInsightsSort;
+limit?: number;
+};
+
+export type GetMyPostInsightsSort = typeof GetMyPostInsightsSort[keyof typeof GetMyPostInsightsSort];
+
+
+export const GetMyPostInsightsSort = {
+  recent: 'recent',
+  views: 'views',
+} as const;
+
+export type GetMyPostInsights402 = {
+  error: string;
+  message: string;
 };
 
 export type GetDailyMemoryParams = {
