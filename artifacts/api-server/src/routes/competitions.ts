@@ -13,6 +13,14 @@ import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middleware
 import { applyHatchlingXp } from "../services/hatchlingXp.ts";
 import { resolveActivePartner } from "../services/activePartner.ts";
 
+/**
+ * Pure XP reward calculation for a competition result.
+ * Exported for unit testing without needing a running server.
+ */
+export function computeCompetitionXp(score: number, rank: number): number {
+  return score * 2 + (rank === 1 ? 200 : rank === 2 ? 100 : 50);
+}
+
 const router = Router();
 
 router.get("/competitions/game-modes", async (req, res) => {
@@ -105,7 +113,7 @@ router.post("/competitions/:id/result", requireAuth, attachPlayer, async (req, r
   if (!comp) { res.status(404).json({ error: "Competition not found" }); return; }
   if (comp.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
 
-  const xpEarned = body.data.score * 2 + (body.data.rank === 1 ? 200 : body.data.rank === 2 ? 100 : 50);
+  const xpEarned = computeCompetitionXp(body.data.score, body.data.rank);
   const coinsEarned = body.data.rank === 1 ? 50 : body.data.rank === 2 ? 30 : 15;
 
   const updated = await db.update(competitionsTable).set({

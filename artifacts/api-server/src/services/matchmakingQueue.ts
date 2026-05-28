@@ -299,6 +299,35 @@ async function executeTurn(
   }
 }
 
+// ── Hatchling XP award (exported for unit testing) ───────────────────────────
+/**
+ * Award XP to both fighters' hatchlings after a battle ends.
+ * The winner earns more XP than the loser; the exact amounts come from
+ * `computeRewards`. Exported so tests can verify the XP wiring without
+ * spinning up a full WebSocket battle session.
+ */
+export async function awardBattleHatchlingXp(state: BattleState): Promise<{
+  fighter1Xp: number;
+  fighter2Xp: number | null;
+  palXp1: Awaited<ReturnType<typeof applyHatchlingXp>>;
+  palXp2: Awaited<ReturnType<typeof applyHatchlingXp>>;
+}> {
+  const r1 = computeRewards(state, 1);
+  const r2 = computeRewards(state, 2);
+  const [palXp1, palXp2] = await Promise.all([
+    applyHatchlingXp(state.fighter1.hatchlingId, r1.xp).catch(() => null),
+    state.fighter2.hatchlingId && !state.fighter2.isBot
+      ? applyHatchlingXp(state.fighter2.hatchlingId, r2.xp).catch(() => null)
+      : Promise.resolve(null),
+  ]);
+  return {
+    fighter1Xp: r1.xp,
+    fighter2Xp: state.fighter2.hatchlingId && !state.fighter2.isBot ? r2.xp : null,
+    palXp1,
+    palXp2,
+  };
+}
+
 // ── Battle finalization ──────────────────────────────────────────────────────
 async function finalizeBattle(battleId: number) {
   const battle = activeBattles.get(battleId);
@@ -350,12 +379,7 @@ async function finalizeBattle(battleId: number) {
 
     // Award XP to the participating hatchlings so level-ups can cross the
     // evolution thresholds (5 and 15) that trigger the share prompt.
-    const [palXp1, palXp2] = await Promise.all([
-      applyHatchlingXp(state.fighter1.hatchlingId, r1.xp).catch(() => undefined),
-      state.fighter2.hatchlingId && !state.fighter2.isBot
-        ? applyHatchlingXp(state.fighter2.hatchlingId, computeRewards(state, 2).xp).catch(() => undefined)
-        : Promise.resolve(undefined),
-    ]);
+    const { palXp1, palXp2 } = await awardBattleHatchlingXp(state);
 
     // Confidence & loyalty boost on battle win — winner's Pal gets a morale bump
     const winnerHatchlingId = p1Won ? state.fighter1.hatchlingId : (p2Won ? state.fighter2.hatchlingId : null);
