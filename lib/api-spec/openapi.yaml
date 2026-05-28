@@ -2280,6 +2280,98 @@ paths:
               schema:
                 type: object
 
+  /push/public-key:
+    get:
+      operationId: getPushPublicKey
+      tags: [notifications]
+      summary: Get the VAPID public key for browser push subscription
+      responses:
+        "200":
+          description: Public key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushPublicKey"
+        "503":
+          description: Push not configured
+
+  /push/subscribe:
+    post:
+      operationId: subscribePush
+      tags: [notifications]
+      summary: Register a browser push subscription for the current player
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushSubscribeBody"
+      responses:
+        "200":
+          description: Updated existing subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushSubscribeResult"
+        "201":
+          description: New subscription created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushSubscribeResult"
+
+  /push/unsubscribe:
+    post:
+      operationId: unsubscribePush
+      tags: [notifications]
+      summary: Remove a browser push subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint]
+              properties:
+                endpoint: { type: string }
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResult"
+
+  /push/preferences:
+    get:
+      operationId: getPushPreferences
+      tags: [notifications]
+      summary: Get per-category push notification preferences
+      responses:
+        "200":
+          description: Preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushPreferences"
+    patch:
+      operationId: updatePushPreferences
+      tags: [notifications]
+      summary: Update per-category push notification preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushPreferencesUpdate"
+      responses:
+        "200":
+          description: Updated preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushPreferences"
+
   /notifications:
     get:
       operationId: listNotifications
@@ -3799,6 +3891,49 @@ components:
           type: array
           items:
             type: object
+
+    PushPublicKey:
+      type: object
+      required: [publicKey, configured]
+      properties:
+        publicKey: { type: string }
+        configured: { type: boolean }
+
+    PushSubscribeBody:
+      type: object
+      required: [endpoint, keys]
+      properties:
+        endpoint: { type: string }
+        userAgent: { type: string }
+        keys:
+          type: object
+          required: [p256dh, auth]
+          properties:
+            p256dh: { type: string }
+            auth:   { type: string }
+
+    PushSubscribeResult:
+      type: object
+      required: [success, id]
+      properties:
+        success: { type: boolean }
+        id:      { type: integer }
+
+    PushPreferences:
+      type: object
+      required: [invites, endingSoon, completed]
+      properties:
+        invites:           { type: boolean }
+        endingSoon:        { type: boolean }
+        completed:         { type: boolean }
+        subscriptionCount: { type: integer }
+
+    PushPreferencesUpdate:
+      type: object
+      properties:
+        invites:    { type: boolean }
+        endingSoon: { type: boolean }
+        completed:  { type: boolean }
 
     Notification:
       type: object

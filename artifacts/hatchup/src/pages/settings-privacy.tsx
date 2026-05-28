@@ -31,7 +31,9 @@ import {
   Camera,
   KeyRound,
   Baby,
+  Bell,
 } from "lucide-react";
+import { usePushSubscription } from "@/hooks/use-push-subscription";
 
 const LOCATION_OPTIONS = [
   { value: "exact", label: "Exact location", desc: "Other users see your precise location", icon: <MapPin className="w-4 h-4 text-red-400" />, color: "text-red-400" },
@@ -56,6 +58,47 @@ export default function SettingsPrivacy() {
   const [verifyPending, setVerifyPending] = useState(false);
   const [verifyPhotoName, setVerifyPhotoName] = useState<string | null>(null);
   const todayLabel = useMemo(() => new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }), []);
+
+  // Web push state ──
+  const push = usePushSubscription();
+  const [pushPrefs, setPushPrefs] = useState({ invites: true, endingSoon: true, completed: true });
+  const [pushPrefsLoaded, setPushPrefsLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!playerId || pushPrefsLoaded) return;
+    fetch("/api/push/preferences", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) setPushPrefs({ invites: !!data.invites, endingSoon: !!data.endingSoon, completed: !!data.completed });
+        setPushPrefsLoaded(true);
+      })
+      .catch(() => setPushPrefsLoaded(true));
+  }, [playerId, pushPrefsLoaded]);
+
+  const updatePushPref = async (key: "invites" | "endingSoon" | "completed", value: boolean) => {
+    setPushPrefs(prev => ({ ...prev, [key]: value }));
+    try {
+      await fetch("/api/push/preferences", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: value }),
+      });
+    } catch {
+      toast({ title: "Could not update notification preference", variant: "destructive" });
+    }
+  };
+
+  const togglePush = async (next: boolean) => {
+    if (next) {
+      const ok = await push.enable();
+      if (ok) toast({ title: "Push notifications enabled", description: "We'll ping you when challenges need your attention." });
+      else if (push.error) toast({ title: "Couldn't enable push", description: push.error, variant: "destructive" });
+    } else {
+      await push.disable();
+      toast({ title: "Push notifications disabled" });
+    }
+  };
 
   useEffect(() => {
     if (!playerId || loaded) return;
@@ -347,6 +390,61 @@ export default function SettingsPrivacy() {
                 }}
                 disabled={isMinor}
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Push notifications */}
+        <Card className="border border-cyan-500/20 bg-cyan-950/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-black flex items-center gap-2">
+              <Bell className="w-4 h-4 text-cyan-400" />
+              Push Notifications
+            </CardTitle>
+            <p className="text-xs text-muted-foreground font-medium">
+              Get pinged about challenge invites and deadlines even when HatchUp is closed.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="font-bold text-sm">Enable on this device</p>
+                <p className="text-xs text-muted-foreground font-medium">
+                  {!push.supported
+                    ? "Not supported in this browser."
+                    : push.permission === "denied"
+                      ? "Blocked by your browser — enable notifications in site settings."
+                      : push.subscribed
+                        ? "This device will receive push notifications."
+                        : "Turn on to receive pushes on this device."}
+                </p>
+              </div>
+              <Switch
+                checked={push.subscribed}
+                disabled={!push.supported || push.enabling || push.permission === "denied"}
+                onCheckedChange={togglePush}
+              />
+            </div>
+
+            <div className="border-t border-cyan-500/10 pt-3 space-y-3">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Categories</p>
+              {[
+                { key: "invites" as const, label: "Challenge invites", desc: "Someone invites you to a challenge" },
+                { key: "endingSoon" as const, label: "Ending soon", desc: "A joined challenge has under 24 hours left" },
+                { key: "completed" as const, label: "Challenge complete", desc: "A challenge you joined wrapped up" },
+              ].map(({ key, label, desc }) => (
+                <div key={key} className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm">{label}</p>
+                    <p className="text-xs text-muted-foreground font-medium">{desc}</p>
+                  </div>
+                  <Switch
+                    checked={pushPrefs[key]}
+                    disabled={!pushPrefsLoaded}
+                    onCheckedChange={(v) => updatePushPref(key, v)}
+                  />
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

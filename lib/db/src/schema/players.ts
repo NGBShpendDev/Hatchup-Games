@@ -80,6 +80,10 @@ export const playersTable = pgTable("players", {
   dailyCoachResetDate: date("daily_coach_reset_date"),
   dailyBattleUsedCount: integer("daily_battle_used_count").notNull().default(0),
   dailyBattleResetDate: date("daily_battle_reset_date"),
+  // Web push notification preferences (per category)
+  notifyInvitesPush: boolean("notify_invites_push").notNull().default(true),
+  notifyEndingSoonPush: boolean("notify_ending_soon_push").notNull().default(true),
+  notifyCompletedPush: boolean("notify_completed_push").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

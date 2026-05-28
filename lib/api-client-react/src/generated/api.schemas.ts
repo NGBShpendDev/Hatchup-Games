@@ -985,6 +985,40 @@ export interface ChallengeDetail {
   leaderboard: ChallengeDetailLeaderboardItem[];
 }
 
+export interface PushPublicKey {
+  publicKey: string;
+  configured: boolean;
+}
+
+export type PushSubscribeBodyKeys = {
+  p256dh: string;
+  auth: string;
+};
+
+export interface PushSubscribeBody {
+  endpoint: string;
+  userAgent?: string;
+  keys: PushSubscribeBodyKeys;
+}
+
+export interface PushSubscribeResult {
+  success: boolean;
+  id: number;
+}
+
+export interface PushPreferences {
+  invites: boolean;
+  endingSoon: boolean;
+  completed: boolean;
+  subscriptionCount?: number;
+}
+
+export interface PushPreferencesUpdate {
+  invites?: boolean;
+  endingSoon?: boolean;
+  completed?: boolean;
+}
+
 export interface Notification {
   id: number;
   playerId: number;
@@ -1691,6 +1725,10 @@ export const ListChallengesTab = {
 } as const;
 
 export type InviteToChallenge201 = { [key: string]: unknown };
+
+export type UnsubscribePushBody = {
+  endpoint: string;
+};
 
 export type ListNotificationsParams = {
 unread?: boolean;

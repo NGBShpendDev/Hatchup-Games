@@ -3,6 +3,8 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { attachBattleWss } from "./services/matchmakingQueue";
 import { getStripeSync } from "./stripeClient";
+import { initPushNotifications } from "./services/pushNotifications";
+import { startChallengePushJob } from "./services/challengePushJob";
 
 /**
  * Initialize Stripe sync — migrations, managed webhook, and backfill.
@@ -30,6 +32,7 @@ async function initStripe(): Promise<void> {
 }
 
 void initStripe();
+void initPushNotifications().then(() => startChallengePushJob());
 
 const rawPort = process.env["PORT"];
 

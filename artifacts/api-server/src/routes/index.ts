@@ -28,6 +28,7 @@ import locationsRouter from "./locations";
 import subscriptionRouter from "./subscription";
 import storageRouter from "./storage";
 import notificationsRouter from "./notifications";
+import pushRouter from "./push";
 
 const router: IRouter = Router();
 
@@ -60,5 +61,6 @@ router.use(locationsRouter);
 router.use(subscriptionRouter);
 router.use(storageRouter);
 router.use(notificationsRouter);
+router.use(pushRouter);
 
 export default router;

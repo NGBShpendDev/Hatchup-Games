@@ -138,6 +138,11 @@ import type {
   PlayerStub,
   PlayerUpdate,
   PostComment,
+  PushPreferences,
+  PushPreferencesUpdate,
+  PushPublicKey,
+  PushSubscribeBody,
+  PushSubscribeResult,
   RankDistribution,
   ReactToPostInput,
   ReactionResult,
@@ -158,6 +163,7 @@ import type {
   SuccessResult,
   SyncResult,
   TodayGoalProgress,
+  UnsubscribePushBody,
   UploadUrlRequest,
   UploadUrlResponse,
   UpsertNotificationBody,
@@ -8135,6 +8141,373 @@ export const useInviteToChallenge = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getInviteToChallengeMutationOptions(options));
+    }
+
+export const getGetPushPublicKeyUrl = () => {
+
+
+
+
+  return `/api/push/public-key`
+}
+
+/**
+ * @summary Get the VAPID public key for browser push subscription
+ */
+export const getPushPublicKey = async ( options?: RequestInit): Promise<PushPublicKey> => {
+
+  return customFetch<PushPublicKey>(getGetPushPublicKeyUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPushPublicKeyQueryKey = () => {
+    return [
+    `/api/push/public-key`
+    ] as const;
+    }
+
+
+export const getGetPushPublicKeyQueryOptions = <TData = Awaited<ReturnType<typeof getPushPublicKey>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPushPublicKey>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPushPublicKeyQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPushPublicKey>>> = ({ signal }) => getPushPublicKey({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPushPublicKey>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPushPublicKeyQueryResult = NonNullable<Awaited<ReturnType<typeof getPushPublicKey>>>
+export type GetPushPublicKeyQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the VAPID public key for browser push subscription
+ */
+
+export function useGetPushPublicKey<TData = Awaited<ReturnType<typeof getPushPublicKey>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPushPublicKey>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPushPublicKeyQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSubscribePushUrl = () => {
+
+
+
+
+  return `/api/push/subscribe`
+}
+
+/**
+ * @summary Register a browser push subscription for the current player
+ */
+export const subscribePush = async (pushSubscribeBody: PushSubscribeBody, options?: RequestInit): Promise<PushSubscribeResult> => {
+
+  return customFetch<PushSubscribeResult>(getSubscribePushUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      pushSubscribeBody,)
+  }
+);}
+
+
+
+
+export const getSubscribePushMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof subscribePush>>, TError,{data: BodyType<PushSubscribeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof subscribePush>>, TError,{data: BodyType<PushSubscribeBody>}, TContext> => {
+
+const mutationKey = ['subscribePush'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof subscribePush>>, {data: BodyType<PushSubscribeBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  subscribePush(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubscribePushMutationResult = NonNullable<Awaited<ReturnType<typeof subscribePush>>>
+    export type SubscribePushMutationBody = BodyType<PushSubscribeBody>
+    export type SubscribePushMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Register a browser push subscription for the current player
+ */
+export const useSubscribePush = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof subscribePush>>, TError,{data: BodyType<PushSubscribeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof subscribePush>>,
+        TError,
+        {data: BodyType<PushSubscribeBody>},
+        TContext
+      > => {
+      return useMutation(getSubscribePushMutationOptions(options));
+    }
+
+export const getUnsubscribePushUrl = () => {
+
+
+
+
+  return `/api/push/unsubscribe`
+}
+
+/**
+ * @summary Remove a browser push subscription
+ */
+export const unsubscribePush = async (unsubscribePushBody: UnsubscribePushBody, options?: RequestInit): Promise<SuccessResult> => {
+
+  return customFetch<SuccessResult>(getUnsubscribePushUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      unsubscribePushBody,)
+  }
+);}
+
+
+
+
+export const getUnsubscribePushMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unsubscribePush>>, TError,{data: BodyType<UnsubscribePushBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unsubscribePush>>, TError,{data: BodyType<UnsubscribePushBody>}, TContext> => {
+
+const mutationKey = ['unsubscribePush'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unsubscribePush>>, {data: BodyType<UnsubscribePushBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  unsubscribePush(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnsubscribePushMutationResult = NonNullable<Awaited<ReturnType<typeof unsubscribePush>>>
+    export type UnsubscribePushMutationBody = BodyType<UnsubscribePushBody>
+    export type UnsubscribePushMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Remove a browser push subscription
+ */
+export const useUnsubscribePush = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unsubscribePush>>, TError,{data: BodyType<UnsubscribePushBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unsubscribePush>>,
+        TError,
+        {data: BodyType<UnsubscribePushBody>},
+        TContext
+      > => {
+      return useMutation(getUnsubscribePushMutationOptions(options));
+    }
+
+export const getGetPushPreferencesUrl = () => {
+
+
+
+
+  return `/api/push/preferences`
+}
+
+/**
+ * @summary Get per-category push notification preferences
+ */
+export const getPushPreferences = async ( options?: RequestInit): Promise<PushPreferences> => {
+
+  return customFetch<PushPreferences>(getGetPushPreferencesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPushPreferencesQueryKey = () => {
+    return [
+    `/api/push/preferences`
+    ] as const;
+    }
+
+
+export const getGetPushPreferencesQueryOptions = <TData = Awaited<ReturnType<typeof getPushPreferences>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPushPreferences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPushPreferencesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPushPreferences>>> = ({ signal }) => getPushPreferences({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPushPreferences>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPushPreferencesQueryResult = NonNullable<Awaited<ReturnType<typeof getPushPreferences>>>
+export type GetPushPreferencesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get per-category push notification preferences
+ */
+
+export function useGetPushPreferences<TData = Awaited<ReturnType<typeof getPushPreferences>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPushPreferences>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPushPreferencesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdatePushPreferencesUrl = () => {
+
+
+
+
+  return `/api/push/preferences`
+}
+
+/**
+ * @summary Update per-category push notification preferences
+ */
+export const updatePushPreferences = async (pushPreferencesUpdate: PushPreferencesUpdate, options?: RequestInit): Promise<PushPreferences> => {
+
+  return customFetch<PushPreferences>(getUpdatePushPreferencesUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      pushPreferencesUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdatePushPreferencesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePushPreferences>>, TError,{data: BodyType<PushPreferencesUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePushPreferences>>, TError,{data: BodyType<PushPreferencesUpdate>}, TContext> => {
+
+const mutationKey = ['updatePushPreferences'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePushPreferences>>, {data: BodyType<PushPreferencesUpdate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updatePushPreferences(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePushPreferencesMutationResult = NonNullable<Awaited<ReturnType<typeof updatePushPreferences>>>
+    export type UpdatePushPreferencesMutationBody = BodyType<PushPreferencesUpdate>
+    export type UpdatePushPreferencesMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update per-category push notification preferences
+ */
+export const useUpdatePushPreferences = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePushPreferences>>, TError,{data: BodyType<PushPreferencesUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updatePushPreferences>>,
+        TError,
+        {data: BodyType<PushPreferencesUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdatePushPreferencesMutationOptions(options));
     }
 
 export const getListNotificationsUrl = (params?: ListNotificationsParams,) => {

@@ -21,6 +21,7 @@ export const challengesTable = pgTable("challenges", {
   maxParticipants: integer("max_participants").notNull().default(100),
   isElimination: boolean("is_elimination").notNull().default(false),
   currentRound: integer("current_round").notNull().default(1),
+  completedPushSentAt: timestamp("completed_push_sent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -33,6 +34,7 @@ export const challengeParticipantsTable = pgTable("challenge_participants", {
   rank: integer("rank"),
   joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
   eliminatedRound: integer("eliminated_round"),
+  endingSoonPushSentAt: timestamp("ending_soon_push_sent_at", { withTimezone: true }),
 }, (t) => [
   unique("challenge_participants_unique").on(t.challengeId, t.playerId),
 ]);

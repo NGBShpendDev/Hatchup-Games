@@ -2723,6 +2723,73 @@ export const InviteToChallengeBody = zod.object({
 
 
 /**
+ * @summary Get the VAPID public key for browser push subscription
+ */
+export const GetPushPublicKeyResponse = zod.object({
+  "publicKey": zod.string(),
+  "configured": zod.boolean()
+})
+
+
+/**
+ * @summary Register a browser push subscription for the current player
+ */
+export const SubscribePushBody = zod.object({
+  "endpoint": zod.string(),
+  "userAgent": zod.string().optional(),
+  "keys": zod.object({
+  "p256dh": zod.string(),
+  "auth": zod.string()
+})
+})
+
+export const SubscribePushResponse = zod.object({
+  "success": zod.boolean(),
+  "id": zod.number()
+})
+
+
+/**
+ * @summary Remove a browser push subscription
+ */
+export const UnsubscribePushBody = zod.object({
+  "endpoint": zod.string()
+})
+
+export const UnsubscribePushResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Get per-category push notification preferences
+ */
+export const GetPushPreferencesResponse = zod.object({
+  "invites": zod.boolean(),
+  "endingSoon": zod.boolean(),
+  "completed": zod.boolean(),
+  "subscriptionCount": zod.number().optional()
+})
+
+
+/**
+ * @summary Update per-category push notification preferences
+ */
+export const UpdatePushPreferencesBody = zod.object({
+  "invites": zod.boolean().optional(),
+  "endingSoon": zod.boolean().optional(),
+  "completed": zod.boolean().optional()
+})
+
+export const UpdatePushPreferencesResponse = zod.object({
+  "invites": zod.boolean(),
+  "endingSoon": zod.boolean(),
+  "completed": zod.boolean(),
+  "subscriptionCount": zod.number().optional()
+})
+
+
+/**
  * @summary List in-app notifications for the current player
  */
 export const listNotificationsQueryLimitMax = 100;

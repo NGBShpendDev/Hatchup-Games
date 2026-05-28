@@ -13,6 +13,7 @@ import { requireAuth, attachPlayer } from "../middlewares/auth";
 import { awardBadge } from "../services/badgeService";
 import { computeChallengeReward } from "../services/challengeRewards";
 import { planEliminationRound } from "../services/eliminationBracket";
+import { sendPushToPlayer } from "../services/pushNotifications";
 
 const router = Router();
 
@@ -75,6 +76,51 @@ async function advanceEliminationRound(challengeId: number): Promise<boolean> {
   return true;
 }
 
+// ── Ending-soon push fan-out ───────────────────────────────────────────────
+// Scans active challenges whose end is within the next 24h and sends a push to
+// each joined, active participant who hasn't received one yet for this round.
+// Per-participant `endingSoonPushSentAt` makes it idempotent across cron ticks
+// and resets naturally each elimination round when participants advance.
+export async function sendEndingSoonPushes(): Promise<void> {
+  const now = new Date();
+  const horizon = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  const active = await db.query.challengesTable.findMany({
+    where: and(
+      eq(challengesTable.status, "active"),
+      gt(challengesTable.endAt, now),
+      lt(challengesTable.endAt, horizon),
+    ),
+  });
+
+  for (const challenge of active) {
+    const participants = await db.query.challengeParticipantsTable.findMany({
+      where: and(
+        eq(challengeParticipantsTable.challengeId, challenge.id),
+        eq(challengeParticipantsTable.eliminated, false),
+      ),
+    });
+
+    const msLeft = new Date(challenge.endAt).getTime() - now.getTime();
+    const hoursLeft = Math.max(1, Math.round(msLeft / 3_600_000));
+
+    for (const p of participants) {
+      if (p.endingSoonPushSentAt) continue;
+      await db.update(challengeParticipantsTable)
+        .set({ endingSoonPushSentAt: now })
+        .where(eq(challengeParticipantsTable.id, p.id));
+
+      void sendPushToPlayer(p.playerId, {
+        title: "Challenge ending soon",
+        body: `"${challenge.title}" ends in ~${hoursLeft}h. Push for the podium!`,
+        link: `/challenges/${challenge.id}`,
+        category: "endingSoon",
+        tag: `challenge-ending-${challenge.id}`,
+      });
+    }
+  }
+}
+
 // ── Reward distribution helper ─────────────────────────────────────────────
 async function finalizeChallenge(challengeId: number) {
   const challenge = await db.query.challengesTable.findFirst({
@@ -87,7 +133,17 @@ async function finalizeChallenge(challengeId: number) {
   // finalizing. If a new round started, leave the challenge active.
   if (challenge.isElimination) {
     const advanced = await advanceEliminationRound(challengeId);
-    if (advanced) return;
+    if (advanced) {
+      // Survivors begin a fresh round — reset their ending-soon flag so they
+      // can receive a new push when the next deadline approaches.
+      await db.update(challengeParticipantsTable)
+        .set({ endingSoonPushSentAt: null })
+        .where(and(
+          eq(challengeParticipantsTable.challengeId, challengeId),
+          eq(challengeParticipantsTable.eliminated, false),
+        ));
+      return;
+    }
   }
 
   // Rank participants by currentValue desc
@@ -125,8 +181,26 @@ async function finalizeChallenge(challengeId: number) {
   }
 
   await db.update(challengesTable)
-    .set({ status: "completed" })
+    .set({ status: "completed", completedPushSentAt: new Date() })
     .where(eq(challengesTable.id, challengeId));
+
+  // Fan out a "challenge complete" push to every participant (active or
+  // eliminated) so they can see their final rank.
+  if (!challenge.completedPushSentAt) {
+    const allParticipants = await db.query.challengeParticipantsTable.findMany({
+      where: eq(challengeParticipantsTable.challengeId, challengeId),
+      columns: { playerId: true },
+    });
+    for (const p of allParticipants) {
+      void sendPushToPlayer(p.playerId, {
+        title: "Challenge complete!",
+        body: `"${challenge.title}" wrapped up — tap to see your final rank.`,
+        link: `/challenges/${challengeId}`,
+        category: "completed",
+        tag: `challenge-complete-${challengeId}`,
+      });
+    }
+  }
 }
 
 // ── Browse challenges ──────────────────────────────────────────────────────
@@ -427,6 +501,15 @@ router.post("/challenges/:id/invite", requireAuth, attachPlayer, async (req, res
       body: `${inviterName} invited you to "${challenge.title}".`,
       link: "/challenges",
       sourceId: invite.id,
+    });
+
+    // Fire-and-forget push so the invitee hears about it even when offline.
+    void sendPushToPlayer(inviteeId, {
+      title: "New challenge invite",
+      body: `${inviterName} invited you to "${challenge.title}".`,
+      link: "/challenges",
+      category: "invites",
+      tag: `challenge-invite-${invite.id}`,
     });
   }
 
