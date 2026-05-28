@@ -117,14 +117,16 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, async (req, res) =
   }
 
   // ── Privacy filter: use players.locationVisibility as canonical source ────
-  // Players with locationVisibility="hidden" are excluded from all location-scoped boards.
+  // World scope: all players are visible regardless of locationVisibility (it is a global board, not location-gated).
+  // Non-world scopes: players with locationVisibility="hidden" are excluded.
   // This respects whatever the user set in /settings/privacy.
-  const allNonHiddenPlayers = await db.query.playersTable.findMany({
-    where: ne(playersTable.locationVisibility, "hidden"),
-  });
-  const nonHiddenSet = new Set(allNonHiddenPlayers.map(p => p.id));
+  const basePlayers = scope === "world"
+    ? await db.query.playersTable.findMany()
+    : await db.query.playersTable.findMany({
+        where: ne(playersTable.locationVisibility, "hidden"),
+      });
 
-  // Also exclude blocked users
+  // Also exclude blocked/hidden users (block list applies to all scopes)
   const hiddenIds = req.playerId ? await getHiddenPlayerIds(req.playerId) : [];
   const blockedSet = new Set(hiddenIds);
 
@@ -173,10 +175,10 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, async (req, res) =
   }
 
   // ── Build final player list ───────────────────────────────────────────────
-  const playerMap = new Map(allNonHiddenPlayers.map(p => [p.id, p]));
+  const playerMap = new Map(basePlayers.map(p => [p.id, p]));
 
-  // For world scope, include ALL non-hidden players (with or without location)
-  let filteredPlayers = allNonHiddenPlayers.filter(p => {
+  // For world scope: includes ALL players. For location scopes: only non-hidden.
+  let filteredPlayers = basePlayers.filter(p => {
     if (blockedSet.has(p.id)) return false;
     if (eligiblePlayerIds !== null && !eligiblePlayerIds.has(p.id)) return false;
     return true;

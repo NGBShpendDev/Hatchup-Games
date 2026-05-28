@@ -139,8 +139,13 @@ router.get("/local-challenges", requireAuth, attachPlayer, async (req, res) => {
       )
     : eq(localChallengesTable.scope, "world");
 
+  // Only return currently active challenges (startAt <= now AND endAt >= now)
   const challenges = await db.query.localChallengesTable.findMany({
-    where: relevantFilter,
+    where: and(
+      relevantFilter,
+      lte(localChallengesTable.startAt, now),
+      gte(localChallengesTable.endAt, now),
+    ),
   });
 
   // Get participation data
