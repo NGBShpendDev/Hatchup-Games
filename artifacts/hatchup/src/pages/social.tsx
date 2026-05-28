@@ -2,8 +2,6 @@ import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  useGetGlobalLeaderboard,
-  getGetGlobalLeaderboardQueryKey,
   useListEvents,
   getListEventsQueryKey,
   useListClubs,
@@ -11,6 +9,7 @@ import {
   useListCompetitions,
   getListCompetitionsQueryKey
 } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,10 +23,17 @@ import { SafetyBanner } from "@/components/safety-banner";
 export default function Social() {
   const { playerId } = usePlayer();
   const pid = playerId ?? 0;
-  const { data: leaderboard, isLoading: isLoadingLeaderboard } = useGetGlobalLeaderboard(
-    { limit: 10 },
-    { query: { queryKey: getGetGlobalLeaderboardQueryKey({ limit: 10 }) } }
-  );
+  const { data: leaderboard, isLoading: isLoadingLeaderboard } = useQuery({
+    queryKey: ["leaderboard", "global", pid],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: "10" });
+      if (pid) params.set("viewerId", String(pid));
+      const res = await fetch(`/api/leaderboards/global?${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load leaderboard");
+      return res.json() as Promise<Array<{ position: number; playerId: number; username: string; displayName: string | null; avatarUrl: string | null; rank: string; score: number; wins: number; hatchlingName: string; hatchlingCategory: string }>>;
+    },
+    staleTime: 30_000,
+  });
 
   const { data: events, isLoading: isLoadingEvents } = useListEvents(
     {},
@@ -122,7 +128,7 @@ export default function Social() {
                         <div>
                           <h3 className="text-2xl font-black mb-1">{event.name}</h3>
                           <p className="text-sm font-bold text-muted-foreground uppercase flex items-center gap-2">
-                            <Calendar className="w-4 h-4" /> {new Date(event.startsAt).toLocaleDateString()}
+                            <Calendar className="w-4 h-4" /> {new Date(event.startTime).toLocaleDateString()}
                           </p>
                         </div>
                         {event.status === "active" && (
@@ -157,12 +163,12 @@ export default function Social() {
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">
                         <h3 className="text-xl font-black">{club.name}</h3>
-                        <Badge variant="secondary">Lvl {club.level}</Badge>
+                        <Badge variant="secondary">{club.rank}</Badge>
                       </div>
                       <p className="text-sm text-muted-foreground font-medium mb-4 line-clamp-2">{club.description}</p>
                       <div className="flex justify-between items-center text-sm font-bold">
                         <span className="flex items-center gap-1 text-blue-500"><Users className="w-4 h-4" /> {club.memberCount}/{club.maxMembers}</span>
-                        <span className="flex items-center gap-1 text-green-500"><Trophy className="w-4 h-4" /> {club.totalWins} Wins</span>
+                        <span className="flex items-center gap-1 text-green-500"><Trophy className="w-4 h-4" /> {club.totalXp} XP</span>
                       </div>
                     </CardContent>
                   </Card>

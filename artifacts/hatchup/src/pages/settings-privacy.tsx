@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { SafetyGuidelinesSheet } from "@/components/safety-guidelines-sheet";
 import { motion } from "framer-motion";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Shield,
   MapPin,
   Phone,
@@ -21,6 +28,7 @@ import {
   Ban,
   AlertTriangle,
   ChevronRight,
+  Camera,
 } from "lucide-react";
 
 const LOCATION_OPTIONS = [
@@ -40,10 +48,14 @@ export default function SettingsPrivacy() {
   const [emergencyPhone, setEmergencyPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  const [verifySubmitting, setVerifySubmitting] = useState(false);
+  const [verifyPending, setVerifyPending] = useState(false);
+  const todayLabel = useMemo(() => new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }), []);
 
   useEffect(() => {
     if (!playerId || loaded) return;
-    fetch(`/api/players/${playerId}/privacy-settings?callerId=${playerId}`, { credentials: "include" })
+    fetch(`/api/players/${playerId}/privacy-settings`, { credentials: "include" })
       .then(r => r.json())
       .then(data => {
         setLocationVisibility(data.locationVisibility ?? "city");
@@ -55,6 +67,32 @@ export default function SettingsPrivacy() {
       .catch(() => setLoaded(true));
   }, [playerId]);
 
+  const handleVerifySubmit = async () => {
+    if (!playerId) return;
+    setVerifySubmitting(true);
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reason: "verification_request",
+          contentType: "verification",
+          description: `Verification request submitted on ${todayLabel}`,
+        }),
+      });
+      if (res.ok) {
+        setVerifyPending(true);
+        setVerifyOpen(false);
+        toast({ title: "Verification submitted", description: "Our team will review your request within 24 hours." });
+      } else {
+        toast({ title: "Error", description: "Could not submit verification. Please try again.", variant: "destructive" });
+      }
+    } finally {
+      setVerifySubmitting(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!playerId) return;
     setSaving(true);
@@ -64,7 +102,6 @@ export default function SettingsPrivacy() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          callerId: playerId,
           locationVisibility,
           requireWorkoutApproval: requireApproval,
           emergencyContactName: emergencyName || null,
@@ -103,15 +140,60 @@ export default function SettingsPrivacy() {
               <p className="font-bold text-sm">Profile Verification</p>
               <p className="text-xs text-muted-foreground font-medium">Verified profiles earn more trust and unlock group features.</p>
             </div>
-            {player && (player as { isVerified?: boolean }).isVerified ? (
+            {(player as { isVerified?: boolean } | null)?.isVerified ? (
               <Badge className="bg-blue-500 text-white font-black shrink-0">Verified ✓</Badge>
+            ) : verifyPending ? (
+              <Badge className="bg-amber-500 text-black font-black shrink-0 text-[10px]">Pending Review</Badge>
             ) : (
-              <Button size="sm" variant="outline" className="shrink-0 text-xs font-bold border-blue-500/30 text-blue-400">
-                Verify
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0 text-xs font-bold border-blue-500/30 text-blue-400"
+                onClick={() => setVerifyOpen(true)}
+              >
+                Start Verification
               </Button>
             )}
           </CardContent>
         </Card>
+
+        {/* Verification dialog */}
+        <Dialog open={verifyOpen} onOpenChange={setVerifyOpen}>
+          <DialogContent className="bg-card max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 font-black">
+                <Camera className="w-5 h-5 text-blue-400" />
+                Verify Your Profile
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 py-2 text-sm">
+              <p className="text-muted-foreground font-medium">
+                Complete these steps, then submit. Our team will review within 24 hours:
+              </p>
+              <ol className="space-y-2 text-sm font-medium list-decimal list-inside">
+                <li>Take a clear selfie photo of yourself.</li>
+                <li>Hold up a handwritten note showing today's date:</li>
+              </ol>
+              <div className="bg-muted/40 rounded-xl px-4 py-3 text-center font-black text-blue-300 text-sm border border-blue-500/20">
+                {todayLabel}
+              </div>
+              <li className="font-medium text-sm list-none">3. Submit below — our team verifies the photo manually.</li>
+              <p className="text-xs text-muted-foreground italic">
+                HatchUp is a safe, trusted, and family-friendly community. No government ID is collected.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setVerifyOpen(false)} className="flex-1">Cancel</Button>
+              <Button
+                onClick={handleVerifySubmit}
+                disabled={verifySubmitting}
+                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-black"
+              >
+                {verifySubmitting ? "Submitting..." : "Submit for Review"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Location Visibility */}
         <Card className="border">

@@ -1,0 +1,176 @@
+ADD THIS TO THE MASTER PROMPT:
+
+========================================
+
+USER-GENERATED CHALLENGE SYSTEM
+
+Allow users to create their own custom fitness challenges, competitions, tournaments, and social events that other players can join, compete in, or be invited to.
+
+The system should feel:
+- social
+- competitive
+- viral
+- motivating
+- community-driven
+- highly interactive
+
+========================================
+
+CUSTOM CHALLENGE CREATION
+
+Users should be able to create challenges for:
+- steps
+- running
+- cycling
+- pushups
+- burpees
+- squats
+- pull-ups
+- workouts
+- streaks
+- calories burned
+- battle wins
+- HatchUp leveling
+- hydration
+- sleep consistency
+- transformation goals
+
+Examples:
+- “First to 10,000 pushups”
+- “30-Day Weight Loss Challenge”
+- “City Step War”
+- “100 Burpees Daily”
+- “Elite Runner Challenge”
+- “Battle Arena Tournament”
+- “Weekend Warrior Competition”
+
+========================================
+
+CHALLENGE TYPES
+
+Allow:
+- public challenges
+- private friend challenges
+- guild competitions
+- city-vs-city challenges
+- timed events
+- bracket tournaments
+- elimination challenges
+- streak contests
+- team competitions
+
+========================================
+
+INVITE + JOIN SYSTEM
+
+Users can:
+- invite friends
+- challenge nearby players
+- create open public events
+- share challenge links
+- recruit teammates
+- join trending challenges
+
+Allow users to:
+- accept or decline challenges
+- spectate competitions
+- follow challenge progress live
+
+========================================
+
+LIVE TRACKING + VERIFICATION
+
+Challenges should support:
+- live stat tracking
+- GPS tracking
+- AI rep counting
+- video verification
+- replay systems
+- anti-cheat validation
+
+Users should be able to:
+- upload proof
+- stream challenges live
+- post highlights
+- share clips
+
+========================================
+
+REWARDS + STAKES
+
+Challenge creators can choose rewards such as:
+- XP
+- coins
+- artifacts
+- cosmetics
+- badges
+- rare eggs
+- leaderboard boosts
+- prestige titles
+
+Optional wager systems can include:
+- in-game coins
+- XP bets
+- tournament buy-ins
+- seasonal rankings
+
+========================================
+
+CHALLENGE LEADERBOARDS
+
+Each challenge should have:
+- rankings
+- live scoreboards
+- timers
+- stats
+- completion percentages
+- streak tracking
+
+Allow:
+- local rankings
+- global rankings
+- friend-only rankings
+
+========================================
+
+VIRAL + SOCIAL FEATURES
+
+Make challenges easy to share on:
+- TikTok
+- Instagram
+- YouTube
+- X
+- Snapchat
+
+Include:
+- highlight reels
+- dramatic announcers
+- reaction systems
+- crowd effects
+- battle intros
+- challenge hype screens
+
+========================================
+
+COMMUNITY MODERATION + SAFETY
+
+Protect users with:
+- moderation systems
+- reporting tools
+- challenge approval filters
+- anti-harassment protections
+- dangerous challenge detection
+- age restrictions for minors
+- public meetup safety reminders
+
+Do not allow:
+- unsafe fitness challenges
+- harmful dares
+- harassment
+- dangerous behavior
+
+========================================
+
+MAIN GOAL
+
+Turn HatchUp into a living social fitness competition platform where the community constantly creates new viral fitness challenges, tournaments, and events that keep players engaged every day.

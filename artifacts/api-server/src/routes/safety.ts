@@ -1,45 +1,31 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { userReportsTable, blockedUsersTable, playersTable } from "@workspace/db";
-import { eq, and, desc, or, inArray, notInArray } from "drizzle-orm";
+import { eq, and, desc, or, notInArray } from "drizzle-orm";
+import { requireAuth, attachPlayer } from "../middlewares/auth";
 
 const router = Router();
-
-// ── Auth helper ─────────────────────────────────────────────────────────────
-// In this MVP the caller sends their playerId in the request body / query.
-// Ownership is validated by confirming the URL :id matches the caller's
-// playerId.  Admin routes additionally require the caller's player row to
-// have isAdmin = true.
-
-async function resolveCallerPlayer(callerId: unknown) {
-  if (callerId == null) return null;
-  const id = Number(callerId);
-  if (isNaN(id)) return null;
-  return db.query.playersTable.findFirst({ where: eq(playersTable.id, id) }) ?? null;
-}
 
 // ── Block / Unblock ─────────────────────────────────────────────────────────
 
 // POST /api/players/:id/block
-// body: { callerId, targetId }
-router.post("/players/:id/block", async (req, res) => {
+// Authenticated: only the signed-in player can block on their own behalf.
+router.post("/players/:id/block", requireAuth, attachPlayer, async (req, res) => {
   const urlId = Number(req.params.id);
-  const body = req.body as { callerId?: unknown; targetId?: unknown };
-  const callerId = Number(body.callerId);
-  const targetId = Number(body.targetId);
-
-  if (isNaN(callerId) || callerId !== urlId) {
-    res.status(403).json({ error: "Forbidden: callerId must match the player URL" });
+  if (req.playerId !== urlId) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
-  if (!targetId || isNaN(targetId) || callerId === targetId) {
+  const body = req.body as { targetId?: unknown };
+  const targetId = Number(body.targetId);
+  if (!targetId || isNaN(targetId) || urlId === targetId) {
     res.status(400).json({ error: "Invalid targetId" });
     return;
   }
   try {
     await db
       .insert(blockedUsersTable)
-      .values({ blockerId: callerId, blockedId: targetId })
+      .values({ blockerId: urlId, blockedId: targetId })
       .onConflictDoNothing();
     res.json({ success: true });
   } catch (err) {
@@ -49,34 +35,30 @@ router.post("/players/:id/block", async (req, res) => {
 });
 
 // DELETE /api/players/:id/block/:targetId
-// query: ?callerId=
-router.delete("/players/:id/block/:targetId", async (req, res) => {
+router.delete("/players/:id/block/:targetId", requireAuth, attachPlayer, async (req, res) => {
   const urlId = Number(req.params.id);
-  const callerId = Number(req.query.callerId);
-  if (isNaN(callerId) || callerId !== urlId) {
+  if (req.playerId !== urlId) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
   const blockedId = Number(req.params.targetId);
   await db
     .delete(blockedUsersTable)
-    .where(and(eq(blockedUsersTable.blockerId, callerId), eq(blockedUsersTable.blockedId, blockedId)));
+    .where(and(eq(blockedUsersTable.blockerId, urlId), eq(blockedUsersTable.blockedId, blockedId)));
   res.json({ success: true });
 });
 
 // GET /api/players/:id/blocks
-// query: ?callerId=
-router.get("/players/:id/blocks", async (req, res) => {
+router.get("/players/:id/blocks", requireAuth, attachPlayer, async (req, res) => {
   const urlId = Number(req.params.id);
-  const callerId = Number(req.query.callerId);
-  if (isNaN(callerId) || callerId !== urlId) {
+  if (req.playerId !== urlId) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
   const blocks = await db
     .select()
     .from(blockedUsersTable)
-    .where(eq(blockedUsersTable.blockerId, callerId))
+    .where(eq(blockedUsersTable.blockerId, urlId))
     .orderBy(desc(blockedUsersTable.createdAt));
   res.json(blocks);
 });
@@ -84,21 +66,16 @@ router.get("/players/:id/blocks", async (req, res) => {
 // ── Reports ─────────────────────────────────────────────────────────────────
 
 // POST /api/reports
-// body: { reporterId, reportedUserId?, reason, contentType?, contentId?, description? }
-router.post("/reports", async (req, res) => {
+// Uses the authenticated player's session ID as reporterId — never trust client.
+router.post("/reports", requireAuth, attachPlayer, async (req, res) => {
+  const reporterId = req.playerId!;
   const body = req.body as {
-    reporterId?: unknown;
     reportedUserId?: unknown;
     reason?: unknown;
     contentType?: unknown;
     contentId?: unknown;
     description?: unknown;
   };
-  const reporterId = Number(body.reporterId);
-  if (isNaN(reporterId) || reporterId < 1) {
-    res.status(400).json({ error: "reporterId is required" });
-    return;
-  }
   const reason = typeof body.reason === "string" ? body.reason.trim() : "";
   if (!reason) {
     res.status(400).json({ error: "reason is required" });
@@ -123,19 +100,13 @@ router.post("/reports", async (req, res) => {
 
 // ── Admin Moderation ─────────────────────────────────────────────────────────
 
-// GET /api/admin/reports?status=&adminId=
-router.get("/admin/reports", async (req, res) => {
-  const adminId = Number(req.query.adminId);
-  if (isNaN(adminId)) {
-    res.status(403).json({ error: "adminId required" });
-    return;
-  }
-  const caller = await resolveCallerPlayer(adminId);
-  if (!caller || !(caller as { isAdmin?: boolean }).isAdmin) {
+// GET /api/admin/reports?status=
+router.get("/admin/reports", requireAuth, attachPlayer, async (req, res) => {
+  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!caller?.isAdmin) {
     res.status(403).json({ error: "Admin access required" });
     return;
   }
-
   const { status } = req.query as { status?: string };
   const reports = status
     ? await db.select().from(userReportsTable).where(eq(userReportsTable.status, status)).orderBy(desc(userReportsTable.createdAt))
@@ -144,21 +115,15 @@ router.get("/admin/reports", async (req, res) => {
 });
 
 // PATCH /api/admin/reports/:id
-// body: { adminId, status }
-router.patch("/admin/reports/:id", async (req, res) => {
-  const body = req.body as { adminId?: unknown; status?: string };
-  const adminId = Number(body.adminId);
-  if (isNaN(adminId)) {
-    res.status(403).json({ error: "adminId required" });
-    return;
-  }
-  const caller = await resolveCallerPlayer(adminId);
-  if (!caller || !(caller as { isAdmin?: boolean }).isAdmin) {
+// body: { status }
+router.patch("/admin/reports/:id", requireAuth, attachPlayer, async (req, res) => {
+  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!caller?.isAdmin) {
     res.status(403).json({ error: "Admin access required" });
     return;
   }
-
   const id = Number(req.params.id);
+  const body = req.body as { status?: string };
   const status = body.status ?? "";
   if (!["resolved", "dismissed"].includes(status)) {
     res.status(400).json({ error: "Invalid status" });
@@ -175,12 +140,9 @@ router.patch("/admin/reports/:id", async (req, res) => {
 // ── Privacy Settings ─────────────────────────────────────────────────────────
 
 // GET /api/players/:id/privacy-settings
-// query: ?callerId=
-router.get("/players/:id/privacy-settings", async (req, res) => {
+router.get("/players/:id/privacy-settings", requireAuth, attachPlayer, async (req, res) => {
   const urlId = Number(req.params.id);
-  const callerId = Number(req.query.callerId ?? req.query.playerId ?? urlId);
-  // Allow self-access only
-  if (callerId !== urlId) {
+  if (req.playerId !== urlId) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
@@ -201,21 +163,19 @@ router.get("/players/:id/privacy-settings", async (req, res) => {
 const VALID_VISIBILITY = ["exact", "neighborhood", "city", "hidden"] as const;
 
 // PATCH /api/players/:id/privacy-settings
-// body: { callerId, locationVisibility?, requireWorkoutApproval?, emergencyContactName?, emergencyContactPhone? }
-router.patch("/players/:id/privacy-settings", async (req, res) => {
+// body: { locationVisibility?, requireWorkoutApproval?, emergencyContactName?, emergencyContactPhone? }
+router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (req, res) => {
   const urlId = Number(req.params.id);
+  if (req.playerId !== urlId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const body = req.body as {
-    callerId?: unknown;
     locationVisibility?: unknown;
     requireWorkoutApproval?: unknown;
     emergencyContactName?: unknown;
     emergencyContactPhone?: unknown;
   };
-  const callerId = Number(body.callerId ?? urlId);
-  if (callerId !== urlId) {
-    res.status(403).json({ error: "Forbidden" });
-    return;
-  }
 
   const updates: Partial<typeof playersTable.$inferInsert> = {};
 
@@ -250,11 +210,11 @@ router.patch("/players/:id/privacy-settings", async (req, res) => {
   });
 });
 
-// ── Block-aware list helpers (exported for use in other routers) ──────────────
+// ── Block-aware list helper (exported for other routers) ──────────────────────
 
 /**
- * Given a viewer's playerId, returns the set of playerIds that should be hidden:
- * anyone the viewer has blocked, or who has blocked the viewer.
+ * Returns the set of playerIds that should be hidden from viewerId's perspective:
+ * anyone viewerId has blocked, or who has blocked viewerId.
  */
 export async function getHiddenPlayerIds(viewerId: number): Promise<number[]> {
   const blocks = await db

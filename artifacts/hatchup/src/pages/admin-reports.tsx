@@ -48,7 +48,7 @@ export default function AdminReports() {
   const { data: reports, isLoading } = useQuery<AdminReport[]>({
     queryKey: ["admin-reports", filter, playerId],
     queryFn: async () => {
-      const params = new URLSearchParams({ adminId: String(playerId) });
+      const params = new URLSearchParams();
       if (filter !== "all") params.set("status", filter);
       const res = await fetch(`/api/admin/reports?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("Unauthorized");
@@ -62,7 +62,7 @@ export default function AdminReports() {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ adminId: playerId, status: action }),
+      body: JSON.stringify({ status: action }),
     });
     if (res.ok) {
       toast({ title: action === "resolved" ? "Report resolved" : "Report dismissed" });
