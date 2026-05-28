@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { db, pushSubscriptionsTable, playersTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import {
   getVapidPublicKey,
   initPushNotifications,
   isPushConfigured,
-} from "../services/pushNotifications";
+} from "../services/pushNotifications.ts";
 
 const router = Router();
 

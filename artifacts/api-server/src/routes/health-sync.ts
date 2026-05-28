@@ -2,14 +2,14 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { healthConnectionsTable, playersTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth } from "../middlewares/auth.ts";
 import {
   encryptToken,
   syncGoogleFit,
   createOAuthState,
   verifyOAuthState,
-} from "../services/googleFitSync";
-import { logger } from "../lib/logger";
+} from "../services/googleFitSync.ts";
+import { logger } from "../lib/logger.ts";
 
 const router = Router();
 

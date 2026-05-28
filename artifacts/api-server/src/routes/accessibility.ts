@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { playersTable, familyGroupsTable, fitnessActivitiesTable } from "@workspace/db";
 import { eq, gte, and, desc } from "drizzle-orm";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import crypto from "crypto";
 
 const router = Router();

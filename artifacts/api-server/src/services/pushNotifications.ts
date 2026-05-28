@@ -7,7 +7,7 @@ import {
   type PushCategory,
 } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
-import { logger } from "../lib/logger";
+import { logger } from "../lib/logger.ts";
 
 let vapidPublicKey: string | null = null;
 let vapidConfigured = false;

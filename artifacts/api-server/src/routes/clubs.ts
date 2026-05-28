@@ -9,7 +9,7 @@ import {
   JoinClubParams,
   JoinClubBody,
 } from "@workspace/api-zod";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import type { RequestHandler } from "express";
 
 const router = Router();

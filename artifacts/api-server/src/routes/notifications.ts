@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, notificationsTable } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 
 const router = Router();
 

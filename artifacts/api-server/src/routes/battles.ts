@@ -3,8 +3,8 @@ import { db } from "@workspace/db";
 import { battlesTable, hatchlingsTable, notificationsTable, playersTable } from "@workspace/db";
 import { eq, desc, or } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
-import { attachEntitlement, enforceBattleDailyCap } from "../services/subscriptionGuards";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { attachEntitlement, enforceBattleDailyCap } from "../services/subscriptionGuards.ts";
 import {
   issueWsToken,
   createRematchInvite,
@@ -12,7 +12,7 @@ import {
   listPendingRematchInvitesFor,
   setRematchInviteStatus,
   type RematchInvite,
-} from "../services/matchmakingQueue";
+} from "../services/matchmakingQueue.ts";
 
 function serializeInvite(inv: RematchInvite, fromName: string | null, toName: string | null) {
   return {

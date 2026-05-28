@@ -2,8 +2,8 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { playersTable, playerBadgesTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
-import { getDailyReward, checkAndAwardBadges } from "../services/badgeService";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { getDailyReward, checkAndAwardBadges } from "../services/badgeService.ts";
 
 const router = Router();
 

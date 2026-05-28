@@ -2,8 +2,8 @@ import type { Request, Response, NextFunction } from "express";
 import { db } from "@workspace/db";
 import { playersTable, hatchlingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { getEntitlement } from "./entitlement";
-import { refreshTop10Status } from "./top10";
+import { getEntitlement } from "./entitlement.ts";
+import { refreshTop10Status } from "./top10.ts";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);

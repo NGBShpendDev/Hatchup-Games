@@ -9,13 +9,13 @@ import {
 } from "@workspace/db";
 import { eq, desc, and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import {
   getPlayerFitnessBars,
   checkAndAwardArtifacts,
   getRecentWorldNotifications,
-} from "../services/artifactService";
-import { computePowerScore } from "../services/artifactLoadoutService";
+} from "../services/artifactService.ts";
+import { computePowerScore } from "../services/artifactLoadoutService.ts";
 
 const router = Router();
 

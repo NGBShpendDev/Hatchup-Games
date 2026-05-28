@@ -20,10 +20,10 @@ import {
   computeRewards,
   type BattleState,
   type MoveType,
-} from "./battleService";
-import { loadActiveLoadoutModifiers, awardArtifactBattleXp } from "./artifactLoadoutService";
-import { checkAndConsumeBattleCap } from "./subscriptionGuards";
-import { logger } from "../lib/logger";
+} from "./battleService.ts";
+import { loadActiveLoadoutModifiers, awardArtifactBattleXp } from "./artifactLoadoutService.ts";
+import { checkAndConsumeBattleCap } from "./subscriptionGuards.ts";
+import { logger } from "../lib/logger.ts";
 import { BattleWsClientMessageSchema } from "@workspace/api-zod";
 
 // ── In-memory state ──────────────────────────────────────────────────────────

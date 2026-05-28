@@ -1,8 +1,8 @@
 import crypto from "node:crypto";
 import { db, playersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { isEmailConfigured, sendTransactionalEmail } from "./emailService";
-import { logger } from "../lib/logger";
+import { isEmailConfigured, sendTransactionalEmail } from "./emailService.ts";
+import { logger } from "../lib/logger.ts";
 
 export const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 

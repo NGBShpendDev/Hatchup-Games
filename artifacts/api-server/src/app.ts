@@ -9,16 +9,16 @@ import {
   CLERK_PROXY_PATH,
   clerkProxyMiddleware,
   getClerkProxyHost,
-} from "./middlewares/clerkProxyMiddleware";
-import router from "./routes";
-import ogRouter from "./routes/og";
-import ogPlayerRouter from "./routes/og-player";
-import ogClubRouter from "./routes/og-club";
-import { logger } from "./lib/logger";
-import { startPassiveSyncJob } from "./services/passiveSyncJob";
-import { startWeeklyNutritionRecapJob } from "./services/weeklyNutritionRecapJob";
-import { startPostPurgeJob } from "./services/postPurgeJob";
-import { WebhookHandlers } from "./webhookHandlers";
+} from "./middlewares/clerkProxyMiddleware.ts";
+import router from "./routes/index.ts";
+import ogRouter from "./routes/og.ts";
+import ogPlayerRouter from "./routes/og-player.ts";
+import ogClubRouter from "./routes/og-club.ts";
+import { logger } from "./lib/logger.ts";
+import { startPassiveSyncJob } from "./services/passiveSyncJob.ts";
+import { startWeeklyNutritionRecapJob } from "./services/weeklyNutritionRecapJob.ts";
+import { startPostPurgeJob } from "./services/postPurgeJob.ts";
+import { WebhookHandlers } from "./webhookHandlers.ts";
 
 const app: Express = express();
 

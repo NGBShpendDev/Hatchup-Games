@@ -9,7 +9,7 @@ import {
   playersTable,
 } from "@workspace/db";
 import { eq, and, desc, sql, notInArray } from "drizzle-orm";
-import { getHiddenPlayerIds } from "./safety";
+import { getHiddenPlayerIds } from "./safety.ts";
 import {
   CreateGroupBody,
   JoinGroupBody,
@@ -18,10 +18,10 @@ import {
   GetGroupParams,
   ListMyGroupsQueryParams,
 } from "@workspace/api-zod";
-import { logFitnessActivity } from "../services/fitnessLog";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
-import { blockMinorSocialWrite } from "../middlewares/minorGuard";
-import { blockSuspendedSocialWrite } from "../middlewares/suspendedGuard";
+import { logFitnessActivity } from "../services/fitnessLog.ts";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { blockMinorSocialWrite } from "../middlewares/minorGuard.ts";
+import { blockSuspendedSocialWrite } from "../middlewares/suspendedGuard.ts";
 
 const router = Router();
 

@@ -10,10 +10,10 @@ import {
   CompleteQuestParams,
   ListRealmsQueryParams,
 } from "@workspace/api-zod";
-import { logFitnessActivity, ACTIVITY_CONFIG } from "../services/fitnessLog";
-import { validateStepDelta } from "../services/antiCheat";
-import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth";
-import { fitnessLogLimiter } from "../middlewares/rateLimiters";
+import { logFitnessActivity, ACTIVITY_CONFIG } from "../services/fitnessLog.ts";
+import { validateStepDelta } from "../services/antiCheat.ts";
+import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth.ts";
+import { fitnessLogLimiter } from "../middlewares/rateLimiters.ts";
 
 function getGroupXpBonus(memberCount: number): number {
   if (memberCount >= 6) return 0.5;

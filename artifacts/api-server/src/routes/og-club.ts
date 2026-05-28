@@ -1,8 +1,8 @@
 import { db } from "@workspace/db";
 import { clubsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { createClubOgRouter, type OgClubLoader } from "./og-router";
-import type { OgClubInput } from "./og-render";
+import { createClubOgRouter, type OgClubLoader } from "./og-router.ts";
+import type { OgClubInput } from "./og-render.ts";
 
 const clubLoader: OgClubLoader = async (id: number): Promise<OgClubInput | null> => {
   try {

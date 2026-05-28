@@ -9,12 +9,12 @@ import {
   notificationsTable,
 } from "@workspace/db";
 import { eq, desc, and, sql, inArray } from "drizzle-orm";
-import { sendPushToPlayer } from "../services/pushNotifications";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { sendPushToPlayer } from "../services/pushNotifications.ts";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import {
   finalizeChallenge,
   sendEndingSoonPushes,
-} from "../services/challengeFinalize";
+} from "../services/challengeFinalize.ts";
 
 export { finalizeChallenge, sendEndingSoonPushes };
 

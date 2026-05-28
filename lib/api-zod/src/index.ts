@@ -1,4 +1,4 @@
-export * from "./generated/api";
+export * from "./generated/api.ts";
 
 // Convenience re-exports for the live battle WebSocket protocol. The
 // underlying Zod schemas live on documentation-only OpenAPI endpoints
@@ -9,4 +9,4 @@ export * from "./generated/api";
 export {
   DocsValidateBattleWsClientMessageBody as BattleWsClientMessageSchema,
   DocsValidateBattleWsServerMessageBody as BattleWsServerMessageSchema,
-} from "./generated/api";
+} from "./generated/api.ts";

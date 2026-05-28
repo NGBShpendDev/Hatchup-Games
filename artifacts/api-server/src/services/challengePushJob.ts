@@ -1,5 +1,5 @@
-import { sendEndingSoonPushes } from "../routes/challenges";
-import { logger } from "../lib/logger";
+import { sendEndingSoonPushes } from "../routes/challenges.ts";
+import { logger } from "../lib/logger.ts";
 
 // Run every 5 minutes — frequent enough that a participant always lands well
 // within the 24h-remaining window, idempotent thanks to the per-participant

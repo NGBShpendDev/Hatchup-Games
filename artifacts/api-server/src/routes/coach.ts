@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { CoachChatBody } from "@workspace/api-zod";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
-import { aiCoachLimiter } from "../middlewares/rateLimiters";
-import { attachEntitlement, enforceCoachDailyCap } from "../services/subscriptionGuards";
-import { buildCoachContext, buildSystemPrompt } from "../services/coachService";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { aiCoachLimiter } from "../middlewares/rateLimiters.ts";
+import { attachEntitlement, enforceCoachDailyCap } from "../services/subscriptionGuards.ts";
+import { buildCoachContext, buildSystemPrompt } from "../services/coachService.ts";
 
 const router = Router();
 

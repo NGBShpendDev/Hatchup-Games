@@ -7,7 +7,7 @@ import {
   playersTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
-import { logger } from "../lib/logger";
+import { logger } from "../lib/logger.ts";
 
 // ── Fitness bar XP constants ──────────────────────────────────────────────────
 export const BAR_TYPES = [

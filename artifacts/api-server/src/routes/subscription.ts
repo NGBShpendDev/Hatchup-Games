@@ -2,10 +2,10 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { playersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
-import { attachEntitlement } from "../services/subscriptionGuards";
-import { refreshTop10Status } from "../services/top10";
-import { getEntitlement } from "../services/entitlement";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { attachEntitlement } from "../services/subscriptionGuards.ts";
+import { refreshTop10Status } from "../services/top10.ts";
+import { getEntitlement } from "../services/entitlement.ts";
 
 const router = Router();
 

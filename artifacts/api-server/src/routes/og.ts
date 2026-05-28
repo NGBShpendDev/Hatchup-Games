@@ -1,8 +1,8 @@
 import { db } from "@workspace/db";
 import { postsTable, playersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { createOgRouter, type OgLoadResult, type OgPostLoader } from "./og-router";
-import type { OgPostInput, OgAuthorInput } from "./og-render";
+import { createOgRouter, type OgLoadResult, type OgPostLoader } from "./og-router.ts";
+import type { OgPostInput, OgAuthorInput } from "./og-render.ts";
 
 const defaultLoader: OgPostLoader = async (id: number): Promise<OgLoadResult> => {
   const row = await db.query.postsTable.findFirst({ where: eq(postsTable.id, id) });

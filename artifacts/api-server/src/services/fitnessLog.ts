@@ -7,9 +7,9 @@ import {
   personalRecordsTable,
 } from "@workspace/db";
 import { eq, and, gte } from "drizzle-orm";
-import { checkAndAwardBadges, type BadgeDefinition } from "./badgeService";
-import { awardFitnessBarXp, checkAndAwardArtifacts } from "./artifactService";
-import { logger } from "../lib/logger";
+import { checkAndAwardBadges, type BadgeDefinition } from "./badgeService.ts";
+import { awardFitnessBarXp, checkAndAwardArtifacts } from "./artifactService.ts";
+import { logger } from "../lib/logger.ts";
 
 export const STRENGTH_TYPES = new Set(["pushups", "burpees", "squats", "pullups", "planks", "situps"]);
 

@@ -1,8 +1,8 @@
 import { db } from "@workspace/db";
 import { healthConnectionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { syncGoogleFit } from "./googleFitSync";
-import { logger } from "../lib/logger";
+import { syncGoogleFit } from "./googleFitSync.ts";
+import { logger } from "../lib/logger.ts";
 
 const SYNC_INTERVAL_MS = 30 * 60 * 1000;
 

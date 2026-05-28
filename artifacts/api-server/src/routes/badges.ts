@@ -2,8 +2,8 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { playerBadgesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
-import { BADGE_DEFINITIONS, BADGE_MAP } from "../services/badgeService";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { BADGE_DEFINITIONS, BADGE_MAP } from "../services/badgeService.ts";
 
 const router = Router();
 

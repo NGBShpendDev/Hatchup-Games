@@ -2,9 +2,9 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
 import { createHmac, timingSafeEqual } from "crypto";
 import { z } from "zod";
-import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
-import { ObjectPermission } from "../lib/objectAcl";
-import { requireAuth } from "../middlewares/auth";
+import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage.ts";
+import { ObjectPermission } from "../lib/objectAcl.ts";
+import { requireAuth } from "../middlewares/auth.ts";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();

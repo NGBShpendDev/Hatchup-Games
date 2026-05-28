@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
-import { validateGpsUpdate } from "../services/antiCheat";
-import { locationUpdateLimiter } from "../middlewares/rateLimiters";
+import { validateGpsUpdate } from "../services/antiCheat.ts";
+import { locationUpdateLimiter } from "../middlewares/rateLimiters.ts";
 import { db } from "@workspace/db";
 import {
   playersTable,
@@ -11,7 +11,7 @@ import {
   playerArtifactsTable,
 } from "@workspace/db";
 import { eq, and, gte, lte, or, sql } from "drizzle-orm";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 
 const router = Router();
 

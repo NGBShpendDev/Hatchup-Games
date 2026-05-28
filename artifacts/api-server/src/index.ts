@@ -1,10 +1,10 @@
 import { createServer } from "http";
-import app from "./app";
-import { logger } from "./lib/logger";
-import { attachBattleWss } from "./services/matchmakingQueue";
-import { getStripeSync } from "./stripeClient";
-import { initPushNotifications } from "./services/pushNotifications";
-import { startChallengePushJob } from "./services/challengePushJob";
+import app from "./app.ts";
+import { logger } from "./lib/logger.ts";
+import { attachBattleWss } from "./services/matchmakingQueue.ts";
+import { getStripeSync } from "./stripeClient.ts";
+import { initPushNotifications } from "./services/pushNotifications.ts";
+import { startChallengePushJob } from "./services/challengePushJob.ts";
 
 /**
  * Initialize Stripe sync — migrations, managed webhook, and backfill.

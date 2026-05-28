@@ -1,8 +1,8 @@
 import { db, playersTable } from "@workspace/db";
 import { and, eq, sql } from "drizzle-orm";
-import { logger } from "../lib/logger";
-import { sendWeeklyRecapNotification } from "./nutritionRecap";
-import { shouldDeliverForPlayer } from "./recapSchedule";
+import { logger } from "../lib/logger.ts";
+import { sendWeeklyRecapNotification } from "./nutritionRecap.ts";
+import { shouldDeliverForPlayer } from "./recapSchedule.ts";
 
 // Run hourly. Idempotency is enforced per-player by `sourceId = isoWeekKey`
 // inside `sendWeeklyRecapNotification`, so multiple ticks per week are safe.

@@ -1,8 +1,8 @@
 import { db } from "@workspace/db";
 import { playersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { createPlayerOgRouter, type OgPlayerLoader } from "./og-router";
-import type { OgPlayerInput } from "./og-render";
+import { createPlayerOgRouter, type OgPlayerLoader } from "./og-router.ts";
+import type { OgPlayerInput } from "./og-render.ts";
 
 const playerLoader: OgPlayerLoader = async (username: string): Promise<OgPlayerInput | null> => {
   try {

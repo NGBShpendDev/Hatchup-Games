@@ -3,8 +3,8 @@ import { healthConnectionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import type { HealthConnection } from "@workspace/db";
 import * as crypto from "crypto";
-import { logger } from "../lib/logger";
-import { logFitnessActivity } from "./fitnessLog";
+import { logger } from "../lib/logger.ts";
+import { logFitnessActivity } from "./fitnessLog.ts";
 
 function getSecret(): string {
   const secret = process.env.SESSION_SECRET;

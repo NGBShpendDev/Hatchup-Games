@@ -12,8 +12,8 @@ import {
   EvolveHatchlingParams,
   EvolveHatchlingBody,
 } from "@workspace/api-zod";
-import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth";
-import { attachEntitlement, enforceHatchlingCap } from "../services/subscriptionGuards";
+import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth.ts";
+import { attachEntitlement, enforceHatchlingCap } from "../services/subscriptionGuards.ts";
 
 const router = Router();
 

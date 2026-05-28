@@ -10,7 +10,7 @@ import {
   GetWorkoutPlanQueryParams,
   GetMealPlanQueryParams,
 } from "@workspace/api-zod";
-import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth";
+import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth.ts";
 
 const router = Router();
 

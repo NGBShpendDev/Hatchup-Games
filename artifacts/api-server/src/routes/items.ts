@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { itemsTable, hatchlingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { ListItemsQueryParams, UseItemBody, UseItemParams } from "@workspace/api-zod";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 
 const router = Router();
 

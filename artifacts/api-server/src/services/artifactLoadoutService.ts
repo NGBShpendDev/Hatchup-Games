@@ -13,7 +13,7 @@ import {
   fitnessBarsTable,
 } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
-import { logger } from "../lib/logger";
+import { logger } from "../lib/logger.ts";
 
 // ── Rarity power scores (used for matchmaking balancing) ──────────────────────
 export const RARITY_POWER_SCORE: Record<string, number> = {

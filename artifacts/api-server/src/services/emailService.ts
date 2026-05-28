@@ -1,4 +1,4 @@
-import { logger } from "../lib/logger";
+import { logger } from "../lib/logger.ts";
 
 /**
  * Generic transactional email gateway. Currently speaks the Resend REST API

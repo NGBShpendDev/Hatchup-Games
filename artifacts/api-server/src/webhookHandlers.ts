@@ -7,11 +7,11 @@
  * (paidUntil, stripeSubscriptionId) so the entitlement resolver can read it
  * without joining stripe schema tables on every request.
  */
-import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
+import { getStripeSync, getUncachableStripeClient } from "./stripeClient.ts";
 import { db } from "@workspace/db";
 import { playersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { logger } from "./lib/logger";
+import { logger } from "./lib/logger.ts";
 
 export const WebhookHandlers = {
   async processWebhook(payload: Buffer, signature: string): Promise<void> {
