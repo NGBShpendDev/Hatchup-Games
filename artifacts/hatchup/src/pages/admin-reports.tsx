@@ -1,3 +1,4 @@
+import { AdminGate } from "@/components/admin-gate";
 import { useState } from "react";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
@@ -122,7 +123,7 @@ function formatCountdown(iso: string): string {
   return `purges in ${hours}h`;
 }
 
-export default function AdminReports() {
+function AdminReportsInner() {
   const { playerId, player } = usePlayer();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -766,5 +767,13 @@ export default function AdminReports() {
         )}
       </div>
     </Layout>
+  );
+}
+
+export default function AdminReports() {
+  return (
+    <AdminGate>
+      <AdminReportsInner />
+    </AdminGate>
   );
 }

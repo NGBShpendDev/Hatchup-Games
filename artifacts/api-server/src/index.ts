@@ -33,6 +33,10 @@ async function initStripe(): Promise<void> {
 
 void initStripe();
 void initPushNotifications().then(() => startChallengePushJob());
+void (async () => {
+  const { bootstrapAdminPanel } = await import("./routes/admin.ts");
+  await bootstrapAdminPanel();
+})();
 
 const rawPort = process.env["PORT"];
 

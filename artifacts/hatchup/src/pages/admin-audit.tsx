@@ -1,3 +1,4 @@
+import { AdminGate } from "@/components/admin-gate";
 import { useState } from "react";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
@@ -69,7 +70,7 @@ function formatRelative(iso: string): string {
   return `${days}d ago`;
 }
 
-export default function AdminAudit() {
+function AdminAuditInner() {
   const { playerId, player } = usePlayer();
   const isAdmin = !!(player as { isAdmin?: boolean } | null)?.isAdmin;
   const queryClient = useQueryClient();
@@ -281,5 +282,13 @@ export default function AdminAudit() {
         )}
       </div>
     </Layout>
+  );
+}
+
+export default function AdminAudit() {
+  return (
+    <AdminGate>
+      <AdminAuditInner />
+    </AdminGate>
   );
 }

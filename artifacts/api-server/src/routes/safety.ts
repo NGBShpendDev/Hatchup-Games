@@ -4,6 +4,7 @@ import { userReportsTable, blockedUsersTable, playersTable, moderationAuditLogTa
 import { eq, and, desc, or, ne, notInArray, inArray } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { requireAdminPanel } from "../middlewares/adminPanel.ts";
 import { emailResendLimiter, consumeEmailResendBudget } from "../middlewares/rateLimiters.ts";
 import { issueEmailVerification } from "../services/emailVerification.ts";
 import { isEmailBouncing, recordEmailBounce, clearEmailBounce } from "../services/bouncedEmails.ts";
@@ -152,12 +153,8 @@ async function writeAuditLog(entry: {
 // ── Admin Moderation ─────────────────────────────────────────────────────────
 
 // GET /api/admin/reports?status=
-router.get("/admin/reports", requireAuth, attachPlayer, async (req, res) => {
-  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
-  if (!caller?.isAdmin) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
+router.get("/admin/reports", requireAuth, attachPlayer, requireAdminPanel, async (req, res) => {
+  const caller = req.adminPlayer!;
   const { status } = req.query as { status?: string };
   const reports = status
     ? await db.select().from(userReportsTable).where(eq(userReportsTable.status, status)).orderBy(desc(userReportsTable.createdAt))
@@ -167,12 +164,8 @@ router.get("/admin/reports", requireAuth, attachPlayer, async (req, res) => {
 
 // PATCH /api/admin/reports/:id
 // body: { status }
-router.patch("/admin/reports/:id", requireAuth, attachPlayer, async (req, res) => {
-  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
-  if (!caller?.isAdmin) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
+router.patch("/admin/reports/:id", requireAuth, attachPlayer, requireAdminPanel, async (req, res) => {
+  const caller = req.adminPlayer!;
   const id = Number(req.params.id);
   const body = req.body as { status?: string };
   const status = body.status ?? "";
@@ -201,12 +194,8 @@ router.patch("/admin/reports/:id", requireAuth, attachPlayer, async (req, res) =
 });
 
 // GET /api/admin/audit?actorId=&targetPlayerId=&action=&limit=
-router.get("/admin/audit", requireAuth, attachPlayer, async (req, res) => {
-  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
-  if (!caller?.isAdmin) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
+router.get("/admin/audit", requireAuth, attachPlayer, requireAdminPanel, async (req, res) => {
+  const caller = req.adminPlayer!;
   const { actorId, targetPlayerId, action } = req.query as {
     actorId?: string;
     targetPlayerId?: string;
@@ -320,12 +309,8 @@ const UNDOABLE_ACTIONS = new Set<AuditAction>([
 // the original via metadata.undoOf. Refuses if the entry is already undone,
 // is itself an undo entry, isn't a reversible action, or is older than the
 // configured window.
-router.post("/admin/audit/:id/undo", requireAuth, attachPlayer, async (req, res) => {
-  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
-  if (!caller?.isAdmin) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
+router.post("/admin/audit/:id/undo", requireAuth, attachPlayer, requireAdminPanel, async (req, res) => {
+  const caller = req.adminPlayer!;
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     res.status(400).json({ error: "Invalid id" });
@@ -863,12 +848,8 @@ router.post("/email/bounce-webhook", async (req, res) => {
 // POST /api/email/bounce-clear
 // Admin escape hatch: wipe an address from the bounce list (e.g. after a user
 // reports the bounce was a transient outage). Admin-only.
-router.post("/email/bounce-clear", requireAuth, attachPlayer, async (req, res) => {
-  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
-  if (!caller?.isAdmin) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
+router.post("/email/bounce-clear", requireAuth, attachPlayer, requireAdminPanel, async (req, res) => {
+  const caller = req.adminPlayer!;
   const body = req.body as { email?: unknown };
   const email = typeof body.email === "string" ? body.email : "";
   if (!email) {
@@ -922,12 +903,8 @@ router.get("/players/me/suspension", requireAuth, attachPlayer, async (req, res)
 });
 
 // GET /api/admin/players/suspended
-router.get("/admin/players/suspended", requireAuth, attachPlayer, async (req, res) => {
-  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
-  if (!caller?.isAdmin) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
+router.get("/admin/players/suspended", requireAuth, attachPlayer, requireAdminPanel, async (req, res) => {
+  const caller = req.adminPlayer!;
   const rows = await db
     .select({
       id: playersTable.id,
@@ -975,12 +952,8 @@ router.get("/admin/players/suspended", requireAuth, attachPlayer, async (req, re
 
 // PATCH /api/admin/players/:id/suspend
 // body: { isSuspended: boolean }
-router.patch("/admin/players/:id/suspend", requireAuth, attachPlayer, async (req, res) => {
-  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
-  if (!caller?.isAdmin) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
+router.patch("/admin/players/:id/suspend", requireAuth, attachPlayer, requireAdminPanel, async (req, res) => {
+  const caller = req.adminPlayer!;
   const targetId = Number(req.params.id);
   if (isNaN(targetId)) {
     res.status(400).json({ error: "Invalid id" });
@@ -1040,12 +1013,8 @@ router.patch("/admin/players/:id/suspend", requireAuth, attachPlayer, async (req
 
 // POST /api/admin/players/:id/verify
 // Sets players.isVerified = true. Admin only.
-router.post("/admin/players/:id/verify", requireAuth, attachPlayer, async (req, res) => {
-  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
-  if (!caller?.isAdmin) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
+router.post("/admin/players/:id/verify", requireAuth, attachPlayer, requireAdminPanel, async (req, res) => {
+  const caller = req.adminPlayer!;
   const targetId = Number(req.params.id);
   if (isNaN(targetId)) { res.status(400).json({ error: "Invalid id" }); return; }
   const verifyReason = typeof (req.body as { reason?: unknown })?.reason === "string"
@@ -1249,12 +1218,8 @@ router.post("/account/appeals", requireAuth, attachPlayer, async (req, res) => {
 });
 
 // GET /api/admin/appeals?status=
-router.get("/admin/appeals", requireAuth, attachPlayer, async (req, res) => {
-  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
-  if (!caller?.isAdmin) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
+router.get("/admin/appeals", requireAuth, attachPlayer, requireAdminPanel, async (req, res) => {
+  const caller = req.adminPlayer!;
   const { status } = req.query as { status?: string };
   const rows = status
     ? await db
@@ -1300,12 +1265,8 @@ router.get("/admin/appeals", requireAuth, attachPlayer, async (req, res) => {
 // Approving an appeal also unsuspends the player by default (set
 // unsuspend=false to approve without lifting the suspension, e.g. partial
 // resolutions). Denying never changes suspension state.
-router.patch("/admin/appeals/:id", requireAuth, attachPlayer, async (req, res) => {
-  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
-  if (!caller?.isAdmin) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
+router.patch("/admin/appeals/:id", requireAuth, attachPlayer, requireAdminPanel, async (req, res) => {
+  const caller = req.adminPlayer!;
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     res.status(400).json({ error: "Invalid id" });

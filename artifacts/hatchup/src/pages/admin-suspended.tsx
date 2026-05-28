@@ -1,3 +1,4 @@
+import { AdminGate } from "@/components/admin-gate";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
@@ -24,7 +25,7 @@ interface SuspendedPlayer {
   } | null;
 }
 
-export default function AdminSuspended() {
+function AdminSuspendedInner() {
   const { playerId, player } = usePlayer();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -173,5 +174,13 @@ export default function AdminSuspended() {
         )}
       </div>
     </Layout>
+  );
+}
+
+export default function AdminSuspended() {
+  return (
+    <AdminGate>
+      <AdminSuspendedInner />
+    </AdminGate>
   );
 }

@@ -50,6 +50,7 @@ export const playersTable = pgTable("players", {
   locationVisibility: text("location_visibility").notNull().default("city"),
   requireWorkoutApproval: boolean("require_workout_approval").notNull().default(false),
   isAdmin: boolean("is_admin").notNull().default(false),
+  isSuperAdmin: boolean("is_super_admin").notNull().default(false),
   isVerified: boolean("is_verified").notNull().default(false),
   isMinor: boolean("is_minor").notNull().default(false),
   isSuspended: boolean("is_suspended").notNull().default(false),

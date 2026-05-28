@@ -29,6 +29,7 @@ import subscriptionRouter from "./subscription.ts";
 import storageRouter from "./storage.ts";
 import notificationsRouter from "./notifications.ts";
 import pushRouter from "./push.ts";
+import adminRouter from "./admin.ts";
 
 const router: IRouter = Router();
 
@@ -62,5 +63,6 @@ router.use(subscriptionRouter);
 router.use(storageRouter);
 router.use(notificationsRouter);
 router.use(pushRouter);
+router.use(adminRouter);
 
 export default router;

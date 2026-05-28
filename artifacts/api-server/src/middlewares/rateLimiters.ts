@@ -206,6 +206,16 @@ export async function emailResendLimiter(
   next();
 }
 
+// Admin panel unlock attempts: 5 wrong codes per 15 min per admin/IP.
+// Failures share the same bucket as successes so brute-forcing a wrong code
+// still ratchets the counter even when the success path would have cleared it.
+export const adminUnlockLimiter = dbLimiter({
+  scope: "admin_unlock",
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: "too_many_attempts", message: "Too many attempts. Try again in 15 minutes." },
+});
+
 // Body / meal scan uploads: expensive vision calls.
 export const scanLimiter = dbLimiter({
   scope: "scan",

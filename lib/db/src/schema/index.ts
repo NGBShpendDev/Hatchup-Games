@@ -22,3 +22,4 @@ export * from "./locations.ts";
 export * from "./notifications.ts";
 export * from "./push.ts";
 export * from "./rematch.ts";
+export * from "./admin.ts";
