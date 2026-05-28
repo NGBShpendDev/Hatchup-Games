@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot, Dumbbell, Minus, Plus, Users, MessageCircle, ChevronDown, ChevronUp, Send, Heart, RefreshCw } from "lucide-react";
+import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot, Dumbbell, Minus, Plus, Users, MessageCircle, ChevronDown, ChevronUp, Send, Heart, RefreshCw, ShieldCheck } from "lucide-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { XpBar } from "@/components/xp-bar";
@@ -545,7 +545,7 @@ export default function Home() {
             {/* Daily login streak badge */}
             <button
               onClick={() => setStreakModalOpen(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all active:scale-95 ${
+              className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all active:scale-95 ${
                 dailyStreak && !dailyStreak.alreadyClaimed
                   ? "bg-gradient-to-r from-orange-500/30 to-red-500/20 border-orange-500/60 shadow-[0_0_8px_rgba(251,146,60,0.4)] animate-pulse"
                   : "bg-card/80 backdrop-blur border-border"
@@ -557,6 +557,12 @@ export default function Home() {
               </span>
               {dailyStreak && !dailyStreak.alreadyClaimed && (
                 <span className="text-[9px] font-black text-orange-300 uppercase tracking-wide">Claim!</span>
+              )}
+              {(dailyStreak?.streakShields ?? 0) > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex items-center gap-0.5 bg-cyan-950 border border-cyan-500/60 text-cyan-400 rounded-full px-1 py-0.5 leading-none" data-testid="home-shield-badge">
+                  <ShieldCheck className="w-2.5 h-2.5" />
+                  <span className="text-[9px] font-black">{dailyStreak!.streakShields}</span>
+                </span>
               )}
             </button>
             <div className="flex items-center gap-1.5 bg-card/80 backdrop-blur px-3 py-1.5 rounded-full border border-border">

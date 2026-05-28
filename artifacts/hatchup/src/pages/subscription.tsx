@@ -1,7 +1,9 @@
 import { useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
-import { Crown, Check, Sparkles, Trophy, X, ExternalLink, ArrowLeft, Loader2, Palette, Egg, Bot, Swords, MapPin } from "lucide-react";
+import { Crown, Check, Sparkles, Trophy, X, ExternalLink, ArrowLeft, Loader2, Palette, Egg, Bot, Swords, MapPin, ShieldCheck, ShoppingCart } from "lucide-react";
 import { useSubscription, useStartCheckout, useOpenPortal } from "@/lib/subscription";
+import { useGetDailyStreak, getGetDailyStreakQueryKey, useBuyStreakShield } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 type UpsellIcon = "palette" | "crown" | "egg" | "bot" | "swords" | "map";
@@ -80,12 +82,34 @@ function UpsellIconView({ icon }: { icon: UpsellIcon }) {
   }
 }
 
+const SHIELD_COST = 200;
+
 export default function SubscriptionPage() {
   const [, setLocation] = useLocation();
   const { data, isLoading } = useSubscription();
   const checkout = useStartCheckout();
   const portal = useOpenPortal();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: streakData } = useGetDailyStreak({
+    query: { queryKey: getGetDailyStreakQueryKey() },
+  });
+
+  const buyShield = useBuyStreakShield({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetDailyStreakQueryKey() });
+        toast({ title: "Shield purchased!", description: "Your streak is now protected for one missed day." });
+      },
+      onError: (e: unknown) => {
+        const msg = e instanceof Error ? e.message : "Purchase failed";
+        toast({ title: "Couldn't buy shield", description: msg, variant: "destructive" });
+      },
+    },
+  });
+
+  const shieldCount = streakData?.streakShields ?? 0;
 
   const upsellSource = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -259,6 +283,52 @@ export default function SubscriptionPage() {
                 );
               })}
             </ul>
+          </div>
+        </section>
+
+        {/* Streak Protection */}
+        <section
+          className="rounded-3xl border border-cyan-500/20 bg-cyan-500/5 p-5 space-y-4"
+          data-testid="section-streak-protection"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-cyan-400/15 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5 text-cyan-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-black text-sm text-cyan-200">Streak Protection</h3>
+              <p className="text-xs text-white/60 mt-0.5 leading-relaxed">
+                A Shield auto-saves your streak if you miss a day — no reset.
+              </p>
+            </div>
+            {shieldCount > 0 && (
+              <div className="shrink-0 flex flex-col items-center bg-cyan-950/50 border border-cyan-500/30 rounded-xl px-3 py-2">
+                <span className="text-lg font-black text-cyan-300" data-testid="shield-count">{shieldCount}</span>
+                <span className="text-[9px] font-bold text-cyan-400/70 uppercase tracking-wide">
+                  {shieldCount === 1 ? "Shield" : "Shields"}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between bg-white/5 rounded-2xl px-4 py-3">
+            <div>
+              <p className="text-sm font-black">Buy a Streak Shield</p>
+              <p className="text-xs text-white/50 mt-0.5">{SHIELD_COST} coins per shield</p>
+            </div>
+            <button
+              onClick={() => buyShield.mutate()}
+              disabled={buyShield.isPending}
+              data-testid="button-buy-shield"
+              className="flex items-center gap-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 font-bold text-sm px-4 py-2 rounded-xl transition disabled:opacity-50"
+            >
+              {buyShield.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ShoppingCart className="w-4 h-4" />
+              )}
+              {SHIELD_COST}¢
+            </button>
           </div>
         </section>
 
