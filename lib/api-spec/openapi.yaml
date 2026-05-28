@@ -3788,10 +3788,11 @@ components:
 
     CompetitionResultInput:
       type: object
-      required: [score, duration]
+      required: [score, duration, rank]
       properties:
         score:    { type: integer }
         duration: { type: integer }
+        rank:     { type: integer }
         playerId: { type: integer }
 
     GameMode:

@@ -403,12 +403,13 @@ router.get("/fitness/quests/:playerId", requireAuth, attachPlayer, async (req, r
   if (quests.length === 0) {
     const newQuests = generateDailyQuests(params.data.playerId);
     const inserted = await db.insert(fitnessQuestsTable).values(newQuests).returning();
-    return res.json(inserted.map(q => ({
+    res.json(inserted.map(q => ({
       ...q,
       expiresAt: q.expiresAt.toISOString(),
       createdAt: q.createdAt.toISOString(),
       progressPct: 0,
     })));
+    return;
   }
 
   res.json(quests.map(q => ({
@@ -469,7 +470,8 @@ router.get("/fitness/realms", requireAuth, attachPlayer, async (req, res) => {
       playerXp: r.id === playerRealm ? realmXp : null,
       isUnlocked: r.id !== "mythic" || realmXp >= 10000,
     }));
-    return res.json(realms);
+    res.json(realms);
+    return;
   }
 
   res.json(REALMS.map(r => ({ ...r, playerXp: null, isUnlocked: r.id !== "mythic" })));

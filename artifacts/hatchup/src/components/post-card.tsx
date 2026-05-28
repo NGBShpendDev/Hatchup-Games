@@ -462,12 +462,12 @@ export function PostCard({
                     )}
                     {(meta.boostedXp ?? 0) > 0 && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/30 text-green-300">
-                        <Zap className="w-3 h-3" /> +{meta.boostedXp.toLocaleString()} XP
+                        <Zap className="w-3 h-3" /> +{(meta.boostedXp ?? 0).toLocaleString()} XP
                       </span>
                     )}
                     {(meta.boostedCoins ?? 0) > 0 && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/30 text-amber-200">
-                        <Coins className="w-3 h-3" /> +{meta.boostedCoins.toLocaleString()}
+                        <Coins className="w-3 h-3" /> +{(meta.boostedCoins ?? 0).toLocaleString()}
                       </span>
                     )}
                   </div>

@@ -193,7 +193,7 @@ async function postView(
     method: "POST",
     headers: { "content-type": "application/json", ...headers },
   });
-  const body = await res.json().catch(() => ({}));
+  const body = (await res.json().catch(() => ({}))) as { viewCount?: number; counted?: boolean; error?: string };
   return { status: res.status, body };
 }
 

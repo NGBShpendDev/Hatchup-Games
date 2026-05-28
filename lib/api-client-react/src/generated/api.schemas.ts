@@ -305,6 +305,7 @@ export interface CompetitionInput {
 export interface CompetitionResultInput {
   score: number;
   duration: number;
+  rank: number;
   playerId?: number;
 }
 

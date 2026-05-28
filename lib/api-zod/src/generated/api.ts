@@ -786,6 +786,7 @@ export const SubmitCompetitionResultParams = zod.object({
 export const SubmitCompetitionResultBody = zod.object({
   "score": zod.number(),
   "duration": zod.number(),
+  "rank": zod.number(),
   "playerId": zod.number().optional()
 })
 

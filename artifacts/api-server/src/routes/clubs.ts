@@ -24,7 +24,7 @@ router.get("/clubs", async (req, res) => {
 router.post("/clubs", requireAuth as RequestHandler, async (req, res) => {
   const body = CreateClubBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
-  const club = await db.insert(clubsTable).values(body.data).returning();
+  const club = await db.insert(clubsTable).values({ ...body.data, description: body.data.description ?? "" }).returning();
   res.status(201).json({ ...club[0], createdAt: club[0].createdAt.toISOString() });
 });
 

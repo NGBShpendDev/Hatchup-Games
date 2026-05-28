@@ -24,10 +24,10 @@ async function getStripe(): Promise<Stripe> {
   url.searchParams.set("environment", process.env.REPLIT_DEPLOYMENT === "1" ? "production" : "development");
 
   const res = await fetch(url.toString(), { headers: { Accept: "application/json", "X-Replit-Token": xReplitToken } });
-  const data = await res.json();
+  const data = (await res.json()) as { items?: Array<{ settings?: { secret?: string } }> };
   const secret = data.items?.[0]?.settings?.secret;
   if (!secret) throw new Error("Stripe connection not found");
-  return new Stripe(secret, { apiVersion: "2025-08-27.basil" });
+  return new Stripe(secret);
 }
 
 async function main(): Promise<void> {
