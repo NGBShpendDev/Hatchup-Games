@@ -2235,6 +2235,7 @@ export const GetTrendingPostsResponse = zod.object({
   "engagementScore": zod.number(),
   "viewCount": zod.number(),
   "createdAt": zod.string(),
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). May be\nnull for post types that don\'t carry extra data.\n'),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),
   "encourage": zod.number().optional(),
