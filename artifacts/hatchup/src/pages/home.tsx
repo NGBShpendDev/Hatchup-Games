@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { useGetPlayerDashboard, getGetPlayerDashboardQueryKey, useLogActivity, useGetSocialFeed, getGetSocialFeedQueryKey, useReactToPost, useAddPostComment } from "@workspace/api-client-react";
@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { XpBar } from "@/components/xp-bar";
 import { SubscriptionChip } from "@/components/subscription-chip";
 import { LevelUpOverlay } from "@/components/level-up-overlay";
-import { ArtifactUnlockOverlay, type UnlockedArtifact } from "@/components/artifact-unlock-overlay";
+import { useEpicMomentQueue, type EpicMomentEvent } from "@/components/epic-moment-overlay";
 import { ForYouStrip, type ForYouItem } from "@/components/for-you-strip";
 import { TrendingStrip } from "@/components/trending-strip";
 import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
@@ -32,6 +32,9 @@ import { errorMessage } from "@/lib/errorMessage";
 import { Bot as BotIcon, Salad as SaladIcon, Swords as SwordsIcon, Users as UsersIcon, Trophy as TrophyIcon, Egg as EggLucide } from "lucide-react";
 
 const OVERLAY_RARITIES = new Set(["Legendary", "Mythic", "Ancient", "Celestial"]);
+const FITNESS_BAR_MILESTONES = new Set([10, 25, 50]);
+
+type FitnessBar = { barType: string; level: number; xp: number; nextLevelXp: number; xpInCurrentLevel: number; progressPct: number };
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -93,7 +96,7 @@ export default function Home() {
     enabled: !!playerId,
   });
 
-  const { data: fitnessBars } = useQuery<Array<{ barType: string; level: number; xp: number; nextLevelXp: number; xpInCurrentLevel: number; progressPct: number }>>({
+  const { data: fitnessBars } = useQuery<FitnessBar[]>({
     queryKey: ["fitness-bars", pid],
     queryFn: () => fetch(`${BASE}/api/players/me/fitness-bars`, { credentials: "include" }).then(r => r.json()),
     enabled: !!playerId,
@@ -148,7 +151,8 @@ export default function Home() {
   const [distanceMiles, setDistanceMiles] = useState("");
   const [levelUpShow, setLevelUpShow] = useState(false);
   const [levelUpData, setLevelUpData] = useState<{ level: number; newBadges: any[] }>({ level: 1, newBadges: [] });
-  const [artifactQueue, setArtifactQueue] = useState<UnlockedArtifact[]>([]);
+  const { enqueue: enqueueEpicMoment } = useEpicMomentQueue();
+  const prevPrestigeRef = useRef<number | null>(null);
   const [xpPopups, setXpPopups] = useState<{ id: number; amount: number }[]>([]);
   const [rewardSummary, setRewardSummary] = useState<{ open: boolean; entries: RewardEntry[] }>({ open: false, entries: [] });
 
@@ -188,18 +192,24 @@ export default function Home() {
           setDistanceMiles("");
 
           const prResult = (res as any).prResult;
-          const newArtifacts: UnlockedArtifact[] = (res as any).newArtifacts ?? [];
+          const newArtifacts: Array<{ id: number; name: string; rarity: string; lore?: string }> = (res as any).newArtifacts ?? [];
           const newBadges: Array<{ id?: number; name?: string; rarity?: string }> = (res as any).newBadges ?? [];
           const groupBonusXp = (res as any).groupBonusXp ?? 0;
           const eggsUpdated = (res as any).eggsUpdated ?? 0;
           const streakAfter = (res as any).player?.currentStreak ?? null;
+          const prevBars: FitnessBar[] = queryClient.getQueryData<FitnessBar[]>(["fitness-bars", pid]) ?? [];
 
           // Epic artifact unlocks get the dedicated celebratory overlay;
           // everything else funnels through the unified reward summary.
           const epicUnlocks = newArtifacts.filter(a => OVERLAY_RARITIES.has(a.rarity));
           const minorUnlocks = newArtifacts.filter(a => !OVERLAY_RARITIES.has(a.rarity));
           if (epicUnlocks.length > 0) {
-            setArtifactQueue(epicUnlocks);
+            enqueueEpicMoment(epicUnlocks.map(a => ({
+              kind: "artifact" as const,
+              rarity: a.rarity as "Legendary" | "Mythic" | "Ancient" | "Celestial",
+              name: a.name,
+              lore: a.lore,
+            })));
           }
 
           // Build a unified cross-feature reward summary that reflects the
@@ -242,10 +252,47 @@ export default function Home() {
               setLevelUpShow(true);
             }
           });
+
+          // Refetch fitness bars and enqueue an epic moment for any bar that
+          // just crossed a 10/25/50 milestone. We diff against the previous
+          // cached levels so we only fire once per crossing.
+          queryClient.invalidateQueries({ queryKey: ["fitness-bars", pid] }).then(() => {
+            const newBars = queryClient.getQueryData<FitnessBar[]>(["fitness-bars", pid]) ?? [];
+            const events: EpicMomentEvent[] = [];
+            for (const bar of newBars) {
+              const prev = prevBars.find(b => b.barType === bar.barType);
+              const prevLvl = prev?.level ?? 1;
+              for (const milestone of [10, 25, 50] as const) {
+                if (prevLvl < milestone && bar.level >= milestone) {
+                  events.push({
+                    kind: "fitnessBar",
+                    barType: bar.barType,
+                    level: milestone,
+                    emoji: BAR_MINI_ICONS[bar.barType],
+                  });
+                }
+              }
+            }
+            if (events.length > 0) enqueueEpicMoment(events);
+          });
         }
       }
     );
   };
+
+  // Detect a prestige unlock by watching the dashboard for a delta. Skips the
+  // first paint (when prevPrestigeRef is null) so we never fire on initial load.
+  useEffect(() => {
+    const current = (dashboard as any)?.prestige ?? 0;
+    if (prevPrestigeRef.current !== null && current > prevPrestigeRef.current) {
+      enqueueEpicMoment({
+        kind: "prestige",
+        prestige: current,
+        title: (dashboard as any)?.title,
+      });
+    }
+    if (dashboard) prevPrestigeRef.current = current;
+  }, [(dashboard as any)?.prestige]);
 
   if (isLoading) {
     return (
@@ -292,11 +339,6 @@ export default function Home() {
         level={levelUpData.level}
         newBadges={levelUpData.newBadges}
         onDismiss={() => setLevelUpShow(false)}
-      />
-
-      <ArtifactUnlockOverlay
-        queue={artifactQueue}
-        onDismissAll={() => setArtifactQueue([])}
       />
 
       <RewardSummaryModal

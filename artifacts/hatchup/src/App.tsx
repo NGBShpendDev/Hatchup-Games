@@ -48,6 +48,7 @@ import ClubDetail from "@/pages/club-detail";
 import NotificationsPage from "@/pages/notifications";
 import PostDetail from "@/pages/post-detail";
 import { PageTransition } from "@/components/page-transition";
+import { EpicMomentProvider } from "@/components/epic-moment-overlay";
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({ onError: handleAccountSuspendedError }),
@@ -292,7 +293,9 @@ function HomeRedirect() {
     <>
       <Show when="signed-in">
         <PlayerProvider>
-          <AppRoutes />
+          <EpicMomentProvider>
+            <AppRoutes />
+          </EpicMomentProvider>
         </PlayerProvider>
       </Show>
       <Show when="signed-out">

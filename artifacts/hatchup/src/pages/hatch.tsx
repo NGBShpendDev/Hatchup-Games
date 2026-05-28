@@ -22,6 +22,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { ErrorCard } from "@/components/error-card";
+import { useEpicMomentQueue } from "@/components/epic-moment-overlay";
 
 // ── Realm visual config ────────────────────────────────────────────────────────
 const REALM_EGG_STYLES: Record<string, {
@@ -161,6 +162,7 @@ export default function Hatch() {
 
   const hatchMutation = useHatchEgg();
   const addEggMutation = useAddEgg();
+  const { enqueue: enqueueEpicMoment } = useEpicMomentQueue();
 
   const [selectedEgg, setSelectedEgg] = useState<number | null>(null);
   const [selectedEggRealm, setSelectedEggRealm] = useState<string>("balance");
@@ -193,6 +195,22 @@ export default function Hatch() {
             setHatchPhase("reveal");
             queryClient.invalidateQueries({ queryKey: getListEggsQueryKey({ playerId: pid, hatched: false }) });
             queryClient.invalidateQueries({ queryKey: getListHatchlingsQueryKey({ playerId: pid }) });
+
+            // Mythic+ hatches get the full-screen epic moment. We let the
+            // reveal modal play first so the two celebrations don't fight.
+            const rarity = (res as any)?.hatchling?.rarity;
+            if (rarity === "Mythic" || rarity === "Legendary") {
+              const style = REALM_EGG_STYLES[selectedEggRealm] ?? REALM_EGG_STYLES["balance"];
+              setTimeout(() => {
+                enqueueEpicMoment({
+                  kind: "hatch",
+                  species: (res as any)?.hatchling?.species ?? "Mystery Pal",
+                  rarity: rarity as "Mythic" | "Legendary",
+                  realmColor: style.crackColor,
+                  realmEmoji: style.emoji,
+                });
+              }, 2000);
+            }
           },
           onError: () => {
             setHatchPhase("idle");

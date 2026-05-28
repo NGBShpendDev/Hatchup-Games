@@ -24,6 +24,7 @@ import { ComposeSheet } from "@/components/compose-sheet";
 import { ErrorCard } from "@/components/error-card";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { useEpicMomentQueue } from "@/components/epic-moment-overlay";
 
 import lavaDragonImg from "@/assets/images/lava-dragon.png";
 import cyberCreatureImg from "@/assets/images/cyber-creature.png";
@@ -233,13 +234,26 @@ export default function HatchlingDetail() {
     );
   };
 
+  const { enqueue: enqueueEpicMoment } = useEpicMomentQueue();
+
   const handleEvolve = () => {
     if (!hatchling) return;
     evolveMutation.mutate(
       { id: hatchlingId, data: { triggerId: 1 } },
       {
-        onSuccess: () => {
-          toast({ title: "Evolution Complete!", description: `${hatchling.name} has reached Stage ${(hatchling.evolutionStage ?? 1) + 1}!` });
+        onSuccess: (res) => {
+          const newStage = (res as any)?.evolutionStage ?? (hatchling.evolutionStage ?? 1) + 1;
+          const realm = ((res as any)?.realm ?? hatchling.realm) as string | undefined;
+          const realmCfg = realm ? REALM_CONFIG[realm] : undefined;
+          enqueueEpicMoment({
+            kind: "evolution",
+            hatchlingName: hatchling.name,
+            stage: newStage,
+            stageName: STAGE_LABELS[newStage]?.name,
+            realmColor: realmCfg?.color,
+            realmEmoji: realmCfg?.emoji,
+          });
+          toast({ title: "Evolution Complete!", description: `${hatchling.name} has reached Stage ${newStage}!` });
           queryClient.invalidateQueries({ queryKey: getGetHatchlingQueryKey(hatchlingId) });
         },
         onError: () => {
