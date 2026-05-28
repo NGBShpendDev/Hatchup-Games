@@ -14,3 +14,4 @@ export * from "./badges";
 export * from "./safety";
 export * from "./nutrition";
 export * from "./battles";
+export * from "./artifacts";

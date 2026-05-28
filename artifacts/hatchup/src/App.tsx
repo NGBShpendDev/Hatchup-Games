@@ -28,6 +28,7 @@ import Coach from "@/pages/coach";
 import Records from "@/pages/records";
 import Nutrition from "@/pages/nutrition";
 import Battle from "@/pages/battle";
+import ArtifactsPage from "@/pages/artifacts";
 
 const queryClient = new QueryClient();
 
@@ -230,6 +231,7 @@ function AppRoutes() {
         <Route path="/coach" component={Coach} />
         <Route path="/records" component={Records} />
         <Route path="/nutrition" component={Nutrition} />
+        <Route path="/artifacts" component={ArtifactsPage} />
         <Route component={NotFound} />
       </Switch>
     </>

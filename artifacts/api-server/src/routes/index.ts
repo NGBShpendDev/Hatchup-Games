@@ -20,6 +20,7 @@ import coachRouter from "./coach";
 import recordsRouter from "./records";
 import nutritionRouter from "./nutrition";
 import battlesRouter from "./battles";
+import artifactsRouter from "./artifacts";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use(coachRouter);
 router.use(recordsRouter);
 router.use(nutritionRouter);
 router.use(battlesRouter);
+router.use(artifactsRouter);
 
 export default router;

@@ -570,6 +570,73 @@ paths:
                 items:
                   $ref: "#/components/schemas/RankDistribution"
 
+  # ── Artifacts ─────────────────────────────────────────────────────────────
+  /artifacts:
+    get:
+      operationId: listArtifacts
+      tags: [players]
+      summary: Get artifact museum — all artifacts with per-player discovery state
+      responses:
+        "200":
+          description: Artifact museum list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ArtifactMuseumEntry"
+
+  /players/me/artifacts:
+    get:
+      operationId: getMyArtifacts
+      tags: [players]
+      summary: Get owned artifacts for the authenticated player
+      responses:
+        "200":
+          description: Owned artifacts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OwnedArtifact"
+
+  /players/me/fitness-bars:
+    get:
+      operationId: getMyFitnessBars
+      tags: [players]
+      summary: Get all 8 fitness bar levels for the authenticated player
+      responses:
+        "200":
+          description: Fitness bars
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FitnessBar"
+
+  /artifacts/world-notifications:
+    get:
+      operationId: getArtifactWorldNotifications
+      tags: [players]
+      summary: Get recent world notifications for Mythic+ artifact drops
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: World notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ArtifactWorldNotification"
+
   # ── Items ─────────────────────────────────────────────────────────────────
   /items:
     get:
@@ -2250,6 +2317,73 @@ components:
         strengthTotals:
           $ref: "#/components/schemas/StrengthTotals"
         monthlyRunMiles: { type: number }
+
+    ArtifactAbility:
+      type: object
+      required: [name, description, value]
+      properties:
+        name:        { type: string }
+        description: { type: string }
+        value:       { type: number }
+
+    ArtifactMuseumEntry:
+      type: object
+      required: [id, name, lore, rarity, type, imageSlug, isHidden, abilities, discovered, isEquipped, isFeatured]
+      properties:
+        id:          { type: integer }
+        name:        { type: string }
+        lore:        { type: string }
+        rarity:      { type: string }
+        type:        { type: string }
+        imageSlug:   { type: string }
+        isHidden:    { type: boolean }
+        abilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactAbility"
+        discovered:  { type: boolean }
+        isEquipped:  { type: boolean }
+        isFeatured:  { type: boolean }
+        earnedAt:    { type: ["string", "null"] }
+
+    OwnedArtifact:
+      type: object
+      required: [id, name, lore, rarity, type, imageSlug, abilities, isEquipped, isFeatured, earnedAt]
+      properties:
+        id:          { type: integer }
+        name:        { type: string }
+        lore:        { type: string }
+        rarity:      { type: string }
+        type:        { type: string }
+        imageSlug:   { type: string }
+        abilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactAbility"
+        isEquipped:  { type: boolean }
+        isFeatured:  { type: boolean }
+        earnedAt:    { type: string }
+
+    FitnessBar:
+      type: object
+      required: [barType, level, xp, nextLevelXp, xpInCurrentLevel, progressPct]
+      properties:
+        barType:          { type: string }
+        level:            { type: integer }
+        xp:               { type: integer }
+        nextLevelXp:      { type: integer }
+        xpInCurrentLevel: { type: integer }
+        progressPct:      { type: integer }
+
+    ArtifactWorldNotification:
+      type: object
+      required: [id, playerUsername, artifactName, rarity, createdAt]
+      properties:
+        id:             { type: integer }
+        playerUsername: { type: string }
+        artifactName:   { type: string }
+        rarity:         { type: string }
+        createdAt:      { type: string }
 
     SpeedLeaderboardEntry:
       type: object

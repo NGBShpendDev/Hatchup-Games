@@ -22,6 +22,8 @@ import type {
 import type {
   ActivityLogResult,
   AddEggInput,
+  ArtifactMuseumEntry,
+  ArtifactWorldNotification,
   Club,
   ClubInput,
   CoachChatBody,
@@ -34,12 +36,14 @@ import type {
   EvolutionType,
   EvolveInput,
   FitnessActivity,
+  FitnessBar,
   FitnessQuest,
   FitnessRealm,
   FitnessStats,
   GameMode,
   GenerateMealPlanInput,
   GeneratePlanInput,
+  GetArtifactWorldNotificationsParams,
   GetGlobalLeaderboardParams,
   GetMealPlanParams,
   GetModeLeaderboardParams,
@@ -80,6 +84,7 @@ import type {
   LogGroupWorkoutInput,
   LogSessionInput,
   MealPlan,
+  OwnedArtifact,
   Player,
   PlayerDashboard,
   PlayerInput,
@@ -2090,6 +2095,321 @@ export function useGetRankDistribution<TData = Awaited<ReturnType<typeof getRank
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetRankDistributionQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListArtifactsUrl = () => {
+
+
+
+
+  return `/api/artifacts`
+}
+
+/**
+ * @summary Get artifact museum — all artifacts with per-player discovery state
+ */
+export const listArtifacts = async ( options?: RequestInit): Promise<ArtifactMuseumEntry[]> => {
+
+  return customFetch<ArtifactMuseumEntry[]>(getListArtifactsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListArtifactsQueryKey = () => {
+    return [
+    `/api/artifacts`
+    ] as const;
+    }
+
+
+export const getListArtifactsQueryOptions = <TData = Awaited<ReturnType<typeof listArtifacts>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listArtifacts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListArtifactsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listArtifacts>>> = ({ signal }) => listArtifacts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listArtifacts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListArtifactsQueryResult = NonNullable<Awaited<ReturnType<typeof listArtifacts>>>
+export type ListArtifactsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get artifact museum — all artifacts with per-player discovery state
+ */
+
+export function useListArtifacts<TData = Awaited<ReturnType<typeof listArtifacts>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listArtifacts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListArtifactsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMyArtifactsUrl = () => {
+
+
+
+
+  return `/api/players/me/artifacts`
+}
+
+/**
+ * @summary Get owned artifacts for the authenticated player
+ */
+export const getMyArtifacts = async ( options?: RequestInit): Promise<OwnedArtifact[]> => {
+
+  return customFetch<OwnedArtifact[]>(getGetMyArtifactsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyArtifactsQueryKey = () => {
+    return [
+    `/api/players/me/artifacts`
+    ] as const;
+    }
+
+
+export const getGetMyArtifactsQueryOptions = <TData = Awaited<ReturnType<typeof getMyArtifacts>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyArtifacts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyArtifactsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyArtifacts>>> = ({ signal }) => getMyArtifacts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyArtifacts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyArtifactsQueryResult = NonNullable<Awaited<ReturnType<typeof getMyArtifacts>>>
+export type GetMyArtifactsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get owned artifacts for the authenticated player
+ */
+
+export function useGetMyArtifacts<TData = Awaited<ReturnType<typeof getMyArtifacts>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyArtifacts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyArtifactsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMyFitnessBarsUrl = () => {
+
+
+
+
+  return `/api/players/me/fitness-bars`
+}
+
+/**
+ * @summary Get all 8 fitness bar levels for the authenticated player
+ */
+export const getMyFitnessBars = async ( options?: RequestInit): Promise<FitnessBar[]> => {
+
+  return customFetch<FitnessBar[]>(getGetMyFitnessBarsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyFitnessBarsQueryKey = () => {
+    return [
+    `/api/players/me/fitness-bars`
+    ] as const;
+    }
+
+
+export const getGetMyFitnessBarsQueryOptions = <TData = Awaited<ReturnType<typeof getMyFitnessBars>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyFitnessBars>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyFitnessBarsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyFitnessBars>>> = ({ signal }) => getMyFitnessBars({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyFitnessBars>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyFitnessBarsQueryResult = NonNullable<Awaited<ReturnType<typeof getMyFitnessBars>>>
+export type GetMyFitnessBarsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get all 8 fitness bar levels for the authenticated player
+ */
+
+export function useGetMyFitnessBars<TData = Awaited<ReturnType<typeof getMyFitnessBars>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyFitnessBars>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyFitnessBarsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetArtifactWorldNotificationsUrl = (params?: GetArtifactWorldNotificationsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/artifacts/world-notifications?${stringifiedParams}` : `/api/artifacts/world-notifications`
+}
+
+/**
+ * @summary Get recent world notifications for Mythic+ artifact drops
+ */
+export const getArtifactWorldNotifications = async (params?: GetArtifactWorldNotificationsParams, options?: RequestInit): Promise<ArtifactWorldNotification[]> => {
+
+  return customFetch<ArtifactWorldNotification[]>(getGetArtifactWorldNotificationsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetArtifactWorldNotificationsQueryKey = (params?: GetArtifactWorldNotificationsParams,) => {
+    return [
+    `/api/artifacts/world-notifications`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetArtifactWorldNotificationsQueryOptions = <TData = Awaited<ReturnType<typeof getArtifactWorldNotifications>>, TError = ErrorType<unknown>>(params?: GetArtifactWorldNotificationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getArtifactWorldNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetArtifactWorldNotificationsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getArtifactWorldNotifications>>> = ({ signal }) => getArtifactWorldNotifications(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getArtifactWorldNotifications>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetArtifactWorldNotificationsQueryResult = NonNullable<Awaited<ReturnType<typeof getArtifactWorldNotifications>>>
+export type GetArtifactWorldNotificationsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get recent world notifications for Mythic+ artifact drops
+ */
+
+export function useGetArtifactWorldNotifications<TData = Awaited<ReturnType<typeof getArtifactWorldNotifications>>, TError = ErrorType<unknown>>(
+ params?: GetArtifactWorldNotificationsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getArtifactWorldNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetArtifactWorldNotificationsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

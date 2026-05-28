@@ -12,10 +12,18 @@ import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot, Dumbbell, Minus, Plus } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { XpBar } from "@/components/xp-bar";
 import { LevelUpOverlay } from "@/components/level-up-overlay";
+
+const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+
+const RARITY_NOTIF_STYLES: Record<string, string> = {
+  Mythic:    "bg-pink-950/60 border-pink-500/60 text-pink-300",
+  Ancient:   "bg-orange-950/60 border-orange-500/60 text-orange-300",
+  Celestial: "bg-cyan-950/60 border-cyan-400/70 text-cyan-200",
+};
 
 const TIER_GLOW: Record<string, string> = {
   Common:    "shadow-none",
@@ -45,6 +53,13 @@ export default function Home() {
 
   const { data: dashboard, isLoading } = useGetPlayerDashboard(pid, {
     query: { queryKey: getGetPlayerDashboardQueryKey(pid), enabled: !!playerId }
+  });
+
+  const { data: worldNotifs } = useQuery<Array<{ id: number; playerUsername: string; artifactName: string; rarity: string; createdAt: string }>>({
+    queryKey: ["artifact-world-notifications"],
+    queryFn: () => fetch(`${BASE}/api/artifacts/world-notifications?limit=5`, { credentials: "include" }).then(r => r.json()),
+    refetchInterval: 60_000,
+    enabled: !!playerId,
   });
 
   const logActivity = useLogActivity();
@@ -88,7 +103,14 @@ export default function Home() {
           setDistanceMiles("");
 
           const prResult = (res as any).prResult;
-          if (prResult?.isNew) {
+          const newArtifacts: Array<{ id: number; name: string; rarity: string }> = (res as any).newArtifacts ?? [];
+
+          if (newArtifacts.length > 0) {
+            for (const artifact of newArtifacts) {
+              const rarityEmoji = artifact.rarity === "Mythic" ? "🔴" : artifact.rarity === "Ancient" ? "🟠" : artifact.rarity === "Celestial" ? "🌟" : artifact.rarity === "Legendary" ? "🟡" : "✨";
+              toast({ title: `${rarityEmoji} Artifact Unlocked!`, description: `${artifact.name} (${artifact.rarity}) — visit your Museum to equip it.` });
+            }
+          } else if (prResult?.isNew) {
             const paceDesc = prResult.metric === "pace_seconds_per_mile"
               ? (() => { const s = prResult.value; return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")} /mi pace`; })()
               : prResult.metric === "speed_mph_x10"
@@ -502,6 +524,40 @@ export default function Home() {
                   <span className="text-[9px] font-bold text-muted-foreground text-center">All Rewards</span>
                 </motion.div>
               </Link>
+            </div>
+          </section>
+        )}
+
+        {/* Legendary Drops Widget */}
+        {worldNotifs && worldNotifs.length > 0 && (
+          <section>
+            <div className="flex justify-between items-end mb-3">
+              <h2 className="text-lg font-black flex items-center gap-2">
+                <span className="text-lg">🌍</span> World Drops
+              </h2>
+              <Link href="/artifacts" className="text-xs font-bold text-primary flex items-center hover:underline">
+                Museum <ChevronRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="space-y-2">
+              {worldNotifs.map(notif => {
+                const s = RARITY_NOTIF_STYLES[notif.rarity] ?? "bg-muted/40 border-border text-muted-foreground";
+                const emoji = notif.rarity === "Celestial" ? "🌟" : notif.rarity === "Ancient" ? "🟠" : "🔴";
+                return (
+                  <motion.div
+                    key={notif.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className={`flex items-center gap-3 border rounded-xl px-3 py-2.5 ${s}`}
+                  >
+                    <span className="text-xl flex-shrink-0">{emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-black truncate">{notif.playerUsername} <span className="font-normal opacity-80">unlocked</span> {notif.artifactName}</p>
+                      <p className="text-[10px] opacity-60">{notif.rarity} Artifact · {new Date(notif.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
           </section>
         )}

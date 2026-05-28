@@ -8,6 +8,7 @@ import {
 } from "@workspace/db";
 import { eq, and, gte } from "drizzle-orm";
 import { checkAndAwardBadges, type BadgeDefinition } from "./badgeService";
+import { awardFitnessBarXp, checkAndAwardArtifacts } from "./artifactService";
 
 export const STRENGTH_TYPES = new Set(["pushups", "burpees", "squats", "pullups", "planks", "situps"]);
 
@@ -68,6 +69,7 @@ export type LogActivityResult = {
   activity: typeof fitnessActivitiesTable.$inferSelect | null;
   newBadges?: BadgeDefinition[];
   prResult?: PrResult;
+  newArtifacts?: Array<{ id: number; name: string; rarity: string }>;
 };
 
 /** Upsert a personal record. Returns whether it is a new/improved PR. */
@@ -325,6 +327,10 @@ export async function logFitnessActivity(
     paceSecsPerMile,
   });
 
+  // Award fitness bar XP and check artifact milestones
+  await awardFitnessBarXp(playerId, type, value).catch(() => {});
+  const newArtifacts = await checkAndAwardArtifacts(playerId, updatedPlayer.username).catch(() => []);
+
   return {
     fitnessXpEarned,
     eggsUpdated,
@@ -333,5 +339,6 @@ export async function logFitnessActivity(
     activity: insertedRows[0]!,
     newBadges,
     prResult,
+    newArtifacts: newArtifacts.map(a => ({ id: a.id, name: a.name, rarity: a.rarity })),
   };
 }

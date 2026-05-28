@@ -738,6 +738,58 @@ export interface PlayerRecordsResult {
   monthlyRunMiles: number;
 }
 
+export interface ArtifactAbility {
+  name: string;
+  description: string;
+  value: number;
+}
+
+export interface ArtifactMuseumEntry {
+  id: number;
+  name: string;
+  lore: string;
+  rarity: string;
+  type: string;
+  imageSlug: string;
+  isHidden: boolean;
+  abilities: ArtifactAbility[];
+  discovered: boolean;
+  isEquipped: boolean;
+  isFeatured: boolean;
+  /** @nullable */
+  earnedAt?: string | null;
+}
+
+export interface OwnedArtifact {
+  id: number;
+  name: string;
+  lore: string;
+  rarity: string;
+  type: string;
+  imageSlug: string;
+  abilities: ArtifactAbility[];
+  isEquipped: boolean;
+  isFeatured: boolean;
+  earnedAt: string;
+}
+
+export interface FitnessBar {
+  barType: string;
+  level: number;
+  xp: number;
+  nextLevelXp: number;
+  xpInCurrentLevel: number;
+  progressPct: number;
+}
+
+export interface ArtifactWorldNotification {
+  id: number;
+  playerUsername: string;
+  artifactName: string;
+  rarity: string;
+  createdAt: string;
+}
+
 export interface SpeedLeaderboardEntry {
   position: number;
   playerId: number;
@@ -820,6 +872,10 @@ export const GetSpeedLeaderboardMode = {
   steps: 'steps',
   pace: 'pace',
 } as const;
+
+export type GetArtifactWorldNotificationsParams = {
+limit?: number;
+};
 
 export type ListItemsParams = {
 category?: string;
