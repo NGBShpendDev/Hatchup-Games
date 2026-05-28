@@ -11,6 +11,7 @@ import {
   ListRealmsQueryParams,
 } from "@workspace/api-zod";
 import { logFitnessActivity, ACTIVITY_CONFIG } from "../services/fitnessLog";
+import { validateStepDelta } from "../services/antiCheat";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth";
 import { fitnessLogLimiter } from "../middlewares/rateLimiters";
 
@@ -203,6 +204,31 @@ router.post("/fitness/log", fitnessLogLimiter, requireAuth, attachPlayer, requir
   if (isDurationMinutes && body.data.value > 1440) {
     res.status(400).json({ error: "fitness_anti_cheat_reject", reason: "duration_too_long" });
     return;
+  }
+
+  // ── Anti-cheat: step-rate spoof detection ────────────────────────────────
+  // For step ingestion, compare against the most-recent prior steps log to
+  // bound the cadence. Rejects impossible step rates (>400/min).
+  if (body.data.type === "steps") {
+    const lastSteps = await db.query.fitnessActivitiesTable.findFirst({
+      where: and(
+        eq(fitnessActivitiesTable.playerId, body.data.playerId),
+        eq(fitnessActivitiesTable.type, "steps"),
+      ),
+      orderBy: [desc(fitnessActivitiesTable.createdAt)],
+    });
+    if (lastSteps) {
+      const secondsElapsed = Math.max(1, Math.floor((Date.now() - lastSteps.createdAt.getTime()) / 1000));
+      const stepVerdict = validateStepDelta({ stepsAdded: body.data.value, secondsElapsed });
+      if (stepVerdict.verdict === "reject") {
+        req.log?.warn?.({ playerId: body.data.playerId, reason: stepVerdict.reason, details: stepVerdict.details }, "Step log rejected by anti-cheat");
+        res.status(400).json({ error: "fitness_anti_cheat_reject", reason: stepVerdict.reason });
+        return;
+      }
+      if (stepVerdict.verdict === "suspicious") {
+        req.log?.info?.({ playerId: body.data.playerId, reason: stepVerdict.reason, details: stepVerdict.details }, "Step log flagged suspicious");
+      }
+    }
   }
 
   const result = await logFitnessActivity({

@@ -171,7 +171,15 @@ router.post("/players/me/location", locationUpdateLimiter, requireAuth, attachPl
     }
   }
 
-  const resolvedVisibility = visibility ?? playerRow?.locationVisibility ?? existing?.visibility ?? "city";
+  // ── Minor-account safety enforcement ──────────────────────────────────────
+  // Minor accounts cannot set precise location visibility via this endpoint.
+  // Any "exact" or "neighborhood" request is silently downgraded to "city".
+  let requestedVisibility = visibility;
+  if (playerRow?.isMinor && requestedVisibility && (requestedVisibility === "exact" || requestedVisibility === "neighborhood")) {
+    req.log?.info?.({ playerId: req.playerId, requested: requestedVisibility }, "Minor account location visibility downgraded to city");
+    requestedVisibility = "city";
+  }
+  const resolvedVisibility = requestedVisibility ?? playerRow?.locationVisibility ?? existing?.visibility ?? "city";
 
   // Build the update payload using the inferred Drizzle type
   const base: Partial<typeof playerLocationTable.$inferInsert> = {
@@ -201,9 +209,9 @@ router.post("/players/me/location", locationUpdateLimiter, requireAuth, attachPl
       .returning();
   }
 
-  // Sync visibility to players table if explicitly provided
-  if (visibility && playerRow?.locationVisibility !== visibility) {
-    await db.update(playersTable).set({ locationVisibility: visibility }).where(eq(playersTable.id, req.playerId!));
+  // Sync visibility to players table if explicitly provided (after minor downgrade).
+  if (requestedVisibility && playerRow?.locationVisibility !== requestedVisibility) {
+    await db.update(playersTable).set({ locationVisibility: requestedVisibility }).where(eq(playersTable.id, req.playerId!));
   }
 
   res.json(safeLocationRecord(record));
