@@ -159,6 +159,181 @@ function AncientRunes() {
   );
 }
 
+// ── Ancient jade/teal burst ────────────────────────────────────────────────────
+function AncientJadeBurst() {
+  const JADE = ["#14b8a6", "#0d9488", "#10b981", "#34d399", "#06b6d4"];
+
+  const shards = Array.from({ length: 28 }, (_, i) => ({
+    angle: (i / 28) * 360,
+    length: 70 + (i % 5) * 45,
+    width: 1.5 + (i % 3) * 0.8,
+    color: JADE[i % JADE.length],
+    delay: (i % 7) * 0.03,
+    duration: 0.65 + (i % 3) * 0.12,
+  }));
+
+  const dots = Array.from({ length: 36 }, (_, i) => ({
+    angle: (i / 36) * Math.PI * 2,
+    dist: 90 + (i % 4) * 55,
+    size: 5 + (i % 4) * 3,
+    color: JADE[i % JADE.length],
+    delay: (i % 6) * 0.035,
+  }));
+
+  return (
+    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+      {/* Central jade flash */}
+      <motion.div
+        className="absolute rounded-full"
+        style={{
+          background:
+            "radial-gradient(circle, rgba(20,184,166,0.95) 0%, rgba(16,185,129,0.5) 40%, transparent 70%)",
+        }}
+        initial={{ width: 0, height: 0, opacity: 1 }}
+        animate={{ width: "85vmin", height: "85vmin", opacity: [1, 0.7, 0] }}
+        transition={{ duration: 0.85, ease: "easeOut" }}
+      />
+
+      {/* Three concentric jade rings that expand outward */}
+      {[0, 1, 2].map((i) => (
+        <motion.div
+          key={`jade-ring-${i}`}
+          className="absolute rounded-full"
+          style={{
+            border: `${2.5 - i * 0.5}px solid ${JADE[i]}`,
+            width: "55vmin",
+            height: "55vmin",
+            boxShadow: `0 0 14px ${JADE[i]}80`,
+          }}
+          initial={{ scale: 0, opacity: 0.95 }}
+          animate={{ scale: 2.8 + i * 0.4, opacity: 0 }}
+          transition={{ duration: 0.9, delay: i * 0.14, ease: "easeOut" }}
+        />
+      ))}
+
+      {/* Crystal shard rays */}
+      {shards.map((s, i) => (
+        <motion.div
+          key={`shard-${i}`}
+          className="absolute"
+          style={{
+            width: s.length,
+            height: s.width,
+            background: `linear-gradient(to right, ${s.color}ff, ${s.color}20, transparent)`,
+            rotate: `${s.angle}deg`,
+            left: "50%",
+            top: "50%",
+            transformOrigin: "left center",
+            boxShadow: `0 0 6px ${s.color}90`,
+          }}
+          initial={{ scaleX: 0, opacity: 1 }}
+          animate={{ scaleX: [0, 1, 0.5], opacity: [0, 1, 0] }}
+          transition={{ duration: s.duration, delay: s.delay, ease: "easeOut" }}
+        />
+      ))}
+
+      {/* Jade particle dots */}
+      {dots.map((p, i) => (
+        <motion.div
+          key={`jadedot-${i}`}
+          className="absolute rounded-full"
+          style={{
+            width: p.size,
+            height: p.size,
+            backgroundColor: p.color,
+            boxShadow: `0 0 8px ${p.color}`,
+          }}
+          initial={{ scale: 0, x: 0, y: 0, opacity: 1 }}
+          animate={{
+            scale: [0, 1.6, 0.8],
+            x: Math.cos(p.angle) * p.dist,
+            y: Math.sin(p.angle) * p.dist,
+            opacity: [1, 1, 0],
+          }}
+          transition={{ duration: 1.05, delay: p.delay, ease: "easeOut" }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── Celestial slow prismatic rainbow explosion ──────────────────────────────
+function CelestialRainbowExplosion() {
+  const PRISM = ["#22d3ee", "#818cf8", "#f472b6", "#34d399", "#fbbf24", "#60a5fa", "#c084fc", "#f9a8d4"];
+
+  const rings = Array.from({ length: 7 }, (_, i) => ({
+    color: PRISM[i % PRISM.length],
+    delay: i * 0.28,
+    thickness: Math.max(1, 3.5 - i * 0.4),
+  }));
+
+  const particles = Array.from({ length: 52 }, (_, i) => ({
+    angle: (i / 52) * Math.PI * 2,
+    dist: 130 + (i % 6) * 55,
+    size: 5 + (i % 3) * 4,
+    color: PRISM[i % PRISM.length],
+    delay: (i % 8) * 0.18,
+    duration: 2.8 + (i % 4) * 0.4,
+  }));
+
+  return (
+    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+      {/* Slow-rotating conic gradient bloom */}
+      <motion.div
+        className="absolute rounded-full"
+        style={{
+          background:
+            "conic-gradient(from 0deg, #22d3ee70, #818cf870, #f472b670, #34d39970, #fbbf2470, #60a5fa70, #c084fc70, #22d3ee70)",
+          width: "75vmin",
+          height: "75vmin",
+        }}
+        initial={{ scale: 0, opacity: 0, rotate: 0 }}
+        animate={{ scale: [0, 2.2], opacity: [0, 0.85, 0.3, 0], rotate: 240 }}
+        transition={{ duration: 3.2, ease: "easeOut" }}
+      />
+
+      {/* Slow expanding prismatic rings */}
+      {rings.map((ring, i) => (
+        <motion.div
+          key={`prism-ring-${i}`}
+          className="absolute rounded-full"
+          style={{
+            border: `${ring.thickness}px solid ${ring.color}`,
+            width: "55vmin",
+            height: "55vmin",
+            boxShadow: `0 0 22px ${ring.color}60, inset 0 0 10px ${ring.color}20`,
+          }}
+          initial={{ scale: 0, opacity: 1 }}
+          animate={{ scale: 4.5 + i * 0.3, opacity: 0 }}
+          transition={{ duration: 3.0, delay: ring.delay, ease: "easeOut" }}
+        />
+      ))}
+
+      {/* Languid prismatic particles */}
+      {particles.map((p, i) => (
+        <motion.div
+          key={`prism-dot-${i}`}
+          className="absolute rounded-full"
+          style={{
+            width: p.size,
+            height: p.size,
+            backgroundColor: p.color,
+            boxShadow: `0 0 12px ${p.color}, 0 0 24px ${p.color}80`,
+          }}
+          initial={{ scale: 0, x: 0, y: 0, opacity: 0 }}
+          animate={{
+            scale: [0, 1.3, 1.0, 0],
+            x: Math.cos(p.angle) * p.dist,
+            y: Math.sin(p.angle) * p.dist,
+            opacity: [0, 1, 0.9, 0],
+          }}
+          transition={{ duration: p.duration, delay: p.delay, ease: "easeOut" }}
+        />
+      ))}
+    </div>
+  );
+}
+
 // ── Celestial prismatic burst ──────────────────────────────────────────────────
 function CelestialPrismatic() {
   const rays = Array.from({ length: 8 }, (_, i) => {
@@ -271,12 +446,17 @@ export function LegendaryCinematic({
     advanceTimer.current = setTimeout(() => setPhase(to), delay);
   }, []);
 
+  const isLegendary = rarity === "Legendary";
+  const isMythic = rarity === "Mythic";
+  const isAncient = rarity === "Ancient";
+  const isCelestial = rarity === "Celestial";
+
   useEffect(() => {
     if (phase === "shaking") advance("particles", 500);
-    if (phase === "particles") advance("rarity-reveal", 1200);
+    if (phase === "particles") advance("rarity-reveal", isCelestial ? 2400 : 1200);
     if (phase === "rarity-reveal") advance("creature-reveal", 3500);
     return () => { if (advanceTimer.current) clearTimeout(advanceTimer.current); };
-  }, [phase, advance]);
+  }, [phase, advance, isCelestial]);
 
   const handleShare = async () => {
     const shareText = `I just hatched a ${rarity} ${species} after ${steps.toLocaleString()} steps in HatchUp! 🥚✨`;
@@ -329,11 +509,6 @@ export function LegendaryCinematic({
     }
     setSharing(false);
   };
-
-  const isLegendary = rarity === "Legendary";
-  const isMythic = rarity === "Mythic";
-  const isAncient = rarity === "Ancient";
-  const isCelestial = rarity === "Celestial";
 
   return (
     <motion.div
@@ -409,15 +584,21 @@ export function LegendaryCinematic({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <ParticleBurst colors={cfg.particleColors} />
+            {isAncient ? (
+              <AncientJadeBurst />
+            ) : isCelestial ? (
+              <CelestialRainbowExplosion />
+            ) : (
+              <ParticleBurst colors={cfg.particleColors} />
+            )}
             <motion.div
               className="text-[7rem] select-none relative z-10"
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: [0.5, 1.6, 1.2], opacity: [0, 1, 1], rotate: [0, 20, -10, 0] }}
-              transition={{ duration: 0.9 }}
+              transition={{ duration: isAncient ? 0.75 : isCelestial ? 1.8 : 0.9 }}
               style={{ filter: `drop-shadow(0 0 40px ${realmColor})` }}
             >
-              💥
+              {isAncient ? "🏺" : isCelestial ? "🌌" : "💥"}
             </motion.div>
           </motion.div>
         )}
