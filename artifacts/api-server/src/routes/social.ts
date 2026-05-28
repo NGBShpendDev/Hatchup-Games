@@ -31,7 +31,7 @@ import { attachEntitlement, requirePremium } from "../services/subscriptionGuard
 import { blockMinorSocialWrite } from "../middlewares/minorGuard.ts";
 import { blockSuspendedSocialWrite } from "../middlewares/suspendedGuard.ts";
 import { socialWriteLimiter, postViewLimiter } from "../middlewares/rateLimiters.ts";
-import { selectTopComments } from "./socialCommentOrdering.ts";
+import { isTopCommentAt, selectTopComments } from "./socialCommentOrdering.ts";
 import {
   loadSharedGroupsForViewer,
   loadMutualWorkoutPartnersForViewer,
@@ -221,7 +221,7 @@ async function enrichPost(
     // Mark the lead comment as the "Top comment" only when it actually owes
     // its position to likes (not just recency). The list is pre-sorted by
     // likes desc, so the first entry is the top when it has >0 likes.
-    const isTopComment = idx === 0 && likeCount > 0;
+    const isTopComment = isTopCommentAt(idx, comments, likeCountByComment);
     return {
       ...c,
       authorName: commentAuthor?.displayName ?? commentAuthor?.username ?? "Trainer",
