@@ -6,6 +6,8 @@ import {
   getGetUnreadNotificationCountQueryKey,
   useMarkNotificationRead,
   useMarkAllNotificationsRead,
+  useAcceptBattleRematch,
+  useDeclineBattleRematch,
   type Notification,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -93,6 +95,8 @@ export default function NotificationsPage() {
 
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
+  const acceptInvite = useAcceptBattleRematch();
+  const declineInvite = useDeclineBattleRematch();
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: getListNotificationsQueryKey(listParams) });
@@ -112,14 +116,7 @@ export default function NotificationsPage() {
   const acceptRematch = async (n: Notification, inviteId: string) => {
     setBusyInvite({ id: n.id, action: "accept" });
     try {
-      const res = await fetch(`${BASE}/api/battles/rematch/${inviteId}/accept`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error ?? `HTTP ${res.status}`);
-      }
+      await acceptInvite.mutateAsync({ id: inviteId });
       if (!n.read) markRead.mutate({ id: n.id });
       refresh();
       // Drop the user into the battle queue with the invite-tagged hatchling.
@@ -200,14 +197,7 @@ export default function NotificationsPage() {
   const declineRematch = async (n: Notification, inviteId: string) => {
     setBusyInvite({ id: n.id, action: "decline" });
     try {
-      const res = await fetch(`${BASE}/api/battles/rematch/${inviteId}/decline`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error ?? `HTTP ${res.status}`);
-      }
+      await declineInvite.mutateAsync({ id: inviteId });
       if (!n.read) markRead.mutate({ id: n.id });
       refresh();
       toast({ title: "Rematch declined" });
