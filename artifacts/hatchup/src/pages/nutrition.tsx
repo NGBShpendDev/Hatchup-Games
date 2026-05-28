@@ -286,6 +286,8 @@ export default function Nutrition() {
           hatchlingName: c.hatchlingName,
           happinessDelta: c.happinessDelta ?? 0,
           energyDelta: c.energyDelta ?? 0,
+          imageUrl: c.imageUrl ?? null,
+          realm: c.realm ?? null,
         });
       }
 

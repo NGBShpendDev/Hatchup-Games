@@ -172,6 +172,8 @@ export default function HatchlingDetail() {
           hatchlingName: hatchling.name,
           happinessDelta,
           energyDelta,
+          imageUrl: hatchling.imageUrl ?? null,
+          realm: (hatchling.realm as string | undefined) ?? null,
         });
       }
     }

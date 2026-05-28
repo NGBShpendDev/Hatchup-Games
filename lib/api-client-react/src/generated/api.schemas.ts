@@ -2065,6 +2065,10 @@ export interface MealHatchlingStatChange {
   happiness: number;
   energy: number;
   buffActive: boolean;
+  /** @nullable */
+  imageUrl: string | null;
+  /** @nullable */
+  realm: string | null;
 }
 
 export interface MealDailyMacroRewardHatchling {

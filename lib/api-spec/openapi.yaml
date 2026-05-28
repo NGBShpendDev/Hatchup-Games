@@ -6317,7 +6317,7 @@ components:
 
     MealHatchlingStatChange:
       type: object
-      required: [hatchlingId, hatchlingName, happinessDelta, energyDelta, happiness, energy, buffActive]
+      required: [hatchlingId, hatchlingName, happinessDelta, energyDelta, happiness, energy, buffActive, imageUrl, realm]
       properties:
         hatchlingId:    { type: integer }
         hatchlingName:  { type: string }
@@ -6326,6 +6326,8 @@ components:
         happiness:      { type: integer }
         energy:         { type: integer }
         buffActive:     { type: boolean }
+        imageUrl:       { type: ["string", "null"] }
+        realm:          { type: ["string", "null"] }
 
     MealDailyMacroRewardHatchling:
       type: object

@@ -146,6 +146,8 @@ async function applyNutritionStatBuff(playerId: number, qualityScore: number) {
     happiness: newHappiness,
     energy: newEnergy,
     buffActive: qualityScore >= 7,
+    imageUrl: active.imageUrl ?? null,
+    realm: (active.realm as string | null) ?? null,
   };
 }
 
