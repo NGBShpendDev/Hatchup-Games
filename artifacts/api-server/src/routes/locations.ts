@@ -6,6 +6,7 @@ import {
   playerLocationTable,
   localChallengesTable,
   localChallengeParticipantsTable,
+  playerArtifactsTable,
 } from "@workspace/db";
 import { eq, and, gte, lte, or, sql } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
@@ -314,31 +315,67 @@ router.get("/local-challenges/:id/leaderboard", requireAuth, attachPlayer, async
   const now = new Date();
   const isEnded = now > challenge.endAt;
 
-  // ── Reward top 3 for ended challenges (idempotent) ───────────────────────
+  // ── Reward top 3 for ended challenges (race-safe + idempotent) ───────────
+  // CRITICAL: under concurrent requests, multiple readers could see rewardsAwarded=false
+  // and double-pay. We prevent this by using a conditional UPDATE that flips the flag
+  // ONLY where it is still false, then awarding XP/coins/artifact ONLY if the update
+  // actually mutated a row (returning() lists affected rows). This makes each
+  // participant rewarded exactly once even under heavy concurrency.
   const rewardTiers = [1.0, 0.6, 0.3];
   if (isEnded) {
     for (let i = 0; i < Math.min(3, sorted.length); i++) {
       const participant = sorted[i];
-      if (!participant.rewardsAwarded) {
-        const xpAward   = Math.round(challenge.rewardXp    * rewardTiers[i]);
-        const coinAward = Math.round(challenge.rewardCoins  * rewardTiers[i]);
-        await db.update(playersTable)
-          .set({ xp: sql`xp + ${xpAward}`, coins: sql`coins + ${coinAward}` })
-          .where(eq(playersTable.id, participant.playerId));
-        await db.update(localChallengeParticipantsTable)
-          .set({ rank: i + 1, rewardsAwarded: true })
-          .where(eq(localChallengeParticipantsTable.id, participant.id));
-        // Reflect in-memory so response shows awarded state
-        participant.rank = i + 1;
-        participant.rewardsAwarded = true;
+      if (participant.rewardsAwarded) continue; // fast path: already paid
+
+      // Atomic flip — only one concurrent request can win
+      const claimed = await db.update(localChallengeParticipantsTable)
+        .set({ rank: i + 1, rewardsAwarded: true })
+        .where(and(
+          eq(localChallengeParticipantsTable.id, participant.id),
+          eq(localChallengeParticipantsTable.rewardsAwarded, false),
+        ))
+        .returning({ id: localChallengeParticipantsTable.id });
+
+      if (claimed.length === 0) {
+        // Someone else just paid this row — re-read to reflect their state
+        const fresh = await db.query.localChallengeParticipantsTable.findFirst({
+          where: eq(localChallengeParticipantsTable.id, participant.id),
+        });
+        if (fresh) {
+          participant.rank = fresh.rank;
+          participant.rewardsAwarded = fresh.rewardsAwarded;
+        }
+        continue;
       }
+
+      // We won the race — pay rewards exactly once
+      const xpAward   = Math.round(challenge.rewardXp   * rewardTiers[i]);
+      const coinAward = Math.round(challenge.rewardCoins * rewardTiers[i]);
+      await db.update(playersTable)
+        .set({ xp: sql`xp + ${xpAward}`, coins: sql`coins + ${coinAward}` })
+        .where(eq(playersTable.id, participant.playerId));
+
+      // Grant artifact if the challenge defines one (top 3 all get a copy)
+      if (challenge.rewardArtifactId != null) {
+        await db.insert(playerArtifactsTable)
+          .values({ playerId: participant.playerId, artifactId: challenge.rewardArtifactId })
+          .onConflictDoNothing(); // unique(playerId, artifactId) — idempotent
+      }
+
+      // Reflect in-memory so response shows awarded state
+      participant.rank = i + 1;
+      participant.rewardsAwarded = true;
     }
   }
 
   const entries = sorted.map((p, i) => {
     const player = playerMap.get(p.playerId);
     const rewardEarned = p.rewardsAwarded && i < 3
-      ? { xp: Math.round(challenge.rewardXp * rewardTiers[i]), coins: Math.round(challenge.rewardCoins * rewardTiers[i]) }
+      ? {
+          xp:         Math.round(challenge.rewardXp   * rewardTiers[i]),
+          coins:      Math.round(challenge.rewardCoins * rewardTiers[i]),
+          artifactId: challenge.rewardArtifactId ?? null,
+        }
       : null;
     return {
       rank:           i + 1,

@@ -101,6 +101,7 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, async (req, res) =
   const scope  = ((req.query.scope  as string) ?? "world") as ScopeKey;
   const metric = ((req.query.metric as string) ?? "xp")    as MetricKey;
   const limit  = Math.min(50, Number(req.query.limit ?? 20));
+  const page   = Math.max(1, Number(req.query.page ?? 1));
 
   const validScopes  = ["world", "country", "state", "county", "city", "nearby"];
   const validMetrics = ["steps", "workouts", "battle_wins", "streaks", "xp", "artifacts"];
@@ -199,11 +200,16 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, async (req, res) =
   // Sort by metric descending in memory
   filteredPlayers.sort((a, b) => getMetricValue(b, metric, artifactCountMap) - getMetricValue(a, metric, artifactCountMap));
 
-  const top = filteredPlayers.slice(0, limit);
+  // ── Pagination ─────────────────────────────────────────────────────────────
+  const totalPlayers = filteredPlayers.length;
+  const totalPages   = Math.max(1, Math.ceil(totalPlayers / limit));
+  const safePage     = Math.min(page, totalPages);
+  const offset       = (safePage - 1) * limit;
+  const top = filteredPlayers.slice(offset, offset + limit);
   const myRankIndex = filteredPlayers.findIndex(p => p.id === req.playerId);
 
   const entries = top.map((p, i) => ({
-    position:      i + 1,
+    position:      offset + i + 1,
     playerId:      p.id,
     username:      p.username,
     displayName:   p.displayName,
@@ -238,11 +244,19 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, async (req, res) =
     myEntry,
     scope,
     metric,
-    totalInScope:     filteredPlayers.length,
+    totalInScope:     totalPlayers,
     locationRequired: false,
     locationContext:  myLocation
       ? { city: myLocation.city, state: myLocation.state, country: myLocation.country }
       : null,
+    pagination: {
+      page:        safePage,
+      limit,
+      totalPages,
+      totalEntries: totalPlayers,
+      hasNext:     safePage < totalPages,
+      hasPrev:     safePage > 1,
+    },
   });
 });
 

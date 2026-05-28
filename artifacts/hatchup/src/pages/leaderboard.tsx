@@ -64,6 +64,14 @@ interface ScopedBoard {
   totalInScope: number;
   locationRequired: boolean;
   locationContext: { city: string | null; state: string | null; country: string | null } | null;
+  pagination?: {
+    page: number;
+    limit: number;
+    totalPages: number;
+    totalEntries: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
 }
 
 interface LocalChallenge {
@@ -91,7 +99,7 @@ interface ChallengeWinner {
   currentValue: number;
   isMe: boolean;
   rewardsAwarded?: boolean;
-  rewardEarned?: { xp: number; coins: number } | null;
+  rewardEarned?: { xp: number; coins: number; artifactId?: number | null } | null;
 }
 
 interface ChallengeLeaderboard {
@@ -117,6 +125,9 @@ export default function Leaderboard() {
   const [metricOpen, setMetricOpen]   = useState(false);
   const [requestingLoc, setRequestingLoc] = useState(false);
   const [expandedChallenge, setExpandedChallenge] = useState<number | null>(null);
+  const [page, setPage] = useState<number>(1);
+  // Reset to page 1 whenever scope or metric changes
+  useEffect(() => { setPage(1); }, [scope, metric]);
   const [firstVisitDismissed, setFirstVisitDismissed] = useState<boolean>(
     () => typeof window !== "undefined" && window.localStorage?.getItem("hatchup_loc_prompted") === "1"
   );
@@ -144,9 +155,12 @@ export default function Leaderboard() {
 
   // ── Scoped leaderboard ───────────────────────────────────────────────────
   const { data: scopedBoard, isLoading: scopedLoading } = useQuery<ScopedBoard>({
-    queryKey: ["leaderboard-scoped", scope, metric],
+    queryKey: ["leaderboard-scoped", scope, metric, page],
     queryFn: async () => {
-      const res = await fetch(`${BASE}/api/leaderboards/scoped?scope=${scope}&metric=${metric}&limit=20`, { credentials: "include" });
+      const res = await fetch(
+        `${BASE}/api/leaderboards/scoped?scope=${scope}&metric=${metric}&limit=20&page=${page}`,
+        { credentials: "include" }
+      );
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
@@ -419,6 +433,34 @@ export default function Leaderboard() {
               ) : (
                 <RankedList entries={scopedBoard?.entries ?? []} myEntry={scopedBoard?.myEntry ?? null} metric={metric} />
               )}
+
+              {/* Pagination controls */}
+              {scopedBoard?.pagination && scopedBoard.pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between gap-3 pt-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="bg-white/5 border-white/10 text-xs font-bold disabled:opacity-30"
+                    disabled={!scopedBoard.pagination.hasPrev || scopedLoading}
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                  >
+                    ← Prev
+                  </Button>
+                  <span className="text-xs font-bold text-white/50">
+                    Page {scopedBoard.pagination.page} / {scopedBoard.pagination.totalPages}
+                    <span className="ml-2 text-white/30">· {scopedBoard.pagination.totalEntries} players</span>
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="bg-white/5 border-white/10 text-xs font-bold disabled:opacity-30"
+                    disabled={!scopedBoard.pagination.hasNext || scopedLoading}
+                    onClick={() => setPage(p => p + 1)}
+                  >
+                    Next →
+                  </Button>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -670,6 +712,9 @@ export default function Leaderboard() {
                                                 <div className="text-[9px] space-y-0.5 pt-1 border-t border-white/10">
                                                   <div className="text-yellow-400 font-bold">⚡ {w.rewardEarned.xp}</div>
                                                   <div className="text-amber-400 font-bold">🪙 {w.rewardEarned.coins}</div>
+                                                  {w.rewardEarned.artifactId != null && (
+                                                    <div className="text-violet-400 font-bold">🎁 Artifact</div>
+                                                  )}
                                                 </div>
                                               )}
                                               {w.isMe && w.rewardsAwarded && (
