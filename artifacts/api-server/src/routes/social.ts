@@ -19,6 +19,8 @@ import { requireAuth, attachPlayer } from "../middlewares/auth";
 import { attachEntitlement, requirePremium } from "../services/subscriptionGuards";
 import { blockMinorSocialWrite } from "../middlewares/minorGuard";
 import { socialWriteLimiter, postViewLimiter } from "../middlewares/rateLimiters";
+import { sendPushToPlayer } from "../services/pushNotifications";
+import { notificationsTable } from "@workspace/db";
 import { createHmac } from "node:crypto";
 import {
   CreatePostBody,
@@ -758,6 +760,50 @@ router.post(
     } else {
       await db.insert(postCommentReactionsTable).values({ commentId, playerId, reactionType: "like" });
       liked = true;
+    }
+
+    // Notify the comment author when someone else likes their comment.
+    // Skip self-likes and dedupe per (author, comment, liker) so rapid toggling
+    // doesn't spam the notifications feed.
+    if (liked && comment.playerId !== playerId) {
+      const link = `/post/${comment.postId}?commentLikeFrom=${playerId}`;
+      const duplicate = await db.query.notificationsTable.findFirst({
+        where: and(
+          eq(notificationsTable.playerId, comment.playerId),
+          eq(notificationsTable.type, "comment_like"),
+          eq(notificationsTable.sourceId, commentId),
+          eq(notificationsTable.link, link),
+        ),
+      });
+
+      if (!duplicate) {
+        const liker = await db.query.playersTable.findFirst({
+          where: eq(playersTable.id, playerId),
+        });
+        const likerName = liker?.displayName ?? liker?.username ?? "Someone";
+        const snippet = comment.content.length > 60
+          ? `${comment.content.slice(0, 57)}…`
+          : comment.content;
+        const title = "New like on your comment";
+        const body = `${likerName} liked your comment: "${snippet}"`;
+
+        await db.insert(notificationsTable).values({
+          playerId: comment.playerId,
+          type: "comment_like",
+          title,
+          body,
+          link,
+          sourceId: commentId,
+        });
+
+        void sendPushToPlayer(comment.playerId, {
+          title,
+          body,
+          link,
+          category: "invites",
+          tag: `comment-like-${commentId}-${playerId}`,
+        });
+      }
     }
 
     const likeCount = await db
