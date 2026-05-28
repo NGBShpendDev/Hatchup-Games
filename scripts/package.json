@@ -9,6 +9,7 @@
     "seed:nearby-players": "tsx ./src/seed-nearby-players.ts"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/node": "catalog:",
     "tsx": "catalog:"
   },
