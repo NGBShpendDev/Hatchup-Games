@@ -828,6 +828,27 @@ export interface ToggleOwnedArtifactBody {
   isFeatured?: boolean;
 }
 
+export interface SwapFeaturedArtifactBody {
+  /**
+     * ID of the artifact currently featured that should be unfeatured.
+     * @minimum 1
+     */
+  removeId: number;
+  /**
+     * ID of the artifact to feature in its place.
+     * @minimum 1
+     */
+  addId: number;
+}
+
+export interface SwapFeaturedArtifactResponse {
+  ok: boolean;
+  removedId: number;
+  addedId: number;
+  /** Updated list of the player's featured artifacts in display order. */
+  featured: OwnedArtifact[];
+}
+
 export interface ReorderFeaturedArtifactsBody {
   /**
      * Featured artifact IDs in the desired display order. Every ID must already be featured and owned by the player.

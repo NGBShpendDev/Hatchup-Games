@@ -200,6 +200,8 @@ import type {
   StorageErrorEnvelope,
   SubmitProgressBody,
   SuccessResult,
+  SwapFeaturedArtifactBody,
+  SwapFeaturedArtifactResponse,
   SyncResult,
   TodayGoalProgress,
   ToggleOwnedArtifactBody,
@@ -2936,6 +2938,77 @@ export const useToggleOwnedArtifact = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getToggleOwnedArtifactMutationOptions(options));
+    }
+
+export const getSwapFeaturedArtifactUrl = () => {
+
+
+
+
+  return `/api/players/me/featured-swap`
+}
+
+/**
+ * @summary Atomically swap one featured artifact for another in a single transaction
+ */
+export const swapFeaturedArtifact = async (swapFeaturedArtifactBody: SwapFeaturedArtifactBody, options?: RequestInit): Promise<SwapFeaturedArtifactResponse> => {
+
+  return customFetch<SwapFeaturedArtifactResponse>(getSwapFeaturedArtifactUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      swapFeaturedArtifactBody,)
+  }
+);}
+
+
+
+
+export const getSwapFeaturedArtifactMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof swapFeaturedArtifact>>, TError,{data: BodyType<SwapFeaturedArtifactBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof swapFeaturedArtifact>>, TError,{data: BodyType<SwapFeaturedArtifactBody>}, TContext> => {
+
+const mutationKey = ['swapFeaturedArtifact'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof swapFeaturedArtifact>>, {data: BodyType<SwapFeaturedArtifactBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  swapFeaturedArtifact(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SwapFeaturedArtifactMutationResult = NonNullable<Awaited<ReturnType<typeof swapFeaturedArtifact>>>
+    export type SwapFeaturedArtifactMutationBody = BodyType<SwapFeaturedArtifactBody>
+    export type SwapFeaturedArtifactMutationError = ErrorType<void>
+
+    /**
+ * @summary Atomically swap one featured artifact for another in a single transaction
+ */
+export const useSwapFeaturedArtifact = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof swapFeaturedArtifact>>, TError,{data: BodyType<SwapFeaturedArtifactBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof swapFeaturedArtifact>>,
+        TError,
+        {data: BodyType<SwapFeaturedArtifactBody>},
+        TContext
+      > => {
+      return useMutation(getSwapFeaturedArtifactMutationOptions(options));
     }
 
 export const getReorderFeaturedArtifactsUrl = () => {

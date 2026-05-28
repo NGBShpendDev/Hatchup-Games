@@ -7,7 +7,7 @@ import {
   artifactLoadoutsTable,
   artifactBattleXpTable,
 } from "@workspace/db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
 import {
@@ -157,6 +157,90 @@ router.patch("/players/me/artifacts/:id", requireAuth, attachPlayer, async (req,
     featuredOrder: row.featuredOrder,
     earnedAt: row.earnedAt.toISOString(),
   });
+});
+
+// ── POST /players/me/featured-swap ───────────────────────────────────────────
+// Atomically unfeature one artifact and feature another in a single DB
+// transaction so a swap can never leave the player half-updated.
+const SwapSchema = z.object({
+  removeId: z.number().int().positive(),
+  addId:    z.number().int().positive(),
+});
+
+router.post("/players/me/featured-swap", requireAuth, attachPlayer, async (req, res) => {
+  const playerId = req.playerId!;
+  const body = SwapSchema.safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
+
+  const { removeId, addId } = body.data;
+  if (removeId === addId) { res.status(400).json({ error: "removeId and addId must differ" }); return; }
+
+  try {
+    await db.transaction(async (tx) => {
+      const owned = await tx.query.playerArtifactsTable.findMany({
+        where: and(
+          eq(playerArtifactsTable.playerId, playerId),
+          inArray(playerArtifactsTable.artifactId, [removeId, addId]),
+        ),
+      });
+      const outgoing = owned.find(o => o.artifactId === removeId);
+      const incoming = owned.find(o => o.artifactId === addId);
+      if (!outgoing || !incoming) {
+        const err = new Error("not_owned"); (err as Error & { status?: number }).status = 404;
+        throw err;
+      }
+      if (!outgoing.isFeatured) {
+        const err = new Error("remove_not_featured"); (err as Error & { status?: number }).status = 400;
+        throw err;
+      }
+      // Hand the outgoing artifact's slot directly to the incoming one so the
+      // overall featured order is preserved.
+      const slot = outgoing.featuredOrder;
+      await tx.update(playerArtifactsTable)
+        .set({ isFeatured: false, featuredOrder: null })
+        .where(eq(playerArtifactsTable.id, outgoing.id));
+      await tx.update(playerArtifactsTable)
+        .set({ isFeatured: true, featuredOrder: slot })
+        .where(eq(playerArtifactsTable.id, incoming.id));
+    });
+  } catch (err) {
+    const status = (err as Error & { status?: number }).status ?? 500;
+    const message = (err as Error).message;
+    if (status === 404) { res.status(404).json({ error: "Artifact not owned" }); return; }
+    if (status === 400) { res.status(400).json({ error: message }); return; }
+    throw err;
+  }
+
+  // Return the player's current featured list so the client can reconcile
+  // without an extra round-trip.
+  const featuredOwned = await db.query.playerArtifactsTable.findMany({
+    where: and(eq(playerArtifactsTable.playerId, playerId), eq(playerArtifactsTable.isFeatured, true)),
+    orderBy: (t, { sql: sqlFn }) => [sqlFn`${t.featuredOrder} asc nulls last`],
+  });
+  const artifactIds = featuredOwned.map(o => o.artifactId);
+  const artifacts = artifactIds.length === 0 ? [] : await db.query.artifactsTable.findMany({
+    where: (t, { inArray }) => inArray(t.id, artifactIds),
+  });
+  const aMap = new Map(artifacts.map(a => [a.id, a]));
+  const featured = featuredOwned.map(o => {
+    const a = aMap.get(o.artifactId);
+    if (!a) return null;
+    return {
+      id: a.id,
+      name: a.name,
+      lore: a.lore,
+      rarity: a.rarity,
+      type: a.type,
+      imageSlug: a.imageSlug,
+      abilities: a.abilities as unknown[],
+      isEquipped: o.isEquipped,
+      isFeatured: o.isFeatured,
+      featuredOrder: o.featuredOrder,
+      earnedAt: o.earnedAt.toISOString(),
+    };
+  }).filter(Boolean);
+
+  res.json({ ok: true, removedId: removeId, addedId: addId, featured });
 });
 
 // ── PUT /players/me/featured-order ────────────────────────────────────────────

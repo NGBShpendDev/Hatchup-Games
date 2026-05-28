@@ -817,6 +817,29 @@ paths:
         "404":
           description: Artifact not owned by the authenticated player
 
+  /players/me/featured-swap:
+    post:
+      operationId: swapFeaturedArtifact
+      tags: [players]
+      summary: Atomically swap one featured artifact for another in a single transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SwapFeaturedArtifactBody"
+      responses:
+        "200":
+          description: Swap completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SwapFeaturedArtifactResponse"
+        "400":
+          description: Invalid input or removeId is not currently featured
+        "404":
+          description: One of the artifacts is not owned by the authenticated player
+
   /players/me/featured-order:
     put:
       operationId: reorderFeaturedArtifacts
@@ -4472,6 +4495,32 @@ components:
         isEquipped: { type: boolean }
         isFeatured: { type: boolean }
       description: At least one of `isEquipped` or `isFeatured` should be provided. Omitted fields are left unchanged.
+
+    SwapFeaturedArtifactBody:
+      type: object
+      required: [removeId, addId]
+      properties:
+        removeId:
+          type: integer
+          minimum: 1
+          description: ID of the artifact currently featured that should be unfeatured.
+        addId:
+          type: integer
+          minimum: 1
+          description: ID of the artifact to feature in its place.
+
+    SwapFeaturedArtifactResponse:
+      type: object
+      required: [ok, removedId, addedId, featured]
+      properties:
+        ok: { type: boolean }
+        removedId: { type: integer }
+        addedId: { type: integer }
+        featured:
+          type: array
+          description: Updated list of the player's featured artifacts in display order.
+          items:
+            $ref: "#/components/schemas/OwnedArtifact"
 
     ReorderFeaturedArtifactsBody:
       type: object

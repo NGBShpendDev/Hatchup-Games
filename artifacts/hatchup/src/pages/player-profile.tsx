@@ -139,17 +139,17 @@ export default function PlayerProfilePage() {
 
   const swapFeatured = useMutation({
     mutationFn: async ({ removeId, addId }: { removeId: number; addId: number }) => {
-      // Unfeature the outgoing artifact first so the cap check on the server
-      // doesn't block the incoming feature call.
-      await patchOwnedArtifact(removeId, false);
-      try {
-        await patchOwnedArtifact(addId, true);
-      } catch (err) {
-        // Best-effort rollback so the player isn't left with an empty slot if
-        // the second call fails.
-        await patchOwnedArtifact(removeId, true).catch(() => undefined);
-        throw err;
-      }
+      // Single atomic backend call — the server runs both updates in one DB
+      // transaction so a dropped network mid-swap can never leave the player's
+      // showcase half-updated.
+      const res = await fetch(`${BASE}/api/players/me/featured-swap`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ removeId, addId }),
+      });
+      if (!res.ok) throw new Error("Failed to swap");
+      return res.json();
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["player-profile", profileId] });
