@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { userReportsTable, blockedUsersTable, playersTable, moderationAuditLogTable } from "@workspace/db";
+import { userReportsTable, blockedUsersTable, playersTable, moderationAuditLogTable, notificationsTable } from "@workspace/db";
 import { eq, and, desc, or, notInArray } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
@@ -240,6 +240,18 @@ router.get("/players/:id/privacy-settings", requireAuth, attachPlayer, async (re
     res.status(404).json({ error: "Player not found" });
     return;
   }
+  // Derive the timestamp of the most recently delivered scheduled weekly
+  // recap from the notifications row the scheduler inserts. We only look at
+  // type="nutrition_recap" (the real delivery), never "nutrition_recap_preview",
+  // so preview sends don't get surfaced as the real last-sent time.
+  const lastRecap = await db.query.notificationsTable.findFirst({
+    where: and(
+      eq(notificationsTable.playerId, urlId),
+      eq(notificationsTable.type, "nutrition_recap"),
+    ),
+    orderBy: [desc(notificationsTable.createdAt)],
+    columns: { createdAt: true },
+  });
   res.json({
     locationVisibility: player.locationVisibility,
     requireWorkoutApproval: player.requireWorkoutApproval,
@@ -257,6 +269,7 @@ router.get("/players/:id/privacy-settings", requireAuth, attachPlayer, async (re
     notifyRecapEmail: player.notifyRecapEmail,
     notifyChampionEmail: player.notifyChampionEmail,
     notifyRecapPush: player.notifyRecapPush,
+    weeklyRecapLastSentAt: lastRecap?.createdAt.toISOString() ?? null,
   });
 });
 

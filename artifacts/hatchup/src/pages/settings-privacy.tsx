@@ -40,6 +40,18 @@ import {
 } from "lucide-react";
 import { usePushSubscription } from "@/hooks/use-push-subscription";
 
+// Mirror of the server's `isoWeekKey` (artifacts/api-server/src/services/nutritionRecap.ts).
+// Used to decide whether a real delivery timestamp falls inside the current ISO
+// week, matching the same dedupe key the scheduler uses.
+function isoWeekKey(d: Date): number {
+  const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return date.getUTCFullYear() * 100 + week;
+}
+
 const LOCATION_OPTIONS = [
   { value: "exact", label: "Exact location", desc: "Other users see your precise location", icon: <MapPin className="w-4 h-4 text-red-400" />, color: "text-red-400" },
   { value: "neighborhood", label: "Neighborhood", desc: "Show approx. 1-mile area", icon: <MapPin className="w-4 h-4 text-amber-400" />, color: "text-amber-400" },
@@ -71,6 +83,7 @@ export default function SettingsPrivacy() {
   const [loaded, setLoaded] = useState(false);
   const [recapPreviewSending, setRecapPreviewSending] = useState(false);
   const [recapPreview, setRecapPreview] = useState<{ title: string; body: string } | null>(null);
+  const [weeklyRecapLastSentAt, setWeeklyRecapLastSentAt] = useState<string | null>(null);
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [verifySubmitting, setVerifySubmitting] = useState(false);
   const [verifyPending, setVerifyPending] = useState(false);
@@ -101,8 +114,25 @@ export default function SettingsPrivacy() {
       hour: "numeric",
       minute: "2-digit",
     });
-    return { formatted, alreadySentThisWeek: thisWeekSlotPassed };
-  }, [nowTick, recapDay, recapHour]);
+    // Match the server's ISO-week dedupe so the badge agrees with the
+    // scheduler. If we have a real delivery timestamp in the same ISO week
+    // as `now`, trust it over the heuristic.
+    const lastSent = weeklyRecapLastSentAt ? new Date(weeklyRecapLastSentAt) : null;
+    const lastSentValid = lastSent && !isNaN(lastSent.getTime()) ? lastSent : null;
+    const alreadySentThisWeek = lastSentValid
+      ? isoWeekKey(lastSentValid) === isoWeekKey(now)
+      : thisWeekSlotPassed;
+    const lastSentFormatted = lastSentValid
+      ? lastSentValid.toLocaleString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : null;
+    return { formatted, alreadySentThisWeek, lastSentFormatted };
+  }, [nowTick, recapDay, recapHour, weeklyRecapLastSentAt]);
 
   // Web push state ──
   const push = usePushSubscription();
@@ -164,6 +194,7 @@ export default function SettingsPrivacy() {
         if (typeof data.notifyRecapEmail === "boolean") setNotifyRecapEmail(data.notifyRecapEmail);
         if (typeof data.notifyChampionEmail === "boolean") setNotifyChampionEmail(data.notifyChampionEmail);
         if (typeof data.notifyRecapPush === "boolean") setNotifyRecapPush(data.notifyRecapPush);
+        setWeeklyRecapLastSentAt(typeof data.weeklyRecapLastSentAt === "string" ? data.weeklyRecapLastSentAt : null);
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
@@ -719,7 +750,7 @@ export default function SettingsPrivacy() {
 
                 <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5 flex items-start gap-2.5">
                   <CalendarClock className="w-4 h-4 text-emerald-300 mt-0.5 shrink-0" />
-                  <div className="min-w-0 text-xs">
+                  <div className="min-w-0 text-xs space-y-0.5">
                     {nextRecap.alreadySentThisWeek && (
                       <p className="font-bold text-emerald-200">
                         Already sent this week
@@ -728,6 +759,11 @@ export default function SettingsPrivacy() {
                     <p className={`font-bold ${nextRecap.alreadySentThisWeek ? "text-muted-foreground" : "text-emerald-200"}`}>
                       Next recap: <span className="text-emerald-100">{nextRecap.formatted}</span>
                     </p>
+                    {nextRecap.lastSentFormatted && (
+                      <p className="font-bold text-muted-foreground">
+                        Last sent: <span className="text-emerald-100/80">{nextRecap.lastSentFormatted}</span>
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
