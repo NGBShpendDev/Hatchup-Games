@@ -36,6 +36,7 @@ const playerFollowsTable = makeTable("playerFollows", ["id", "followerId", "foll
 const playersTable = makeTable("players", [
   "id", "clerkId", "username", "displayName", "avatarUrl", "creatorBadge",
   "fitnessRealm", "physiqueGoal", "fitnessLevel",
+  "locationVisibility", "isMinor",
 ]);
 const hatchlingsTable = makeTable("hatchlings", ["id", "playerId", "name"]);
 const groupMembersTable = makeTable("groupMembers", ["id", "groupId", "playerId"]);

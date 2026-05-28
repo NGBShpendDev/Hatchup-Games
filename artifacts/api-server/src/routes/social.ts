@@ -1588,6 +1588,11 @@ router.get("/social/discover", requireAuth, attachPlayer, async (req, res) => {
   const viewerId = req.playerId!;
   const limit = Math.min(Number(req.query.limit) || 20, 50);
 
+  // Privacy filter shared with /players/search and /players/nearby:
+  // exclude block-list (either direction), visibility=hidden, and minors from
+  // people-discovery surfaces.
+  const hiddenIds = new Set(await getHiddenPlayerIds(viewerId));
+
   // Who the viewer already follows
   const myFollows = await db.query.playerFollowsTable.findMany({
     where: eq(playerFollowsTable.followerId, viewerId),
@@ -1603,7 +1608,7 @@ router.get("/social/discover", requireAuth, attachPlayer, async (req, res) => {
   type Candidate = { id: number; reason: string; reasonDetail: string | null; weight: number };
   const candidates = new Map<number, Candidate>();
   const consider = (id: number, reason: string, detail: string | null, weight: number) => {
-    if (id === viewerId || followedIds.has(id)) return;
+    if (id === viewerId || followedIds.has(id) || hiddenIds.has(id)) return;
     const existing = candidates.get(id);
     if (!existing || existing.weight < weight) {
       candidates.set(id, { id, reason, reasonDetail: detail, weight });
@@ -1675,7 +1680,11 @@ router.get("/social/discover", requireAuth, attachPlayer, async (req, res) => {
   if (ranked.length === 0) { res.json([]); return; }
 
   const playerRows = await db.query.playersTable.findMany({
-    where: inArray(playersTable.id, ranked.map(c => c.id)),
+    where: and(
+      inArray(playersTable.id, ranked.map(c => c.id)),
+      ne(playersTable.locationVisibility, "hidden"),
+      ne(playersTable.isMinor, true),
+    ),
   });
   const playerMap = new Map(playerRows.map(p => [p.id, p]));
 
@@ -1742,13 +1751,22 @@ router.get("/social/search", requireAuth, attachPlayer, async (req, res) => {
   if (q.length < 1) { res.json([]); return; }
   const pattern = `%${q.replace(/[%_]/g, m => "\\" + m)}%`;
 
-  const matches = await db.query.playersTable.findMany({
+  // Privacy filter shared with /players/search and /social/discover: exclude
+  // block-list (either direction), visibility=hidden, and minors from
+  // people-discovery surfaces.
+  const hiddenIds = await getHiddenPlayerIds(viewerId);
+
+  const rawMatches = await db.query.playersTable.findMany({
     where: and(
       ne(playersTable.id, viewerId),
       or(ilike(playersTable.username, pattern), ilike(playersTable.displayName, pattern)),
+      ne(playersTable.locationVisibility, "hidden"),
+      ne(playersTable.isMinor, true),
     ),
-    limit,
+    limit: limit * 4,
   });
+  const hiddenSet = new Set(hiddenIds);
+  const matches = rawMatches.filter(p => !hiddenSet.has(p.id)).slice(0, limit);
 
   if (matches.length === 0) { res.json([]); return; }
   const ids = matches.map(m => m.id);
