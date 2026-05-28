@@ -1,11 +1,13 @@
+import { useEffect, useState } from "react";
 import { Link, useRoute } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { motion } from "framer-motion";
+import { motion, Reorder } from "framer-motion";
 import { usePlayer } from "@/lib/playerContext";
-import { BadgeCheck, Flame, Trophy, Sparkles, ArrowLeft, Settings } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { BadgeCheck, Flame, Trophy, Sparkles, ArrowLeft, Settings, GripVertical } from "lucide-react";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -59,10 +61,31 @@ export default function PlayerProfilePage() {
   const { playerId: viewerId } = usePlayer();
   const isOwnProfile = viewerId === profileId;
 
+  const qc = useQueryClient();
   const { data: profile, isLoading } = useQuery<PlayerProfile>({
     queryKey: ["player-profile", profileId],
     queryFn: () => fetch(`${BASE}/api/players/${profileId}/profile`, { credentials: "include" }).then(r => r.json()),
     enabled: !isNaN(profileId),
+  });
+
+  const reorderFeatured = useMutation({
+    mutationFn: async (artifactIds: number[]) => {
+      const res = await fetch(`${BASE}/api/players/me/featured-order`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artifactIds }),
+      });
+      if (!res.ok) throw new Error("Failed to reorder");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["player-profile", profileId] });
+      qc.invalidateQueries({ queryKey: ["artifacts-museum", viewerId] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Couldn't reorder", description: err.message, variant: "destructive" });
+    },
   });
 
   if (isNaN(profileId)) {
@@ -96,7 +119,12 @@ export default function PlayerProfilePage() {
         ) : (
           <>
             <ProfileHeader profile={profile} />
-            <ShowcaseStrip artifacts={profile.artifactShowcase} totalCount={profile.artifactCount} isOwnProfile={isOwnProfile} />
+            <ShowcaseStrip
+              artifacts={profile.artifactShowcase}
+              totalCount={profile.artifactCount}
+              isOwnProfile={isOwnProfile}
+              onReorder={(ids) => reorderFeatured.mutate(ids)}
+            />
           </>
         )}
       </div>
@@ -158,11 +186,34 @@ function ShowcaseStrip({
   artifacts,
   totalCount,
   isOwnProfile,
+  onReorder,
 }: {
   artifacts: ShowcaseArtifact[];
   totalCount: number;
   isOwnProfile: boolean;
+  onReorder: (ids: number[]) => void;
 }) {
+  // Only featured artifacts are reorderable — the server's featured-order
+  // endpoint rejects any IDs that aren't currently featured. Equipped-but-not-
+  // featured cards stay in place after the featured group.
+  const featured = artifacts.filter(a => a.isFeatured);
+  const nonFeatured = artifacts.filter(a => !a.isFeatured);
+  const canReorder = isOwnProfile && featured.length > 1;
+
+  const [orderedFeatured, setOrderedFeatured] = useState<ShowcaseArtifact[]>(featured);
+  useEffect(() => {
+    setOrderedFeatured(featured);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [artifacts]);
+
+  const commitReorder = (next: ShowcaseArtifact[]) => {
+    setOrderedFeatured(next);
+    const ids = next.map(a => a.id);
+    const prevIds = featured.map(a => a.id);
+    const changed = ids.length !== prevIds.length || ids.some((id, i) => id !== prevIds[i]);
+    if (changed) onReorder(ids);
+  };
+
   return (
     <div className="space-y-3" data-testid="section-showcase">
       <div className="flex items-center justify-between px-1">
@@ -187,6 +238,34 @@ function ShowcaseStrip({
             </Link>
           )}
         </div>
+      ) : canReorder ? (
+        <>
+          <p className="text-[11px] text-muted-foreground px-1">Drag to reorder how your featured artifacts appear on your profile.</p>
+          <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
+            <Reorder.Group
+              axis="x"
+              values={orderedFeatured}
+              onReorder={commitReorder}
+              className="flex gap-3"
+              data-testid="profile-featured-reorder-list"
+            >
+              {orderedFeatured.map((artifact, i) => (
+                <Reorder.Item
+                  key={artifact.id}
+                  value={artifact}
+                  className="flex-shrink-0 cursor-grab active:cursor-grabbing select-none"
+                  whileDrag={{ scale: 1.04, zIndex: 10, boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }}
+                  data-testid={`profile-featured-item-${artifact.id}`}
+                >
+                  <ShowcaseCard artifact={artifact} index={i} draggable />
+                </Reorder.Item>
+              ))}
+            </Reorder.Group>
+            {nonFeatured.map((artifact, i) => (
+              <ShowcaseCard key={artifact.id} artifact={artifact} index={orderedFeatured.length + i} />
+            ))}
+          </div>
+        </>
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
           {artifacts.map((artifact, i) => (
@@ -198,16 +277,21 @@ function ShowcaseStrip({
   );
 }
 
-function ShowcaseCard({ artifact, index }: { artifact: ShowcaseArtifact; index: number }) {
+function ShowcaseCard({ artifact, index, draggable = false }: { artifact: ShowcaseArtifact; index: number; draggable?: boolean }) {
   const styles = RARITY_STYLES[artifact.rarity] ?? RARITY_STYLES.Common!;
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.92, y: 8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ delay: index * 0.08, duration: 0.3 }}
-      className={`flex-shrink-0 w-40 rounded-3xl border-2 ${styles.border} ${styles.bg} ${styles.glow} p-4 snap-center`}
+      className={`flex-shrink-0 w-40 rounded-3xl border-2 ${styles.border} ${styles.bg} ${styles.glow} p-4 ${draggable ? "relative" : "snap-center"}`}
       data-testid={`card-showcase-artifact-${artifact.id}`}
     >
+      {draggable && (
+        <div className="absolute top-2 right-2 text-muted-foreground/70">
+          <GripVertical className="w-3.5 h-3.5" />
+        </div>
+      )}
       <div className={`w-full aspect-square rounded-2xl ${styles.bg} border ${styles.border} flex items-center justify-center text-5xl mb-3`}>
         {SLUG_EMOJIS[artifact.imageSlug] ?? "🏺"}
       </div>
