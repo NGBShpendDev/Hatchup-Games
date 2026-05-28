@@ -8,6 +8,7 @@ import { handleAccountSuspendedError } from "@/lib/suspendedError";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PlayerProvider, usePlayer } from "@/lib/playerContext";
+import { SuspendedScreen } from "@/components/suspended-screen";
 
 import Landing from "@/pages/landing";
 import ProfileSetup from "@/pages/profile-setup";
@@ -229,6 +230,13 @@ function AppRoutes() {
 
   if (needsOnboarding) {
     return <Onboarding onComplete={completeOnboarding} />;
+  }
+
+  // Replace the entire app shell with a full-screen suspension notice so the
+  // user cannot navigate around it. The notice surfaces the recorded reason
+  // and date, plus an appeal flow / contact-support fallback.
+  if (player?.isSuspended) {
+    return <SuspendedScreen />;
   }
 
   return (

@@ -853,6 +853,46 @@ router.post("/email/bounce-clear", requireAuth, attachPlayer, async (req, res) =
 
 // ── Admin: list suspended accounts ──────────────────────────────────────────
 
+// GET /api/players/me/suspension
+// User-facing snapshot of the current player's suspension state. Returns the
+// reason and date so the suspended UI can show an honest, appealable notice
+// instead of a generic 403. Never gated by suspendedGuard — suspended users
+// must be able to read this.
+router.get("/players/me/suspension", requireAuth, attachPlayer, async (req, res) => {
+  const playerId = req.playerId;
+  if (!playerId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const player = await db.query.playersTable.findFirst({
+    where: eq(playersTable.id, playerId),
+    columns: {
+      isSuspended: true,
+      suspendedAt: true,
+      suspensionReason: true,
+      suspendedByAdminId: true,
+    },
+  });
+  if (!player) {
+    res.status(404).json({ error: "Player not found" });
+    return;
+  }
+  let suspendedByAdmin: { id: number; username: string; displayName: string | null } | null = null;
+  if (player.suspendedByAdminId != null) {
+    const admin = await db.query.playersTable.findFirst({
+      where: eq(playersTable.id, player.suspendedByAdminId),
+      columns: { id: true, username: true, displayName: true },
+    });
+    if (admin) suspendedByAdmin = admin;
+  }
+  res.json({
+    isSuspended: player.isSuspended,
+    suspendedAt: player.suspendedAt ? player.suspendedAt.toISOString() : null,
+    suspensionReason: player.suspensionReason ?? null,
+    suspendedByAdmin,
+  });
+});
+
 // GET /api/admin/players/suspended
 router.get("/admin/players/suspended", requireAuth, attachPlayer, async (req, res) => {
   const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
