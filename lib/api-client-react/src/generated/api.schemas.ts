@@ -1226,6 +1226,11 @@ export interface PlayerStub {
   creatorBadge: string | null;
 }
 
+export interface SharedGroup {
+  id: number;
+  name: string;
+}
+
 export interface DiscoverablePlayer {
   id: number;
   username: string;
@@ -1240,6 +1245,8 @@ export interface DiscoverablePlayer {
   reason: string;
   /** @nullable */
   reasonDetail?: string | null;
+  /** Groups that both the viewer and this player are members of. */
+  sharedGroups: SharedGroup[];
 }
 
 export interface MemoryPost {
@@ -1247,11 +1254,6 @@ export interface MemoryPost {
   memoryType: string;
   yearsAgo: number;
   label: string;
-}
-
-export interface SharedGroup {
-  id: number;
-  name: string;
 }
 
 export interface PlayerSocialProfile {

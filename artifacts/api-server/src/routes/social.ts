@@ -875,6 +875,31 @@ router.get("/social/discover", requireAuth, attachPlayer, async (req, res) => {
     .groupBy(playerFollowsTable.followeeId);
   const followerCounts = new Map(followerRows.map(r => [r.followeeId, r.count]));
 
+  // Shared groups per candidate: groups where both viewer and the candidate are members.
+  const sharedGroupsByPlayer = new Map<number, Array<{ id: number; name: string }>>();
+  if (myGroupIds.length > 0) {
+    const candidateMemberships = await db.query.groupMembersTable.findMany({
+      where: and(
+        inArray(groupMembersTable.playerId, ranked.map(c => c.id)),
+        inArray(groupMembersTable.groupId, myGroupIds),
+      ),
+    });
+    if (candidateMemberships.length > 0) {
+      const referencedGroupIds = Array.from(new Set(candidateMemberships.map(m => m.groupId)));
+      const groupRows = await db.query.groupsTable.findMany({
+        where: inArray(groupsTable.id, referencedGroupIds),
+      });
+      const groupNameMap = new Map(groupRows.map(g => [g.id, g.name]));
+      for (const m of candidateMemberships) {
+        const name = groupNameMap.get(m.groupId);
+        if (!name) continue;
+        const list = sharedGroupsByPlayer.get(m.playerId) ?? [];
+        list.push({ id: m.groupId, name });
+        sharedGroupsByPlayer.set(m.playerId, list);
+      }
+    }
+  }
+
   const result = ranked.flatMap(c => {
     const p = playerMap.get(c.id);
     if (!p) return [];
@@ -888,6 +913,7 @@ router.get("/social/discover", requireAuth, attachPlayer, async (req, res) => {
       isFollowing: false,
       reason: c.reason,
       reasonDetail: c.reasonDetail,
+      sharedGroups: sharedGroupsByPlayer.get(p.id) ?? [],
     }];
   });
 
@@ -926,6 +952,35 @@ router.get("/social/search", requireAuth, attachPlayer, async (req, res) => {
     .groupBy(playerFollowsTable.followeeId);
   const followerCounts = new Map(followerRows.map(r => [r.followeeId, r.count]));
 
+  // Shared groups per match: groups where both viewer and the match are members.
+  const sharedGroupsByPlayer = new Map<number, Array<{ id: number; name: string }>>();
+  const viewerMemberships = await db.query.groupMembersTable.findMany({
+    where: eq(groupMembersTable.playerId, viewerId),
+  });
+  const viewerGroupIds = viewerMemberships.map(m => m.groupId);
+  if (viewerGroupIds.length > 0) {
+    const matchMemberships = await db.query.groupMembersTable.findMany({
+      where: and(
+        inArray(groupMembersTable.playerId, ids),
+        inArray(groupMembersTable.groupId, viewerGroupIds),
+      ),
+    });
+    if (matchMemberships.length > 0) {
+      const referencedGroupIds = Array.from(new Set(matchMemberships.map(m => m.groupId)));
+      const groupRows = await db.query.groupsTable.findMany({
+        where: inArray(groupsTable.id, referencedGroupIds),
+      });
+      const groupNameMap = new Map(groupRows.map(g => [g.id, g.name]));
+      for (const m of matchMemberships) {
+        const name = groupNameMap.get(m.groupId);
+        if (!name) continue;
+        const list = sharedGroupsByPlayer.get(m.playerId) ?? [];
+        list.push({ id: m.groupId, name });
+        sharedGroupsByPlayer.set(m.playerId, list);
+      }
+    }
+  }
+
   // Rank: username prefix match first, then displayName prefix, then others
   const lowerQ = q.toLowerCase();
   const scored = matches.map(p => {
@@ -948,6 +1003,7 @@ router.get("/social/search", requireAuth, attachPlayer, async (req, res) => {
     isFollowing: followingSet.has(p.id),
     reason: "search",
     reasonDetail: null,
+    sharedGroups: sharedGroupsByPlayer.get(p.id) ?? [],
   })));
 });
 

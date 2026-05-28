@@ -282,9 +282,24 @@ function PlayerDiscoverCard({
     search: { text: "", icon: null, color: "" },
   };
   const reason = reasonLabel[player.reason] ?? reasonLabel.recently_active;
-  const reasonText = player.reason === "similar_goals" && player.reasonDetail
-    ? player.reasonDetail
-    : reason.text;
+  const sharedGroupNames = (player.sharedGroups ?? []).map(g => g.name);
+  const sharedGroupPreview = sharedGroupNames.slice(0, 2).join(" & ");
+  const sharedGroupExtra = sharedGroupNames.length - 2;
+  const sharedGroupSuffix = sharedGroupExtra > 0 ? ` +${sharedGroupExtra} more` : "";
+  let reasonText = reason.text;
+  let reasonIcon: React.ReactNode = reason.icon;
+  let reasonColor = reason.color;
+  if (player.reason === "shared_group" && sharedGroupNames.length > 0) {
+    reasonText = `In ${sharedGroupPreview}${sharedGroupSuffix} with you`;
+  } else if (player.reason === "similar_goals" && player.reasonDetail) {
+    reasonText = player.reasonDetail;
+  } else if (player.reason === "search" && sharedGroupNames.length > 0) {
+    reasonText = `Also in ${sharedGroupPreview}${sharedGroupSuffix} with you`;
+    reasonIcon = <Users2 className="w-3 h-3" />;
+    reasonColor = "text-purple-400";
+  } else if (sharedGroupNames.length > 0) {
+    reasonText = `${reason.text} · also in ${sharedGroupPreview}${sharedGroupExtra > 0 ? ` +${sharedGroupExtra}` : ""}`;
+  }
 
   async function handleFollow() {
     if (optimisticFollow) return;
@@ -330,8 +345,8 @@ function PlayerDiscoverCard({
             @{player.username} · {player.followerCount} {player.followerCount === 1 ? "follower" : "followers"}
           </p>
           {reasonText && (
-            <p className={`text-[10px] font-bold mt-0.5 flex items-center gap-1 ${reason.color}`}>
-              {reason.icon}
+            <p className={`text-[10px] font-bold mt-0.5 flex items-center gap-1 ${reasonColor}`}>
+              {reasonIcon}
               {reasonText}
             </p>
           )}

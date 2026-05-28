@@ -4209,7 +4209,7 @@ components:
 
     DiscoverablePlayer:
       type: object
-      required: [id, username, displayName, avatarUrl, creatorBadge, followerCount, isFollowing, reason]
+      required: [id, username, displayName, avatarUrl, creatorBadge, followerCount, isFollowing, reason, sharedGroups]
       properties:
         id:            { type: integer }
         username:      { type: string }
@@ -4220,6 +4220,11 @@ components:
         isFollowing:   { type: boolean }
         reason:        { type: string }
         reasonDetail:  { type: ["string", "null"] }
+        sharedGroups:
+          type: array
+          description: Groups that both the viewer and this player are members of.
+          items:
+            $ref: "#/components/schemas/SharedGroup"
 
     PlayerSocialProfile:
       type: object

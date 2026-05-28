@@ -2356,7 +2356,11 @@ export const DiscoverPlayersResponseItem = zod.object({
   "followerCount": zod.number(),
   "isFollowing": zod.boolean(),
   "reason": zod.string(),
-  "reasonDetail": zod.string().nullish()
+  "reasonDetail": zod.string().nullish(),
+  "sharedGroups": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string()
+})).describe('Groups that both the viewer and this player are members of.')
 })
 export const DiscoverPlayersResponse = zod.array(DiscoverPlayersResponseItem)
 
@@ -2379,7 +2383,11 @@ export const SearchDiscoverablePlayersResponseItem = zod.object({
   "followerCount": zod.number(),
   "isFollowing": zod.boolean(),
   "reason": zod.string(),
-  "reasonDetail": zod.string().nullish()
+  "reasonDetail": zod.string().nullish(),
+  "sharedGroups": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string()
+})).describe('Groups that both the viewer and this player are members of.')
 })
 export const SearchDiscoverablePlayersResponse = zod.array(SearchDiscoverablePlayersResponseItem)
 
