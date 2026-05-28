@@ -19,7 +19,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SafetyBanner } from "@/components/safety-banner";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
@@ -88,6 +88,20 @@ function ChallengeCard({ challenge, onJoin }: {
                 {isCompleted && <Badge variant="secondary" className="text-xs shrink-0">Ended</Badge>}
                 {isExpired && !isCompleted && <Badge variant="destructive" className="text-xs shrink-0">Expired</Badge>}
               </div>
+
+              {challenge.creator && (
+                <p className="text-[11px] text-muted-foreground mb-2">
+                  by{" "}
+                  <Link
+                    href={`/players/${challenge.creator.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="font-bold hover:text-primary transition-colors"
+                    data-testid={`link-profile-${challenge.creator.id}`}
+                  >
+                    {challenge.creator.displayName ?? challenge.creator.username}
+                  </Link>
+                </p>
+              )}
 
               <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3 flex-wrap">
                 <span className="flex items-center gap-1">

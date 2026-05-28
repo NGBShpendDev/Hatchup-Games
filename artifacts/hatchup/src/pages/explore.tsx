@@ -1,13 +1,19 @@
 import { Layout } from "@/components/layout";
-import { useListRealms, getListRealmsQueryKey } from "@workspace/api-client-react";
+import {
+  useListRealms,
+  getListRealmsQueryKey,
+  useGetScopedLeaderboard,
+  getGetScopedLeaderboardQueryKey,
+} from "@workspace/api-client-react";
 import { usePlayer } from "@/lib/playerContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { Map, Lock, Zap, Egg, Sparkles, Trophy } from "lucide-react";
+import { Map, Lock, Zap, Egg, Sparkles, Trophy, Users } from "lucide-react";
 import { ForYouStrip } from "@/components/for-you-strip";
 import { GlassCard } from "@/components/ui/glass-card";
+import { Link } from "wouter";
 
 export default function Explore() {
   const { playerId } = usePlayer();
@@ -16,6 +22,13 @@ export default function Explore() {
     { playerId: pid },
     { query: { queryKey: getListRealmsQueryKey({ playerId: pid }), enabled: !!playerId } }
   );
+
+  const nearbyParams = { scope: "nearby" as const, metric: "xp" as const, limit: 8 };
+  const { data: nearby, isLoading: nearbyLoading } = useGetScopedLeaderboard(
+    nearbyParams,
+    { query: { queryKey: getGetScopedLeaderboardQueryKey(nearbyParams), enabled: !!playerId } }
+  );
+  const nearbyEntries = nearby?.entries?.filter((e) => !e.isMe).slice(0, 6) ?? [];
 
   return (
     <Layout>
@@ -28,6 +41,54 @@ export default function Explore() {
             Explore diverse environments to unlock specialized Pal evolutions and powerful stat bonuses.
           </p>
         </div>
+
+        {(nearbyLoading || nearbyEntries.length > 0) && (
+          <section>
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Users className="w-4 h-4" /> Players Nearby
+              </h2>
+            </div>
+            <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
+              <div className="flex gap-3 pb-2 snap-x snap-mandatory">
+                {nearbyLoading
+                  ? [...Array(4)].map((_, i) => (
+                      <Skeleton key={i} className="snap-start flex-shrink-0 w-36 h-24 rounded-2xl" />
+                    ))
+                  : nearbyEntries.map((entry) => {
+                      const name = entry.displayName ?? entry.username;
+                      return (
+                        <Link
+                          key={entry.playerId}
+                          href={`/players/${entry.playerId}`}
+                          className="snap-start flex-shrink-0 w-36"
+                          data-testid={`link-profile-${entry.playerId}`}
+                        >
+                          <div className="group h-full rounded-2xl border border-white/10 bg-card/70 backdrop-blur p-3 hover:border-primary/50 hover:bg-card/90 transition-all active:scale-[0.97]">
+                            <div className="flex items-center gap-2">
+                              <div className="w-9 h-9 rounded-full bg-muted overflow-hidden flex items-center justify-center text-sm font-black shrink-0">
+                                {entry.avatarUrl ? (
+                                  <img src={entry.avatarUrl} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  name.charAt(0).toUpperCase()
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-black text-sm truncate group-hover:text-primary transition-colors">{name}</p>
+                                <p className="text-[10px] text-muted-foreground truncate">@{entry.username}</p>
+                              </div>
+                            </div>
+                            <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-primary">
+                              #{entry.position} · {entry.metricValue.toLocaleString()} XP
+                            </p>
+                          </div>
+                        </Link>
+                      );
+                    })}
+              </div>
+            </div>
+          </section>
+        )}
 
         <ForYouStrip
           heading="Grow Your Pals"

@@ -17,7 +17,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -353,7 +353,18 @@ export default function ChallengeDetail() {
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-black text-foreground truncate">{challenge.title}</h1>
             <p className="text-xs text-muted-foreground">
-              by {(challenge as { creator?: { username: string } | null }).creator?.username ?? "Unknown"}
+              by{" "}
+              {rich.creatorId ? (
+                <Link
+                  href={`/players/${rich.creatorId}`}
+                  className="hover:text-primary transition-colors"
+                  data-testid={`link-profile-${rich.creatorId}`}
+                >
+                  {rich.creator?.username ?? "Unknown"}
+                </Link>
+              ) : (
+                rich.creator?.username ?? "Unknown"
+              )}
             </p>
           </div>
           <div className="flex items-center gap-1">
@@ -523,9 +534,13 @@ export default function ChallengeDetail() {
                   const colors = ["bg-slate-600/40", "bg-yellow-600/40", "bg-amber-700/40"];
                   return (
                     <div key={idx} className="flex flex-col items-center gap-1 flex-1">
-                      <p className="text-xs font-bold text-muted-foreground truncate max-w-[80px]">
+                      <Link
+                        href={`/players/${entry.playerId}`}
+                        className="text-xs font-bold text-muted-foreground truncate max-w-[80px] hover:text-primary transition-colors"
+                        data-testid={`link-profile-${entry.playerId}`}
+                      >
                         {entry.player?.displayName ?? entry.player?.username ?? `Player ${entry.playerId}`}
-                      </p>
+                      </Link>
                       <p className="text-xs text-primary font-black">
                         {entry.currentValue.toLocaleString()} {metric.unit}
                       </p>
@@ -603,16 +618,22 @@ export default function ChallengeDetail() {
                                   : "bg-muted/30 border-border/40"
                             }`}
                           >
-                            <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-black shrink-0 overflow-hidden">
-                              {entry.player?.avatarUrl ? (
-                                <img src={entry.player.avatarUrl} alt="" className="w-full h-full object-cover" />
-                              ) : (
-                                name.charAt(0).toUpperCase()
-                              )}
-                            </div>
-                            <p className={`flex-1 min-w-0 truncate text-xs font-bold ${outThisRound ? "line-through text-muted-foreground" : isMe ? "text-primary" : "text-foreground"}`}>
-                              {name}{isMe && !outThisRound && <span className="text-[10px] ml-1 text-primary/70">(you)</span>}
-                            </p>
+                            <Link
+                              href={`/players/${entry.playerId}`}
+                              className="flex items-center gap-2 flex-1 min-w-0 hover:opacity-80 transition-opacity"
+                              data-testid={`link-profile-${entry.playerId}`}
+                            >
+                              <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-black shrink-0 overflow-hidden">
+                                {entry.player?.avatarUrl ? (
+                                  <img src={entry.player.avatarUrl} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  name.charAt(0).toUpperCase()
+                                )}
+                              </div>
+                              <p className={`flex-1 min-w-0 truncate text-xs font-bold ${outThisRound ? "line-through text-muted-foreground" : isMe ? "text-primary" : "text-foreground"}`}>
+                                {name}{isMe && !outThisRound && <span className="text-[10px] ml-1 text-primary/70">(you)</span>}
+                              </p>
+                            </Link>
                             {outThisRound ? (
                               <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
                             ) : round === bracketRounds.length && isCompleted && entries.length === 1 ? (
@@ -667,19 +688,27 @@ export default function ChallengeDetail() {
                       className={`flex items-center gap-3 p-2 rounded-xl transition-all ${isMe ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/30"} ${entry.eliminated ? "opacity-40" : ""}`}
                     >
                       <RankIcon rank={rank} />
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-black shrink-0 overflow-hidden">
+                      <Link
+                        href={`/players/${entry.playerId}`}
+                        className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-black shrink-0 overflow-hidden hover:opacity-80 transition-opacity"
+                        data-testid={`link-profile-${entry.playerId}`}
+                      >
                         {entry.player?.avatarUrl ? (
                           <img src={entry.player.avatarUrl} alt="" className="w-full h-full object-cover" />
                         ) : (
                           (entry.player?.displayName ?? entry.player?.username ?? "?").charAt(0).toUpperCase()
                         )}
-                      </div>
+                      </Link>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
-                          <p className={`text-sm font-bold truncate ${isMe ? "text-primary" : "text-foreground"}`}>
+                          <Link
+                            href={`/players/${entry.playerId}`}
+                            className={`text-sm font-bold truncate hover:text-primary transition-colors ${isMe ? "text-primary" : "text-foreground"}`}
+                            data-testid={`link-profile-name-${entry.playerId}`}
+                          >
                             {entry.player?.displayName ?? entry.player?.username ?? `Player ${entry.playerId}`}
                             {isMe && <span className="text-xs ml-1 text-primary/70">(you)</span>}
-                          </p>
+                          </Link>
                           <p className="text-xs text-muted-foreground font-bold shrink-0 ml-2">
                             {entry.currentValue.toLocaleString()} / {targetValue.toLocaleString()}
                           </p>

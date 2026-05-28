@@ -958,9 +958,23 @@ export interface Challenge {
   createdAt: string;
 }
 
+/**
+ * @nullable
+ */
+export type ChallengeListItemCreator = {
+  id?: number;
+  username?: string;
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  avatarUrl?: string | null;
+} | null;
+
 export interface ChallengeListItem {
   id: number;
   creatorId: number;
+  /** @nullable */
+  creator?: ChallengeListItemCreator;
   title: string;
   description?: string;
   metric: string;

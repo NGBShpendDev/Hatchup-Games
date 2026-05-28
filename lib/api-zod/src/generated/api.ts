@@ -2620,6 +2620,12 @@ export const ListChallengesQueryParams = zod.object({
 export const ListChallengesResponseItem = zod.object({
   "id": zod.number(),
   "creatorId": zod.number(),
+  "creator": zod.object({
+  "id": zod.number().optional(),
+  "username": zod.string().optional(),
+  "displayName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish()
+}).nullish(),
   "title": zod.string(),
   "description": zod.string().optional(),
   "metric": zod.string(),

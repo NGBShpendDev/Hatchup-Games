@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import {
   Swords, Zap, Shield, Sparkles, Trophy, RotateCcw, ChevronLeft,
   Share2, Bookmark, Trash2, Star, Plus, X,
@@ -405,7 +405,7 @@ export default function BattlePage() {
     enabled: !!pid,
   });
 
-  const { data: history = [] } = useQuery<{ id: number; opponent: string; viewerWon: boolean; myHatchling: string; createdAt: string; battleMode: string }[]>({
+  const { data: history = [] } = useQuery<{ id: number; opponent: string; opponentPlayerId: number | null; viewerWon: boolean; myHatchling: string; createdAt: string; battleMode: string }[]>({
     queryKey: ["battle-history", pid],
     queryFn: () => fetch(`${BASE}/api/battles/history`, { credentials: "include" }).then(r => r.json()),
     enabled: !!pid,
@@ -822,7 +822,20 @@ export default function BattlePage() {
                     <div key={b.id} className={`flex items-center gap-3 p-3 rounded-xl border text-sm ${b.viewerWon ? "border-green-500/30 bg-green-500/5" : "border-red-500/30 bg-red-500/5"}`}>
                       <span className="text-lg">{b.viewerWon ? "🏆" : "💀"}</span>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold truncate">{b.viewerWon ? "Victory" : "Defeat"} vs {b.opponent}</p>
+                        <p className="font-bold truncate">
+                          {b.viewerWon ? "Victory" : "Defeat"} vs{" "}
+                          {b.opponentPlayerId ? (
+                            <Link
+                              href={`/players/${b.opponentPlayerId}`}
+                              className="hover:text-primary transition-colors"
+                              data-testid={`link-profile-${b.opponentPlayerId}`}
+                            >
+                              {b.opponent}
+                            </Link>
+                          ) : (
+                            b.opponent
+                          )}
+                        </p>
                         <p className="text-[11px] text-muted-foreground">{b.myHatchling} · {b.battleMode}</p>
                       </div>
                       <span className={`text-xs font-bold ${b.viewerWon ? "text-green-400" : "text-red-400"}`}>

@@ -73,6 +73,9 @@ router.get("/battles/history", requireAuth, attachPlayer, async (req, res) => {
     opponent: b.player1Id === playerId
       ? (b.player2Id ? playerMap[b.player2Id]?.username ?? "Bot" : "Bot")
       : (playerMap[b.player1Id]?.username ?? "Unknown"),
+    opponentPlayerId: b.player1Id === playerId
+      ? (b.player2Id ?? null)
+      : (b.player1Id ?? null),
     myHatchling: b.player1Id === playerId
       ? (b.hatchling1Id ? hatchlingMap[b.hatchling1Id]?.name : null)
       : (b.hatchling2Id ? hatchlingMap[b.hatchling2Id]?.name : null),

@@ -350,6 +350,13 @@ router.get("/challenges", requireAuth, attachPlayer, async (req, res) => {
     rows = rows.filter(c => c.type === "public" || c.type === "private").slice(0, 20);
   }
 
+  // Batch-load creators
+  const creatorIds = [...new Set(rows.map(c => c.creatorId))];
+  const creators = creatorIds.length
+    ? await db.query.playersTable.findMany({ where: (t, { inArray }) => inArray(t.id, creatorIds) })
+    : [];
+  const creatorMap = Object.fromEntries(creators.map(p => [p.id, p]));
+
   // Enrich with participant count
   const enriched = await Promise.all(rows.map(async (c) => {
     const [{ count }] = await db.select({ count: sql<number>`count(*)::int` })
@@ -358,6 +365,7 @@ router.get("/challenges", requireAuth, attachPlayer, async (req, res) => {
     const myEntry = await db.query.challengeParticipantsTable.findFirst({
       where: and(eq(challengeParticipantsTable.challengeId, c.id), eq(challengeParticipantsTable.playerId, playerId)),
     });
+    const creator = creatorMap[c.creatorId];
     return {
       ...c,
       startAt: c.startAt.toISOString(),
@@ -365,6 +373,9 @@ router.get("/challenges", requireAuth, attachPlayer, async (req, res) => {
       createdAt: c.createdAt.toISOString(),
       participantCount: count ?? 0,
       isJoined: !!myEntry,
+      creator: creator
+        ? { id: creator.id, username: creator.username, displayName: creator.displayName, avatarUrl: creator.avatarUrl }
+        : null,
     };
   }));
 

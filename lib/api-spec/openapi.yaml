@@ -3942,6 +3942,13 @@ components:
       properties:
         id:                   { type: integer }
         creatorId:            { type: integer }
+        creator:
+          type: ["object", "null"]
+          properties:
+            id:          { type: integer }
+            username:    { type: string }
+            displayName: { type: ["string", "null"] }
+            avatarUrl:   { type: ["string", "null"] }
         title:                { type: string }
         description:          { type: string }
         metric:               { type: string }
