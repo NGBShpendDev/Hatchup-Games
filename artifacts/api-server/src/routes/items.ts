@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { itemsTable, hatchlingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { ListItemsQueryParams, UseItemBody, UseItemParams } from "@workspace/api-zod";
+import { requireAuth, attachPlayer } from "../middlewares/auth";
 
 const router = Router();
 
@@ -15,7 +16,7 @@ router.get("/items", async (req, res) => {
   res.json(results);
 });
 
-router.post("/items/:id/use", async (req, res) => {
+router.post("/items/:id/use", requireAuth, attachPlayer, async (req, res) => {
   const id = Number(req.params.id);
   const body = UseItemBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
@@ -25,6 +26,7 @@ router.post("/items/:id/use", async (req, res) => {
 
   const hatchling = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, body.data.hatchlingId) });
   if (!hatchling) { res.status(404).json({ error: "Hatchling not found" }); return; }
+  if (hatchling.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
 
   const updates: Partial<typeof hatchling> = {};
   if (item.effectType === "happiness") updates.happiness = Math.min(100, hatchling.happiness + item.effectValue);

@@ -318,13 +318,14 @@ router.post("/fitness/quests/:id/complete", requireAuth, attachPlayer, async (re
 });
 
 // GET /fitness/realms
-router.get("/fitness/realms", async (req, res) => {
+router.get("/fitness/realms", requireAuth, attachPlayer, async (req, res) => {
   const query = ListRealmsQueryParams.safeParse({
     playerId: req.query.playerId ? Number(req.query.playerId) : undefined,
   });
 
   if (query.success && query.data.playerId) {
-    const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, query.data.playerId) });
+    if (query.data.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
+    const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
     const playerRealm = player?.fitnessRealm ?? "strength";
     const realmXp = player?.fitnessXp ?? 0;
 

@@ -69,9 +69,10 @@ router.post("/players", async (req, res) => {
   res.status(201).json(player[0]);
 });
 
-router.get("/players/:id", requireAuth, async (req, res) => {
+router.get("/players/:id", requireAuth, attachPlayer, async (req, res) => {
   const params = GetPlayerParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
+  if (params.data.id !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, params.data.id) });
   if (!player) { res.status(404).json({ error: "Player not found" }); return; }
   res.json(player);
