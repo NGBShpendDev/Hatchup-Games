@@ -31,6 +31,7 @@ import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
 import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
 import { ChampionVictoryOverlay } from "@/components/champion-victory-overlay";
+import { PodiumFinishOverlay } from "@/components/podium-finish-overlay";
 import {
   Trophy, Users, Users2, Clock, Zap, Coins, Target, ArrowLeft,
   MapPin, Share2, CheckCircle2, Medal, Crown,
@@ -88,6 +89,9 @@ export default function ChallengeDetail() {
   const [rewardSummary, setRewardSummary] = useState<{ open: boolean; entries: RewardEntry[]; title?: string }>({ open: false, entries: [] });
   const [championOverlayOpen, setChampionOverlayOpen] = useState(false);
   const [victoryShared, setVictoryShared] = useState(false);
+  const [podiumOverlayOpen, setPodiumOverlayOpen] = useState(false);
+  const [podiumRank, setPodiumRank] = useState<2 | 3 | null>(null);
+  const [podiumShared, setPodiumShared] = useState(false);
 
   // Debounce the search input by 300ms to avoid hammering the API
   useEffect(() => {
@@ -232,12 +236,19 @@ export default function ChallengeDetail() {
     },
   });
 
+  const shareContextRef = useRef<"champion" | "podium" | null>(null);
+
   const createPostMutation = useCreatePost({
     mutation: {
       onSuccess: () => {
-        setVictoryShared(true);
+        if (shareContextRef.current === "podium") {
+          setPodiumShared(true);
+          toast({ title: "Podium shared! 🥈", description: "Your finish is live on the feed." });
+        } else {
+          setVictoryShared(true);
+          toast({ title: "Victory shared! 🏆", description: "Your win is live on the feed." });
+        }
         queryClient.invalidateQueries({ queryKey: ["/api/social/feed"] });
-        toast({ title: "Victory shared! 🏆", description: "Your win is live on the feed." });
       },
       onError: (err: { response?: { data?: { error?: string } } }) => {
         toast({
@@ -257,6 +268,7 @@ export default function ChallengeDetail() {
 
   // Champion victory overlay trigger. Lives above the loading early-return so
   // hooks order stays stable. Reads the rank straight off the challenge payload.
+  // The podium overlay (rank 2/3) follows the same pattern below.
   useEffect(() => {
     if (!challenge || !player) return;
     const c = challenge as unknown as {
@@ -264,18 +276,27 @@ export default function ChallengeDetail() {
       isElimination?: boolean;
       leaderboard?: { playerId: number; rank?: number }[];
     };
-    const won =
-      c.status === "completed" &&
-      c.isElimination === true &&
-      (c.leaderboard ?? []).some((e) => e.playerId === player.id && e.rank === 1);
-    if (!won) return;
-    const key = `champion-overlay-seen:${player.id}:${challengeId}`;
-    try {
-      if (localStorage.getItem(key)) return;
-    } catch {
-      // localStorage unavailable — still show this session.
+    if (c.status !== "completed" || c.isElimination !== true) return;
+    const me = (c.leaderboard ?? []).find((e) => e.playerId === player.id);
+    const rank = me?.rank;
+    if (rank === 1) {
+      const key = `champion-overlay-seen:${player.id}:${challengeId}`;
+      try {
+        if (localStorage.getItem(key)) return;
+      } catch {
+        // localStorage unavailable — still show this session.
+      }
+      setChampionOverlayOpen(true);
+    } else if (rank === 2 || rank === 3) {
+      const key = `podium-overlay-seen:${player.id}:${challengeId}`;
+      try {
+        if (localStorage.getItem(key)) return;
+      } catch {
+        // localStorage unavailable — still show this session.
+      }
+      setPodiumRank(rank);
+      setPodiumOverlayOpen(true);
     }
-    setChampionOverlayOpen(true);
   }, [challenge, player, challengeId]);
 
   if (isLoading || !challenge) {
@@ -343,6 +364,7 @@ export default function ChallengeDetail() {
 
   const handleShareVictory = async () => {
     if (!player || victoryShared || createPostMutation.isPending) return;
+    shareContextRef.current = "champion";
     try {
       await createPostMutation.mutateAsync({
         data: {
@@ -374,6 +396,58 @@ export default function ChallengeDetail() {
       try {
         await navigator.clipboard.writeText(victoryShareText);
         toast({ title: "Copied!", description: "Victory details copied to clipboard." });
+      } catch {
+        // clipboard unavailable — the feed post is still up
+      }
+    }
+  };
+
+  const dismissPodiumOverlay = () => {
+    setPodiumOverlayOpen(false);
+    if (player) {
+      try {
+        localStorage.setItem(`podium-overlay-seen:${player.id}:${challengeId}`, "1");
+      } catch {
+        // ignore — the overlay just won't be suppressed across reloads
+      }
+    }
+  };
+
+  const podiumRewardXp = (rich as { rewardXp: number }).rewardXp;
+  const podiumRewardCoins = (rich as { rewardCoins: number }).rewardCoins;
+  const podiumPlaceText = podiumRank === 2 ? "2nd" : "3rd";
+  const podiumMedal = podiumRank === 2 ? "🥈" : "🥉";
+  const podiumShareText =
+    `${podiumMedal} I made the podium — ${podiumPlaceText} place in "${challenge.title}", ` +
+    `a ${bracketSize}-player elimination tournament on HatchUp! ` +
+    `Think you can outlast me? Join the next bracket: ${challengeUrl}`;
+
+  const handleSharePodium = async () => {
+    if (!player || !podiumRank || podiumShared || createPostMutation.isPending) return;
+    shareContextRef.current = "podium";
+    try {
+      await createPostMutation.mutateAsync({
+        data: {
+          playerId: player.id,
+          content: podiumShareText,
+          postType: "streak_milestone",
+        },
+      });
+    } catch {
+      // toast handled in mutation onError
+      return;
+    }
+    if (typeof navigator === "undefined") return;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: challenge.title, text: podiumShareText, url: challengeUrl });
+      } catch {
+        // user canceled — that's fine
+      }
+    } else if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(podiumShareText);
+        toast({ title: "Copied!", description: "Podium details copied to clipboard." });
       } catch {
         // clipboard unavailable — the feed post is still up
       }
@@ -807,9 +881,24 @@ export default function ChallengeDetail() {
         boostedCoins={boostedCoins}
         onDismiss={dismissChampionOverlay}
         onShare={handleShareVictory}
-        isSharing={createPostMutation.isPending}
+        isSharing={shareContextRef.current === "champion" && createPostMutation.isPending}
         shared={victoryShared}
       />
+
+      {/* Podium finish overlay — same one-time pattern for ranks 2 and 3 */}
+      {podiumRank !== null && (
+        <PodiumFinishOverlay
+          show={podiumOverlayOpen}
+          rank={podiumRank}
+          challengeTitle={challenge.title}
+          rewardXp={podiumRewardXp}
+          rewardCoins={podiumRewardCoins}
+          onDismiss={dismissPodiumOverlay}
+          onShare={handleSharePodium}
+          isSharing={shareContextRef.current === "podium" && createPostMutation.isPending}
+          shared={podiumShared}
+        />
+      )}
 
       {/* Unified reward summary — fires on join and every progress submission */}
       <RewardSummaryModal
