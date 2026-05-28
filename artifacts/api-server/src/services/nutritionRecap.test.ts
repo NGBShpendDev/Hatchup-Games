@@ -433,6 +433,25 @@ describe("sendWeeklyRecapNotification", () => {
     assert.equal(externalCalls.pushes, 1);
   });
 
+  it("skips the recap email when emailVerifiedAt is null, even if notifyRecapEmail is true", async () => {
+    externalCalls.emails = 0;
+    externalCalls.pushes = 0;
+    state.players.set(20, {
+      id: 20,
+      physiqueGoal: "lean_athlete",
+      email: "unverified@example.com",
+      emailVerifiedAt: null,
+      notifyRecapEmail: true,
+      notifyRecapPush: true,
+      displayName: "Twenty",
+    });
+    await sendWeeklyRecapNotification(20, new Date("2026-06-14T12:00:00Z"), { deliverExternalChannels: true });
+    assert.equal(externalCalls.emails, 0, "email must NOT fire to an unverified address");
+    assert.equal(externalCalls.pushes, 1, "push still fires (verification only gates email)");
+    // No recapEmailLastSentWeek was written for the unverified send.
+    assert.equal(state.players.get(20)?.recapEmailLastSentWeek ?? null, null);
+  });
+
   it("respects per-channel opt-out flags", async () => {
     externalCalls.emails = 0;
     externalCalls.pushes = 0;
