@@ -3,6 +3,7 @@ import { notificationsTable, playersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger.ts";
 import { isEmailConfigured, sendTransactionalEmail } from "./emailService.ts";
+import { pushForNotification } from "./notificationFanout.ts";
 
 export type ModerationAction = "suspend" | "unsuspend" | "verify";
 
@@ -87,6 +88,19 @@ export async function notifyModerationAction(
       body: copy.body(cleanReason),
       link: SAFETY_LINK,
     });
+    // Fan out to web push so players hear about account-status changes even
+    // when the app is closed. Best-effort: respects the per-category push
+    // opt-out inside `sendPushToPlayer` and never throws back to the caller.
+    void pushForNotification(
+      {
+        playerId,
+        type: copy.type,
+        title: copy.title,
+        body: copy.body(cleanReason),
+        link: SAFETY_LINK,
+      },
+      { tag: `moderation-${action}-${playerId}` },
+    );
   } catch (err) {
     logger.warn({ err, playerId, action }, "moderation notification insert failed");
   }

@@ -34,6 +34,7 @@ import {
   type EliminationStore,
 } from "./eliminationBracket.ts";
 import { sendPushToPlayer } from "./pushNotifications.ts";
+import { pushForNotification } from "./notificationFanout.ts";
 import { isEmailConfigured, sendTransactionalEmail } from "./emailService.ts";
 import { logger } from "../lib/logger.ts";
 
@@ -111,7 +112,13 @@ async function advanceEliminationRound(challengeId: number): Promise<AdvanceOutc
       link,
       sourceId: challengeId,
     }));
-    if (rows.length > 0) await db.insert(notificationsTable).values(rows);
+    if (rows.length > 0) {
+      await db.insert(notificationsTable).values(rows);
+      // Also fan out to web push so eliminated players hear it offline.
+      for (const row of rows) {
+        void pushForNotification(row, { tag: `tournament-eliminated-${challengeId}-${row.playerId}` });
+      }
+    }
   }
 
   // Notify survivors that they advanced to the next round.
@@ -126,7 +133,12 @@ async function advanceEliminationRound(challengeId: number): Promise<AdvanceOutc
       link,
       sourceId: challengeId,
     }));
-    if (rows.length > 0) await db.insert(notificationsTable).values(rows);
+    if (rows.length > 0) {
+      await db.insert(notificationsTable).values(rows);
+      for (const row of rows) {
+        void pushForNotification(row, { tag: `tournament-advanced-${challengeId}-${row.playerId}` });
+      }
+    }
   }
 
   return outcome;

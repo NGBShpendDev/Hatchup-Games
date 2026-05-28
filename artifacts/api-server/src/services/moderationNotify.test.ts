@@ -79,6 +79,12 @@ mock.module("@workspace/db", {
   },
 });
 
+mock.module("./pushNotifications.ts", {
+  namedExports: {
+    sendPushToPlayer: async () => {},
+  },
+});
+
 mock.module("./emailService.ts", {
   namedExports: {
     isEmailConfigured: () => state.emailConfigured,

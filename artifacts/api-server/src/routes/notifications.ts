@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, notificationsTable } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { pushForNotification } from "../services/notificationFanout.ts";
 
 const router = Router();
 
@@ -102,6 +103,12 @@ router.post("/notifications", requireAuth, attachPlayer, async (req, res) => {
     link: String(body.link ?? ""),
     sourceId,
   }).returning();
+
+  if (row) {
+    void pushForNotification(row, {
+      tag: sourceId !== null ? `${type}-${sourceId}` : `${type}-${row.id}`,
+    });
+  }
 
   res.status(201).json({ ...row!, createdAt: row!.createdAt.toISOString() });
 });

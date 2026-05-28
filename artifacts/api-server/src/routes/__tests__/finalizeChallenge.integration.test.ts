@@ -241,8 +241,27 @@ describe("finalizeChallenge — elimination tournament", () => {
     assert.equal(advancedTypes.length, 2, "two survivors notified of advance");
     assert.equal(eliminatedTypes.length, 2, "two losers notified of elimination");
 
-    // No completion push should have fired yet.
-    assert.equal(capturedPushes.filter(p => p.category === "completed").length, 0);
+    // No "challenge complete" / champion push should have fired yet — only
+    // the per-round advance/eliminated fan-outs (which now also use the
+    // `completed` category since they share the outcome opt-in).
+    assert.equal(
+      capturedPushes.filter(p => p.tag?.startsWith("challenge-complete-")).length,
+      0,
+    );
+    assert.equal(
+      capturedPushes.filter(p => p.tag?.startsWith("tournament-champion-")).length,
+      0,
+    );
+    assert.equal(
+      capturedPushes.filter(p => p.tag?.startsWith("tournament-advanced-")).length,
+      2,
+      "two advance pushes fired for round-1 survivors",
+    );
+    assert.equal(
+      capturedPushes.filter(p => p.tag?.startsWith("tournament-eliminated-")).length,
+      2,
+      "two elimination pushes fired for round-1 losers",
+    );
 
     // Now seed currentValue for the new round to give p1 the win, then
     // expire the round.
@@ -308,10 +327,16 @@ describe("finalizeChallenge — elimination tournament", () => {
     assert.ok(ownership, "champion owns the Crown of the Bracket");
     assert.equal(ownership!.artifactId, crown!.id);
 
-    // Completion push fan-out: one per participant (active + eliminated).
-    const completed = capturedPushes.filter(p => p.category === "completed");
-    assert.equal(completed.length, 4, "completion push fired for every participant");
-    const completedPlayerIds = new Set(completed.map(p => p.playerId));
+    // Completion push fan-out: one `challenge-complete-*` push per non-champion
+    // participant + one `tournament-champion-*` for the winner.
+    const completePushes = capturedPushes.filter(p => p.tag?.startsWith("challenge-complete-"));
+    const championPushes = capturedPushes.filter(p => p.tag?.startsWith("tournament-champion-"));
+    assert.equal(completePushes.length, 3, "challenge-complete push fired for the 3 non-champions");
+    assert.equal(championPushes.length, 1, "champion push fired exactly once");
+    const completedPlayerIds = new Set([
+      ...completePushes.map(p => p.playerId),
+      ...championPushes.map(p => p.playerId),
+    ]);
     assert.deepEqual(
       [...completedPlayerIds].sort((a, b) => a - b),
       [p1, p2, p3, p4].sort((a, b) => a - b),

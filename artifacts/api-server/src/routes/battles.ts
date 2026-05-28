@@ -13,6 +13,7 @@ import {
   setRematchInviteStatus,
   type RematchInvite,
 } from "../services/matchmakingQueue.ts";
+import { pushForNotification } from "../services/notificationFanout.ts";
 
 function serializeInvite(inv: RematchInvite, fromName: string | null, toName: string | null) {
   return {
@@ -351,14 +352,16 @@ router.post("/battles/rematch", requireAuth, attachPlayer, async (req, res) => {
   const fromName = me_?.displayName ?? me_?.username ?? `Player #${me}`;
   // Drop a persistent in-app notification so the opponent sees it in their inbox.
   try {
-    await db.insert(notificationsTable).values({
+    const notif = {
       playerId: opponentId,
       type: "rematch_invite",
       title: `${fromName} wants a rematch!`,
       body: `${mode === "ranked" ? "Ranked" : "Casual"} battle · expires in 5 minutes`,
       link: `/compete/battle?rematch=${invite.id}`,
       sourceId: battleId,
-    });
+    };
+    await db.insert(notificationsTable).values(notif);
+    void pushForNotification(notif, { tag: `rematch-invite-${invite.id}` });
   } catch {
     // Non-fatal: invite still exists and can be polled from the pending list.
   }
@@ -408,14 +411,16 @@ router.post("/battles/rematch/:id/accept", requireAuth, attachPlayer, async (req
   const me_ = await db.query.playersTable.findFirst({ where: eq(playersTable.id, me) });
   const acceptorName = me_?.displayName ?? me_?.username ?? `Player #${me}`;
   try {
-    await db.insert(notificationsTable).values({
+    const notif = {
       playerId: inv.fromPlayerId,
       type: "rematch_invite",
       title: `${acceptorName} accepted your rematch!`,
       body: "Tap to enter the arena.",
       link: `/compete/battle?rematch=${inv.id}`,
       sourceId: inv.fromBattleId,
-    });
+    };
+    await db.insert(notificationsTable).values(notif);
+    void pushForNotification(notif, { tag: `rematch-accept-${inv.id}` });
   } catch { /* non-fatal */ }
 
   res.json({ ok: true, inviteId: inv.id });
@@ -437,14 +442,16 @@ router.post("/battles/rematch/:id/decline", requireAuth, attachPlayer, async (re
       const me_ = await db.query.playersTable.findFirst({ where: eq(playersTable.id, me) });
       const declinerName = me_?.displayName ?? me_?.username ?? `Player #${me}`;
       try {
-        await db.insert(notificationsTable).values({
+        const notif = {
           playerId: inv.fromPlayerId,
           type: "rematch_invite",
           title: `${declinerName} declined your rematch`,
           body: "Maybe next time.",
           link: `/compete`,
           sourceId: inv.fromBattleId,
-        });
+        };
+        await db.insert(notificationsTable).values(notif);
+        void pushForNotification(notif, { tag: `rematch-decline-${inv.id}` });
       } catch { /* non-fatal */ }
     }
   }
