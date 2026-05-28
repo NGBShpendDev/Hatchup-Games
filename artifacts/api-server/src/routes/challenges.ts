@@ -23,6 +23,8 @@ import {
   type EliminationStore,
 } from "../services/eliminationBracket";
 import { sendPushToPlayer } from "../services/pushNotifications";
+import { isEmailConfigured, sendTransactionalEmail } from "../services/emailService";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -307,13 +309,18 @@ async function finalizeChallenge(challengeId: number) {
   if (outcome.kind !== "completed") return;
 
   // Fan out a "challenge complete" push to every participant (active or
-  // eliminated) so they can see their final rank.
+  // eliminated) so they can see their final rank. The tournament champion
+  // (if any) gets a dedicated champion notification instead, so we skip
+  // them here to avoid sending two pushes for the same event.
   if (!challenge.completedPushSentAt) {
+    const championPlayerId = outcome.rankings.find(r => r.grant.isChampion)?.playerId ?? null;
+
     const allParticipants = await db.query.challengeParticipantsTable.findMany({
       where: eq(challengeParticipantsTable.challengeId, challengeId),
       columns: { playerId: true },
     });
     for (const p of allParticipants) {
+      if (p.playerId === championPlayerId) continue;
       void sendPushToPlayer(p.playerId, {
         title: "Challenge complete!",
         body: `"${challenge.title}" wrapped up — tap to see your final rank.`,
@@ -322,6 +329,96 @@ async function finalizeChallenge(challengeId: number) {
         tag: `challenge-complete-${challengeId}`,
       });
     }
+
+    if (championPlayerId !== null) {
+      void notifyTournamentChampion(championPlayerId, challengeId, challenge.title);
+    }
+  }
+}
+
+// ── Tournament champion notification ───────────────────────────────────────
+// When an elimination tournament finalizes, the rank-1 survivor gets a
+// dedicated celebratory notification on top of the in-app reward feedback.
+// Fires exactly once per challenge because it lives inside the
+// `!completedPushSentAt` gate in `finalizeChallenge` (markCompleted flips
+// that flag as part of reward distribution). Honors existing opt-in prefs:
+// push respects `notifyCompletedPush`, email respects `notifyRecapEmail`
+// and only fires when the player has an email on file and an email
+// provider is configured.
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+async function notifyTournamentChampion(
+  playerId: number,
+  challengeId: number,
+  challengeTitle: string,
+): Promise<void> {
+  const link = `/challenges/${challengeId}`;
+  const title = `You won ${challengeTitle}!`;
+  const body = `Champion of "${challengeTitle}" — claim your XP, coins, badge, and the Crown of the Bracket.`;
+
+  try {
+    await db.insert(notificationsTable).values({
+      playerId,
+      type: "tournament_champion",
+      title,
+      body,
+      link,
+      sourceId: challengeId,
+    });
+  } catch (err) {
+    logger.warn({ err, playerId, challengeId }, "tournament_champion notification insert failed");
+  }
+
+  void sendPushToPlayer(playerId, {
+    title: `🏆 ${title}`,
+    body,
+    link,
+    category: "completed",
+    tag: `tournament-champion-${challengeId}`,
+  });
+
+  if (!isEmailConfigured()) return;
+
+  try {
+    const player = await db.query.playersTable.findFirst({
+      where: eq(playersTable.id, playerId),
+      columns: {
+        email: true,
+        notifyRecapEmail: true,
+        displayName: true,
+        username: true,
+      },
+    });
+    if (!player || !player.email || !player.notifyRecapEmail) return;
+
+    const name = player.displayName ?? player.username;
+    const safeTitle = escapeHtml(challengeTitle);
+    const safeName = escapeHtml(name);
+    const html = `
+      <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#111;max-width:560px;margin:0 auto;padding:24px;">
+        <h1 style="font-size:24px;margin:0 0 16px;">🏆 You won ${safeTitle}!</h1>
+        <p style="font-size:16px;line-height:1.5;margin:0 0 12px;">Congrats, ${safeName} — you outlasted every contender and claimed the bracket.</p>
+        <p style="font-size:16px;line-height:1.5;margin:0 0 12px;">Your rewards are waiting: bonus XP &amp; coins, the Tournament Champion badge, and the legendary <strong>Crown of the Bracket</strong> artifact.</p>
+        <p style="margin:24px 0;"><a href="${link}" style="background:#ec4899;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">View your win</a></p>
+        <p style="font-size:12px;color:#666;">You're receiving this because you have HATCHUP email notifications enabled.</p>
+      </div>
+    `;
+    const subject = `🏆 You won ${challengeTitle}!`;
+    await sendTransactionalEmail({
+      to: player.email,
+      subject,
+      html,
+      text: `You won ${challengeTitle}! Claim your XP, coins, Tournament Champion badge, and the Crown of the Bracket: ${link}`,
+    });
+  } catch (err) {
+    logger.warn({ err, playerId, challengeId }, "tournament_champion email step failed");
   }
 }
 
