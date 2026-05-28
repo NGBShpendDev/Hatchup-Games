@@ -8,8 +8,8 @@ import {
   useSubmitChallengeProgress,
   useReportChallenge,
   useInviteToChallenge,
-  useListFollowing,
-  getListFollowingQueryKey,
+  useSearchPlayers,
+  getSearchPlayersQueryKey,
   type PlayerStub,
 } from "@workspace/api-client-react";
 import {
@@ -76,7 +76,14 @@ export default function ChallengeDetail() {
   const [progressValue, setProgressValue] = useState(100);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteSearch, setInviteSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [invitedIds, setInvitedIds] = useState<Set<number>>(new Set());
+
+  // Debounce the search input by 300ms to avoid hammering the API
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(inviteSearch.trim()), 300);
+    return () => clearTimeout(t);
+  }, [inviteSearch]);
 
   const challengeId = Number(id);
   const { data: challenge, isLoading } = useGetChallenge(
@@ -84,9 +91,15 @@ export default function ChallengeDetail() {
     { query: { queryKey: getGetChallengeQueryKey(challengeId), refetchInterval: 30000 } }
   );
 
-  const { data: following, isLoading: followingLoading } = useListFollowing(
-    player?.id ?? 0,
-    { query: { queryKey: getListFollowingQueryKey(player?.id ?? 0), enabled: !!player?.id && inviteOpen } }
+  const searchParams = { q: debouncedSearch, limit: 20 };
+  const { data: searchResults, isLoading: searchLoading, isFetching: searchFetching } = useSearchPlayers(
+    searchParams,
+    {
+      query: {
+        queryKey: getSearchPlayersQueryKey(searchParams),
+        enabled: inviteOpen && debouncedSearch.length > 0,
+      },
+    }
   );
 
   // Live countdown
@@ -161,14 +174,10 @@ export default function ChallengeDetail() {
   const isCompleted = rich.status === "completed";
   const isExpired = new Date(rich.endAt) < new Date();
   const isCreator = !!player && rich.creatorId === player.id;
-  const filteredFollowing: PlayerStub[] = (following ?? []).filter((p) => {
-    const q = inviteSearch.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      p.username.toLowerCase().includes(q) ||
-      (p.displayName ?? "").toLowerCase().includes(q)
-    );
-  });
+  const inviteResults: PlayerStub[] = (searchResults ?? []).filter((p) => p.id !== player?.id);
+  const searchIsLoading = (searchLoading || searchFetching) && debouncedSearch.length > 0;
+  const hasTypedQuery = inviteSearch.trim().length > 0;
+  const queryStillDebouncing = hasTypedQuery && debouncedSearch !== inviteSearch.trim();
   const leaderboard: LeaderboardEntry[] = rich.leaderboard ?? [];
   const myEntry = leaderboard.find(e => e.playerId === player?.id);
   const targetValue = rich.targetValue;
@@ -584,7 +593,7 @@ export default function ChallengeDetail() {
               <UserPlus className="w-5 h-5 text-primary" /> Invite Friends
             </SheetTitle>
             <SheetDescription>
-              Invite people you follow to join "{challenge.title}".
+              Search for anyone to invite to "{challenge.title}".
             </SheetDescription>
           </SheetHeader>
 
@@ -599,27 +608,25 @@ export default function ChallengeDetail() {
           </div>
 
           <ScrollArea className="flex-1 mt-3 px-4 pb-4">
-            {followingLoading ? (
+            {!hasTypedQuery ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Search className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p className="font-bold">Search for players to invite</p>
+                <p className="text-xs mt-1">Type a name or username to get started.</p>
+              </div>
+            ) : searchIsLoading || queryStillDebouncing ? (
               <div className="space-y-2 py-2">
                 {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}
               </div>
-            ) : filteredFollowing.length === 0 ? (
+            ) : inviteResults.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p className="font-bold">
-                  {(following ?? []).length === 0
-                    ? "Follow some players first"
-                    : "No matches"}
-                </p>
-                <p className="text-xs mt-1">
-                  {(following ?? []).length === 0
-                    ? "You can invite anyone you follow."
-                    : "Try a different search."}
-                </p>
+                <p className="font-bold">No matches</p>
+                <p className="text-xs mt-1">Try a different name or username.</p>
               </div>
             ) : (
               <div className="space-y-2 py-2">
-                {filteredFollowing.map((p) => {
+                {inviteResults.map((p) => {
                   const invited = invitedIds.has(p.id);
                   const isPending =
                     inviteMutation.isPending &&

@@ -144,6 +144,7 @@ import type {
   SaveArtifactBuildBody,
   SaveArtifactLoadoutBody,
   ScopedLeaderboardResult,
+  SearchPlayersParams,
   SendGroupMessageInput,
   SpeedLeaderboardEntry,
   StorageErrorEnvelope,
@@ -618,6 +619,95 @@ export const useCreatePlayer = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getCreatePlayerMutationOptions(options));
     }
+
+export const getSearchPlayersUrl = (params: SearchPlayersParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/players/search?${stringifiedParams}` : `/api/players/search`
+}
+
+/**
+ * Returns up to `limit` players whose username or displayName contains the
+query string (case-insensitive). Used by the Invite Friends sheet on
+challenges to let creators invite anyone, not just people they follow.
+The current player is excluded from results.
+
+ * @summary Search players by username or display name
+ */
+export const searchPlayers = async (params: SearchPlayersParams, options?: RequestInit): Promise<PlayerStub[]> => {
+
+  return customFetch<PlayerStub[]>(getSearchPlayersUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchPlayersQueryKey = (params?: SearchPlayersParams,) => {
+    return [
+    `/api/players/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchPlayersQueryOptions = <TData = Awaited<ReturnType<typeof searchPlayers>>, TError = ErrorType<unknown>>(params: SearchPlayersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchPlayers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchPlayersQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchPlayers>>> = ({ signal }) => searchPlayers(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchPlayers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type SearchPlayersQueryResult = NonNullable<Awaited<ReturnType<typeof searchPlayers>>>
+export type SearchPlayersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Search players by username or display name
+ */
+
+export function useSearchPlayers<TData = Awaited<ReturnType<typeof searchPlayers>>, TError = ErrorType<unknown>>(
+ params: SearchPlayersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchPlayers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getSearchPlayersQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetPlayerUrl = (id: number,) => {
 

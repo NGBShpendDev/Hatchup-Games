@@ -96,6 +96,35 @@ export const CreatePlayerBody = zod.object({
 
 
 /**
+ * Returns up to `limit` players whose username or displayName contains the
+query string (case-insensitive). Used by the Invite Friends sheet on
+challenges to let creators invite anyone, not just people they follow.
+The current player is excluded from results.
+
+ * @summary Search players by username or display name
+ */
+
+export const searchPlayersQueryLimitDefault = 20;
+export const searchPlayersQueryLimitMax = 50;
+
+
+
+export const SearchPlayersQueryParams = zod.object({
+  "q": zod.coerce.string().min(1),
+  "limit": zod.coerce.number().min(1).max(searchPlayersQueryLimitMax).default(searchPlayersQueryLimitDefault)
+})
+
+export const SearchPlayersResponseItem = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
+})
+export const SearchPlayersResponse = zod.array(SearchPlayersResponseItem)
+
+
+/**
  * @summary Get player by ID
  */
 export const GetPlayerParams = zod.object({

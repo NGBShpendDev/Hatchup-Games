@@ -1480,6 +1480,18 @@ export interface LocalChallengeLeaderboardResult {
   myEntry?: LocalChallengeLeaderboardEntry | null;
 }
 
+export type SearchPlayersParams = {
+/**
+ * @minLength 1
+ */
+q: string;
+/**
+ * @minimum 1
+ * @maximum 50
+ */
+limit?: number;
+};
+
 export type ListHatchlingsParams = {
 playerId?: number;
 limit?: number;

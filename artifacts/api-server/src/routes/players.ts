@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable, eggsTable, fitnessActivitiesTable, playerBadgesTable, playerArtifactsTable, artifactsTable } from "@workspace/db";
-import { eq, desc, and, gte } from "drizzle-orm";
+import { eq, desc, and, gte, or, ilike, ne } from "drizzle-orm";
 import {
   CreatePlayerBody,
   UpdatePlayerBody,
@@ -81,6 +81,40 @@ router.post("/players", requireAuth, async (req, res) => {
     })
     .returning();
   res.status(201).json(player[0]);
+});
+
+// GET /players/search — search by username or displayName (case-insensitive)
+router.get("/players/search", requireAuth, attachPlayer, async (req, res) => {
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (!q) {
+    res.json([]);
+    return;
+  }
+  const rawLimit = Number(req.query.limit);
+  const limit = Math.min(50, Math.max(1, Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : 20));
+  const needle = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+
+  const viewerId = req.playerId;
+  const whereExpr = viewerId
+    ? and(
+        or(ilike(playersTable.username, needle), ilike(playersTable.displayName, needle)),
+        ne(playersTable.id, viewerId),
+      )
+    : or(ilike(playersTable.username, needle), ilike(playersTable.displayName, needle));
+
+  const rows = await db.query.playersTable.findMany({
+    where: whereExpr,
+    limit,
+    orderBy: (t, { asc }) => [asc(t.username)],
+  });
+
+  res.json(rows.map(p => ({
+    id: p.id,
+    username: p.username,
+    displayName: p.displayName ?? null,
+    avatarUrl: p.avatarUrl ?? null,
+    creatorBadge: p.creatorBadge ?? null,
+  })));
 });
 
 router.get("/players/:id", requireAuth, attachPlayer, async (req, res) => {
