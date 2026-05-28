@@ -2161,6 +2161,35 @@ export interface NutritionAnalyzeResult {
   suggestions?: string[];
 }
 
+export interface NutritionAnalyzeImageInput {
+  /**
+     * @maxLength 500
+     * @pattern ^/objects/
+     */
+  imageUrl: string;
+  /**
+     * @minLength 1
+     * @maxLength 256
+     */
+  uploadToken: string;
+}
+
+export interface NutritionAnalyzeImageResult {
+  recognized: boolean;
+  food_name?: string;
+  description?: string;
+  calories?: number;
+  protein_g?: number;
+  carbs_g?: number;
+  fat_g?: number;
+  /**
+     * @minimum 1
+     * @maximum 10
+     */
+  quality_score?: number;
+  suggestions?: string[];
+}
+
 export interface NutritionChallenge {
   key: string;
   name: string;

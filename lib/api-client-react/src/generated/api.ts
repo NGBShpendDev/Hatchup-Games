@@ -173,6 +173,8 @@ import type {
   MutualFollowersPage,
   MutualFollowingPage,
   Notification,
+  NutritionAnalyzeImageInput,
+  NutritionAnalyzeImageResult,
   NutritionAnalyzeInput,
   NutritionAnalyzeResult,
   NutritionChallenge,
@@ -12196,6 +12198,84 @@ export const useAnalyzeMealDescription = <TError = ErrorType<StorageErrorEnvelop
         TContext
       > => {
       return useMutation(getAnalyzeMealDescriptionMutationOptions(options));
+    }
+
+export const getAnalyzeMealImageUrl = () => {
+
+
+
+
+  return `/api/nutrition/analyze-image`
+}
+
+/**
+ * Reads a previously uploaded meal photo (the same `/objects/...` path and
+`uploadToken` issued by the storage upload flow) and sends it to a
+vision model to estimate calories, macros, a 1-10 quality score, a
+short food description, and 1-3 improvement suggestions. Returns
+`recognized=false` with a static fallback estimate if the model cannot
+confidently identify the meal.
+
+ * @summary Estimate macros + quality score from an uploaded food photo
+ */
+export const analyzeMealImage = async (nutritionAnalyzeImageInput: NutritionAnalyzeImageInput, options?: RequestInit): Promise<NutritionAnalyzeImageResult> => {
+
+  return customFetch<NutritionAnalyzeImageResult>(getAnalyzeMealImageUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      nutritionAnalyzeImageInput,)
+  }
+);}
+
+
+
+
+export const getAnalyzeMealImageMutationOptions = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeMealImage>>, TError,{data: BodyType<NutritionAnalyzeImageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof analyzeMealImage>>, TError,{data: BodyType<NutritionAnalyzeImageInput>}, TContext> => {
+
+const mutationKey = ['analyzeMealImage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof analyzeMealImage>>, {data: BodyType<NutritionAnalyzeImageInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  analyzeMealImage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnalyzeMealImageMutationResult = NonNullable<Awaited<ReturnType<typeof analyzeMealImage>>>
+    export type AnalyzeMealImageMutationBody = BodyType<NutritionAnalyzeImageInput>
+    export type AnalyzeMealImageMutationError = ErrorType<StorageErrorEnvelope>
+
+    /**
+ * @summary Estimate macros + quality score from an uploaded food photo
+ */
+export const useAnalyzeMealImage = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeMealImage>>, TError,{data: BodyType<NutritionAnalyzeImageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof analyzeMealImage>>,
+        TError,
+        {data: BodyType<NutritionAnalyzeImageInput>},
+        TContext
+      > => {
+      return useMutation(getAnalyzeMealImageMutationOptions(options));
     }
 
 export const getListNutritionChallengesUrl = () => {

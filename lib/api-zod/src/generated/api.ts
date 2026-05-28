@@ -4098,6 +4098,46 @@ export const AnalyzeMealDescriptionResponse = zod.object({
 
 
 /**
+ * Reads a previously uploaded meal photo (the same `/objects/...` path and
+`uploadToken` issued by the storage upload flow) and sends it to a
+vision model to estimate calories, macros, a 1-10 quality score, a
+short food description, and 1-3 improvement suggestions. Returns
+`recognized=false` with a static fallback estimate if the model cannot
+confidently identify the meal.
+
+ * @summary Estimate macros + quality score from an uploaded food photo
+ */
+export const analyzeMealImageBodyImageUrlMax = 500;
+
+
+export const analyzeMealImageBodyImageUrlRegExp = new RegExp('^\/objects');
+export const analyzeMealImageBodyUploadTokenMax = 256;
+
+
+
+export const AnalyzeMealImageBody = zod.object({
+  "imageUrl": zod.string().max(analyzeMealImageBodyImageUrlMax).regex(analyzeMealImageBodyImageUrlRegExp),
+  "uploadToken": zod.string().min(1).max(analyzeMealImageBodyUploadTokenMax)
+})
+
+export const analyzeMealImageResponseQualityScoreMax = 10;
+
+
+
+export const AnalyzeMealImageResponse = zod.object({
+  "recognized": zod.boolean(),
+  "food_name": zod.string().optional(),
+  "description": zod.string().optional(),
+  "calories": zod.number().optional(),
+  "protein_g": zod.number().optional(),
+  "carbs_g": zod.number().optional(),
+  "fat_g": zod.number().optional(),
+  "quality_score": zod.number().min(1).max(analyzeMealImageResponseQualityScoreMax).optional(),
+  "suggestions": zod.array(zod.string()).optional()
+})
+
+
+/**
  * @summary List nutrition challenges with the player's current progress
  */
 export const ListNutritionChallengesResponseItem = zod.object({

@@ -23,6 +23,7 @@ import {
   useListMealPostComments,
   useAddMealPostComment,
   useAnalyzeMealDescription,
+  useAnalyzeMealImage,
   useListNutritionChallenges,
   useIncrementNutritionChallengeProgress,
   useGetNutritionMacroTarget,
@@ -41,6 +42,7 @@ import {
   type NutritionMacroTarget,
   type NutritionStreak,
   type NutritionAnalyzeResult,
+  type NutritionAnalyzeImageResult,
 } from "@workspace/api-client-react";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
@@ -104,7 +106,9 @@ export default function Nutrition() {
     fatG: "",
   });
   const [analyzing, setAnalyzing] = useState(false);
+  const [analyzingImage, setAnalyzingImage] = useState(false);
   const [aiResult, setAiResult] = useState<NutritionAnalyzeResult | null>(null);
+  const [imageAiResult, setImageAiResult] = useState<NutritionAnalyzeImageResult | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploadToken, setUploadToken] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -161,6 +165,7 @@ export default function Nutrition() {
     setImageUrl(null);
     setUploadToken(null);
     setImagePreview(null);
+    setImageAiResult(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -271,6 +276,7 @@ export default function Nutrition() {
       setShowCreateSheet(false);
       setForm({ name: "", emoji: "🍽️", tag: "healthy-snack", description: "", calories: "", proteinG: "", carbsG: "", fatG: "" });
       setAiResult(null);
+      setImageAiResult(null);
       setImageUrl(null);
       setUploadToken(null);
       setImagePreview(null);
@@ -335,6 +341,43 @@ export default function Nutrition() {
   });
 
   const analyzeMutation = useAnalyzeMealDescription();
+  const analyzeImageMutation = useAnalyzeMealImage();
+
+  const handleAnalyzeImage = async () => {
+    if (!imageUrl || !uploadToken) return;
+    setAnalyzingImage(true);
+    try {
+      const data = await analyzeImageMutation.mutateAsync({ data: { imageUrl, uploadToken } });
+      setImageAiResult(data);
+      if (!data.recognized) {
+        toast({
+          title: "Couldn't identify the meal",
+          description: data.description ?? "Try a clearer photo or fill in the macros manually.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setForm(f => ({
+        ...f,
+        name:        f.name || (data.food_name ?? f.name),
+        description: f.description || (data.description ?? f.description),
+        calories: data.calories != null ? String(data.calories) : f.calories,
+        proteinG: data.protein_g != null ? String(data.protein_g) : f.proteinG,
+        carbsG:   data.carbs_g   != null ? String(data.carbs_g)   : f.carbsG,
+        fatG:     data.fat_g     != null ? String(data.fat_g)     : f.fatG,
+      }));
+      toast({
+        title: "Photo analyzed!",
+        description: data.food_name
+          ? `${data.food_name} · ${data.quality_score ?? "?"}/10 quality`
+          : `Quality score: ${data.quality_score ?? "?"}/10`,
+      });
+    } catch (err) {
+      toast({ title: "Photo analysis failed", description: errorMessage(err, "Try again in a moment."), variant: "destructive" });
+    } finally {
+      setAnalyzingImage(false);
+    }
+  };
 
   const handleAnalyze = async () => {
     if (!form.description) return;
@@ -681,21 +724,60 @@ export default function Nutrition() {
                     className="hidden"
                   />
                   {imagePreview ? (
-                    <div className="relative rounded-2xl overflow-hidden border border-border bg-muted/40">
-                      <img src={imagePreview} alt="Meal preview" className="w-full h-48 object-cover" />
-                      {uploadingImage && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                          <Loader2 className="w-6 h-6 text-white animate-spin" />
+                    <div className="space-y-2">
+                      <div className="relative rounded-2xl overflow-hidden border border-border bg-muted/40">
+                        <img src={imagePreview} alt="Meal preview" className="w-full h-48 object-cover" />
+                        {(uploadingImage || analyzingImage) && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center gap-2">
+                            <Loader2 className="w-6 h-6 text-white animate-spin" />
+                            {analyzingImage && <span className="text-xs font-bold text-white">Analyzing photo...</span>}
+                          </div>
+                        )}
+                        <button
+                          onClick={clearImage}
+                          disabled={uploadingImage || analyzingImage}
+                          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black/90 disabled:opacity-50"
+                          aria-label="Remove photo"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      {imageUrl && !uploadingImage && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full text-purple-400 border-purple-500/40 hover:bg-purple-500/10 text-xs font-black"
+                          onClick={handleAnalyzeImage}
+                          disabled={analyzingImage}
+                        >
+                          {analyzingImage ? (
+                            <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Analyzing photo...</>
+                          ) : (
+                            <><Sparkles className="w-3 h-3 mr-1" /> {imageAiResult ? "Re-analyze photo" : "Analyze photo with AI"}</>
+                          )}
+                        </Button>
+                      )}
+                      {imageAiResult && (
+                        <div className={`rounded-xl border px-3 py-2 text-[11px] ${
+                          imageAiResult.recognized
+                            ? "border-purple-500/30 bg-purple-500/5 text-purple-200"
+                            : "border-yellow-500/30 bg-yellow-500/5 text-yellow-200"
+                        }`}>
+                          {imageAiResult.recognized ? (
+                            <>
+                              <span className="font-black">{imageAiResult.food_name ?? "Meal"}</span>
+                              {imageAiResult.quality_score != null && (
+                                <span className="ml-1 opacity-80">· {imageAiResult.quality_score}/10 quality</span>
+                              )}
+                              {imageAiResult.suggestions?.length ? (
+                                <p className="mt-1 opacity-80">{imageAiResult.suggestions.join(" · ")}</p>
+                              ) : null}
+                            </>
+                          ) : (
+                            <span>{imageAiResult.description ?? "Couldn't identify the meal — fill the macros in manually."}</span>
+                          )}
                         </div>
                       )}
-                      <button
-                        onClick={clearImage}
-                        disabled={uploadingImage}
-                        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black/90 disabled:opacity-50"
-                        aria-label="Remove photo"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
                     </div>
                   ) : (
                     <button

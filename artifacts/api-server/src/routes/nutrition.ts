@@ -677,6 +677,112 @@ router.post("/nutrition/analyze", requireAuth, attachPlayer, async (req, res) =>
   }
 });
 
+// ── POST /nutrition/analyze-image ─────────────────────────────────────────────
+// Vision-based macro estimation from a previously uploaded meal photo. The
+// client passes the `/objects/...` path returned by the storage upload flow
+// plus the matching HMAC `uploadToken` — same trust model as POST
+// /nutrition/posts — so users can only analyze images they actually uploaded.
+const AnalyzeImageBody = z.object({
+  imageUrl: z.string().regex(/^\/objects\//, "imageUrl must be an /objects/ path").max(500),
+  uploadToken: z.string().min(1).max(256),
+});
+
+const FALLBACK_ANALYSIS = {
+  recognized: false as const,
+  food_name: "Unknown meal",
+  description: "We couldn't identify the meal from this photo. Try a clearer shot or fill in the macros manually.",
+  calories: 400,
+  protein_g: 25,
+  carbs_g: 40,
+  fat_g: 15,
+  quality_score: 6,
+  suggestions: ["Photo wasn't clear enough to identify — edit the values if needed."],
+};
+
+// Cap how much of the image we ship to the model. ~6 MB base64 ≈ 4.5 MB raw,
+// comfortably under OpenAI's per-request limits and well above what a typical
+// meal photo needs after the client-side 8 MB upload cap.
+const MAX_IMAGE_BYTES_FOR_VISION = 6 * 1024 * 1024;
+
+router.post("/nutrition/analyze-image", requireAuth, attachPlayer, async (req, res) => {
+  const body = AnalyzeImageBody.safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "imageUrl and uploadToken required" }); return; }
+
+  const { imageUrl, uploadToken } = body.data;
+
+  // Same gate as POST /nutrition/posts — the user must own the upload.
+  if (!verifyUploadToken(imageUrl, req.clerkUserId!, uploadToken)) {
+    res.status(403).json({ error: "Invalid uploadToken for imageUrl" });
+    return;
+  }
+
+  // Fetch the uploaded bytes from object storage.
+  let base64: string;
+  let contentType: string;
+  try {
+    const file = await objectStorageService.getObjectEntityFile(imageUrl);
+    const [metadata] = await file.getMetadata();
+    contentType = (metadata.contentType as string) || "image/jpeg";
+    const size = Number(metadata.size ?? 0);
+    if (size > 0 && size > MAX_IMAGE_BYTES_FOR_VISION) {
+      res.status(400).json({ error: "Image too large for analysis" });
+      return;
+    }
+    const [buf] = await file.download();
+    base64 = buf.toString("base64");
+  } catch (err) {
+    req.log.warn({ err, imageUrl }, "analyze-image: failed to read uploaded object");
+    res.status(404).json({ error: "Image not found or expired" });
+    return;
+  }
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5-mini",
+      max_completion_tokens: 400,
+      messages: [
+        {
+          role: "system",
+          content: `You are a sports nutritionist analyzing a real food photo. Return ONLY valid JSON with these fields: recognized (boolean — false if the photo isn't food or you can't identify it), food_name (short string, e.g. "Grilled chicken, rice, broccoli"), description (1 short sentence describing the meal), calories (number), protein_g (number), carbs_g (number), fat_g (number), quality_score (1-10 integer reflecting protein density and macro balance), suggestions (array of 1-3 short improvement tips). If recognized=false, you may omit the macro fields. No markdown, no extra text.`,
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Estimate macros for this meal photo." },
+            { type: "image_url", image_url: { url: `data:${contentType};base64,${base64}` } },
+          ],
+        },
+      ],
+    });
+
+    const raw = completion.choices[0]?.message?.content ?? "{}";
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      res.json(FALLBACK_ANALYSIS);
+      return;
+    }
+
+    // If the model says it couldn't identify the meal, return the fallback so
+    // the client gets a consistent shape (and the UI can still surface a helpful
+    // message instead of silently zeroing the form).
+    if (parsed.recognized === false) {
+      res.json({
+        ...FALLBACK_ANALYSIS,
+        description: typeof parsed.description === "string" ? parsed.description : FALLBACK_ANALYSIS.description,
+        suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : FALLBACK_ANALYSIS.suggestions,
+      });
+      return;
+    }
+
+    res.json({ recognized: true, ...parsed });
+  } catch (err) {
+    req.log.error({ err }, "AI analyze-image error");
+    res.status(503).json({ error: "AI service unavailable" });
+  }
+});
+
 // ── GET /nutrition/challenges ─────────────────────────────────────────────────
 router.get("/nutrition/challenges", requireAuth, attachPlayer, async (req, res) => {
   const playerId = req.playerId!; // bind to authenticated player
