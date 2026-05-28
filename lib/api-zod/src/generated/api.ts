@@ -4336,6 +4336,47 @@ export const ListBattleRivalsResponse = zod.array(ListBattleRivalsResponseItem)
 
 
 /**
+ * Returns aggregated head-to-head stats and a reverse-chronological list
+of every battle the authenticated player has fought against
+`opponentId`. Each log entry is enriched from the viewer's perspective
+(own/opponent hatchling names, outcome, signed ELO change).
+
+ * @summary Full head-to-head battle log vs a specific opponent
+ */
+export const GetBattleRivalDetailParams = zod.object({
+  "opponentId": zod.coerce.number()
+})
+
+export const GetBattleRivalDetailResponse = zod.object({
+  "opponentId": zod.number(),
+  "opponentUsername": zod.string().nullable(),
+  "opponentDisplayName": zod.string().nullable(),
+  "opponentBattleElo": zod.number(),
+  "totalBattles": zod.number(),
+  "wins": zod.number(),
+  "losses": zod.number(),
+  "draws": zod.number(),
+  "viewerEloDelta": zod.number().describe('Net ELO swing across all head-to-head battles, from the viewer\'s perspective.'),
+  "lastBattleId": zod.number().nullable(),
+  "lastBattleAt": zod.coerce.date().nullable(),
+  "battles": zod.array(zod.object({
+  "id": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "battleMode": zod.string(),
+  "outcome": zod.enum(['win', 'loss', 'draw']),
+  "viewerWon": zod.boolean(),
+  "myHatchlingId": zod.number().nullable(),
+  "myHatchlingName": zod.string().nullable(),
+  "opponentHatchlingId": zod.number().nullable(),
+  "opponentHatchlingName": zod.string().nullable(),
+  "eloChange": zod.number().describe('Signed ELO delta from the viewer\'s perspective.'),
+  "xpAwarded": zod.number(),
+  "coinsAwarded": zod.number()
+}).describe('A single battle in the head-to-head log returned by\n`GET \/battles\/rivals\/{opponentId}`. All fields are from the\nauthenticated viewer\'s perspective.\n'))
+}).describe('Aggregated head-to-head record plus the full reverse-chronological\nbattle log between the authenticated viewer and a single opponent.\nReturned by `GET \/battles\/rivals\/{opponentId}`.\n')
+
+
+/**
  * Returns the full battle row (including `turnsJson`) for a battle the
 authenticated player participated in.
 

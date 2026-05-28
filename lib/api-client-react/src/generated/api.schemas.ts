@@ -2346,6 +2346,67 @@ export interface BattleRival {
   streakCount: number;
 }
 
+export type BattleRivalDetailEntryOutcome = typeof BattleRivalDetailEntryOutcome[keyof typeof BattleRivalDetailEntryOutcome];
+
+
+export const BattleRivalDetailEntryOutcome = {
+  win: 'win',
+  loss: 'loss',
+  draw: 'draw',
+} as const;
+
+/**
+ * A single battle in the head-to-head log returned by
+`GET /battles/rivals/{opponentId}`. All fields are from the
+authenticated viewer's perspective.
+
+ */
+export interface BattleRivalDetailEntry {
+  id: number;
+  createdAt: string;
+  battleMode: string;
+  outcome: BattleRivalDetailEntryOutcome;
+  viewerWon: boolean;
+  /** @nullable */
+  myHatchlingId: number | null;
+  /** @nullable */
+  myHatchlingName: string | null;
+  /** @nullable */
+  opponentHatchlingId: number | null;
+  /** @nullable */
+  opponentHatchlingName: string | null;
+  /** Signed ELO delta from the viewer's perspective. */
+  eloChange: number;
+  xpAwarded: number;
+  coinsAwarded: number;
+}
+
+/**
+ * Aggregated head-to-head record plus the full reverse-chronological
+battle log between the authenticated viewer and a single opponent.
+Returned by `GET /battles/rivals/{opponentId}`.
+
+ */
+export interface BattleRivalDetail {
+  opponentId: number;
+  /** @nullable */
+  opponentUsername: string | null;
+  /** @nullable */
+  opponentDisplayName: string | null;
+  opponentBattleElo: number;
+  totalBattles: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  /** Net ELO swing across all head-to-head battles, from the viewer's perspective. */
+  viewerEloDelta: number;
+  /** @nullable */
+  lastBattleId: number | null;
+  /** @nullable */
+  lastBattleAt: string | null;
+  battles: BattleRivalDetailEntry[];
+}
+
 export interface BattleRematchCreateBody {
   battleId: number;
   hatchlingId: number;

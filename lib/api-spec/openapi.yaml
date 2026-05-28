@@ -3809,6 +3809,34 @@ paths:
                 items:
                   $ref: "#/components/schemas/BattleRival"
 
+  /battles/rivals/{opponentId}:
+    get:
+      operationId: getBattleRivalDetail
+      tags: [battles]
+      summary: Full head-to-head battle log vs a specific opponent
+      description: |
+        Returns aggregated head-to-head stats and a reverse-chronological list
+        of every battle the authenticated player has fought against
+        `opponentId`. Each log entry is enriched from the viewer's perspective
+        (own/opponent hatchling names, outcome, signed ELO change).
+      parameters:
+        - name: opponentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Head-to-head detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BattleRivalDetail"
+        "400":
+          description: Invalid `opponentId` (non-numeric, non-positive, or equal to the caller's id)
+        "404":
+          description: Opponent not found
+
   /battles/{id}:
     get:
       operationId: getBattle
@@ -6605,6 +6633,77 @@ components:
         lastEloChange:       { type: integer, description: "ELO swing from the viewer's most recent battle vs this rival." }
         streakType:          { type: string, enum: [W, L, D], description: "Outcome type of the current head-to-head streak." }
         streakCount:         { type: integer, description: "Length of the current head-to-head streak." }
+
+    BattleRivalDetailEntry:
+      type: object
+      description: |
+        A single battle in the head-to-head log returned by
+        `GET /battles/rivals/{opponentId}`. All fields are from the
+        authenticated viewer's perspective.
+      required:
+        - id
+        - createdAt
+        - battleMode
+        - outcome
+        - viewerWon
+        - myHatchlingId
+        - myHatchlingName
+        - opponentHatchlingId
+        - opponentHatchlingName
+        - eloChange
+        - xpAwarded
+        - coinsAwarded
+      properties:
+        id:                    { type: integer }
+        createdAt:             { type: string, format: date-time }
+        battleMode:            { type: string }
+        outcome:
+          type: string
+          enum: [win, loss, draw]
+        viewerWon:             { type: boolean }
+        myHatchlingId:         { type: ["integer", "null"] }
+        myHatchlingName:       { type: ["string", "null"] }
+        opponentHatchlingId:   { type: ["integer", "null"] }
+        opponentHatchlingName: { type: ["string", "null"] }
+        eloChange:             { type: integer, description: "Signed ELO delta from the viewer's perspective." }
+        xpAwarded:             { type: integer }
+        coinsAwarded:          { type: integer }
+
+    BattleRivalDetail:
+      type: object
+      description: |
+        Aggregated head-to-head record plus the full reverse-chronological
+        battle log between the authenticated viewer and a single opponent.
+        Returned by `GET /battles/rivals/{opponentId}`.
+      required:
+        - opponentId
+        - opponentUsername
+        - opponentDisplayName
+        - opponentBattleElo
+        - totalBattles
+        - wins
+        - losses
+        - draws
+        - viewerEloDelta
+        - lastBattleId
+        - lastBattleAt
+        - battles
+      properties:
+        opponentId:          { type: integer }
+        opponentUsername:    { type: ["string", "null"] }
+        opponentDisplayName: { type: ["string", "null"] }
+        opponentBattleElo:   { type: integer }
+        totalBattles:        { type: integer }
+        wins:                { type: integer }
+        losses:              { type: integer }
+        draws:               { type: integer }
+        viewerEloDelta:      { type: integer, description: "Net ELO swing across all head-to-head battles, from the viewer's perspective." }
+        lastBattleId:        { type: ["integer", "null"] }
+        lastBattleAt:        { type: ["string", "null"], format: date-time }
+        battles:
+          type: array
+          items:
+            $ref: "#/components/schemas/BattleRivalDetailEntry"
 
     BattleRematchCreateBody:
       type: object

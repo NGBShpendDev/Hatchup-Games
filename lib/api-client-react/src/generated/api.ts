@@ -39,6 +39,7 @@ import type {
   BattleRematchCreateBody,
   BattleRematchInvite,
   BattleRival,
+  BattleRivalDetail,
   BattleWsClientMessage,
   BattleWsServerMessage,
   BattleWsTokenResponse,
@@ -13053,6 +13054,88 @@ export function useListBattleRivals<TData = Awaited<ReturnType<typeof listBattle
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListBattleRivalsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetBattleRivalDetailUrl = (opponentId: number,) => {
+
+
+
+
+  return `/api/battles/rivals/${opponentId}`
+}
+
+/**
+ * Returns aggregated head-to-head stats and a reverse-chronological list
+of every battle the authenticated player has fought against
+`opponentId`. Each log entry is enriched from the viewer's perspective
+(own/opponent hatchling names, outcome, signed ELO change).
+
+ * @summary Full head-to-head battle log vs a specific opponent
+ */
+export const getBattleRivalDetail = async (opponentId: number, options?: RequestInit): Promise<BattleRivalDetail> => {
+
+  return customFetch<BattleRivalDetail>(getGetBattleRivalDetailUrl(opponentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBattleRivalDetailQueryKey = (opponentId: number,) => {
+    return [
+    `/api/battles/rivals/${opponentId}`
+    ] as const;
+    }
+
+
+export const getGetBattleRivalDetailQueryOptions = <TData = Awaited<ReturnType<typeof getBattleRivalDetail>>, TError = ErrorType<void>>(opponentId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBattleRivalDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBattleRivalDetailQueryKey(opponentId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBattleRivalDetail>>> = ({ signal }) => getBattleRivalDetail(opponentId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(opponentId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBattleRivalDetail>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBattleRivalDetailQueryResult = NonNullable<Awaited<ReturnType<typeof getBattleRivalDetail>>>
+export type GetBattleRivalDetailQueryError = ErrorType<void>
+
+
+/**
+ * @summary Full head-to-head battle log vs a specific opponent
+ */
+
+export function useGetBattleRivalDetail<TData = Awaited<ReturnType<typeof getBattleRivalDetail>>, TError = ErrorType<void>>(
+ opponentId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBattleRivalDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBattleRivalDetailQueryOptions(opponentId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

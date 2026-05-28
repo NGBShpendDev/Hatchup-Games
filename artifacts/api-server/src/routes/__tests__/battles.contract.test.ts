@@ -240,6 +240,7 @@ const {
   LeaveBattleQueueResponse,
   ListBattleHistoryResponse,
   ListBattleRivalsResponse,
+  GetBattleRivalDetailResponse,
   GetBattleResponse,
   GetBattleRematchResponse,
   ListPendingBattleRematchesResponse,
@@ -247,39 +248,6 @@ const {
   DeclineBattleRematchResponse,
   GetBattleEloLeaderboardResponse,
 } = await import("@workspace/api-zod");
-
-// `/battles/rivals/:opponentId` is documented in the route handler but
-// does not have a generated Zod schema in `@workspace/api-zod` yet. We
-// mirror the OpenAPI-ish shape here so the contract is still pinned in
-// tests, even though it's not part of the spec.
-const { z } = await import("zod");
-const RivalDetailResponseZ = z.object({
-  opponentId: z.number(),
-  opponentUsername: z.string().nullable(),
-  opponentDisplayName: z.string().nullable(),
-  opponentBattleElo: z.number(),
-  totalBattles: z.number(),
-  wins: z.number(),
-  losses: z.number(),
-  draws: z.number(),
-  viewerEloDelta: z.number(),
-  lastBattleId: z.number().nullable(),
-  lastBattleAt: z.string().nullable(),
-  battles: z.array(z.object({
-    id: z.number(),
-    createdAt: z.string(),
-    battleMode: z.string(),
-    outcome: z.enum(["win", "loss", "draw"]),
-    viewerWon: z.boolean(),
-    myHatchlingId: z.number().nullable(),
-    myHatchlingName: z.string().nullable(),
-    opponentHatchlingId: z.number().nullable(),
-    opponentHatchlingName: z.string().nullable(),
-    eloChange: z.number(),
-    xpAwarded: z.number(),
-    coinsAwarded: z.number(),
-  })),
-});
 
 // ── Server setup ────────────────────────────────────────────────────────────
 let baseUrl: string;
@@ -418,7 +386,7 @@ describe("battles REST contract", () => {
     ];
     const res = await fetch(`${baseUrl}/battles/rivals/${OPPONENT_ID}`);
     assert.equal(res.status, 200);
-    const parsed = RivalDetailResponseZ.parse(await res.json());
+    const parsed = GetBattleRivalDetailResponse.parse(await res.json());
     assert.equal(parsed.opponentId, OPPONENT_ID);
     assert.equal(parsed.totalBattles, 3);
   });
