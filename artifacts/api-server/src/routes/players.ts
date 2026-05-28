@@ -712,8 +712,13 @@ router.post("/players/me/streak-shield/buy", requireAuth, attachPlayer, async (r
       coins: sql`${playersTable.coins} - ${STREAK_SHIELD_COST}`,
       streakShields: sql`${playersTable.streakShields} + 1`,
     })
-    .where(eq(playersTable.id, playerId))
+    .where(and(eq(playersTable.id, playerId), gte(playersTable.coins, STREAK_SHIELD_COST)))
     .returning({ coins: playersTable.coins, streakShields: playersTable.streakShields });
+
+  if (updated.length === 0) {
+    res.status(400).json({ error: "not_enough_coins" });
+    return;
+  }
 
   const row = updated[0]!;
   res.json({
