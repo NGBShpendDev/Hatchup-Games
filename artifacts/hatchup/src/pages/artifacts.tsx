@@ -9,6 +9,7 @@ import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Sparkles, Lock, Star, Zap, Shield, Trophy, ChevronDown, ChevronUp, User, GripVertical } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useReorderFeaturedArtifacts } from "@workspace/api-client-react";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -99,23 +100,15 @@ export default function Artifacts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [museum]);
 
-  const reorderFeatured = useMutation({
-    mutationFn: async (artifactIds: number[]) => {
-      const res = await fetch(`${BASE}/api/players/me/featured-order`, {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ artifactIds }),
-      });
-      if (!res.ok) throw new Error("Failed to reorder");
-      return res.json();
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["artifacts-museum", pid] });
-      qc.invalidateQueries({ queryKey: ["player-profile", pid] });
-    },
-    onError: (err: Error) => {
-      toast({ title: "Couldn't reorder", description: err.message, variant: "destructive" });
+  const reorderFeatured = useReorderFeaturedArtifacts({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ["artifacts-museum", pid] });
+        qc.invalidateQueries({ queryKey: ["player-profile", pid] });
+      },
+      onError: (err: Error) => {
+        toast({ title: "Couldn't reorder", description: err.message, variant: "destructive" });
+      },
     },
   });
 
@@ -124,7 +117,7 @@ export default function Artifacts() {
     const ids = next.map(a => a.id);
     const prevIds = featuredArtifacts.map(a => a.id);
     const changed = ids.length !== prevIds.length || ids.some((id, i) => id !== prevIds[i]);
-    if (changed) reorderFeatured.mutate(ids);
+    if (changed) reorderFeatured.mutate({ data: { artifactIds: ids } });
   };
 
   const toggleFeatured = useMutation({

@@ -752,6 +752,25 @@ paths:
                 items:
                   $ref: "#/components/schemas/OwnedArtifact"
 
+  /players/me/featured-order:
+    put:
+      operationId: reorderFeaturedArtifacts
+      tags: [players]
+      summary: Reorder the authenticated player's featured artifact showcase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderFeaturedArtifactsBody"
+      responses:
+        "200":
+          description: New featured order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReorderFeaturedArtifactsResponse"
+
   /players/me/fitness-bars:
     get:
       operationId: getMyFitnessBars
@@ -3696,7 +3715,7 @@ components:
 
     ArtifactMuseumEntry:
       type: object
-      required: [id, name, lore, rarity, type, imageSlug, isHidden, abilities, discovered, isEquipped, isFeatured]
+      required: [id, name, lore, rarity, type, imageSlug, isHidden, abilities, discovered, isEquipped, isFeatured, featuredOrder]
       properties:
         id:          { type: integer }
         name:        { type: string }
@@ -3712,11 +3731,14 @@ components:
         discovered:  { type: boolean }
         isEquipped:  { type: boolean }
         isFeatured:  { type: boolean }
+        featuredOrder:
+          type: ["integer", "null"]
+          description: 1-based position in the player's profile showcase, or null if not featured.
         earnedAt:    { type: ["string", "null"] }
 
     OwnedArtifact:
       type: object
-      required: [id, name, lore, rarity, type, imageSlug, abilities, isEquipped, isFeatured, earnedAt]
+      required: [id, name, lore, rarity, type, imageSlug, abilities, isEquipped, isFeatured, featuredOrder, earnedAt]
       properties:
         id:          { type: integer }
         name:        { type: string }
@@ -3730,7 +3752,31 @@ components:
             $ref: "#/components/schemas/ArtifactAbility"
         isEquipped:  { type: boolean }
         isFeatured:  { type: boolean }
+        featuredOrder:
+          type: ["integer", "null"]
+          description: 1-based position in the player's profile showcase, or null if not featured.
         earnedAt:    { type: string }
+
+    ReorderFeaturedArtifactsBody:
+      type: object
+      required: [artifactIds]
+      properties:
+        artifactIds:
+          type: array
+          maxItems: 10
+          items:
+            type: integer
+            minimum: 1
+          description: Featured artifact IDs in the desired display order. Every ID must already be featured and owned by the player.
+
+    ReorderFeaturedArtifactsResponse:
+      type: object
+      required: [ok, order]
+      properties:
+        ok: { type: boolean }
+        order:
+          type: array
+          items: { type: integer }
 
     FitnessBar:
       type: object

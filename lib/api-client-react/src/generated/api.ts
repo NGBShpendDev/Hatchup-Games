@@ -148,6 +148,8 @@ import type {
   ReactToPostInput,
   ReactionResult,
   RealmInfo,
+  ReorderFeaturedArtifactsBody,
+  ReorderFeaturedArtifactsResponse,
   ReportChallengeBody,
   RepostInput,
   RepostResult,
@@ -2734,6 +2736,77 @@ export function useGetMyArtifacts<TData = Awaited<ReturnType<typeof getMyArtifac
 
 
 
+
+export const getReorderFeaturedArtifactsUrl = () => {
+
+
+
+
+  return `/api/players/me/featured-order`
+}
+
+/**
+ * @summary Reorder the authenticated player's featured artifact showcase
+ */
+export const reorderFeaturedArtifacts = async (reorderFeaturedArtifactsBody: ReorderFeaturedArtifactsBody, options?: RequestInit): Promise<ReorderFeaturedArtifactsResponse> => {
+
+  return customFetch<ReorderFeaturedArtifactsResponse>(getReorderFeaturedArtifactsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      reorderFeaturedArtifactsBody,)
+  }
+);}
+
+
+
+
+export const getReorderFeaturedArtifactsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reorderFeaturedArtifacts>>, TError,{data: BodyType<ReorderFeaturedArtifactsBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reorderFeaturedArtifacts>>, TError,{data: BodyType<ReorderFeaturedArtifactsBody>}, TContext> => {
+
+const mutationKey = ['reorderFeaturedArtifacts'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reorderFeaturedArtifacts>>, {data: BodyType<ReorderFeaturedArtifactsBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  reorderFeaturedArtifacts(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReorderFeaturedArtifactsMutationResult = NonNullable<Awaited<ReturnType<typeof reorderFeaturedArtifacts>>>
+    export type ReorderFeaturedArtifactsMutationBody = BodyType<ReorderFeaturedArtifactsBody>
+    export type ReorderFeaturedArtifactsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reorder the authenticated player's featured artifact showcase
+ */
+export const useReorderFeaturedArtifacts = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reorderFeaturedArtifacts>>, TError,{data: BodyType<ReorderFeaturedArtifactsBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reorderFeaturedArtifacts>>,
+        TError,
+        {data: BodyType<ReorderFeaturedArtifactsBody>},
+        TContext
+      > => {
+      return useMutation(getReorderFeaturedArtifactsMutationOptions(options));
+    }
 
 export const getGetMyFitnessBarsUrl = () => {
 

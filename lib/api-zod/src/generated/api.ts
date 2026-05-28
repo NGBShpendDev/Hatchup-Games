@@ -915,6 +915,7 @@ export const ListArtifactsResponseItem = zod.object({
   "discovered": zod.boolean(),
   "isEquipped": zod.boolean(),
   "isFeatured": zod.boolean(),
+  "featuredOrder": zod.number().nullable().describe('1-based position in the player\'s profile showcase, or null if not featured.'),
   "earnedAt": zod.string().nullish()
 })
 export const ListArtifactsResponse = zod.array(ListArtifactsResponseItem)
@@ -937,9 +938,28 @@ export const GetMyArtifactsResponseItem = zod.object({
 })),
   "isEquipped": zod.boolean(),
   "isFeatured": zod.boolean(),
+  "featuredOrder": zod.number().nullable().describe('1-based position in the player\'s profile showcase, or null if not featured.'),
   "earnedAt": zod.string()
 })
 export const GetMyArtifactsResponse = zod.array(GetMyArtifactsResponseItem)
+
+
+/**
+ * @summary Reorder the authenticated player's featured artifact showcase
+ */
+
+export const reorderFeaturedArtifactsBodyArtifactIdsMax = 10;
+
+
+
+export const ReorderFeaturedArtifactsBody = zod.object({
+  "artifactIds": zod.array(zod.number().min(1)).max(reorderFeaturedArtifactsBodyArtifactIdsMax).describe('Featured artifact IDs in the desired display order. Every ID must already be featured and owned by the player.')
+})
+
+export const ReorderFeaturedArtifactsResponse = zod.object({
+  "ok": zod.boolean(),
+  "order": zod.array(zod.number())
+})
 
 
 /**

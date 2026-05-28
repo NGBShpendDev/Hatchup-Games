@@ -779,6 +779,11 @@ export interface ArtifactMuseumEntry {
   discovered: boolean;
   isEquipped: boolean;
   isFeatured: boolean;
+  /**
+     * 1-based position in the player's profile showcase, or null if not featured.
+     * @nullable
+     */
+  featuredOrder: number | null;
   /** @nullable */
   earnedAt?: string | null;
 }
@@ -793,7 +798,25 @@ export interface OwnedArtifact {
   abilities: ArtifactAbility[];
   isEquipped: boolean;
   isFeatured: boolean;
+  /**
+     * 1-based position in the player's profile showcase, or null if not featured.
+     * @nullable
+     */
+  featuredOrder: number | null;
   earnedAt: string;
+}
+
+export interface ReorderFeaturedArtifactsBody {
+  /**
+     * Featured artifact IDs in the desired display order. Every ID must already be featured and owned by the player.
+     * @maxItems 10
+     */
+  artifactIds: number[];
+}
+
+export interface ReorderFeaturedArtifactsResponse {
+  ok: boolean;
+  order: number[];
 }
 
 export interface FitnessBar {
