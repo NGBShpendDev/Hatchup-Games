@@ -198,26 +198,28 @@ function ProfileModal({
                     className="text-[11px] text-emerald-300 font-bold mt-1 flex items-center gap-1 truncate"
                   />
                 )}
-                <div className="flex gap-4 mt-1 text-xs font-bold">
-                  <button
-                    type="button"
-                    className="hover:underline focus:outline-none"
-                    data-testid="button-open-followers-list"
-                    onClick={() => setFollowersSheetOpen(true)}
-                  >
-                    <span className="text-foreground">{profile.followerCount}</span>{" "}
-                    <span className="text-muted-foreground">Followers</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="hover:underline focus:outline-none"
-                    data-testid="button-open-following-list"
-                    onClick={() => setFollowingSheetOpen(true)}
-                  >
-                    <span className="text-foreground">{profile.followingCount}</span>{" "}
-                    <span className="text-muted-foreground">Following</span>
-                  </button>
-                </div>
+                {profileId === viewerId && (
+                  <div className="flex gap-4 mt-1 text-xs font-bold">
+                    <button
+                      type="button"
+                      className="hover:underline focus:outline-none"
+                      data-testid="button-open-followers-list"
+                      onClick={() => setFollowersSheetOpen(true)}
+                    >
+                      <span className="text-foreground">{profile.followerCount}</span>{" "}
+                      <span className="text-muted-foreground">Followers</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="hover:underline focus:outline-none"
+                      data-testid="button-open-following-list"
+                      onClick={() => setFollowingSheetOpen(true)}
+                    >
+                      <span className="text-foreground">{profile.followingCount}</span>{" "}
+                      <span className="text-muted-foreground">Following</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1156,7 +1158,7 @@ function PlayerDiscoverCard({
             )}
           </div>
           <p className="text-[11px] text-muted-foreground truncate">
-            @{player.username} · {player.followerCount} {player.followerCount === 1 ? "follower" : "followers"}
+            @{player.username}
           </p>
           {reasonText && (
             <p className={`text-[10px] font-bold mt-0.5 flex items-center gap-1 ${reasonColor}`}>
