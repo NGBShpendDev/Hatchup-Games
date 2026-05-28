@@ -7,11 +7,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
 import { GlowBadge } from "@/components/ui/glow-badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { Swords, Trophy, Zap, Crown, Salad, Dumbbell, Bot } from "lucide-react";
+import { Swords, Trophy, Zap, Crown, Salad, Dumbbell, Bot, Flame } from "lucide-react";
 import { ForYouStrip } from "@/components/for-you-strip";
 import { ErrorCard } from "@/components/error-card";
+import { useState } from "react";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -25,9 +29,47 @@ interface BattleHistoryItem {
   eloChange: number;
 }
 
+interface RivalItem {
+  opponentId: number;
+  opponentUsername: string | null;
+  opponentDisplayName: string | null;
+  totalBattles: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  lastBattleAt: string;
+  lastBattleId: number;
+}
+
+interface HatchlingLite {
+  id: number;
+  name: string;
+  level: number;
+}
+
+function formatRelative(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "—";
+  const diffMs = Date.now() - then;
+  const mins = Math.round(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.round(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.round(months / 12)}y ago`;
+}
+
 export default function Compete() {
   const { playerId } = usePlayer();
   const pid = playerId ?? 0;
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const [rematchTarget, setRematchTarget] = useState<RivalItem | null>(null);
+  const [sendingRematch, setSendingRematch] = useState(false);
 
   const { data: modes, isLoading, isError, refetch } = useListGameModes({
     query: { queryKey: getListGameModesQueryKey() }
@@ -44,6 +86,46 @@ export default function Compete() {
     queryFn: () => fetch(`${BASE}/api/battles/history?limit=5`, { credentials: "include" }).then(r => r.json()),
     enabled: !!pid,
   });
+
+  const { data: rivals = [] } = useQuery<RivalItem[]>({
+    queryKey: ["battle-rivals", pid],
+    queryFn: () => fetch(`${BASE}/api/battles/rivals?limit=8`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!pid,
+  });
+
+  const { data: myHatchlings = [] } = useQuery<HatchlingLite[]>({
+    queryKey: ["hatchlings-compete", pid],
+    queryFn: () => fetch(`${BASE}/api/hatchlings?playerId=${pid}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!pid && !!rematchTarget,
+  });
+
+  async function sendRematch(rival: RivalItem, hatchlingId: number) {
+    setSendingRematch(true);
+    try {
+      const res = await fetch(`${BASE}/api/battles/rematch`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ battleId: rival.lastBattleId, hatchlingId }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.error ?? "Could not send rematch");
+      toast({
+        title: "Rematch sent!",
+        description: `Waiting for ${rival.opponentDisplayName ?? rival.opponentUsername ?? "your rival"}…`,
+      });
+      setRematchTarget(null);
+      navigate("/compete/battle");
+    } catch (err) {
+      toast({
+        title: "Could not send rematch",
+        description: String((err as Error).message),
+        variant: "destructive",
+      });
+    } finally {
+      setSendingRematch(false);
+    }
+  }
 
   return (
     <Layout>
@@ -131,6 +213,61 @@ export default function Compete() {
           </div>
         )}
 
+        {/* ── Rivalries ── */}
+        {rivals.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Flame className="w-4 h-4 text-orange-400" />
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Your Rivalries</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {rivals.map(r => {
+                const ahead = r.wins > r.losses;
+                const tied = r.wins === r.losses;
+                const name = r.opponentDisplayName ?? r.opponentUsername ?? `Player #${r.opponentId}`;
+                return (
+                  <GlassCard key={r.opponentId} className="p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-black truncate">{name}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {r.totalBattles} battle{r.totalBattles === 1 ? "" : "s"} · last {formatRelative(r.lastBattleAt)}
+                        </p>
+                      </div>
+                      <div className={`text-right font-black text-lg leading-none ${
+                        ahead ? "text-green-400" : tied ? "text-yellow-300" : "text-red-400"
+                      }`}>
+                        {r.wins}<span className="text-muted-foreground/60 text-base mx-0.5">–</span>{r.losses}
+                        {r.draws > 0 && (
+                          <span className="text-muted-foreground text-xs font-bold ml-1">({r.draws}D)</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                        ahead ? "bg-green-500/15 text-green-300"
+                          : tied ? "bg-yellow-500/15 text-yellow-300"
+                          : "bg-red-500/15 text-red-300"
+                      }`}>
+                        {ahead ? "Ahead" : tied ? "Tied" : "Behind"}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="font-bold"
+                        onClick={() => setRematchTarget(r)}
+                        data-testid={`button-rematch-${r.opponentId}`}
+                      >
+                        <Swords className="w-3.5 h-3.5 mr-1.5" /> Rematch
+                      </Button>
+                    </div>
+                  </GlassCard>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ── Page header ── */}
         <div className="bg-gradient-to-r from-blue-600 to-cyan-500 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
           <div className="relative z-10">
@@ -187,6 +324,51 @@ export default function Compete() {
           </div>
         )}
       </div>
+
+      <Dialog open={!!rematchTarget} onOpenChange={(open) => { if (!open) setRematchTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Rematch {rematchTarget?.opponentDisplayName ?? rematchTarget?.opponentUsername ?? "rival"}?
+            </DialogTitle>
+            <DialogDescription>
+              {rematchTarget && (
+                <>You're {rematchTarget.wins}–{rematchTarget.losses}
+                {rematchTarget.draws > 0 ? `–${rematchTarget.draws}` : ""} against them.
+                Pick a Hatchling to send into the arena.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-72 overflow-y-auto space-y-2">
+            {myHatchlings.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                You need a Hatchling first.
+              </p>
+            ) : (
+              myHatchlings.map(h => (
+                <button
+                  key={h.id}
+                  disabled={sendingRematch}
+                  onClick={() => rematchTarget && sendRematch(rematchTarget, h.id)}
+                  className="w-full flex items-center justify-between gap-3 rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left hover:border-primary/50 hover:bg-primary/5 transition disabled:opacity-50"
+                  data-testid={`button-pick-hatchling-${h.id}`}
+                >
+                  <div className="min-w-0">
+                    <p className="font-bold truncate">{h.name}</p>
+                    <p className="text-[11px] text-muted-foreground">Lv. {h.level}</p>
+                  </div>
+                  <Swords className="w-4 h-4 text-primary shrink-0" />
+                </button>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRematchTarget(null)} disabled={sendingRematch}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

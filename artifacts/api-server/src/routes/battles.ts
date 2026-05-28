@@ -113,6 +113,86 @@ router.get("/battles/history", requireAuth, attachPlayer, async (req, res) => {
   }));
 });
 
+// ── GET /battles/rivals ──────────────────────────────────────────────────────
+// Head-to-head record vs each opponent (only humans) you've faced 2+ times.
+router.get("/battles/rivals", requireAuth, attachPlayer, async (req, res) => {
+  const playerId = req.playerId!;
+  const limit = Math.min(Math.max(Number(req.query.limit ?? 20), 1), 50);
+
+  const battles = await db.query.battlesTable.findMany({
+    where: or(eq(battlesTable.player1Id, playerId), eq(battlesTable.player2Id, playerId)),
+    orderBy: [desc(battlesTable.createdAt)],
+  });
+
+  type RivalAgg = {
+    opponentId: number;
+    totalBattles: number;
+    wins: number;
+    losses: number;
+    draws: number;
+    lastBattleAt: Date;
+    lastBattleId: number;
+  };
+  const byOpponent = new Map<number, RivalAgg>();
+
+  for (const b of battles) {
+    const opponentId = b.player1Id === playerId ? b.player2Id : b.player1Id;
+    if (!opponentId) continue; // skip bots
+    let agg = byOpponent.get(opponentId);
+    if (!agg) {
+      agg = {
+        opponentId,
+        totalBattles: 0,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        lastBattleAt: b.createdAt,
+        lastBattleId: b.id,
+      };
+      byOpponent.set(opponentId, agg);
+    }
+    agg.totalBattles += 1;
+    if (b.winnerId == null) agg.draws += 1;
+    else if (b.winnerId === playerId) agg.wins += 1;
+    else agg.losses += 1;
+    if (b.createdAt > agg.lastBattleAt) {
+      agg.lastBattleAt = b.createdAt;
+      agg.lastBattleId = b.id;
+    }
+  }
+
+  const rivals = [...byOpponent.values()]
+    .filter(r => r.totalBattles >= 2)
+    .sort((a, b) => {
+      if (b.totalBattles !== a.totalBattles) return b.totalBattles - a.totalBattles;
+      return b.lastBattleAt.getTime() - a.lastBattleAt.getTime();
+    })
+    .slice(0, limit);
+
+  if (rivals.length === 0) { res.json([]); return; }
+
+  const opponentIds = rivals.map(r => r.opponentId);
+  const players = await db.query.playersTable.findMany({
+    where: (t, { inArray }) => inArray(t.id, opponentIds),
+  });
+  const playerMap = new Map(players.map(p => [p.id, p]));
+
+  res.json(rivals.map(r => {
+    const opp = playerMap.get(r.opponentId);
+    return {
+      opponentId: r.opponentId,
+      opponentUsername: opp?.username ?? null,
+      opponentDisplayName: opp?.displayName ?? opp?.username ?? null,
+      totalBattles: r.totalBattles,
+      wins: r.wins,
+      losses: r.losses,
+      draws: r.draws,
+      lastBattleAt: r.lastBattleAt.toISOString(),
+      lastBattleId: r.lastBattleId,
+    };
+  }));
+});
+
 // ── GET /battles/:id ─────────────────────────────────────────────────────────
 router.get("/battles/:id", requireAuth, attachPlayer, async (req, res) => {
   const battleId = Number(req.params.id);
