@@ -1118,6 +1118,7 @@ export function PostCard({
         shareUrl={shareUrl}
         shareText={shareText}
         title="Share this post"
+        analytics={{ contentType: "post", contentId: String(post.id) }}
       />
     </motion.div>
   );

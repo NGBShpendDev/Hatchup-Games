@@ -52,6 +52,8 @@ tags:
     description: Meal logging, macro tracking, and weekly nutrition rollups
   - name: appeals
     description: Account suspension appeals (player-facing and admin moderation)
+  - name: analytics
+    description: Lightweight product analytics events
 
 paths:
   /storage/uploads/request-url:
@@ -4914,8 +4916,49 @@ paths:
               schema:
                 $ref: "#/components/schemas/AppealErrorEnvelope"
 
+  /analytics/share:
+    post:
+      tags: [analytics]
+      operationId: trackShareEvent
+      summary: Record a share button analytics event
+      description: |
+        Fire-and-forget endpoint that records when a player opens the share
+        dialog, completes a native share, or copies a link. Requires auth so
+        events are attributable to a player. Failures are silently ignored
+        by the client.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShareEventBody"
+      responses:
+        "204":
+          description: Event recorded.
+        "400":
+          description: Invalid payload.
+        "401":
+          description: Unauthorized.
+
 components:
   schemas:
+    ShareEventBody:
+      type: object
+      required: [contentType, contentId, action]
+      properties:
+        contentType:
+          type: string
+          enum: [player, club, post]
+          description: The type of content being shared.
+        contentId:
+          type: string
+          description: The identifier of the content (username, club ID, or post ID).
+          minLength: 1
+          maxLength: 256
+        action:
+          type: string
+          enum: [dialog_opened, native_share, copy_link]
+          description: Which share action the player performed.
     UploadUrlRequest:
       type: object
       required: [name, size, contentType]

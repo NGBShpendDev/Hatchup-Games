@@ -5,6 +5,43 @@
  * HatchUp Fitness Pals Game API
  * OpenAPI spec version: 0.1.0
  */
+/**
+ * The type of content being shared.
+ */
+export type ShareEventBodyContentType = typeof ShareEventBodyContentType[keyof typeof ShareEventBodyContentType];
+
+
+export const ShareEventBodyContentType = {
+  player: 'player',
+  club: 'club',
+  post: 'post',
+} as const;
+
+/**
+ * Which share action the player performed.
+ */
+export type ShareEventBodyAction = typeof ShareEventBodyAction[keyof typeof ShareEventBodyAction];
+
+
+export const ShareEventBodyAction = {
+  dialog_opened: 'dialog_opened',
+  native_share: 'native_share',
+  copy_link: 'copy_link',
+} as const;
+
+export interface ShareEventBody {
+  /** The type of content being shared. */
+  contentType: ShareEventBodyContentType;
+  /**
+     * The identifier of the content (username, club ID, or post ID).
+     * @minLength 1
+     * @maxLength 256
+     */
+  contentId: string;
+  /** Which share action the player performed. */
+  action: ShareEventBodyAction;
+}
+
 export interface UploadUrlRequest {
   /** @minLength 1 */
   name: string;

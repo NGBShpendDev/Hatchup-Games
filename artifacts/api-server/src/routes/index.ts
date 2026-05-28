@@ -30,6 +30,7 @@ import storageRouter from "./storage.ts";
 import notificationsRouter from "./notifications.ts";
 import pushRouter from "./push.ts";
 import adminRouter from "./admin.ts";
+import analyticsRouter from "./analytics.ts";
 
 const router: IRouter = Router();
 
@@ -64,5 +65,6 @@ router.use(storageRouter);
 router.use(notificationsRouter);
 router.use(pushRouter);
 router.use(adminRouter);
+router.use(analyticsRouter);
 
 export default router;

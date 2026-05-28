@@ -252,6 +252,7 @@ import type {
   SendGroupMessageInput,
   ShareArtifactToFriendInput,
   ShareArtifactToFriendResult,
+  ShareEventBody,
   SpeedLeaderboardEntry,
   StorageErrorEnvelope,
   SubmitProgressBody,
@@ -15978,5 +15979,81 @@ export const useResolveAdminAppeal = <TError = ErrorType<AppealErrorEnvelope>,
         TContext
       > => {
       return useMutation(getResolveAdminAppealMutationOptions(options));
+    }
+
+export const getTrackShareEventUrl = () => {
+
+
+
+
+  return `/api/analytics/share`
+}
+
+/**
+ * Fire-and-forget endpoint that records when a player opens the share
+dialog, completes a native share, or copies a link. Requires auth so
+events are attributable to a player. Failures are silently ignored
+by the client.
+
+ * @summary Record a share button analytics event
+ */
+export const trackShareEvent = async (shareEventBody: ShareEventBody, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getTrackShareEventUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      shareEventBody,)
+  }
+);}
+
+
+
+
+export const getTrackShareEventMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof trackShareEvent>>, TError,{data: BodyType<ShareEventBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof trackShareEvent>>, TError,{data: BodyType<ShareEventBody>}, TContext> => {
+
+const mutationKey = ['trackShareEvent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof trackShareEvent>>, {data: BodyType<ShareEventBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  trackShareEvent(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TrackShareEventMutationResult = NonNullable<Awaited<ReturnType<typeof trackShareEvent>>>
+    export type TrackShareEventMutationBody = BodyType<ShareEventBody>
+    export type TrackShareEventMutationError = ErrorType<void>
+
+    /**
+ * @summary Record a share button analytics event
+ */
+export const useTrackShareEvent = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof trackShareEvent>>, TError,{data: BodyType<ShareEventBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof trackShareEvent>>,
+        TError,
+        {data: BodyType<ShareEventBody>},
+        TContext
+      > => {
+      return useMutation(getTrackShareEventMutationOptions(options));
     }
 

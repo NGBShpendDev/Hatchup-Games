@@ -5728,3 +5728,22 @@ export const ResolveAdminAppealResponse = zod.object({
 }),
   "unsuspended": zod.boolean()
 })
+
+
+/**
+ * Fire-and-forget endpoint that records when a player opens the share
+dialog, completes a native share, or copies a link. Requires auth so
+events are attributable to a player. Failures are silently ignored
+by the client.
+
+ * @summary Record a share button analytics event
+ */
+export const trackShareEventBodyContentIdMax = 256;
+
+
+
+export const TrackShareEventBody = zod.object({
+  "contentType": zod.enum(['player', 'club', 'post']).describe('The type of content being shared.'),
+  "contentId": zod.string().min(1).max(trackShareEventBodyContentIdMax).describe('The identifier of the content (username, club ID, or post ID).'),
+  "action": zod.enum(['dialog_opened', 'native_share', 'copy_link']).describe('Which share action the player performed.')
+})

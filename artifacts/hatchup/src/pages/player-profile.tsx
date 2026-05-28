@@ -291,6 +291,7 @@ function ProfileHeader({ profile, viewerIsAdmin, isOwnProfile }: { profile: Play
         shareUrl={buildPlayerShareUrl(profile.username)}
         shareText={`Check out ${displayName} on HatchUp`}
         title={`Share ${displayName}'s profile`}
+        analytics={{ contentType: "player", contentId: profile.username }}
       />
       <div className="flex justify-center">
         {profile.avatarUrl ? (

@@ -201,6 +201,7 @@ function SharePreviewAffordance({ post }: { post: { id: number; authorName?: str
         shareUrl={shareUrl}
         shareText={shareText}
         title="Share card preview"
+        analytics={{ contentType: "post", contentId: String(post.id) }}
       />
     </div>
   );

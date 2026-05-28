@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Share2, Copy, ImageOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useTrackShareEvent } from "@workspace/api-client-react";
+import type { ShareEventBody } from "@workspace/api-client-react";
 
 export function buildPostOgImageUrl(postId: number): string {
   if (typeof window === "undefined") return "";
@@ -36,6 +38,11 @@ export function buildClubShareUrl(clubId: number): string {
   return `${window.location.origin}/club/${clubId}`;
 }
 
+export interface ShareAnalyticsProps {
+  contentType: ShareEventBody["contentType"];
+  contentId: string;
+}
+
 export function ShareCardDialog({
   open,
   onOpenChange,
@@ -44,6 +51,7 @@ export function ShareCardDialog({
   shareText,
   title,
   description,
+  analytics,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -52,15 +60,33 @@ export function ShareCardDialog({
   shareText: string;
   title?: string;
   description?: string;
+  analytics?: ShareAnalyticsProps;
 }) {
   const { toast } = useToast();
   const [imgState, setImgState] = useState<"loading" | "loaded" | "error">("loading");
+  const { mutate: trackShare } = useTrackShareEvent();
+
+  function fireEvent(action: ShareEventBody["action"]) {
+    if (!analytics) return;
+    trackShare(
+      { data: { contentType: analytics.contentType, contentId: analytics.contentId, action } },
+      { onError: () => {} },
+    );
+  }
 
   // Reset the preview state when a different image URL is shown so we don't
   // briefly flash the previous card's loaded state.
   useEffect(() => {
     setImgState("loading");
   }, [ogImageUrl]);
+
+  // Track when the dialog is opened.
+  useEffect(() => {
+    if (open) {
+      fireEvent("dialog_opened");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   async function handleShare() {
     const canNativeShare =
@@ -69,6 +95,7 @@ export function ShareCardDialog({
     if (canNativeShare) {
       try {
         await (navigator as any).share({ title: "HatchUp", text: shareText, url: shareUrl });
+        fireEvent("native_share");
         onOpenChange(false);
         return;
       } catch (err: any) {
@@ -82,6 +109,7 @@ export function ShareCardDialog({
     if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
       try {
         await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+        fireEvent("copy_link");
         toast({ title: "Link copied to clipboard! 📋", description: "Paste it anywhere to share." });
         onOpenChange(false);
         return;

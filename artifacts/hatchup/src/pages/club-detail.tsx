@@ -519,6 +519,7 @@ export default function ClubDetail() {
             shareUrl={buildClubShareUrl(id)}
             shareText={`Check out ${club?.name ?? "this club"} on HatchUp`}
             title={`Share ${club?.name ?? "this club"}`}
+            analytics={{ contentType: "club", contentId: String(id) }}
           />
         )}
 
