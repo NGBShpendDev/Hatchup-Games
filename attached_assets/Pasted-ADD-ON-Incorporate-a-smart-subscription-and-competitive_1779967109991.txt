@@ -1,0 +1,116 @@
+ADD ON:
+
+Incorporate a smart subscription and competitive access system into HatchUp Fitness Pals.
+
+Every new user receives:
+- full premium access free for 7 days
+- access to all features
+- access to all tools
+- premium AI assistant
+- battle arena access
+- advanced analytics
+- full social systems
+- unlimited HatchUp progression
+- all premium fitness tools
+
+The free trial should fully immerse users into the HatchUp universe and make them emotionally attached to progression, streaks, rankings, creatures, and social competition.
+
+After the 7-day free trial:
+
+Users have 3 options:
+
+1. TOP CITY LEADERBOARD EXEMPTION
+If a user is ranked in the Top 10 of their city leaderboard:
+- they continue receiving premium access for free
+- premium status remains active while maintaining Top 10 status
+- this creates massive local competition and motivation
+
+If the user drops out of Top 10:
+- premium access returns to limited free mode unless subscribed
+
+2. FREE LIMITED VERSION
+Users can continue using a free version with limited access.
+
+Free version includes:
+- limited HatchUp storage
+- limited AI assistant usage
+- limited battle entries
+- basic progression tools
+- basic leaderboards
+- limited customization
+- ads or reduced rewards
+- restricted premium cosmetics
+- restricted advanced analytics
+
+The free version should still feel fun and rewarding while encouraging upgrades naturally.
+
+3. PREMIUM SUBSCRIPTION
+Premium subscription unlocks:
+- all AI tools
+- unlimited battle arena access
+- advanced body scans
+- premium workout plans
+- elite analytics
+- unlimited social features
+- premium cosmetics
+- advanced artifact systems
+- exclusive tournaments
+- enhanced progression rewards
+- creator tools
+- premium playlists
+- enhanced customization
+- faster progression systems
+- premium guild features
+
+Pricing:
+- $8.99 monthly
+- $80 yearly subscription
+
+========================================
+
+COMPETITIVE MOTIVATION SYSTEM
+
+Use the leaderboard system to motivate users to:
+- stay active
+- compete locally
+- grind rankings
+- maintain streaks
+- dominate city leaderboards
+
+The system should create:
+- local rivalries
+- city pride
+- fitness competition
+- viral social flex culture
+- motivation to stay active daily
+
+========================================
+
+PREMIUM EXPERIENCE
+
+Premium membership should feel:
+- elite
+- futuristic
+- exclusive
+- rewarding
+- valuable
+
+But the app must avoid feeling aggressively pay-to-win.
+
+Skill, consistency, and real fitness effort should still matter most.
+
+========================================
+
+SEAMLESS PAYWALL DESIGN
+
+The subscription system should integrate naturally into the HatchUp universe.
+
+Use:
+- cinematic upgrade screens
+- premium aura visuals
+- elite animations
+- smooth onboarding
+- motivational messaging
+- progression previews
+
+Users should feel excited to upgrade rather than pressured.

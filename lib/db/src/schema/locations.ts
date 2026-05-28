@@ -1,9 +1,10 @@
-import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
-// Raw GPS coordinates are NEVER stored — only city/state/county/country derived via reverse geocoding.
-// The exact coords received from the browser are used transiently (for the geocoding call) and discarded.
+// Privacy-first design: raw GPS coordinates are accepted transiently (for reverse geocoding only),
+// then encrypted with AES-256-GCM before storage. The encrypted values are NEVER exposed in API
+// responses. Only city/state/county/country fields (from Nominatim) are returned to clients.
 export const playerLocationTable = pgTable("player_location", {
   id: serial("id").primaryKey(),
   playerId: integer("player_id").notNull().unique(),
@@ -12,6 +13,10 @@ export const playerLocationTable = pgTable("player_location", {
   state: text("state"),
   county: text("county"),
   city: text("city"),
+  // AES-256-GCM encrypted coordinates — stored for potential future proximity features
+  // Format: base64(iv):base64(tag):base64(ciphertext) — never returned in API responses
+  latEncrypted: text("lat_encrypted"),
+  lngEncrypted: text("lng_encrypted"),
   // visibility mirrors players.locationVisibility and is kept in sync on every upsert
   visibility: text("visibility").notNull().default("city"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -48,6 +53,7 @@ export const localChallengeParticipantsTable = pgTable("local_challenge_particip
   currentValue: integer("current_value").notNull().default(0),
   rank: integer("rank"),
   completedAt: timestamp("completed_at", { withTimezone: true }),
+  rewardsAwarded: boolean("rewards_awarded").notNull().default(false),
   joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
