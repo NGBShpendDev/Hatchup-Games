@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation, Link } from "wouter";
 import {
   Swords, Zap, Shield, Sparkles, Trophy, RotateCcw, ChevronLeft,
-  Share2, Bookmark, Trash2, Star, Plus, X, Send,
+  Share2, Bookmark, Trash2, Star, Plus, X, Send, Repeat,
 } from "lucide-react";
 import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
 import {
@@ -378,6 +378,7 @@ export default function BattlePage() {
   const [rematchInviteId, setRematchInviteId] = useState<string | null>(null);
   const [incomingInvite, setIncomingInvite] = useState<BattleRematchInvite | null>(null);
   const [sendingRematch, setSendingRematch] = useState(false);
+  const [rematchingRivalId, setRematchingRivalId] = useState<number | null>(null);
 
   // Loadout state
   const [loadoutSlots, setLoadoutSlots] = useState<LoadoutSlots>({ major: null, minor1: null, minor2: null });
@@ -686,6 +687,48 @@ export default function BattlePage() {
       toast({ title: "Could not send rematch", description: String((err as Error).message), variant: "destructive" });
     } finally {
       setSendingRematch(false);
+    }
+  }
+
+  // ── Rivals row: send a rematch challenge from the select screen ────────────
+  async function rematchRival(rival: BattleRival) {
+    if (rematchingRivalId !== null) return;
+    if (!selectedHatchling) {
+      toast({
+        title: "Pick a Hatchling first",
+        description: "Choose which Hatchling you want to send into the rematch.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setRematchingRivalId(rival.opponentId);
+    try {
+      const invite = await createBattleRematch({
+        battleId: rival.lastBattleId,
+        hatchlingId: selectedHatchling.id,
+      });
+      setRematchInviteId(invite.id);
+      setMode(invite.mode);
+      toast({
+        title: "Rematch sent!",
+        description: `Waiting for ${invite.toDisplayName ?? rival.opponentDisplayName ?? rival.opponentUsername ?? "your rival"}…`,
+      });
+      // Drop straight into the queue with the invite id; server pairs us on accept.
+      wsRef.current?.close();
+      wsRef.current = null;
+      setBattleState(null);
+      setLastTurn(null);
+      setRewards(null);
+      setArtifactXpGains([]);
+      setPhase("queue");
+    } catch (err) {
+      toast({
+        title: "Could not send rematch",
+        description: String((err as Error).message),
+        variant: "destructive",
+      });
+    } finally {
+      setRematchingRivalId(null);
     }
   }
 
@@ -1008,32 +1051,48 @@ export default function BattlePage() {
                     const name = r.opponentDisplayName ?? r.opponentUsername ?? `Player #${r.opponentId}`;
                     const dominating = r.wins > r.losses;
                     const losing = r.losses > r.wins;
+                    const rematching = rematchingRivalId === r.opponentId;
                     return (
-                      <Link
+                      <div
                         key={r.opponentId}
-                        href={`/players/${r.opponentId}`}
-                        className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/5 hover:border-primary/50 hover:bg-white/10 transition-all"
-                        data-testid={`link-rival-${r.opponentId}`}
+                        className="flex items-center gap-2 p-3 rounded-xl border border-white/10 bg-white/5 hover:border-primary/50 hover:bg-white/10 transition-all"
                       >
-                        <span className="text-lg">{dominating ? "👑" : losing ? "😤" : "⚔️"}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-sm truncate">{name}</p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {r.totalBattles} {r.totalBattles === 1 ? "battle" : "battles"}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs font-black tabular-nums">
-                          <span className="text-green-400" data-testid={`rival-wins-${r.opponentId}`}>{r.wins}W</span>
-                          <span className="text-muted-foreground">/</span>
-                          <span className="text-red-400" data-testid={`rival-losses-${r.opponentId}`}>{r.losses}L</span>
-                          {r.draws > 0 && (
-                            <>
-                              <span className="text-muted-foreground">/</span>
-                              <span className="text-yellow-400" data-testid={`rival-draws-${r.opponentId}`}>{r.draws}D</span>
-                            </>
-                          )}
-                        </div>
-                      </Link>
+                        <Link
+                          href={`/players/${r.opponentId}`}
+                          className="flex items-center gap-3 flex-1 min-w-0"
+                          data-testid={`link-rival-${r.opponentId}`}
+                        >
+                          <span className="text-lg">{dominating ? "👑" : losing ? "😤" : "⚔️"}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm truncate">{name}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {r.totalBattles} {r.totalBattles === 1 ? "battle" : "battles"}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs font-black tabular-nums">
+                            <span className="text-green-400" data-testid={`rival-wins-${r.opponentId}`}>{r.wins}W</span>
+                            <span className="text-muted-foreground">/</span>
+                            <span className="text-red-400" data-testid={`rival-losses-${r.opponentId}`}>{r.losses}L</span>
+                            {r.draws > 0 && (
+                              <>
+                                <span className="text-muted-foreground">/</span>
+                                <span className="text-yellow-400" data-testid={`rival-draws-${r.opponentId}`}>{r.draws}D</span>
+                              </>
+                            )}
+                          </div>
+                        </Link>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 px-2.5 gap-1 text-[11px] font-bold border-primary/40 hover:border-primary hover:bg-primary/10"
+                          onClick={() => rematchRival(r)}
+                          disabled={rematching || rematchingRivalId !== null}
+                          data-testid={`button-rematch-rival-${r.opponentId}`}
+                        >
+                          <Repeat className="w-3 h-3" />
+                          {rematching ? "Sending…" : "Rematch"}
+                        </Button>
+                      </div>
                     );
                   })}
                 </div>
