@@ -28,6 +28,7 @@ import { ReportBlockMenu } from "@/components/report-block-menu";
 import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
 import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
+import { ChampionVictoryOverlay } from "@/components/champion-victory-overlay";
 import {
   Trophy, Users, Clock, Zap, Coins, Target, ArrowLeft,
   MapPin, Share2, CheckCircle2, Medal, Crown,
@@ -96,6 +97,7 @@ export default function ChallengeDetail() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [invitedIds, setInvitedIds] = useState<Set<number>>(new Set());
   const [rewardSummary, setRewardSummary] = useState<{ open: boolean; entries: RewardEntry[]; title?: string }>({ open: false, entries: [] });
+  const [championOverlayOpen, setChampionOverlayOpen] = useState(false);
 
   // Debounce the search input by 300ms to avoid hammering the API
   useEffect(() => {
@@ -246,6 +248,29 @@ export default function ChallengeDetail() {
     },
   });
 
+  // Champion victory overlay trigger. Lives above the loading early-return so
+  // hooks order stays stable. Reads the rank straight off the challenge payload.
+  useEffect(() => {
+    if (!challenge || !player) return;
+    const c = challenge as unknown as {
+      status?: string;
+      isElimination?: boolean;
+      leaderboard?: { playerId: number; rank?: number }[];
+    };
+    const won =
+      c.status === "completed" &&
+      c.isElimination === true &&
+      (c.leaderboard ?? []).some((e) => e.playerId === player.id && e.rank === 1);
+    if (!won) return;
+    const key = `champion-overlay-seen:${player.id}:${challengeId}`;
+    try {
+      if (localStorage.getItem(key)) return;
+    } catch {
+      // localStorage unavailable — still show this session.
+    }
+    setChampionOverlayOpen(true);
+  }, [challenge, player, challengeId]);
+
   if (isLoading || !challenge) {
     return (
       <Layout>
@@ -275,6 +300,22 @@ export default function ChallengeDetail() {
   const targetValue = rich.targetValue;
   const isElimination = (rich as { isElimination?: boolean }).isElimination ?? false;
   const currentRound = (rich as { currentRound?: number }).currentRound ?? 1;
+
+  // Boosted payout mirrors the server-side formula in
+  // services/challengeRewards.ts (rank 1 + isElimination → 2× the base reward).
+  const boostedXp = (rich as { rewardXp: number }).rewardXp * 2;
+  const boostedCoins = (rich as { rewardCoins: number }).rewardCoins * 2;
+
+  const dismissChampionOverlay = () => {
+    setChampionOverlayOpen(false);
+    if (player) {
+      try {
+        localStorage.setItem(`champion-overlay-seen:${player.id}:${challengeId}`, "1");
+      } catch {
+        // ignore — the overlay just won't be suppressed across reloads
+      }
+    }
+  };
 
   // Build bracket rounds: each round shows the players who were in it.
   // Survivors of round N appear in round N+1; players eliminated in round N
@@ -665,6 +706,15 @@ export default function ChallengeDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Tournament champion victory overlay — one-time, dismissed forever via localStorage */}
+      <ChampionVictoryOverlay
+        show={championOverlayOpen}
+        challengeTitle={challenge.title}
+        boostedXp={boostedXp}
+        boostedCoins={boostedCoins}
+        onDismiss={dismissChampionOverlay}
+      />
 
       {/* Unified reward summary — fires on join and every progress submission */}
       <RewardSummaryModal
