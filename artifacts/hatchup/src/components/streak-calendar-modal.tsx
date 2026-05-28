@@ -6,7 +6,7 @@ import { useGetDailyStreak, useClaimDailyReward, getGetDailyStreakQueryKey, useB
 import type { DailyRewardDay, DailyClaimResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetPlayerDashboardQueryKey } from "@workspace/api-client-react";
-import { CheckCircle2, Lock, Gift, Flame, ShieldCheck, ShoppingCart, Sparkles } from "lucide-react";
+import { CheckCircle2, Lock, Gift, Flame, ShieldCheck, ShoppingCart, Sparkles, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const KIND_BG: Record<string, string> = {
@@ -33,6 +33,7 @@ export function StreakCalendarModal({ open, onClose, playerId, onClaimed }: Prop
   const queryClient = useQueryClient();
   const gridRef = useRef<HTMLDivElement>(null);
   const [shieldCelebrating, setShieldCelebrating] = useState(false);
+  const [shieldInfoOpen, setShieldInfoOpen] = useState(false);
   const shieldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const triggerShieldCelebration = useCallback(() => {
@@ -121,23 +122,61 @@ export function StreakCalendarModal({ open, onClose, playerId, onClaimed }: Prop
                 )}
               </p>
             </div>
-            {/* Shield count badge */}
-            <AnimatePresence mode="wait">
-              {(shieldCount > 0 || shieldCelebrating) && (
-                <motion.div
-                  key={shieldCount}
-                  initial={shieldCelebrating ? { scale: 1.4, backgroundColor: "rgba(6,182,212,0.3)" } : { scale: 1 }}
-                  animate={{ scale: 1, backgroundColor: "rgba(6,182,212,0.1)" }}
-                  transition={{ type: "spring", stiffness: 500, damping: 18 }}
-                  className="flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-2 py-1 flex-shrink-0"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-                  <span className="text-xs font-bold text-cyan-400">{shieldCount}</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {/* Shield count badge + info toggle */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <AnimatePresence mode="wait">
+                {(shieldCount > 0 || shieldCelebrating) && (
+                  <motion.button
+                    key={shieldCount}
+                    initial={shieldCelebrating ? { scale: 1.4, backgroundColor: "rgba(6,182,212,0.3)" } : { scale: 1 }}
+                    animate={{ scale: 1, backgroundColor: "rgba(6,182,212,0.1)" }}
+                    transition={{ type: "spring", stiffness: 500, damping: 18 }}
+                    className="flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-2 py-1 cursor-default"
+                    aria-label={`${shieldCount} streak shield${shieldCount !== 1 ? "s" : ""}`}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="text-xs font-bold text-cyan-400">{shieldCount}</span>
+                  </motion.button>
+                )}
+              </AnimatePresence>
+              <button
+                onClick={() => setShieldInfoOpen(v => !v)}
+                className="w-6 h-6 flex items-center justify-center rounded-full text-muted-foreground hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors"
+                aria-label="What is a Streak Shield?"
+              >
+                {shieldInfoOpen ? <X className="w-3.5 h-3.5" /> : <Info className="w-3.5 h-3.5" />}
+              </button>
+            </div>
           </div>
         </DialogHeader>
+
+        {/* Shield info panel */}
+        <AnimatePresence>
+          {shieldInfoOpen && (
+            <motion.div
+              key="shield-info"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="mx-5 mb-2 flex-shrink-0 overflow-hidden"
+            >
+              <div className="bg-cyan-950/40 border border-cyan-500/30 rounded-xl px-4 py-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                  <p className="text-sm font-black text-cyan-200">What is a Streak Shield?</p>
+                </div>
+                <p className="text-xs text-cyan-300/80 leading-relaxed">
+                  A Streak Shield protects your streak if you miss a day. When you forget to log in, a shield activates automatically so your streak continues unbroken.
+                </p>
+                <div className="flex flex-col gap-1 pt-1 border-t border-cyan-500/20">
+                  <p className="text-[11px] font-bold text-cyan-400/70 uppercase tracking-wide">How to earn shields</p>
+                  <p className="text-xs text-muted-foreground">Reach <span className="text-cyan-300 font-bold">Day 3</span> or <span className="text-cyan-300 font-bold">Day 20</span> on the login calendar, or buy one below for 200 coins.</p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Shield earned celebration banner */}
         <AnimatePresence>

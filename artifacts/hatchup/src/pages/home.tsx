@@ -470,6 +470,7 @@ export default function Home() {
         onClaimed={(result: DailyClaimResult) => {
           const entries: RewardEntry[] = [];
           if (result.coinsGranted > 0) entries.push({ kind: "challenge", label: `Day ${result.day} Reward`, value: `+${result.coinsGranted} coins`, detail: `+${result.xpGranted} XP earned` });
+          if (result.streakShieldGranted) entries.push({ kind: "challenge", label: "🛡️ Streak Shield Earned!", detail: "A shield protects your streak if you miss a day. It activates automatically." });
           if (result.eggAdded) {
             const eggLabel = result.bonus === "epic_egg" || result.bonus === "epic_chest" ? "Epic Mystery Egg" : result.bonus === "legendary_chest" ? "Legendary Mystery Egg" : "Rare Mystery Egg";
             entries.push({ kind: "hatchling", label: "Egg added to incubator!", detail: `${eggLabel} is now incubating.` });

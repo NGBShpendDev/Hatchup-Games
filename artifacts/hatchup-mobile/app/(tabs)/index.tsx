@@ -41,6 +41,7 @@ function StreakClaimCard() {
 
   const { data: streak, isLoading } = useGetDailyStreak();
   const shieldCount = streak?.streakShields ?? 0;
+  const shieldActive = streak?.shieldActive ?? false;
   const alreadyClaimed = streak?.alreadyClaimed ?? false;
   const currentDay = streak?.currentDay ?? 0;
 
@@ -115,6 +116,24 @@ function StreakClaimCard() {
           </Animated.View>
         )}
       </View>
+
+      {/* Shield info row — shown when holding shields (not celebrating) */}
+      {shieldCount > 0 && !shieldCelebrating && (
+        <View style={claimStyles.shieldInfoRow}>
+          <Feather name="info" size={12} color="#22d3ee" />
+          <Text style={claimStyles.shieldInfoText}>
+            A Streak Shield protects your streak if you miss a day — it activates automatically.
+          </Text>
+        </View>
+      )}
+
+      {/* Shield used notice */}
+      {shieldActive && alreadyClaimed && (
+        <View style={claimStyles.shieldUsedRow}>
+          <Feather name="shield" size={14} color="#22d3ee" />
+          <Text style={claimStyles.shieldUsedText}>A Streak Shield was used to protect your streak!</Text>
+        </View>
+      )}
 
       {/* Shield celebration banner */}
       {shieldCelebrating && (
@@ -432,4 +451,8 @@ const claimStyles = StyleSheet.create({
   celebrationSub: { fontSize: 12, color: "#67e8f9", marginTop: 2 },
   claimBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#f97316", borderRadius: 12, paddingVertical: 11 },
   claimBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  shieldInfoRow: { flexDirection: "row", alignItems: "flex-start", gap: 6, backgroundColor: "#22d3ee0d", borderRadius: 10, borderWidth: 1, borderColor: "#22d3ee33", paddingHorizontal: 10, paddingVertical: 8 },
+  shieldInfoText: { flex: 1, fontSize: 11, color: "#67e8f9", lineHeight: 16 },
+  shieldUsedRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#22d3ee14", borderRadius: 10, borderWidth: 1, borderColor: "#22d3ee44", paddingHorizontal: 10, paddingVertical: 8 },
+  shieldUsedText: { flex: 1, fontSize: 12, color: "#67e8f9", fontWeight: "600" },
 });
