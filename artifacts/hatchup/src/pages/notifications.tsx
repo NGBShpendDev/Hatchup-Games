@@ -12,11 +12,29 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Bell, CheckCheck, Mail, Trophy, Clock, Sparkles, Users, Swords } from "lucide-react";
+import { Bell, CheckCheck, Mail, Trophy, Clock, Sparkles, Users, Swords, Check, X, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 const POLL_MS = 30_000;
+const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+
+function extractRematchId(link: string | null | undefined): string | null {
+  if (!link) return null;
+  const m = link.match(/[?&]rematch=([^&]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function isPendingRematchInvite(n: Notification): boolean {
+  if (n.type !== "rematch_invite") return false;
+  if (!extractRematchId(n.link)) return false;
+  // The follow-up notifications use titles like "accepted your rematch" /
+  // "declined your rematch". The original challenge title is
+  // "<name> wants a rematch!".
+  return /wants a rematch/i.test(n.title);
+}
 
 const TYPE_META: Record<string, { icon: typeof Bell; color: string }> = {
   challenge_invite:   { icon: Mail,      color: "from-pink-500 to-rose-500" },
@@ -42,6 +60,8 @@ function formatRelative(iso: string): string {
 export default function NotificationsPage() {
   const [, navigate] = useLocation();
   const qc = useQueryClient();
+  const { toast } = useToast();
+  const [busyInvite, setBusyInvite] = useState<{ id: number; action: "accept" | "decline" } | null>(null);
 
   const listParams = { limit: 50 };
   const { data, isLoading } = useListNotifications(listParams, {
@@ -76,6 +96,57 @@ export default function NotificationsPage() {
 
   const markAll = () => {
     markAllRead.mutate(undefined, { onSuccess: refresh });
+  };
+
+  const acceptRematch = async (n: Notification, inviteId: string) => {
+    setBusyInvite({ id: n.id, action: "accept" });
+    try {
+      const res = await fetch(`${BASE}/api/battles/rematch/${inviteId}/accept`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error ?? `HTTP ${res.status}`);
+      }
+      if (!n.read) markRead.mutate({ id: n.id });
+      refresh();
+      // Drop the user into the battle queue with the invite-tagged hatchling.
+      navigate(n.link ?? `/compete/battle?rematch=${inviteId}`);
+    } catch (err) {
+      toast({
+        title: "Could not accept rematch",
+        description: String((err as Error).message),
+        variant: "destructive",
+      });
+    } finally {
+      setBusyInvite(null);
+    }
+  };
+
+  const declineRematch = async (n: Notification, inviteId: string) => {
+    setBusyInvite({ id: n.id, action: "decline" });
+    try {
+      const res = await fetch(`${BASE}/api/battles/rematch/${inviteId}/decline`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error ?? `HTTP ${res.status}`);
+      }
+      if (!n.read) markRead.mutate({ id: n.id });
+      refresh();
+      toast({ title: "Rematch declined" });
+    } catch (err) {
+      toast({
+        title: "Could not decline rematch",
+        description: String((err as Error).message),
+        variant: "destructive",
+      });
+    } finally {
+      setBusyInvite(null);
+    }
   };
 
   const items = data ?? [];
@@ -126,18 +197,14 @@ export default function NotificationsPage() {
             {items.map((n: Notification, idx: number) => {
               const meta = iconFor(n.type);
               const Icon = meta.icon;
-              return (
-                <motion.button
-                  key={n.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.18, delay: Math.min(idx * 0.02, 0.2) }}
-                  onClick={() => open(n)}
-                  className={`w-full text-left rounded-xl border bg-card/60 backdrop-blur p-3 flex items-start gap-3 transition-all hover:bg-card hover:border-border ${
-                    n.read ? "border-border/30 opacity-70" : "border-primary/40 shadow-[0_0_12px_-4px_hsl(var(--primary)/0.6)]"
-                  }`}
-                  data-testid={`notification-row-${n.id}`}
-                >
+              const rematchId = isPendingRematchInvite(n) ? extractRematchId(n.link) : null;
+              const busy = busyInvite?.id === n.id ? busyInvite.action : null;
+              const rowClass = `w-full text-left rounded-xl border bg-card/60 backdrop-blur p-3 flex items-start gap-3 transition-all hover:bg-card hover:border-border ${
+                n.read ? "border-border/30 opacity-70" : "border-primary/40 shadow-[0_0_12px_-4px_hsl(var(--primary)/0.6)]"
+              }`;
+
+              const inner = (
+                <>
                   <div className={`shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br ${meta.color} flex items-center justify-center text-white shadow-md`}>
                     <Icon className="w-5 h-5" />
                   </div>
@@ -154,7 +221,83 @@ export default function NotificationsPage() {
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mt-1">
                       {formatRelative(n.createdAt)}
                     </p>
+                    {rematchId && (
+                      <div className="mt-2 flex gap-2">
+                        <Button
+                          size="sm"
+                          className="h-7 px-2.5 gap-1 bg-gradient-to-br from-red-500 to-pink-600 hover:from-red-500/90 hover:to-pink-600/90"
+                          disabled={busy !== null}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            acceptRematch(n, rematchId);
+                          }}
+                          data-testid={`button-accept-rematch-${n.id}`}
+                        >
+                          {busy === "accept"
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <Check className="w-3.5 h-3.5" />}
+                          Accept
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2.5 gap-1"
+                          disabled={busy !== null}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            declineRematch(n, rematchId);
+                          }}
+                          data-testid={`button-decline-rematch-${n.id}`}
+                        >
+                          {busy === "decline"
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <X className="w-3.5 h-3.5" />}
+                          Decline
+                        </Button>
+                      </div>
+                    )}
                   </div>
+                </>
+              );
+
+              // For rematch invites we render a non-button container so the
+              // nested Accept/Decline buttons don't violate button-in-button
+              // semantics. Tapping the body still opens the link.
+              if (rematchId) {
+                return (
+                  <motion.div
+                    key={n.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.18, delay: Math.min(idx * 0.02, 0.2) }}
+                    onClick={() => open(n)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        open(n);
+                      }
+                    }}
+                    className={`${rowClass} cursor-pointer`}
+                    data-testid={`notification-row-${n.id}`}
+                  >
+                    {inner}
+                  </motion.div>
+                );
+              }
+
+              return (
+                <motion.button
+                  key={n.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.18, delay: Math.min(idx * 0.02, 0.2) }}
+                  onClick={() => open(n)}
+                  className={rowClass}
+                  data-testid={`notification-row-${n.id}`}
+                >
+                  {inner}
                 </motion.button>
               );
             })}
