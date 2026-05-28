@@ -14,7 +14,7 @@ import { usePlayer } from "@/lib/playerContext";
 import { toast } from "@/hooks/use-toast";
 import { BadgeCheck, Flame, Trophy, Sparkles, ArrowLeft, Settings, GripVertical, X, Plus, Lock, BarChart3, Eye, Heart, MessageCircle, Repeat2, Crown, Ban, Swords, ChevronRight, Star, Share2 } from "lucide-react";
 import { ShareCardDialog, buildPlayerOgImageUrl, buildPlayerShareUrl } from "@/components/share-card-dialog";
-import { rankHatchlingsForRematch } from "@/lib/rematchSuggestions";
+import { rankHatchlingsForRematch, formatRecord } from "@/lib/rematchSuggestions";
 import { useGetMyPostInsights, getGetMyPostInsightsQueryKey } from "@workspace/api-client-react";
 import type { PostInsight } from "@workspace/api-client-react";
 import { useSubscription } from "@/lib/subscription";
@@ -480,11 +480,16 @@ function RivalryCard({ viewerId, opponentId }: { viewerId: number; opponentId: n
             ) : (
               rankHatchlingsForRematch(myHatchlings, data?.battles ?? []).map(r => {
                 const h = r.hatchling;
-                const subLabel = r.reason === "last-used"
-                  ? "Last used vs this rival"
-                  : r.wins > 0
-                    ? `${r.wins}W vs this rival`
-                    : `Lv. ${h.level}`;
+                const record = formatRecord(r);
+                const subLabel = r.reason === "best-win-rate" && record
+                  ? `${record} vs this rival`
+                  : r.reason === "last-used"
+                    ? record
+                      ? `Last used · ${record} vs this rival`
+                      : "Last used vs this rival"
+                    : record
+                      ? `${record} vs this rival`
+                      : `Lv. ${h.level}`;
                 return (
                   <button
                     key={h.id}

@@ -15,7 +15,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { ErrorCard } from "@/components/error-card";
 import { ArrowLeft, Swords, Flame, Crown, Trophy, TrendingUp, TrendingDown, Zap, Sparkles, Star } from "lucide-react";
-import { rankHatchlingsForRematch } from "@/lib/rematchSuggestions";
+import { rankHatchlingsForRematch, formatRecord } from "@/lib/rematchSuggestions";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -468,15 +468,18 @@ export default function RivalsDetail() {
             ) : (
               rankHatchlingsForRematch(myHatchlings, data?.battles ?? []).map(r => {
                 const h = r.hatchling;
-                const subLabel = r.isRecommended
-                  ? r.reason === "last-used"
-                    ? "Last used vs this rival"
-                    : `Most wins vs this rival · ${r.wins}W`
+                const record = formatRecord(r);
+                const subLabel = r.reason === "best-win-rate" && record
+                  ? `Best win rate vs this rival · ${record}`
                   : r.reason === "last-used"
-                    ? "Last used vs this rival"
-                    : r.wins > 0
-                      ? `${r.wins}W vs this rival`
-                      : `Lv. ${h.level}`;
+                    ? record
+                      ? `Last used · ${record} vs this rival`
+                      : "Last used vs this rival"
+                    : r.reason === "most-wins" && record
+                      ? `Most wins vs this rival · ${record}`
+                      : record
+                        ? `${record} vs this rival`
+                        : `Lv. ${h.level}`;
                 return (
                   <button
                     key={h.id}
