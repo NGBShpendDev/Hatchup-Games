@@ -70,6 +70,31 @@ mock.module("../../services/pushNotifications.ts", {
   namedExports: { sendPushToPlayer: async () => undefined },
 });
 
+// postPurgeJob transitively imports `../lib/logger` (no extension), which
+// node's experimental ESM resolver under --experimental-strip-types refuses
+// to resolve. Mock it out — the routes under test never invoke it.
+mock.module("../../services/postPurgeJob.ts", {
+  namedExports: {
+    hardDeletePosts: async () => undefined,
+    RETENTION_DAYS: 30,
+    purgeSoftDeletedPosts: async () => ({ purged: 0 }),
+    startPostPurgeJob: () => undefined,
+  },
+});
+
+// safety.ts (re-exported from social.ts via getHiddenPlayerIds) transitively
+// pulls in emailVerification → emailService (also extension-less). Mock the
+// one helper the routes under test actually use.
+{
+  const expressMod = (await import("express")).default;
+  mock.module("../safety.ts", {
+    namedExports: {
+      getHiddenPlayerIds: async () => [] as number[],
+    },
+    defaultExport: expressMod.Router(),
+  });
+}
+
 // Rate-limiter middlewares: pass-through in tests.
 const passthrough = (_req: unknown, _res: unknown, next: () => void) => next();
 mock.module("../../middlewares/rateLimiters.ts", {
@@ -135,6 +160,7 @@ mock.module("drizzle-orm", {
     desc: (col: any) => ({ __desc: true, col }),
     inArray: (col: any, vals: any[]) => ({ __op: "inArray", col, vals }),
     isNull: (col: any) => ({ __op: "isNull", col }),
+    isNotNull: (col: any) => ({ __op: "isNotNull", col }),
     ilike: () => ({ __op: "ilike" }),
     gte: () => ({ __op: "gte" }),
     sql: Object.assign(
@@ -364,7 +390,9 @@ mock.module("@workspace/db", {
     postsTable: makeTable("postsTable"),
     postReactionsTable: makeTable("postReactionsTable"),
     postCommentsTable: makeTable("postCommentsTable"),
+    postCommentRevisionsTable: makeTable("postCommentRevisionsTable"),
     postCommentReactionsTable: makeTable("postCommentReactionsTable"),
+    userReportsTable: makeTable("userReportsTable"),
     postRepostsTable: makeTable("postRepostsTable"),
     postViewsTable: makeTable("postViewsTable"),
     groupMembersTable: makeTable("groupMembersTable"),
