@@ -14,17 +14,15 @@ const RETENTION_DAYS = 30;
 const TICK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const INITIAL_DELAY_MS = 60 * 1000;
 
-export async function purgeSoftDeletedPosts(now: Date = new Date()): Promise<{ purged: number }> {
-  const cutoff = new Date(now.getTime() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+export { RETENTION_DAYS };
 
-  const expired = await db
-    .select({ id: postsTable.id })
-    .from(postsTable)
-    .where(and(isNotNull(postsTable.deletedAt), lt(postsTable.deletedAt, cutoff)));
-
-  if (expired.length === 0) return { purged: 0 };
-
-  const ids = expired.map(r => r.id);
+/**
+ * Hard-delete the given posts (and all dependent rows). Shared by the
+ * scheduled retention job and the admin "purge now" action so they behave
+ * identically.
+ */
+export async function hardDeletePosts(ids: number[]): Promise<void> {
+  if (ids.length === 0) return;
 
   const comments = await db
     .select({ id: postCommentsTable.id })
@@ -45,6 +43,20 @@ export async function purgeSoftDeletedPosts(now: Date = new Date()): Promise<{ p
   for (const id of ids) {
     await db.delete(postsTable).where(eq(postsTable.id, id));
   }
+}
+
+export async function purgeSoftDeletedPosts(now: Date = new Date()): Promise<{ purged: number }> {
+  const cutoff = new Date(now.getTime() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+
+  const expired = await db
+    .select({ id: postsTable.id })
+    .from(postsTable)
+    .where(and(isNotNull(postsTable.deletedAt), lt(postsTable.deletedAt, cutoff)));
+
+  if (expired.length === 0) return { purged: 0 };
+
+  const ids = expired.map(r => r.id);
+  await hardDeletePosts(ids);
 
   logger.info({ purged: ids.length, retentionDays: RETENTION_DAYS }, "post_purge_job_completed");
   return { purged: ids.length };

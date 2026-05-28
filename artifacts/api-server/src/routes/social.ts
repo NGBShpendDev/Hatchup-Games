@@ -13,8 +13,10 @@ import {
   hatchlingsTable,
   groupMembersTable,
   groupsTable,
+  userReportsTable,
 } from "@workspace/db";
-import { eq, and, desc, sql, or, ne, inArray, ilike, gte, isNull } from "drizzle-orm";
+import { eq, and, desc, sql, or, ne, inArray, ilike, gte, isNull, isNotNull } from "drizzle-orm";
+import { hardDeletePosts, RETENTION_DAYS } from "../services/postPurgeJob.ts";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { getHiddenPlayerIds } from "./safety.ts";
@@ -1838,6 +1840,151 @@ router.get("/social/memories", requireAuth, attachPlayer, async (req, res) => {
   const playerId = req.playerId!;
   const memory = await getMemoryForPlayer(playerId);
   res.json(memory);
+});
+
+// ── Admin: deleted-post moderation ───────────────────────────────────────────
+// During the 30-day soft-delete retention window, admins need to see what was
+// taken down so they can investigate reports, spot abuse patterns, or restore
+// a post a user deleted by mistake. These endpoints power the moderation UI
+// at `/admin/reports` → "Deleted Posts".
+
+async function requireAdmin(playerId: number | undefined): Promise<boolean> {
+  if (!playerId) return false;
+  const caller = await db.query.playersTable.findFirst({
+    where: eq(playersTable.id, playerId),
+  });
+  return !!caller?.isAdmin;
+}
+
+// GET /api/admin/social/deleted-posts
+// Lists every post with `deletedAt IS NOT NULL` (most recently deleted first),
+// including author info, original content, deletion time, and the moderation
+// reports filed against the post — so admins have full context in one place.
+router.get("/admin/social/deleted-posts", requireAuth, attachPlayer, async (req, res) => {
+  if (!(await requireAdmin(req.playerId))) {
+    res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+
+  const deleted = await db
+    .select()
+    .from(postsTable)
+    .where(isNotNull(postsTable.deletedAt))
+    .orderBy(desc(postsTable.deletedAt));
+
+  if (deleted.length === 0) {
+    res.json({ posts: [], retentionDays: RETENTION_DAYS });
+    return;
+  }
+
+  const authorIds = Array.from(new Set(deleted.map(p => p.playerId)));
+  const authors = await db.query.playersTable.findMany({
+    where: inArray(playersTable.id, authorIds),
+  });
+  const authorMap = new Map(authors.map(a => [a.id, a]));
+
+  const postIds = deleted.map(p => p.id);
+  const reports = await db
+    .select()
+    .from(userReportsTable)
+    .where(and(
+      eq(userReportsTable.contentType, "post"),
+      inArray(userReportsTable.contentId, postIds),
+    ))
+    .orderBy(desc(userReportsTable.createdAt));
+  const reportsByPost = new Map<number, typeof reports>();
+  for (const r of reports) {
+    if (r.contentId == null) continue;
+    const list = reportsByPost.get(r.contentId) ?? [];
+    list.push(r);
+    reportsByPost.set(r.contentId, list);
+  }
+
+  const purgeAtFor = (deletedAt: Date) =>
+    new Date(deletedAt.getTime() + RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+  const posts = deleted.map(p => {
+    const author = authorMap.get(p.playerId);
+    const linkedReports = (reportsByPost.get(p.id) ?? []).map(r => ({
+      id: r.id,
+      reporterId: r.reporterId,
+      reason: r.reason,
+      description: r.description ?? null,
+      status: r.status,
+      createdAt: r.createdAt.toISOString(),
+    }));
+    return {
+      id: p.id,
+      playerId: p.playerId,
+      authorName: author?.displayName ?? author?.username ?? `Player #${p.playerId}`,
+      authorUsername: author?.username ?? null,
+      authorAvatar: author?.avatarUrl ?? null,
+      content: p.content,
+      mediaUrl: p.mediaUrl ?? null,
+      postType: p.postType,
+      createdAt: p.createdAt.toISOString(),
+      deletedAt: p.deletedAt!.toISOString(),
+      purgeAt: purgeAtFor(p.deletedAt!),
+      isFlagged: p.isFlagged,
+      engagementScore: p.engagementScore,
+      viewCount: p.viewCount,
+      reports: linkedReports,
+    };
+  });
+
+  res.json({ posts, retentionDays: RETENTION_DAYS });
+});
+
+// POST /api/admin/social/posts/:id/restore
+// Clears `deletedAt`, re-surfacing the post in feeds, profile pages, trending,
+// and share previews (all read paths filter on `deletedAt IS NULL`).
+router.post("/admin/social/posts/:id/restore", requireAuth, attachPlayer, async (req, res) => {
+  if (!(await requireAdmin(req.playerId))) {
+    res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, id) });
+  if (!post) { res.status(404).json({ error: "Post not found" }); return; }
+  if (post.deletedAt == null) {
+    res.status(400).json({ error: "Post is not deleted" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(postsTable)
+    .set({ deletedAt: null })
+    .where(eq(postsTable.id, id))
+    .returning();
+
+  req.log.info({ adminId: req.playerId, postId: id }, "admin_restored_post");
+  res.json({ success: true, post: { id: updated.id, deletedAt: null } });
+});
+
+// DELETE /api/admin/social/posts/:id/purge
+// Hard-deletes a soft-deleted post (and all dependents) before the scheduled
+// retention window expires. Refuses to purge posts that haven't been
+// soft-deleted yet — admins should use the user-facing delete first.
+router.delete("/admin/social/posts/:id/purge", requireAuth, attachPlayer, async (req, res) => {
+  if (!(await requireAdmin(req.playerId))) {
+    res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, id) });
+  if (!post) { res.status(404).json({ error: "Post not found" }); return; }
+  if (post.deletedAt == null) {
+    res.status(400).json({ error: "Soft-delete the post before purging" });
+    return;
+  }
+
+  await hardDeletePosts([id]);
+  req.log.info({ adminId: req.playerId, postId: id }, "admin_purged_post");
+  res.status(204).send();
 });
 
 export default router;
