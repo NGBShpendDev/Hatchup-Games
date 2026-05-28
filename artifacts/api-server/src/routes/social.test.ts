@@ -645,6 +645,73 @@ describe("social.ts deleted-post hiding", () => {
       assert.ok(!ids.includes(2), `deleted-only author leaked: got ${ids.join(",")}`);
     });
 
+    it("GET /social/discover ranks goal-matched peers above recently-active-only peers", async () => {
+      // Reset baseline so we fully control candidate qualification: no shared
+      // groups, no creator badges, and a viewer whose realm/goal/level only
+      // matches peer A. Peer B is "recently_active" only via a fresh post;
+      // peer C is the same. As the pool grows we want to be sure the
+      // hand-tuned weights still rank similar-goals (70+) above
+      // recently_active (30).
+      state.players.length = 0;
+      state.players.push({
+        id: 1, clerkId: "clerk_user_1", username: "viewer",
+        displayName: "Viewer", avatarUrl: null, creatorBadge: null,
+        fitnessRealm: "strength", physiqueGoal: "lose_fat",
+        fitnessLevel: "intermediate",
+      });
+      // Peer A: matches realm + goal + level (similar_goals, weight 80).
+      state.players.push({
+        id: 2, clerkId: "clerk_user_2", username: "goal_match",
+        displayName: "Goal Match", avatarUrl: null, creatorBadge: null,
+        fitnessRealm: "strength", physiqueGoal: "lose_fat",
+        fitnessLevel: "intermediate",
+      });
+      // Peers B & C: nothing in common with viewer; only qualify via a
+      // recent post (recently_active, weight 30).
+      state.players.push({
+        id: 3, clerkId: "clerk_user_3", username: "recent_only_b",
+        displayName: "Recent B", avatarUrl: null, creatorBadge: null,
+        fitnessRealm: "endurance", physiqueGoal: "build_muscle",
+        fitnessLevel: "advanced",
+      });
+      state.players.push({
+        id: 4, clerkId: "clerk_user_4", username: "recent_only_c",
+        displayName: "Recent C", avatarUrl: null, creatorBadge: null,
+        fitnessRealm: "flexibility", physiqueGoal: "build_muscle",
+        fitnessLevel: "advanced",
+      });
+
+      // Fresh live posts for the recently-active-only peers. Peer A has no
+      // posts at all — they should still outrank the recent posters.
+      state.posts.push(
+        makePost({ id: 301, playerId: 3, content: "B today",
+          createdAt: new Date("2026-05-28T10:00:00Z") }),
+        makePost({ id: 302, playerId: 4, content: "C today",
+          createdAt: new Date("2026-05-28T11:00:00Z") }),
+      );
+
+      const { status, body } = await req("GET", "/social/discover");
+      assert.equal(status, 200);
+      const rows = body as Array<{ id: number; reason: string }>;
+      const ids = rows.map((r) => r.id);
+      assert.ok(ids.includes(2), `goal-matched peer missing: got ${ids.join(",")}`);
+      assert.ok(ids.includes(3), `recently-active peer B missing: got ${ids.join(",")}`);
+      assert.ok(ids.includes(4), `recently-active peer C missing: got ${ids.join(",")}`);
+
+      const idxA = ids.indexOf(2);
+      const idxB = ids.indexOf(3);
+      const idxC = ids.indexOf(4);
+      assert.ok(
+        idxA < idxB && idxA < idxC,
+        `goal-matched peer must rank above recently-active-only peers: order=${ids.join(",")}`,
+      );
+
+      const peerA = rows.find((r) => r.id === 2);
+      assert.equal(peerA?.reason, "similar_goals");
+      assert.equal(rows.find((r) => r.id === 3)?.reason, "recently_active");
+      assert.equal(rows.find((r) => r.id === 4)?.reason, "recently_active");
+    });
+
     it("GET /social/me/post-insights excludes soft-deleted posts from creator analytics", async () => {
       // The viewer is player 1; surface their own posts only.
       state.posts.push(
