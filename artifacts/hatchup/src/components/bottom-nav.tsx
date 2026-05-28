@@ -1,19 +1,21 @@
 import { Link, useLocation } from "wouter";
 import { Home, Egg, Salad, Swords, MessageSquare } from "lucide-react";
 import { usePlayer } from "@/lib/playerContext";
+import { usePendingInviteCount } from "@/hooks/use-challenge-notifications";
 
 export function BottomNav() {
   const [location] = useLocation();
   const { player } = usePlayer();
   const hasPassiveXp = (player?.passiveXpSinceLastVisit ?? 0) > 0;
   const isChildMode = player?.accessibilityMode === "child";
+  const pendingInvites = usePendingInviteCount();
 
   const allNavItems = [
-    { href: "/", label: "Home", icon: <Home className="w-6 h-6" />, badge: hasPassiveXp, showInChild: true },
-    { href: "/social", label: "Feed", icon: <MessageSquare className="w-6 h-6" />, badge: false, showInChild: false },
-    { href: "/hatch", label: "Hatch", icon: <Egg className="w-6 h-6" />, badge: false, showInChild: true },
-    { href: "/challenges", label: "Compete", icon: <Swords className="w-6 h-6" />, badge: false, showInChild: true },
-    { href: "/nutrition", label: "Nutrition", icon: <Salad className="w-6 h-6" />, badge: false, showInChild: true },
+    { href: "/", label: "Home", icon: <Home className="w-6 h-6" />, badge: hasPassiveXp, count: 0, showInChild: true },
+    { href: "/social", label: "Feed", icon: <MessageSquare className="w-6 h-6" />, badge: false, count: 0, showInChild: false },
+    { href: "/hatch", label: "Hatch", icon: <Egg className="w-6 h-6" />, badge: false, count: 0, showInChild: true },
+    { href: "/challenges", label: "Compete", icon: <Swords className="w-6 h-6" />, badge: pendingInvites > 0, count: pendingInvites, showInChild: true },
+    { href: "/nutrition", label: "Nutrition", icon: <Salad className="w-6 h-6" />, badge: false, count: 0, showInChild: true },
   ];
 
   const navItems = isChildMode ? allNavItems.filter(i => i.showInChild) : allNavItems;
@@ -34,9 +36,13 @@ export function BottomNav() {
               >
                 <div className={`mb-1 transition-transform duration-300 relative ${isActive ? '-translate-y-1' : ''}`}>
                   {item.icon}
-                  {item.badge && (
+                  {item.badge && item.count > 0 ? (
+                    <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-black flex items-center justify-center border-2 border-card shadow-[0_0_8px_rgba(var(--primary),0.8)] animate-pulse">
+                      {item.count > 9 ? "9+" : item.count}
+                    </span>
+                  ) : item.badge ? (
                     <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-yellow-400 border-2 border-card animate-pulse" />
-                  )}
+                  ) : null}
                 </div>
                 <span className={`text-[10px] font-black uppercase tracking-wider transition-opacity duration-300 ${isActive ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}>
                   {item.label}

@@ -2,8 +2,10 @@ import { ReactNode } from "react";
 import { Link } from "wouter";
 import { Settings } from "lucide-react";
 import { BottomNav } from "./bottom-nav";
+import { useChallengeNotifications } from "@/hooks/use-challenge-notifications";
 
 export function Layout({ children }: { children: ReactNode }) {
+  useChallengeNotifications();
   return (
     <div className="min-h-[100dvh] bg-background text-foreground overflow-hidden font-sans flex flex-col relative pb-20 md:pb-24">
       {/* Cinematic noise and gradient backdrop */}
