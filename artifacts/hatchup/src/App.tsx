@@ -34,6 +34,9 @@ import SafetyGuidelines from "@/pages/safety-guidelines";
 import Coach from "@/pages/coach";
 import Records from "@/pages/records";
 import Nutrition from "@/pages/nutrition";
+import Leaderboard from "@/pages/leaderboard";
+import Hatchlings from "@/pages/hatchlings";
+import Compete from "@/pages/compete";
 import Battle from "@/pages/battle";
 import RivalsDetail from "@/pages/rivals-detail";
 import RivalsPage from "@/pages/rivals";
@@ -278,6 +281,9 @@ function AppRoutes() {
         <Route path="/coach" component={Coach} />
         <Route path="/records" component={Records} />
         <Route path="/nutrition" component={Nutrition} />
+        <Route path="/leaderboard" component={Leaderboard} />
+        <Route path="/hatchlings" component={Hatchlings} />
+        <Route path="/compete" component={Compete} />
         <Route path="/artifacts" component={ArtifactsPage} />
         <Route path="/challenges/create" component={ChallengeCreate} />
         <Route path="/challenges/:id" component={ChallengeDetail} />

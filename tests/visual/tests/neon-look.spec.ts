@@ -14,6 +14,11 @@ const PAGES: Array<{ name: string; path: string }> = [
   { name: "compete", path: "/compete" },
   { name: "social", path: "/social" },
   { name: "groups", path: "/groups" },
+  { name: "home", path: "/" },
+  { name: "hatch", path: "/hatch" },
+  { name: "leaderboard", path: "/leaderboard" },
+  { name: "nutrition", path: "/nutrition" },
+  { name: "subscription", path: "/subscription" },
 ];
 
 async function freezeUi(page: Page): Promise<void> {
