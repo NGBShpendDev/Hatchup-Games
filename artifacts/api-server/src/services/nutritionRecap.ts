@@ -2,6 +2,8 @@ import { db, mealPostsTable, playersTable, notificationsTable } from "@workspace
 import { and, desc, eq, sql } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { logger } from "../lib/logger";
+import { isEmailConfigured, sendTransactionalEmail } from "./emailService";
+import { renderRecapEmailHtml } from "./nutritionRecapEmail";
 
 /**
  * Canonical macro-goal targets. Source of truth — `/nutrition/macro-target`
@@ -249,5 +251,51 @@ export async function sendWeeklyRecapNotification(
     sourceId: weekKey,
   });
 
+  // Best-effort: also deliver the recap as an HTML email. Same `weekKey` is
+  // tracked on the player row so we won't double-send if the notification
+  // insert above ever raced. Skipped silently when email isn't configured,
+  // when the player has no email on file, or when they've opted out.
+  await maybeSendRecapEmail(playerId, recap, weekKey);
+
   return true;
+}
+
+async function maybeSendRecapEmail(
+  playerId: number,
+  recap: WeeklyRecap,
+  weekKey: number,
+): Promise<void> {
+  if (!isEmailConfigured()) return;
+
+  try {
+    const player = await db.query.playersTable.findFirst({
+      where: eq(playersTable.id, playerId),
+      columns: {
+        email: true,
+        notifyRecapEmail: true,
+        displayName: true,
+        username: true,
+        recapEmailLastSentWeek: true,
+      },
+    });
+    if (!player) return;
+    if (!player.email) return;
+    if (!player.notifyRecapEmail) return;
+    if (player.recapEmailLastSentWeek === weekKey) return;
+
+    const html = renderRecapEmailHtml(recap, player.displayName ?? player.username);
+    const subject = recap.daysLogged === 0
+      ? `${recap.hatchlingEmoji} Your Hatchling missed you this week`
+      : `${recap.hatchlingEmoji} Your weekly nutrition recap`;
+
+    const ok = await sendTransactionalEmail({ to: player.email, subject, html });
+    if (ok) {
+      await db
+        .update(playersTable)
+        .set({ recapEmailLastSentWeek: weekKey })
+        .where(eq(playersTable.id, playerId));
+    }
+  } catch (err) {
+    logger.warn({ err, playerId }, "weekly recap email step failed");
+  }
 }

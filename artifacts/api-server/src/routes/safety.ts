@@ -162,6 +162,8 @@ router.get("/players/:id/privacy-settings", requireAuth, attachPlayer, async (re
     weeklyRecapDayOfWeek: player.weeklyRecapDayOfWeek,
     weeklyRecapHourLocal: player.weeklyRecapHourLocal,
     weeklyRecapTzOffsetMinutes: player.weeklyRecapTzOffsetMinutes,
+    email: player.email,
+    notifyRecapEmail: player.notifyRecapEmail,
   });
 });
 
@@ -185,6 +187,8 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     weeklyRecapDayOfWeek?: unknown;
     weeklyRecapHourLocal?: unknown;
     weeklyRecapTzOffsetMinutes?: unknown;
+    email?: unknown;
+    notifyRecapEmail?: unknown;
   };
 
   // Read current player so we know if this is (or will become) a minor account.
@@ -240,6 +244,20 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     }
     updates.weeklyRecapTzOffsetMinutes = tz;
   }
+  if (body.email !== undefined) {
+    const raw = body.email;
+    if (raw === null || raw === "") {
+      updates.email = null;
+    } else if (typeof raw === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw.trim())) {
+      updates.email = raw.trim().toLowerCase();
+    } else {
+      res.status(400).json({ error: "Invalid email" });
+      return;
+    }
+  }
+  if (typeof body.notifyRecapEmail === "boolean") {
+    updates.notifyRecapEmail = body.notifyRecapEmail;
+  }
   if (typeof body.isMinor === "boolean") {
     // Minor status is a one-way self-service toggle: a user can mark
     // themselves as a minor at any time, but cannot self-clear that flag.
@@ -280,6 +298,8 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     requireWorkoutApproval: updated.requireWorkoutApproval,
     emergencyContactName: updated.emergencyContactName,
     emergencyContactPhone: updated.emergencyContactPhone,
+    email: updated.email,
+    notifyRecapEmail: updated.notifyRecapEmail,
   });
 });
 
