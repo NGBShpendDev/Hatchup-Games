@@ -235,31 +235,60 @@ export default function Rewards() {
           </motion.div>
         )}
 
-        {/* My Records Card */}
-        <Link href="/records" asChild>
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="rounded-3xl border-2 border-primary/40 bg-gradient-to-br from-primary/10 to-pink-900/10 p-5 cursor-pointer hover:border-primary/70 transition-all active:scale-[0.98]"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <h2 className="font-black text-base">My Personal Records</h2>
-                  <p className="text-xs text-muted-foreground font-semibold">PRs · Strength totals · Run miles</p>
-                </div>
+        {/* My Personal Records — inline section */}
+        <motion.section
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-3xl border-2 border-primary/40 bg-gradient-to-br from-primary/10 to-pink-900/10 p-5"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-primary" />
               </div>
-              <div className="flex items-center gap-2">
-                <Dumbbell className="w-4 h-4 text-muted-foreground" />
-                <Footprints className="w-4 h-4 text-muted-foreground" />
-                <span className="text-primary font-black text-lg">›</span>
+              <div>
+                <h2 className="font-black text-base">My Personal Records</h2>
+                <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wide">Your best performances</p>
               </div>
             </div>
-          </motion.div>
-        </Link>
+            <Link href="/records" className="text-xs font-bold text-primary hover:underline">
+              View all ›
+            </Link>
+          </div>
+
+          {topPrs.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-3">
+              Log a workout with reps or distance to set your first PR.
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {topPrs.slice(0, 4).map((pr, i) => (
+                <motion.div
+                  key={pr.label}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="rounded-2xl bg-background/60 border border-border p-3 flex items-center gap-2"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
+                    {pr.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground truncate">{pr.label}</p>
+                    <p className="text-sm font-black truncate">{pr.value}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          {recordsData?.monthlyRunMiles !== undefined && recordsData.monthlyRunMiles > 0 && (
+            <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-xs">
+              <span className="text-muted-foreground font-semibold">This month's running</span>
+              <span className="font-black text-primary">{recordsData.monthlyRunMiles.toFixed(1)} mi</span>
+            </div>
+          )}
+        </motion.section>
 
         {/* Streak freeze counter */}
         {/* Badge Collection */}
