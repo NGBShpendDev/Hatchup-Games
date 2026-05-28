@@ -6,6 +6,7 @@ import {
   challengeInvitesTable,
   playersTable,
   userReportsTable,
+  notificationsTable,
 } from "@workspace/db";
 import { eq, desc, and, gt, lt, sql, inArray } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
@@ -413,6 +414,20 @@ router.post("/challenges/:id/invite", requireAuth, attachPlayer, async (req, res
     inviterId: req.playerId!,
   }).onConflictDoNothing().returning();
 
+  // Create an in-app notification for the invitee when a fresh invite was created.
+  if (invite) {
+    const inviter = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+    const inviterName = inviter?.displayName ?? inviter?.username ?? "A player";
+    await db.insert(notificationsTable).values({
+      playerId: inviteeId,
+      type: "challenge_invite",
+      title: "New challenge invite",
+      body: `${inviterName} invited you to "${challenge.title}".`,
+      link: "/challenges",
+      sourceId: invite.id,
+    });
+  }
+
   res.status(201).json({ ...(invite ?? {}), sentAt: invite?.sentAt?.toISOString() });
 });
 
@@ -428,6 +443,15 @@ router.post("/challenge-invites/:id/respond", requireAuth, attachPlayer, async (
   if (!invite) { res.status(404).json({ error: "Invite not found" }); return; }
 
   await db.update(challengeInvitesTable).set({ status }).where(eq(challengeInvitesTable.id, id));
+
+  // Mark any related challenge_invite notification as read so the bell clears.
+  await db.update(notificationsTable)
+    .set({ read: true })
+    .where(and(
+      eq(notificationsTable.playerId, req.playerId!),
+      eq(notificationsTable.type, "challenge_invite"),
+      eq(notificationsTable.sourceId, id),
+    ));
 
   if (status === "accepted") {
     await db.insert(challengeParticipantsTable).values({

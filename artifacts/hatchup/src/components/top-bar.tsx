@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Bot, Settings, Flame } from "lucide-react";
 import { usePlayer } from "@/lib/playerContext";
 import { UniversePaletteTrigger } from "./universe-palette";
+import { NotificationsBell } from "./notifications-bell";
 
 // Approximate XP-to-next-level used purely for top-bar ring presentation.
 // The Home dashboard uses the authoritative server values; this just gives
@@ -69,6 +70,7 @@ export function TopBar() {
             </div>
           )}
           <UniversePaletteTrigger />
+          <NotificationsBell />
           <button
             onClick={() => window.dispatchEvent(new Event("open-ai-assistant"))}
             className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground flex items-center justify-center shadow-[0_0_14px_-2px_hsl(var(--primary)/0.7)] border border-white/15"

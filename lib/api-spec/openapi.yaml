@@ -46,6 +46,8 @@ tags:
     description: Social feed, posts, reactions, comments, follows, and creator profiles
   - name: storage
     description: Object storage upload and serving endpoints
+  - name: notifications
+    description: In-app notifications (challenge invites, etc.)
 
 paths:
   /storage/uploads/request-url:
@@ -2217,6 +2219,77 @@ paths:
               schema:
                 type: object
 
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List in-app notifications for the current player
+      parameters:
+        - name: unread
+          in: query
+          required: false
+          schema: { type: boolean }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/unread-count:
+    get:
+      operationId: getUnreadNotificationCount
+      tags: [notifications]
+      summary: Get unread notification count for the current player
+      responses:
+        "200":
+          description: Count
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count]
+                properties:
+                  count: { type: integer }
+
+  /notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a single notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResult"
+
+  /notifications/mark-all-read:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read for the current player
+      responses:
+        "200":
+          description: Marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResult"
+
   /challenge-invites:
     get:
       operationId: getMyChallengeInvites
@@ -3632,6 +3705,20 @@ components:
           type: array
           items:
             type: object
+
+    Notification:
+      type: object
+      required: [id, playerId, type, title, body, link, read, createdAt]
+      properties:
+        id:         { type: integer }
+        playerId:   { type: integer }
+        type:       { type: string }
+        title:      { type: string }
+        body:       { type: string }
+        link:       { type: string }
+        sourceId:   { type: ["integer", "null"] }
+        read:       { type: boolean }
+        createdAt:  { type: string }
 
     ChallengeInvite:
       type: object

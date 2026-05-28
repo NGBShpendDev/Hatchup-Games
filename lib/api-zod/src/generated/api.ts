@@ -2671,6 +2671,60 @@ export const InviteToChallengeBody = zod.object({
 
 
 /**
+ * @summary List in-app notifications for the current player
+ */
+export const listNotificationsQueryLimitMax = 100;
+
+
+
+export const ListNotificationsQueryParams = zod.object({
+  "unread": zod.coerce.boolean().optional(),
+  "limit": zod.coerce.number().min(1).max(listNotificationsQueryLimitMax).optional()
+})
+
+export const ListNotificationsResponseItem = zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "type": zod.string(),
+  "title": zod.string(),
+  "body": zod.string(),
+  "link": zod.string(),
+  "sourceId": zod.number().nullish(),
+  "read": zod.boolean(),
+  "createdAt": zod.string()
+})
+export const ListNotificationsResponse = zod.array(ListNotificationsResponseItem)
+
+
+/**
+ * @summary Get unread notification count for the current player
+ */
+export const GetUnreadNotificationCountResponse = zod.object({
+  "count": zod.number()
+})
+
+
+/**
+ * @summary Mark a single notification as read
+ */
+export const MarkNotificationReadParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const MarkNotificationReadResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Mark all notifications as read for the current player
+ */
+export const MarkAllNotificationsReadResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
  * @summary Get pending challenge invites for the current player
  */
 export const GetMyChallengeInvitesResponseItem = zod.object({

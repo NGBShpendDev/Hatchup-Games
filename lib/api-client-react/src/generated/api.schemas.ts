@@ -981,6 +981,19 @@ export interface ChallengeDetail {
   leaderboard: ChallengeDetailLeaderboardItem[];
 }
 
+export interface Notification {
+  id: number;
+  playerId: number;
+  type: string;
+  title: string;
+  body: string;
+  link: string;
+  /** @nullable */
+  sourceId?: number | null;
+  read: boolean;
+  createdAt: string;
+}
+
 export type ChallengeInviteChallenge = { [key: string]: unknown };
 
 export interface ChallengeInvite {
@@ -1643,6 +1656,19 @@ export const ListChallengesTab = {
 } as const;
 
 export type InviteToChallenge201 = { [key: string]: unknown };
+
+export type ListNotificationsParams = {
+unread?: boolean;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+
+export type GetUnreadNotificationCount200 = {
+  count: number;
+};
 
 export type CompleteOnboarding200Player = { [key: string]: unknown };
 
