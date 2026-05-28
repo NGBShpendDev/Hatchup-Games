@@ -15,6 +15,7 @@ import {
   finalizeChallenge,
   sendEndingSoonPushes,
 } from "../services/challengeFinalize.ts";
+import { rankChallengeParticipants } from "../services/eliminationBracket.ts";
 
 export { finalizeChallenge, sendEndingSoonPushes };
 
@@ -135,16 +136,7 @@ router.get("/challenges/:id", requireAuth, attachPlayer, async (req, res) => {
   // recorded currentValue. For non-elimination challenges, the raw sort
   // is already correct.
   const participants = challenge.isElimination
-    ? [...rawParticipants].sort((a, b) => {
-        if (a.eliminated !== b.eliminated) return a.eliminated ? 1 : -1;
-        if (a.eliminated && b.eliminated) {
-          const ar = a.eliminatedRound ?? 0;
-          const br = b.eliminatedRound ?? 0;
-          if (ar !== br) return br - ar;
-        }
-        if (a.rank != null && b.rank != null && a.rank !== b.rank) return a.rank - b.rank;
-        return (b.currentValue ?? 0) - (a.currentValue ?? 0);
-      })
+    ? rankChallengeParticipants(rawParticipants)
     : rawParticipants;
 
   const playerIds = participants.map(p => p.playerId);

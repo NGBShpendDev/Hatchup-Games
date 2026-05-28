@@ -3,10 +3,13 @@ import assert from "node:assert/strict";
 import {
   advanceEliminationRound,
   planEliminationRound,
+  rankChallengeParticipants,
   type BracketParticipant,
   type EliminationStore,
+  type RankableParticipant,
   type StoredChallenge,
 } from "./eliminationBracket.ts";
+import { computeChallengeReward } from "./challengeRewards.ts";
 
 function p(id: number, currentValue: number): BracketParticipant {
   return { id, currentValue };
@@ -160,6 +163,119 @@ describe("planEliminationRound", () => {
     assert.equal(plan.kind, "champion");
     assert.equal("nextRound" in plan, false);
     assert.equal("nextEndAt" in plan, false);
+  });
+});
+
+// ── rankChallengeParticipants (final ordering + reward selection) ─────────
+function r(
+  id: number,
+  currentValue: number,
+  eliminated: boolean,
+  eliminatedRound: number | null,
+): RankableParticipant {
+  return { id, currentValue, eliminated, eliminatedRound };
+}
+
+describe("rankChallengeParticipants", () => {
+  it("places every non-eliminated participant above every eliminated one", () => {
+    // Stale `currentValue` on eliminated rows MUST NOT outrank a survivor.
+    const ranked = rankChallengeParticipants([
+      r(1, 999, true, 1),
+      r(2, 10, false, null),
+      r(3, 500, true, 2),
+      r(4, 5, false, null),
+    ]);
+    assert.deepEqual(ranked.map(p => p.id), [2, 4, 3, 1]);
+  });
+
+  it("orders eliminated participants by eliminatedRound desc (later round = better finish)", () => {
+    const ranked = rankChallengeParticipants([
+      r(1, 100, true, 1),
+      r(2, 100, true, 3),
+      r(3, 100, true, 2),
+      r(4, 100, true, 4),
+    ]);
+    assert.deepEqual(ranked.map(p => p.id), [4, 2, 3, 1]);
+  });
+
+  it("breaks ties by currentValue desc among survivors", () => {
+    const ranked = rankChallengeParticipants([
+      r(1, 30, false, null),
+      r(2, 90, false, null),
+      r(3, 60, false, null),
+    ]);
+    assert.deepEqual(ranked.map(p => p.id), [2, 3, 1]);
+  });
+
+  it("breaks ties by currentValue desc within the same eliminatedRound", () => {
+    const ranked = rankChallengeParticipants([
+      r(1, 10, true, 2),
+      r(2, 80, true, 2),
+      r(3, 40, true, 2),
+      r(4, 999, true, 1), // earlier round → always behind round-2 group
+    ]);
+    assert.deepEqual(ranked.map(p => p.id), [2, 3, 1, 4]);
+  });
+
+  it("treats a null eliminatedRound as round 0 (sorted to the bottom of the eliminated group)", () => {
+    const ranked = rankChallengeParticipants([
+      r(1, 100, true, null),
+      r(2, 100, true, 1),
+    ]);
+    assert.deepEqual(ranked.map(p => p.id), [2, 1]);
+  });
+
+  it("returns an empty array for empty input and does not mutate the input", () => {
+    assert.deepEqual(rankChallengeParticipants([]), []);
+    const input: RankableParticipant[] = [
+      r(1, 10, false, null),
+      r(2, 50, false, null),
+    ];
+    const snapshot = input.map(p => ({ ...p }));
+    const ranked = rankChallengeParticipants(input);
+    assert.deepEqual(input, snapshot);
+    assert.notEqual(ranked, input);
+  });
+
+  it("feeds the right players into the 1st/2nd/3rd reward slots (elimination single survivor)", () => {
+    // End-to-end: pipe a typical finalized elimination roster through the
+    // ranker, then through `computeChallengeReward` to verify the rewards
+    // actually paid out match expectations.
+    const ranked = rankChallengeParticipants([
+      r(10, 500, true, 1),  // earliest out → 3rd
+      r(20, 300, true, 2),  // later out → 2nd
+      r(30, 50, false, null), // sole survivor → 1st (champion)
+    ]);
+    const rewards = ranked.map((p, i) =>
+      computeChallengeReward(i + 1, 100, 50, /* isElimination */ !p.eliminated),
+    );
+    assert.deepEqual(
+      ranked.map(p => p.id),
+      [30, 20, 10],
+    );
+    // 1st (survivor) = 2× champion boost, 2nd/3rd = normal scale.
+    assert.deepEqual(rewards, [
+      { xp: 200, coins: 100, isChampion: true },
+      { xp: 60, coins: 30, isChampion: false },
+      { xp: 30, coins: 15, isChampion: false },
+    ]);
+  });
+
+  it("feeds the right players into the 1st/2nd/3rd reward slots (non-elimination top 3)", () => {
+    const ranked = rankChallengeParticipants([
+      r(1, 30, false, null),
+      r(2, 90, false, null),
+      r(3, 60, false, null),
+      r(4, 10, false, null),
+    ]);
+    const top3 = ranked.slice(0, 3);
+    const rewards = top3.map((_p, i) => computeChallengeReward(i + 1, 100, 50, false));
+    assert.deepEqual(top3.map(p => p.id), [2, 3, 1]);
+    assert.deepEqual(rewards, [
+      { xp: 100, coins: 50, isChampion: false },
+      { xp: 60, coins: 30, isChampion: false },
+      { xp: 30, coins: 15, isChampion: false },
+    ]);
   });
 });
 

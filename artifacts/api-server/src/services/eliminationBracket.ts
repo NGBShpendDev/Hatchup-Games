@@ -112,6 +112,45 @@ export async function advanceEliminationRound(
   };
 }
 
+// Pure helper: produce the final ordering for a challenge's participants.
+//
+// Used by both the public leaderboard endpoint and the reward distribution
+// flow so they agree on who finished 1st/2nd/3rd. The rule, in order:
+//
+//   1. Non-eliminated participants always rank above eliminated ones.
+//      In a finished elimination tournament the sole survivor is the
+//      champion regardless of stale `currentValue` rivals carried into
+//      elimination.
+//   2. Within the eliminated group, a later `eliminatedRound` wins —
+//      surviving more rounds is the stronger result. Missing rounds are
+//      treated as round 0 so legacy rows sort to the bottom.
+//   3. Ties are broken by `currentValue` descending (raw progress for
+//      non-elimination challenges, or last recorded round progress for
+//      elimination rows).
+//
+// Stable for equal keys (Array.prototype.sort is stable in V8/Node), so
+// identical participants keep their input order.
+export type RankableParticipant = {
+  id: number;
+  currentValue: number;
+  eliminated: boolean;
+  eliminatedRound: number | null;
+};
+
+export function rankChallengeParticipants<T extends RankableParticipant>(
+  participants: ReadonlyArray<T>,
+): T[] {
+  return [...participants].sort((a, b) => {
+    if (a.eliminated !== b.eliminated) return a.eliminated ? 1 : -1;
+    if (a.eliminated && b.eliminated) {
+      const ar = a.eliminatedRound ?? 0;
+      const br = b.eliminatedRound ?? 0;
+      if (ar !== br) return br - ar;
+    }
+    return (b.currentValue ?? 0) - (a.currentValue ?? 0);
+  });
+}
+
 export function planEliminationRound(
   challenge: BracketChallenge,
   activeParticipants: ReadonlyArray<BracketParticipant>,

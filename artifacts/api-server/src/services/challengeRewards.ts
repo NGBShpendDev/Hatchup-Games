@@ -1,3 +1,5 @@
+import { rankChallengeParticipants } from "./eliminationBracket.ts";
+
 export interface ChallengeRewardGrant {
   xp: number;
   coins: number;
@@ -97,26 +99,30 @@ export async function distributeChallengeRewards(
   if (challenge.status !== "active") return { kind: "noop", reason: "not_active" };
   if (now < challenge.endAt) return { kind: "noop", reason: "not_ended" };
 
-  // Only non-eliminated participants are ranked/paid. In elimination mode,
-  // eliminated rows keep their stale `currentValue` from the round they
-  // lost, so a raw sort across all rows would promote a loser above the
-  // sole survivor — filter first, then sort.
+  // Rank every participant — survivors first, then eliminated players by
+  // `eliminatedRound` desc, ties broken by `currentValue` desc. This is the
+  // same helper the public leaderboard endpoint uses, so the ordering shown
+  // to players matches the order in which rewards get paid out. In a
+  // single-survivor elimination tournament that means the survivor is 1st,
+  // the last-eliminated rival is 2nd, etc., even when stale `currentValue`
+  // on eliminated rows is numerically higher.
   const all = await store.getParticipants(challengeId);
-  const active = all
-    .filter((p) => !p.eliminated)
-    .slice()
-    .sort((a, b) => b.currentValue - a.currentValue);
+  const ranked = rankChallengeParticipants(all);
 
   const rankings: DistributionRanking[] = [];
-  for (let i = 0; i < active.length; i++) {
+  for (let i = 0; i < ranked.length; i++) {
     const rank = i + 1;
-    const p = active[i];
+    const p = ranked[i];
     await store.setParticipantRank(p.id, rank);
+    // The champion-tier 2× boost + badge is reserved for a tournament
+    // survivor. In the (defensive) edge case where the rank-1 row is itself
+    // eliminated (e.g. bracket finalized with no survivors), treat it as a
+    // non-champion finish so we never crown an eliminated player.
     const grant = computeChallengeReward(
       rank,
       challenge.rewardXp,
       challenge.rewardCoins,
-      challenge.isElimination,
+      challenge.isElimination && !p.eliminated,
     );
     if (grant.xp > 0 || grant.coins > 0) {
       await store.grantPlayerReward(p.playerId, grant.xp, grant.coins);

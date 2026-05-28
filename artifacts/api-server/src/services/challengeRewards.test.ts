@@ -190,13 +190,29 @@ describe("distributeChallengeRewards", () => {
     assert.equal(outcome.kind, "completed");
     if (outcome.kind !== "completed") return;
 
-    // Only the survivor is ranked; eliminated participants are skipped.
-    assert.deepEqual(outcome.rankings.map(r => r.participantId), [3]);
-    assert.equal(outcome.rankings[0].rank, 1);
-    assert.deepEqual(state.ranksSet, [{ participantId: 3, rank: 1 }]);
+    // Survivor wins 1st; later-eliminated rival takes 2nd; earlier
+    // elimination = 3rd. Stale `currentValue` doesn't promote a loser.
+    assert.deepEqual(
+      outcome.rankings.map(r => ({ id: r.participantId, rank: r.rank })),
+      [
+        { id: 3, rank: 1 },
+        { id: 2, rank: 2 },
+        { id: 1, rank: 3 },
+      ],
+    );
+    assert.deepEqual(state.ranksSet, [
+      { participantId: 3, rank: 1 },
+      { participantId: 2, rank: 2 },
+      { participantId: 1, rank: 3 },
+    ]);
 
-    // Survivor gets champion-tier 2× boost: 200 xp / 100 coins.
-    assert.deepEqual(state.grants, [{ playerId: 30, xp: 200, coins: 100 }]);
+    // Survivor gets champion-tier 2× boost: 200 xp / 100 coins. Eliminated
+    // runners-up still get the normal 2nd/3rd payout (no boost, no badge).
+    assert.deepEqual(state.grants, [
+      { playerId: 30, xp: 200, coins: 100 },
+      { playerId: 20, xp: 60, coins: 30 },
+      { playerId: 10, xp: 30, coins: 15 },
+    ]);
     assert.deepEqual(state.champions, [30]);
     assert.equal(state.markCompletedCalls, 1);
   });
@@ -285,7 +301,10 @@ describe("distributeChallengeRewards", () => {
     assert.equal(outcome.reason, "not_found");
   });
 
-  it("transitions status to completed exactly once, even with zero active participants", async () => {
+  it("transitions status to completed exactly once and never crowns an eliminated rank-1 player", async () => {
+    // Defensive edge case: a bracket somehow finalizes with zero survivors.
+    // The lone eliminated row should still get a rank + normal 1st-place
+    // payout, but MUST NOT receive the champion badge or 2× boost.
     const { store, state } = makeRewardStore(
       { id: 7, status: "active", endAt: PAST, isElimination: true, rewardXp: 100, rewardCoins: 50 },
       [
@@ -297,11 +316,36 @@ describe("distributeChallengeRewards", () => {
 
     assert.equal(outcome.kind, "completed");
     if (outcome.kind !== "completed") return;
-    assert.deepEqual(outcome.rankings, []);
-    assert.deepEqual(state.ranksSet, []);
-    assert.deepEqual(state.grants, []);
+    assert.deepEqual(outcome.rankings.map(r => ({ id: r.participantId, rank: r.rank })), [
+      { id: 1, rank: 1 },
+    ]);
+    assert.equal(outcome.rankings[0].grant.isChampion, false);
+    assert.deepEqual(state.grants, [{ playerId: 10, xp: 100, coins: 50 }]);
     assert.deepEqual(state.champions, []);
     assert.equal(state.markCompletedCalls, 1);
     assert.equal(state.challenge.status, "completed");
+  });
+
+  it("breaks currentValue ties by input order (stable sort) and pays accordingly", async () => {
+    const { store, state } = makeRewardStore(
+      { id: 8, status: "active", endAt: PAST, isElimination: false, rewardXp: 100, rewardCoins: 50 },
+      [
+        { id: 1, playerId: 10, currentValue: 50, eliminated: false, eliminatedRound: null },
+        { id: 2, playerId: 20, currentValue: 50, eliminated: false, eliminatedRound: null },
+        { id: 3, playerId: 30, currentValue: 50, eliminated: false, eliminatedRound: null },
+        { id: 4, playerId: 40, currentValue: 50, eliminated: false, eliminatedRound: null },
+      ],
+    );
+
+    const outcome = await distributeChallengeRewards(store, 8, NOW);
+    assert.equal(outcome.kind, "completed");
+    if (outcome.kind !== "completed") return;
+    assert.deepEqual(outcome.rankings.map(r => r.participantId), [1, 2, 3, 4]);
+    // Top 3 paid in stable input order.
+    assert.deepEqual(state.grants, [
+      { playerId: 10, xp: 100, coins: 50 },
+      { playerId: 20, xp: 60, coins: 30 },
+      { playerId: 30, xp: 30, coins: 15 },
+    ]);
   });
 });
