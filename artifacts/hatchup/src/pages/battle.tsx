@@ -592,6 +592,7 @@ export default function BattlePage() {
         setRewardSummary({ open: true, entries, title: "Victory Rewards" });
       } else {
         // Consolation summary for the losing player — encouraging, not punishing.
+        const isCloseMatch = typeof msg.winnerHpPct === "number" && msg.winnerHpPct <= 0.2;
         const entries: RewardEntry[] = [];
         if (r.xp > 0) entries.push({ kind: "xp", label: "Consolation XP", value: r.xp, detail: "Every battle sharpens your Hatchling." });
         if (r.coins > 0) entries.push({ kind: "artifact", label: "Coins", value: r.coins });
@@ -609,8 +610,13 @@ export default function BattlePage() {
           if (g.newStage > 1) stageUps += 1;
         }
         if (stageUps > 0) entries.push({ kind: "hatchling", label: `${stageUps} artifact stage-up${stageUps === 1 ? "" : "s"}`, detail: "Power scaled up regardless." });
-        if (entries.length === 0) entries.push({ kind: "xp", label: "Almost!", detail: "One more match — you've got this." });
-        setRewardSummary({ open: true, entries, title: "Almost! Keep Going" });
+        if (isCloseMatch) {
+          if (entries.length === 0) entries.push({ kind: "xp", label: "So close — they were nearly down!", detail: "A tiny bit more and it's yours. Rematch!" });
+          setRewardSummary({ open: true, entries, title: "So Close! Almost Had It" });
+        } else {
+          if (entries.length === 0) entries.push({ kind: "xp", label: "Almost!", detail: "One more match — you've got this." });
+          setRewardSummary({ open: true, entries, title: "Almost! Keep Going" });
+        }
       }
 
       // Refetch authoritative hatchling state so the centralized

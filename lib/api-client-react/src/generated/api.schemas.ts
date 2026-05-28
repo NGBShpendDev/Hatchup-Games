@@ -3363,6 +3363,8 @@ export interface BattleWsBattleEndMessage {
   state: BattleState;
   /** Pal XP delta and level progression for the receiving player's Hatchling. */
   hatchlingXp?: BattleWsHatchlingXp;
+  /** Winner's remaining HP as a fraction of their max HP (0–1). Omitted for draws or no-winner outcomes. */
+  winnerHpPct?: number;
 }
 
 export type BattleWsReconnectedMessageType = typeof BattleWsReconnectedMessageType[keyof typeof BattleWsReconnectedMessageType];

@@ -5446,7 +5446,8 @@ export const DocsValidateBattleWsServerMessageBody = zod.union([zod.object({
   "prevLevel": zod.number().describe('Pal level before XP was applied.'),
   "newLevel": zod.number().describe('Pal level after XP was applied.'),
   "newXp": zod.number().describe('Pal total XP after the reward.')
-}).optional().describe('Pal XP delta and level progression for the receiving player\'s Hatchling.')
+}).optional().describe('Pal XP delta and level progression for the receiving player\'s Hatchling.'),
+  "winnerHpPct": zod.number().optional().describe('Winner\'s remaining HP as a fraction of their max HP (0–1). Omitted for draws or no-winner outcomes.')
 }),zod.object({
   "type": zod.enum(['reconnected']),
   "battleId": zod.number(),

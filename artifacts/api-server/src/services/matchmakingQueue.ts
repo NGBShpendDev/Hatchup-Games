@@ -414,6 +414,18 @@ async function finalizeBattle(battleId: number) {
       eloChange,
     }).where(eq(battlesTable.id, battleId));
 
+    // Compute winner's remaining HP fraction for close-match detection on the client.
+    // Only meaningful when there is a clear winner (slot 1 or 2).
+    const winnerHpPct: number | undefined = (() => {
+      if (state.winner === 1) {
+        return state.fighter1.maxHp > 0 ? state.fighter1.currentHp / state.fighter1.maxHp : undefined;
+      }
+      if (state.winner === 2) {
+        return state.fighter2.maxHp > 0 ? state.fighter2.currentHp / state.fighter2.maxHp : undefined;
+      }
+      return undefined;
+    })();
+
     const r1Final = computeRewards(state, 1);
     send(battle.ws1, {
       type: "battle_end",
@@ -423,6 +435,7 @@ async function finalizeBattle(battleId: number) {
       eloChange,
       artifactXp: artifactXpP1,
       state: sanitizeState(state),
+      ...(winnerHpPct !== undefined ? { winnerHpPct } : {}),
       ...(palXp1 ? { hatchlingXp: { xpDelta: palXp1.xpDelta, prevLevel: palXp1.prevLevel, newLevel: palXp1.newLevel, newXp: palXp1.newXp } } : {}),
     });
 
@@ -436,6 +449,7 @@ async function finalizeBattle(battleId: number) {
         eloChange: -eloChange,
         artifactXp: artifactXpP2,
         state: sanitizeState(state),
+        ...(winnerHpPct !== undefined ? { winnerHpPct } : {}),
         ...(palXp2 ? { hatchlingXp: { xpDelta: palXp2.xpDelta, prevLevel: palXp2.prevLevel, newLevel: palXp2.newLevel, newXp: palXp2.newXp } } : {}),
       });
     }

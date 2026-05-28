@@ -8219,6 +8219,9 @@ components:
         hatchlingXp:
           $ref: "#/components/schemas/BattleWsHatchlingXp"
           description: "Pal XP delta and level progression for the receiving player's Hatchling."
+        winnerHpPct:
+          type: number
+          description: "Winner's remaining HP as a fraction of their max HP (0–1). Omitted for draws or no-winner outcomes."
     BattleWsReconnectedMessage:
       type: object
       required: [type, battleId, yourSlot, state]
