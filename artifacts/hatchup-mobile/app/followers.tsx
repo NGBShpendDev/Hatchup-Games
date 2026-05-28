@@ -118,9 +118,10 @@ export default function FollowersScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: bottomPad + 40 }}
           showsVerticalScrollIndicator={false}
           renderItem={({ item: player }) => (
-            <View
+            <Pressable
               style={[styles.playerCard, { backgroundColor: colors.card, borderColor: colors.border }]}
               testID={`follower-row-${player.id}`}
+              onPress={() => router.push(`/social/${player.id}` as any)}
             >
               <View style={[styles.avatar, { backgroundColor: colors.primary + "22", borderColor: colors.primary }]}>
                 <Feather name="user" size={20} color={colors.primary} />
@@ -134,7 +135,7 @@ export default function FollowersScreen() {
               <Pressable style={styles.menuBtn}>
                 <Feather name="more-vertical" size={16} color={colors.mutedForeground} />
               </Pressable>
-            </View>
+            </Pressable>
           )}
           ListFooterComponent={
             hasMore ? (

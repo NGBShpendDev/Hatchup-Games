@@ -44,6 +44,7 @@ const SCREENS: Array<{ name: string }> = [
   { name: "subscription" },
   { name: "notifications" },
   { name: "settings" },
+  { name: "social/[id]" },
 ];
 
 function AuthedStack() {
