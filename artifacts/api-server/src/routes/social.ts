@@ -11,6 +11,8 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { blockMinorSocialWrite } from "../middlewares/minorGuard";
+import { socialWriteLimiter } from "../middlewares/rateLimiters";
 import {
   CreatePostBody,
   ReactToPostBody,
@@ -204,7 +206,7 @@ router.get("/social/feed", requireAuth, attachPlayer, async (req, res) => {
 
 // ── POST /social/posts ──────────────────────────────────────────────────────
 
-router.post("/social/posts", requireAuth, attachPlayer, async (req, res) => {
+router.post("/social/posts", socialWriteLimiter, requireAuth, attachPlayer, blockMinorSocialWrite, async (req, res) => {
   const playerId = req.playerId!;
   const body = CreatePostBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
@@ -296,7 +298,7 @@ router.delete("/social/posts/:id", requireAuth, attachPlayer, async (req, res) =
 
 // ── POST /social/posts/:id/react ────────────────────────────────────────────
 
-router.post("/social/posts/:id/react", requireAuth, attachPlayer, async (req, res) => {
+router.post("/social/posts/:id/react", socialWriteLimiter, requireAuth, attachPlayer, blockMinorSocialWrite, async (req, res) => {
   const postId = Number(req.params.id);
   const playerId = req.playerId!;
   const body = ReactToPostBody.safeParse(req.body);
@@ -353,7 +355,7 @@ router.post("/social/posts/:id/react", requireAuth, attachPlayer, async (req, re
 
 // ── POST /social/posts/:id/repost ───────────────────────────────────────────
 
-router.post("/social/posts/:id/repost", requireAuth, attachPlayer, async (req, res) => {
+router.post("/social/posts/:id/repost", socialWriteLimiter, requireAuth, attachPlayer, blockMinorSocialWrite, async (req, res) => {
   const postId = Number(req.params.id);
   const playerId = req.playerId!;
   const body = RepostPostBody.safeParse(req.body);
@@ -422,7 +424,7 @@ router.get("/social/posts/:id/comments", requireAuth, attachPlayer, async (req, 
 
 // ── POST /social/posts/:id/comments ────────────────────────────────────────
 
-router.post("/social/posts/:id/comments", requireAuth, attachPlayer, async (req, res) => {
+router.post("/social/posts/:id/comments", socialWriteLimiter, requireAuth, attachPlayer, blockMinorSocialWrite, async (req, res) => {
   const postId = Number(req.params.id);
   const playerId = req.playerId!;
   const body = AddPostCommentBody.safeParse(req.body);
@@ -487,7 +489,7 @@ router.delete("/social/posts/:id/comments/:commentId", requireAuth, attachPlayer
 
 // ── POST /social/follow ─────────────────────────────────────────────────────
 
-router.post("/social/follow", requireAuth, attachPlayer, async (req, res) => {
+router.post("/social/follow", socialWriteLimiter, requireAuth, attachPlayer, blockMinorSocialWrite, async (req, res) => {
   const followerId = req.playerId!;
   const body = FollowPlayerBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
@@ -506,7 +508,7 @@ router.post("/social/follow", requireAuth, attachPlayer, async (req, res) => {
 
 // ── POST /social/unfollow ───────────────────────────────────────────────────
 
-router.post("/social/unfollow", requireAuth, attachPlayer, async (req, res) => {
+router.post("/social/unfollow", socialWriteLimiter, requireAuth, attachPlayer, async (req, res) => {
   const followerId = req.playerId!;
   const body = FollowPlayerBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }

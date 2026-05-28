@@ -2,12 +2,13 @@ import { Router } from "express";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { CoachChatBody } from "@workspace/api-zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { aiCoachLimiter } from "../middlewares/rateLimiters";
 import { buildCoachContext, buildSystemPrompt } from "../services/coachService";
 
 const router = Router();
 
 // POST /coach/chat — SSE streaming AI fitness coach response
-router.post("/coach/chat", requireAuth, attachPlayer, async (req, res) => {
+router.post("/coach/chat", aiCoachLimiter, requireAuth, attachPlayer, async (req, res) => {
   const parsed = CoachChatBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });

@@ -157,6 +157,7 @@ router.get("/players/:id/privacy-settings", requireAuth, attachPlayer, async (re
     emergencyContactName: player.emergencyContactName,
     emergencyContactPhone: player.emergencyContactPhone,
     isVerified: player.isVerified,
+    isMinor: player.isMinor,
   });
 });
 
@@ -175,6 +176,7 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     requireWorkoutApproval?: unknown;
     emergencyContactName?: unknown;
     emergencyContactPhone?: unknown;
+    isMinor?: unknown;
   };
 
   const updates: Partial<typeof playersTable.$inferInsert> = {};
@@ -195,6 +197,14 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
   }
   if (body.emergencyContactPhone !== undefined) {
     updates.emergencyContactPhone = body.emergencyContactPhone as string | null;
+  }
+  if (typeof body.isMinor === "boolean") {
+    // When enabling minor mode, force safer defaults (city visibility, require approval).
+    updates.isMinor = body.isMinor;
+    if (body.isMinor) {
+      updates.locationVisibility = "city";
+      updates.requireWorkoutApproval = true;
+    }
   }
 
   const [updated] = await db

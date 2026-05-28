@@ -12,6 +12,7 @@ import {
 } from "@workspace/api-zod";
 import { logFitnessActivity } from "../services/fitnessLog";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth";
+import { fitnessLogLimiter } from "../middlewares/rateLimiters";
 
 function getGroupXpBonus(memberCount: number): number {
   if (memberCount >= 6) return 0.5;
@@ -167,7 +168,7 @@ router.get("/fitness/stats/:playerId", requireAuth, attachPlayer, async (req, re
 });
 
 // POST /fitness/log
-router.post("/fitness/log", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
+router.post("/fitness/log", fitnessLogLimiter, requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const body = LogActivityBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
@@ -178,6 +179,22 @@ router.post("/fitness/log", requireAuth, attachPlayer, requirePlayerOwnership, a
   }
   if (body.data.distanceMiles != null && body.data.distanceMiles <= 0) {
     res.status(400).json({ error: "Distance must be positive when provided" });
+    return;
+  }
+
+  // ── Anti-cheat: reject impossible pace and unrealistic durations ───────────
+  // World-record marathon pace is ~4:30/mile. Anything sub-3:00/mile is clearly spoofed.
+  if (body.data.distanceMiles != null && body.data.value > 0) {
+    const minutesPerMile = body.data.value / body.data.distanceMiles;
+    if (minutesPerMile < 3) {
+      req.log?.warn?.({ playerId: body.data.playerId, minutesPerMile, distanceMiles: body.data.distanceMiles, value: body.data.value }, "Fitness log rejected: impossible pace");
+      res.status(400).json({ error: "fitness_anti_cheat_reject", reason: "impossible_pace" });
+      return;
+    }
+  }
+  // 24h+ single activity is implausible — likely a stuck timer or spoof.
+  if (body.data.value > 1440) {
+    res.status(400).json({ error: "fitness_anti_cheat_reject", reason: "duration_too_long" });
     return;
   }
 

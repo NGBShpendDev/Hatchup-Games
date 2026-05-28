@@ -86,6 +86,36 @@ HatchUp is a family-friendly social fitness platform. All agents must build with
 - "This is a public event. Meet only in the listed public location."
 - "HatchUp is a safe, trusted, and family-friendly community."
 
+## Launch Readiness (Pre-launch Hardening pass)
+
+These systems were added in the pre-launch hardening sweep and must stay wired:
+
+### Auth & security
+- Auth: Clerk (`@clerk/express`). MFA, account recovery, password resets are handled by Clerk's user portal at `/user`.
+- All `/api` routes go through `helmet`, locked CORS (`REPLIT_DOMAINS`), and global rate limits (`generalLimiter` 100/min, `mutationLimiter` 20/min on writes).
+- Per-endpoint stricter limiters live in `artifacts/api-server/src/middlewares/rateLimiters.ts`:
+  - `locationUpdateLimiter` on `POST /players/me/location`
+  - `fitnessLogLimiter` on `POST /fitness/log`
+  - `socialWriteLimiter` on social writes (posts, comments, reacts, follows, reposts)
+  - `aiCoachLimiter` on `POST /coach/chat`
+  - `scanLimiter` reserved for body/meal scan endpoints when added
+- GPS coordinates are AES-256-GCM encrypted via `SESSION_SECRET` (min 16 chars). `decryptCoordinate` is in-memory only — never serialize coords.
+
+### Anti-cheat (`artifacts/api-server/src/services/antiCheat.ts`)
+- `validateGpsUpdate` — rejects >300 km/h velocity, flags >120 km/h or weak (>500m) fixes as suspicious. Wired into `POST /players/me/location` using the decrypted previous fix.
+- `validateStepDelta` — rejects >400 steps/min and negative/zero-time deltas; flags sustained sprint cadence.
+- `POST /fitness/log` rejects sub-3:00/mile pace and >24h durations.
+- Pure functions are unit-tested (`antiCheat.test.ts`) via Node's built-in `node:test` runner. Run with `pnpm --filter @workspace/api-server run test`.
+
+### Minor / parental controls
+- `playersTable.isMinor` toggles safer defaults. When enabled via `PATCH /players/:id/privacy-settings`, the API forces `locationVisibility="city"` and `requireWorkoutApproval=true`.
+- `blockMinorSocialWrite` middleware (in `artifacts/api-server/src/middlewares/minorGuard.ts`) is applied to social posts/comments/reacts/reposts/follows and group chat messages. Returns `403 minor_account_restricted` for flagged accounts.
+- Settings UI: `/settings/privacy` exposes the minor toggle, MFA portal link (`/user`), location visibility, workout approval, and emergency contact.
+
+### Anti-cheat extensions to be aware of
+- When adding a new fitness ingestion endpoint, call `validateStepDelta` before persisting.
+- When adding a new location ingestion endpoint, call `validateGpsUpdate` against the previous decrypted fix.
+
 ## Gotchas
 
 - Vite `strictPort: true` was removed — it caused the workflow restart tool to fail with DIDNT_OPEN_A_PORT even though the server was running

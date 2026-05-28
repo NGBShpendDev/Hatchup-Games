@@ -1,5 +1,7 @@
 import { Router } from "express";
-import { createCipheriv, createHash, randomBytes } from "crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
+import { validateGpsUpdate } from "../services/antiCheat";
+import { locationUpdateLimiter } from "../middlewares/rateLimiters";
 import { db } from "@workspace/db";
 import {
   playersTable,
@@ -39,6 +41,25 @@ export function canAppearInScope(visibility: string | null | undefined, scope: s
   return scope === "city" || scope === "nearby";
 }
 
+function decryptCoordinate(blob: string | null | undefined): number | null {
+  if (!blob) return null;
+  try {
+    const [ivB64, tagB64, ctB64] = blob.split(":");
+    if (!ivB64 || !tagB64 || !ctB64) return null;
+    const key = deriveKey();
+    const iv = Buffer.from(ivB64, "base64");
+    const tag = Buffer.from(tagB64, "base64");
+    const ct = Buffer.from(ctB64, "base64");
+    const decipher = createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(tag);
+    const out = Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
+    const n = Number(out);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
 function encryptCoordinate(value: number): string {
   const key = deriveKey();
   const iv = randomBytes(12); // 96-bit IV for GCM
@@ -74,10 +95,11 @@ function safeLocationRecord(loc: typeof playerLocationTable.$inferSelect) {
 // Accepts lat/lng → calls Nominatim → encrypts coords with AES-256-GCM → stores.
 // Raw GPS values are used ONLY for the geocoding call; only ciphertext is persisted.
 // Encrypted fields are NEVER returned in API responses.
-router.post("/players/me/location", requireAuth, attachPlayer, async (req, res) => {
-  const { latitude, longitude, city, state, county, country, countryCode, visibility } = req.body as {
+router.post("/players/me/location", locationUpdateLimiter, requireAuth, attachPlayer, async (req, res) => {
+  const { latitude, longitude, accuracyMeters, city, state, county, country, countryCode, visibility } = req.body as {
     latitude?: number;
     longitude?: number;
+    accuracyMeters?: number;
     city?: string;
     state?: string;
     county?: string;
@@ -125,6 +147,30 @@ router.post("/players/me/location", requireAuth, attachPlayer, async (req, res) 
   const existing = await db.query.playerLocationTable.findFirst({
     where: eq(playerLocationTable.playerId, req.playerId!),
   });
+
+  // ── Anti-cheat: validate the new GPS update against the previous fix ──────
+  // Decrypt the previous coordinates in-memory only; never expose them.
+  if (latitude != null && longitude != null) {
+    const prevLat = decryptCoordinate(existing?.latEncrypted);
+    const prevLng = decryptCoordinate(existing?.lngEncrypted);
+    const verdict = validateGpsUpdate({
+      prevLat, prevLng,
+      prevTimestamp: existing?.updatedAt ?? null,
+      newLat: latitude,
+      newLng: longitude,
+      newTimestamp: new Date(),
+      accuracyMeters: accuracyMeters ?? null,
+    });
+    if (verdict.verdict === "reject") {
+      req.log?.warn?.({ playerId: req.playerId, reason: verdict.reason, details: verdict.details }, "GPS update rejected by anti-cheat");
+      res.status(400).json({ error: "gps_anti_cheat_reject", reason: verdict.reason });
+      return;
+    }
+    if (verdict.verdict === "suspicious") {
+      req.log?.info?.({ playerId: req.playerId, reason: verdict.reason, details: verdict.details }, "GPS update flagged suspicious");
+    }
+  }
+
   const resolvedVisibility = visibility ?? playerRow?.locationVisibility ?? existing?.visibility ?? "city";
 
   // Build the update payload using the inferred Drizzle type

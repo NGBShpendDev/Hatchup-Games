@@ -29,6 +29,8 @@ import {
   AlertTriangle,
   ChevronRight,
   Camera,
+  KeyRound,
+  Baby,
 } from "lucide-react";
 
 const LOCATION_OPTIONS = [
@@ -46,6 +48,7 @@ export default function SettingsPrivacy() {
   const [requireApproval, setRequireApproval] = useState(false);
   const [emergencyName, setEmergencyName] = useState("");
   const [emergencyPhone, setEmergencyPhone] = useState("");
+  const [isMinor, setIsMinor] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
@@ -63,6 +66,7 @@ export default function SettingsPrivacy() {
         setRequireApproval(data.requireWorkoutApproval ?? false);
         setEmergencyName(data.emergencyContactName ?? "");
         setEmergencyPhone(data.emergencyContactPhone ?? "");
+        setIsMinor(Boolean(data.isMinor));
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
@@ -107,6 +111,7 @@ export default function SettingsPrivacy() {
           requireWorkoutApproval: requireApproval,
           emergencyContactName: emergencyName || null,
           emergencyContactPhone: emergencyPhone || null,
+          isMinor,
         }),
       });
       if (res.ok) {
@@ -303,6 +308,43 @@ export default function SettingsPrivacy() {
                 type="tel"
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Minor account / parental controls */}
+        <Card className="border border-pink-500/20 bg-pink-950/10">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <Baby className="w-5 h-5 text-pink-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-bold text-sm">Minor account (parental controls)</p>
+                  <p className="text-xs text-muted-foreground font-medium">
+                    Enables safer defaults: blocks social posts, comments, follows, and group chat. Forces "City only" location and approval-required workout partners.
+                  </p>
+                </div>
+              </div>
+              <Switch checked={isMinor} onCheckedChange={setIsMinor} />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* MFA / account security pointer */}
+        <Card className="border border-indigo-500/20 bg-indigo-950/10">
+          <CardContent className="p-4">
+            <a
+              href="/user"
+              className="flex items-center gap-3"
+            >
+              <KeyRound className="w-5 h-5 text-indigo-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm">Account & security</p>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Manage your password, two-factor authentication (MFA), connected devices, and account recovery.
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </a>
           </CardContent>
         </Card>
 
