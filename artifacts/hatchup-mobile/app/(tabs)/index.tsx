@@ -4,11 +4,17 @@ import {
   useGetPlayerDashboard,
   useListHatchlings,
   useGetUnreadNotificationCount,
+  useGetDailyStreak,
+  useClaimDailyReward,
+  getGetDailyStreakQueryKey,
+  getGetPlayerDashboardQueryKey,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Platform,
   Pressable,
   ScrollView,
@@ -22,6 +28,138 @@ import { useColors } from "@/hooks/useColors";
 import { getRarityColor, capitalize } from "@/constants/rarity";
 
 const PLAYER_ID = 1;
+
+function StreakClaimCard() {
+  const colors = useColors();
+  const queryClient = useQueryClient();
+
+  const shieldScaleAnim = useRef(new Animated.Value(0)).current;
+  const shieldOpacityAnim = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0.4)).current;
+  const shieldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [shieldCelebrating, setShieldCelebrating] = useState(false);
+
+  const { data: streak, isLoading } = useGetDailyStreak();
+  const shieldCount = streak?.streakShields ?? 0;
+  const alreadyClaimed = streak?.alreadyClaimed ?? false;
+  const currentDay = streak?.currentDay ?? 0;
+
+  const triggerShieldCelebration = useCallback(() => {
+    if (shieldTimerRef.current) clearTimeout(shieldTimerRef.current);
+    setShieldCelebrating(true);
+    shieldScaleAnim.setValue(0.5);
+    shieldOpacityAnim.setValue(0);
+    Animated.parallel([
+      Animated.spring(shieldScaleAnim, { toValue: 1, useNativeDriver: true, stiffness: 400, damping: 22 }),
+      Animated.timing(shieldOpacityAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
+    ]).start();
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0.4, duration: 600, useNativeDriver: true }),
+      ])
+    ).start();
+    shieldTimerRef.current = setTimeout(() => {
+      Animated.timing(shieldOpacityAnim, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => {
+        setShieldCelebrating(false);
+      });
+    }, 2500);
+  }, [shieldScaleAnim, shieldOpacityAnim, glowAnim]);
+
+  useEffect(() => {
+    return () => {
+      if (shieldTimerRef.current) clearTimeout(shieldTimerRef.current);
+    };
+  }, []);
+
+  const claim = useClaimDailyReward({
+    mutation: {
+      onSuccess: (result) => {
+        queryClient.invalidateQueries({ queryKey: getGetDailyStreakQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetPlayerDashboardQueryKey(PLAYER_ID) });
+        if (result.streakShieldGranted) {
+          triggerShieldCelebration();
+        }
+      },
+    },
+  });
+
+  if (isLoading || !streak) return null;
+
+  return (
+    <View style={[claimStyles.card, { backgroundColor: colors.card, borderColor: "#f97316" + "44" }]}>
+      {/* Header row */}
+      <View style={claimStyles.headerRow}>
+        <View style={[claimStyles.flameWrap, { backgroundColor: "#f97316" + "22" }]}>
+          <Feather name="zap" size={18} color="#f97316" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[claimStyles.title, { color: colors.foreground }]}>Daily Login Reward</Text>
+          <Text style={[claimStyles.subtitle, { color: colors.mutedForeground }]}>
+            {alreadyClaimed
+              ? `Day ${currentDay} claimed — come back tomorrow!`
+              : currentDay > 0
+              ? `🔥 ${currentDay}-day streak — claim today's reward!`
+              : "Claim your first reward today!"}
+          </Text>
+        </View>
+        {(shieldCount > 0 || shieldCelebrating) && (
+          <Animated.View
+            style={[
+              claimStyles.shieldBadge,
+              shieldCelebrating && { transform: [{ scale: shieldScaleAnim }] },
+            ]}
+          >
+            <Feather name="shield" size={13} color="#22d3ee" />
+            <Text style={claimStyles.shieldBadgeText}>{shieldCount}</Text>
+          </Animated.View>
+        )}
+      </View>
+
+      {/* Shield celebration banner */}
+      {shieldCelebrating && (
+        <Animated.View
+          style={[
+            claimStyles.celebrationBanner,
+            { opacity: shieldOpacityAnim, transform: [{ scale: shieldScaleAnim }] },
+          ]}
+        >
+          {/* Pulsing glow overlay */}
+          <Animated.View
+            style={[claimStyles.glowOverlay, { opacity: glowAnim }]}
+            pointerEvents="none"
+          />
+          <View style={claimStyles.celebrationIconWrap}>
+            <Feather name="shield" size={28} color="#67e8f9" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={claimStyles.celebrationTitle}>Streak Shield Earned!</Text>
+            <Text style={claimStyles.celebrationSub}>Your streak is protected for one missed day.</Text>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Claim button */}
+      {!alreadyClaimed && !shieldCelebrating && (
+        <Pressable
+          onPress={() => claim.mutate()}
+          disabled={claim.isPending}
+          style={[claimStyles.claimBtn, { opacity: claim.isPending ? 0.6 : 1 }]}
+          testID="button-claim-daily-reward"
+        >
+          {claim.isPending ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Feather name="gift" size={15} color="#fff" />
+              <Text style={claimStyles.claimBtnText}>Claim Day {currentDay + 1} Reward</Text>
+            </>
+          )}
+        </Pressable>
+      )}
+    </View>
+  );
+}
 
 interface QuickLinkProps {
   label: string;
@@ -148,6 +286,11 @@ export default function HomeScreen() {
         ))}
       </View>
 
+      {/* Daily Streak Claim */}
+      <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+        <StreakClaimCard />
+      </View>
+
       {/* Active Pal */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Active Pal</Text>
       {activePal ? (
@@ -256,4 +399,37 @@ const styles = StyleSheet.create({
   questName: { fontSize: 14, fontWeight: "600" },
   questDesc: { fontSize: 12, marginTop: 2 },
   questReward: { fontSize: 13, fontWeight: "700" },
+});
+
+const claimStyles = StyleSheet.create({
+  card: { borderRadius: 16, borderWidth: 1, padding: 14, gap: 10 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  flameWrap: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  title: { fontSize: 14, fontWeight: "700" },
+  subtitle: { fontSize: 12, marginTop: 2 },
+  shieldBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#22d3ee18", borderWidth: 1, borderColor: "#22d3ee44", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 5 },
+  shieldBadgeText: { fontSize: 13, fontWeight: "800", color: "#22d3ee" },
+  celebrationBanner: {
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#22d3ee99",
+    backgroundColor: "#083344",
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    overflow: "hidden",
+  },
+  glowOverlay: {
+    position: "absolute",
+    inset: 0,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#22d3ee66",
+  },
+  celebrationIconWrap: { width: 48, height: 48, borderRadius: 24, backgroundColor: "#22d3ee22", borderWidth: 1, borderColor: "#22d3ee55", alignItems: "center", justifyContent: "center" },
+  celebrationTitle: { fontSize: 15, fontWeight: "800", color: "#a5f3fc" },
+  celebrationSub: { fontSize: 12, color: "#67e8f9", marginTop: 2 },
+  claimBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#f97316", borderRadius: 12, paddingVertical: 11 },
+  claimBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
 });
