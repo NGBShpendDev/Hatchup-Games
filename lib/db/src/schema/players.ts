@@ -96,6 +96,8 @@ export const playersTable = pgTable("players", {
   email: text("email"),
   notifyRecapEmail: boolean("notify_recap_email").notNull().default(true),
   recapEmailLastSentWeek: integer("recap_email_last_sent_week"),
+  notifyRecapPush: boolean("notify_recap_push").notNull().default(true),
+  recapPushLastSentWeek: integer("recap_push_last_sent_week"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

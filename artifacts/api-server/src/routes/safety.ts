@@ -165,6 +165,7 @@ router.get("/players/:id/privacy-settings", requireAuth, attachPlayer, async (re
     weeklyRecapTimezone: player.weeklyRecapTimezone,
     email: player.email,
     notifyRecapEmail: player.notifyRecapEmail,
+    notifyRecapPush: player.notifyRecapPush,
   });
 });
 
@@ -191,6 +192,7 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     weeklyRecapTimezone?: unknown;
     email?: unknown;
     notifyRecapEmail?: unknown;
+    notifyRecapPush?: unknown;
   };
 
   // Read current player so we know if this is (or will become) a minor account.
@@ -278,6 +280,9 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
   if (typeof body.notifyRecapEmail === "boolean") {
     updates.notifyRecapEmail = body.notifyRecapEmail;
   }
+  if (typeof body.notifyRecapPush === "boolean") {
+    updates.notifyRecapPush = body.notifyRecapPush;
+  }
   if (typeof body.isMinor === "boolean") {
     // Minor status is a one-way self-service toggle: a user can mark
     // themselves as a minor at any time, but cannot self-clear that flag.
@@ -320,6 +325,7 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     emergencyContactPhone: updated.emergencyContactPhone,
     email: updated.email,
     notifyRecapEmail: updated.notifyRecapEmail,
+    notifyRecapPush: updated.notifyRecapPush,
   });
 });
 

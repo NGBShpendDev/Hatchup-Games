@@ -60,7 +60,8 @@ export default function SettingsPrivacy() {
   const [recapDay, setRecapDay] = useState(0);
   const [recapHour, setRecapHour] = useState(9);
   const [recapEmail, setRecapEmail] = useState("");
-  const [notifyRecapEmail, setNotifyRecapEmail] = useState(false);
+  const [notifyRecapEmail, setNotifyRecapEmail] = useState(true);
+  const [notifyRecapPush, setNotifyRecapPush] = useState(true);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -127,7 +128,8 @@ export default function SettingsPrivacy() {
         if (typeof data.weeklyRecapDayOfWeek === "number") setRecapDay(data.weeklyRecapDayOfWeek);
         if (typeof data.weeklyRecapHourLocal === "number") setRecapHour(data.weeklyRecapHourLocal);
         setRecapEmail(typeof data.email === "string" ? data.email : "");
-        setNotifyRecapEmail(Boolean(data.notifyRecapEmail));
+        if (typeof data.notifyRecapEmail === "boolean") setNotifyRecapEmail(data.notifyRecapEmail);
+        if (typeof data.notifyRecapPush === "boolean") setNotifyRecapPush(data.notifyRecapPush);
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
@@ -214,6 +216,7 @@ export default function SettingsPrivacy() {
           weeklyRecapTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           email: recapEmail.trim() === "" ? null : recapEmail.trim(),
           notifyRecapEmail,
+          notifyRecapPush,
         }),
       });
       if (res.ok) {
@@ -527,13 +530,44 @@ export default function SettingsPrivacy() {
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <p className="font-bold text-sm">Send me a weekly recap</p>
-                <p className="text-xs text-muted-foreground font-medium">Delivered to your in-app notifications.</p>
+                <p className="text-xs text-muted-foreground font-medium">Always delivered to your in-app notifications. Add email or push below.</p>
               </div>
               <Switch checked={recapEnabled} onCheckedChange={setRecapEnabled} />
             </div>
 
             {recapEnabled && (
-              <div className="border-t border-emerald-500/10 pt-3 grid grid-cols-2 gap-3">
+              <div className="border-t border-emerald-500/10 pt-3 space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm">Also push to this device</p>
+                    <p className="text-xs text-muted-foreground font-medium">
+                      Web push on your recap day, even if HatchUp is closed. Requires push enabled above.
+                    </p>
+                  </div>
+                  <Switch checked={notifyRecapPush} onCheckedChange={setNotifyRecapPush} />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm">Also email the recap</p>
+                      <p className="text-xs text-muted-foreground font-medium">
+                        Sends an HTML summary to the address below.
+                      </p>
+                    </div>
+                    <Switch checked={notifyRecapEmail} onCheckedChange={setNotifyRecapEmail} />
+                  </div>
+                  <Input
+                    type="email"
+                    placeholder="you@example.com"
+                    value={recapEmail}
+                    onChange={(e) => setRecapEmail(e.target.value)}
+                    disabled={!notifyRecapEmail}
+                    className="h-10"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="recap-day" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                     Day
@@ -569,6 +603,7 @@ export default function SettingsPrivacy() {
                 <p className="col-span-2 text-[11px] text-muted-foreground italic">
                   Saved in your device's timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone}).
                 </p>
+                </div>
               </div>
             )}
 

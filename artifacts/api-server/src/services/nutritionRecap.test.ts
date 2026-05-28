@@ -1,7 +1,17 @@
 import { describe, it, beforeEach, mock } from "node:test";
 import assert from "node:assert/strict";
 
-type Player = { id: number; physiqueGoal: string | null };
+type Player = {
+  id: number;
+  physiqueGoal: string | null;
+  email?: string | null;
+  notifyRecapEmail?: boolean;
+  notifyRecapPush?: boolean;
+  recapEmailLastSentWeek?: number | null;
+  recapPushLastSentWeek?: number | null;
+  displayName?: string | null;
+  username?: string | null;
+};
 type MealPost = {
   playerId: number;
   name: string;
@@ -89,6 +99,16 @@ const fakeDb = {
       state.notifications.push({ id: state.notifications.length + 1, ...vals });
     },
   }),
+  update: (_table: unknown) => ({
+    set: (vals: Partial<Player>) => ({
+      where: async (pred: Predicate) => {
+        const id = pred["players.id"] as number | undefined;
+        if (id == null) return;
+        const cur = state.players.get(id);
+        if (cur) state.players.set(id, { ...cur, ...vals });
+      },
+    }),
+  }),
 };
 
 mock.module("@workspace/db", {
@@ -117,6 +137,36 @@ mock.module("drizzle-orm", {
 mock.module("../lib/logger.ts", {
   namedExports: {
     logger: { warn: () => {}, info: () => {}, error: () => {}, debug: () => {} },
+  },
+});
+
+const externalCalls = {
+  emails: 0,
+  pushes: 0,
+};
+
+mock.module("./emailService.ts", {
+  namedExports: {
+    isEmailConfigured: () => true,
+    sendTransactionalEmail: async () => {
+      externalCalls.emails += 1;
+      return true;
+    },
+  },
+});
+
+mock.module("./nutritionRecapEmail.ts", {
+  namedExports: {
+    renderRecapEmailHtml: () => "<html></html>",
+  },
+});
+
+mock.module("./pushNotifications.ts", {
+  namedExports: {
+    isPushConfigured: () => true,
+    sendPushToPlayer: async () => {
+      externalCalls.pushes += 1;
+    },
   },
 });
 
@@ -325,6 +375,62 @@ describe("sendWeeklyRecapNotification", () => {
       assert.equal(n.type, "nutrition_recap");
       assert.equal(n.link, "/nutrition");
     }
+  });
+
+  it("does NOT fan out to email or push when deliverExternalChannels is omitted", async () => {
+    externalCalls.emails = 0;
+    externalCalls.pushes = 0;
+    state.players.set(10, {
+      id: 10,
+      physiqueGoal: "lean_athlete",
+      email: "p10@example.com",
+      notifyRecapEmail: true,
+      notifyRecapPush: true,
+      displayName: "Ten",
+    });
+    const ok = await sendWeeklyRecapNotification(10, new Date("2026-06-14T12:00:00Z"));
+    assert.equal(ok, true);
+    assert.equal(externalCalls.emails, 0, "email should not fire without deliverExternalChannels");
+    assert.equal(externalCalls.pushes, 0, "push should not fire without deliverExternalChannels");
+  });
+
+  it("fans out to email AND push exactly once per week when deliverExternalChannels is set", async () => {
+    externalCalls.emails = 0;
+    externalCalls.pushes = 0;
+    state.players.set(11, {
+      id: 11,
+      physiqueGoal: "lean_athlete",
+      email: "p11@example.com",
+      notifyRecapEmail: true,
+      notifyRecapPush: true,
+      displayName: "Eleven",
+    });
+    const now = new Date("2026-06-14T12:00:00Z");
+
+    await sendWeeklyRecapNotification(11, now, { deliverExternalChannels: true });
+    assert.equal(externalCalls.emails, 1);
+    assert.equal(externalCalls.pushes, 1);
+
+    // Second call same week — in-app idempotency short-circuits before external fanout
+    await sendWeeklyRecapNotification(11, now, { deliverExternalChannels: true });
+    assert.equal(externalCalls.emails, 1);
+    assert.equal(externalCalls.pushes, 1);
+  });
+
+  it("respects per-channel opt-out flags", async () => {
+    externalCalls.emails = 0;
+    externalCalls.pushes = 0;
+    state.players.set(12, {
+      id: 12,
+      physiqueGoal: "lean_athlete",
+      email: "p12@example.com",
+      notifyRecapEmail: false,
+      notifyRecapPush: true,
+      displayName: "Twelve",
+    });
+    await sendWeeklyRecapNotification(12, new Date("2026-06-14T12:00:00Z"), { deliverExternalChannels: true });
+    assert.equal(externalCalls.emails, 0, "email should be skipped when notifyRecapEmail is false");
+    assert.equal(externalCalls.pushes, 1, "push should still fire when its flag is true");
   });
 
   it("returns false and inserts nothing when the player does not exist", async () => {

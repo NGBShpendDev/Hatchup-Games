@@ -72,6 +72,7 @@ const CATEGORY_TO_PLAYER_FIELD: Record<PushCategory, keyof typeof playersTable.$
   invites: "notifyInvitesPush",
   endingSoon: "notifyEndingSoonPush",
   completed: "notifyCompletedPush",
+  nutritionRecap: "notifyRecapPush",
 };
 
 export interface PushPayload {

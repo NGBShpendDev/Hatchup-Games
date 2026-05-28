@@ -2,8 +2,9 @@ import { db, mealPostsTable, playersTable, notificationsTable } from "@workspace
 import { and, desc, eq, sql } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { logger } from "../lib/logger.ts";
-import { isEmailConfigured, sendTransactionalEmail } from "./emailService";
-import { renderRecapEmailHtml } from "./nutritionRecapEmail";
+import { isEmailConfigured, sendTransactionalEmail } from "./emailService.ts";
+import { renderRecapEmailHtml } from "./nutritionRecapEmail.ts";
+import { isPushConfigured, sendPushToPlayer } from "./pushNotifications.ts";
 
 /**
  * Canonical macro-goal targets. Source of truth — `/nutrition/macro-target`
@@ -223,6 +224,7 @@ export function buildRecapMessage(recap: WeeklyRecap): { title: string; body: st
 export async function sendWeeklyRecapNotification(
   playerId: number,
   now: Date = new Date(),
+  options: { deliverExternalChannels?: boolean } = {},
 ): Promise<boolean> {
   const weekKey = isoWeekKey(now);
 
@@ -250,11 +252,24 @@ export async function sendWeeklyRecapNotification(
     sourceId: weekKey,
   });
 
-  // Best-effort: also deliver the recap as an HTML email. Same `weekKey` is
-  // tracked on the player row so we won't double-send if the notification
-  // insert above ever raced. Skipped silently when email isn't configured,
-  // when the player has no email on file, or when they've opted out.
-  await maybeSendRecapEmail(playerId, recap, weekKey);
+  // External channels (email + web push) are only delivered from the
+  // scheduled weekly job, which has already gated on the player's chosen
+  // day/hour/timezone via `shouldDeliverForPlayer`. On-demand call sites
+  // (summary open, manual /recap/send) intentionally skip them so we never
+  // email or push a player outside their configured recap window.
+  if (options.deliverExternalChannels) {
+    // Best-effort: also deliver the recap as an HTML email. Same `weekKey` is
+    // tracked on the player row so we won't double-send if the notification
+    // insert above ever raced. Skipped silently when email isn't configured,
+    // when the player has no email on file, or when they've opted out.
+    await maybeSendRecapEmail(playerId, recap, weekKey);
+
+    // Best-effort: also fan out as a web push so players who haven't opened
+    // the app this week still see the recap. Same `weekKey` idempotency guard
+    // applies; skipped silently when push isn't configured or the player has
+    // opted out / has no subscriptions.
+    await maybeSendRecapPush(playerId, recap, weekKey);
+  }
 
   return true;
 }
@@ -296,5 +311,43 @@ async function maybeSendRecapEmail(
     }
   } catch (err) {
     logger.warn({ err, playerId }, "weekly recap email step failed");
+  }
+}
+
+async function maybeSendRecapPush(
+  playerId: number,
+  recap: WeeklyRecap,
+  weekKey: number,
+): Promise<void> {
+  if (!isPushConfigured()) return;
+
+  try {
+    const player = await db.query.playersTable.findFirst({
+      where: eq(playersTable.id, playerId),
+      columns: {
+        notifyRecapPush: true,
+        recapPushLastSentWeek: true,
+      },
+    });
+    if (!player) return;
+    if (!player.notifyRecapPush) return;
+    if (player.recapPushLastSentWeek === weekKey) return;
+
+    const { title, body } = buildRecapMessage(recap);
+
+    await sendPushToPlayer(playerId, {
+      title,
+      body,
+      link: "/nutrition",
+      category: "nutritionRecap",
+      tag: `nutrition_recap_${weekKey}`,
+    });
+
+    await db
+      .update(playersTable)
+      .set({ recapPushLastSentWeek: weekKey })
+      .where(eq(playersTable.id, playerId));
+  } catch (err) {
+    logger.warn({ err, playerId }, "weekly recap push step failed");
   }
 }

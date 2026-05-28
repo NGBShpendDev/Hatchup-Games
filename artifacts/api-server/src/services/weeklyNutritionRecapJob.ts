@@ -38,7 +38,7 @@ async function runRecapTick(now: Date = new Date()): Promise<void> {
     if (!due) continue;
     considered += 1;
     try {
-      const ok = await sendWeeklyRecapNotification(p.id, now);
+      const ok = await sendWeeklyRecapNotification(p.id, now, { deliverExternalChannels: true });
       if (ok) sent += 1;
     } catch (err) {
       logger.warn({ err, playerId: p.id }, "Weekly recap failed for player");
