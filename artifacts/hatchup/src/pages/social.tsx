@@ -19,6 +19,10 @@ import {
   getListMutualFollowersQueryKey,
   useListMutualFollowing,
   getListMutualFollowingQueryKey,
+  useListFollowers,
+  getListFollowersQueryKey,
+  useListFollowing,
+  getListFollowingQueryKey,
   useDiscoverPlayers,
   getDiscoverPlayersQueryKey,
   useSearchDiscoverablePlayers,
@@ -100,10 +104,14 @@ function ProfileModal({
   const [, setLocation] = useLocation();
   const [mutualSheetOpen, setMutualSheetOpen] = useState(false);
   const [mutualFollowingSheetOpen, setMutualFollowingSheetOpen] = useState(false);
+  const [followersSheetOpen, setFollowersSheetOpen] = useState(false);
+  const [followingSheetOpen, setFollowingSheetOpen] = useState(false);
 
   function handleViewMutualProfile(targetId: number) {
     setMutualSheetOpen(false);
     setMutualFollowingSheetOpen(false);
+    setFollowersSheetOpen(false);
+    setFollowingSheetOpen(false);
     onClose();
     setLocation(`/players/${targetId}`);
   }
@@ -162,8 +170,24 @@ function ProfileModal({
                 </div>
                 <p className="text-xs text-muted-foreground">@{profile.player.username}</p>
                 <div className="flex gap-4 mt-1 text-xs font-bold">
-                  <span><span className="text-foreground">{profile.followerCount}</span> <span className="text-muted-foreground">Followers</span></span>
-                  <span><span className="text-foreground">{profile.followingCount}</span> <span className="text-muted-foreground">Following</span></span>
+                  <button
+                    type="button"
+                    className="hover:underline focus:outline-none"
+                    data-testid="button-open-followers-list"
+                    onClick={() => setFollowersSheetOpen(true)}
+                  >
+                    <span className="text-foreground">{profile.followerCount}</span>{" "}
+                    <span className="text-muted-foreground">Followers</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="hover:underline focus:outline-none"
+                    data-testid="button-open-following-list"
+                    onClick={() => setFollowingSheetOpen(true)}
+                  >
+                    <span className="text-foreground">{profile.followingCount}</span>{" "}
+                    <span className="text-muted-foreground">Following</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -360,7 +384,220 @@ function ProfileModal({
       onClose={() => setMutualFollowingSheetOpen(false)}
       onViewProfile={handleViewMutualProfile}
     />
+    <FollowersListSheet
+      profileId={profileId}
+      viewerId={viewerId}
+      open={followersSheetOpen}
+      onClose={() => setFollowersSheetOpen(false)}
+      onViewProfile={handleViewMutualProfile}
+    />
+    <FollowingListSheet
+      profileId={profileId}
+      viewerId={viewerId}
+      open={followingSheetOpen}
+      onClose={() => setFollowingSheetOpen(false)}
+      onViewProfile={handleViewMutualProfile}
+    />
     </>
+  );
+}
+
+type PlayerStubRow = {
+  id: number;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  creatorBadge: string | null;
+  sharedGroups?: Array<{ id: number; name: string }>;
+};
+
+function formatSharedGroups(groups: Array<{ id: number; name: string }>): string {
+  const names = groups.map(g => g.name);
+  if (names.length === 0) return "";
+  const preview = names.slice(0, 2).join(" & ");
+  const extra = names.length - 2;
+  return extra > 0
+    ? `Also in ${preview} +${extra} more with you`
+    : `Also in ${preview} with you`;
+}
+
+function PlayerListRow({
+  player,
+  testIdPrefix,
+  onViewProfile,
+}: {
+  player: PlayerStubRow;
+  testIdPrefix: string;
+  onViewProfile: (pid: number) => void;
+}) {
+  const sharedGroups = player.sharedGroups ?? [];
+  return (
+    <div
+      className="flex items-start gap-3 bg-muted/30 border border-border/40 rounded-2xl p-3"
+      data-testid={`row-${testIdPrefix}-${player.id}`}
+    >
+      <Avatar className="h-10 w-10 border border-primary/40">
+        <AvatarImage src={player.avatarUrl ?? undefined} />
+        <AvatarFallback className="font-black text-xs">
+          {(player.username ?? "?").substring(0, 2).toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <p className="font-black text-sm truncate">{player.displayName ?? player.username}</p>
+          {player.creatorBadge && (
+            <Badge className="bg-gradient-to-r from-yellow-500 to-amber-400 text-black text-[9px] font-black px-1 py-0">
+              <Award className="w-2 h-2 mr-0.5" /> Creator
+            </Badge>
+          )}
+        </div>
+        <p className="text-[11px] text-muted-foreground truncate">@{player.username}</p>
+        {sharedGroups.length > 0 && (
+          <p
+            className="text-[11px] text-purple-300 font-bold mt-1 flex items-center gap-1 truncate"
+            data-testid={`text-${testIdPrefix}-shared-groups-${player.id}`}
+          >
+            <Users2 className="w-3 h-3 shrink-0" />
+            <span className="truncate">{formatSharedGroups(sharedGroups)}</span>
+          </p>
+        )}
+      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        className="rounded-xl font-bold text-xs h-8 shrink-0"
+        data-testid={`button-view-${testIdPrefix}-${player.id}`}
+        onClick={() => onViewProfile(player.id)}
+      >
+        View profile
+      </Button>
+    </div>
+  );
+}
+
+function FollowersListSheet({
+  profileId,
+  viewerId,
+  open,
+  onClose,
+  onViewProfile,
+}: {
+  profileId: number;
+  viewerId: number;
+  open: boolean;
+  onClose: () => void;
+  onViewProfile: (pid: number) => void;
+}) {
+  const { data, isLoading } = useListFollowers(
+    profileId,
+    {
+      query: {
+        queryKey: getListFollowersQueryKey(profileId),
+        enabled: open && !!profileId,
+      },
+    },
+  );
+
+  return (
+    <Sheet open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-3xl" data-testid="sheet-followers-list">
+        <SheetHeader>
+          <SheetTitle className="text-lg font-black flex items-center gap-2">
+            <Users className="w-4 h-4 text-primary" />
+            Followers
+            {data && (
+              <span className="text-xs font-bold text-muted-foreground">({data.length})</span>
+            )}
+          </SheetTitle>
+        </SheetHeader>
+
+        <div className="mt-4 space-y-2">
+          {isLoading ? (
+            <>
+              <Skeleton className="h-14 w-full rounded-2xl" />
+              <Skeleton className="h-14 w-full rounded-2xl" />
+              <Skeleton className="h-14 w-full rounded-2xl" />
+            </>
+          ) : !data || data.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No followers yet.
+            </p>
+          ) : (
+            data.map(p => (
+              <PlayerListRow
+                key={p.id}
+                player={p as PlayerStubRow}
+                testIdPrefix="follower"
+                onViewProfile={pid => { if (pid !== viewerId) onViewProfile(pid); }}
+              />
+            ))
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function FollowingListSheet({
+  profileId,
+  viewerId,
+  open,
+  onClose,
+  onViewProfile,
+}: {
+  profileId: number;
+  viewerId: number;
+  open: boolean;
+  onClose: () => void;
+  onViewProfile: (pid: number) => void;
+}) {
+  const { data, isLoading } = useListFollowing(
+    profileId,
+    {
+      query: {
+        queryKey: getListFollowingQueryKey(profileId),
+        enabled: open && !!profileId,
+      },
+    },
+  );
+
+  return (
+    <Sheet open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-3xl" data-testid="sheet-following-list">
+        <SheetHeader>
+          <SheetTitle className="text-lg font-black flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-primary" />
+            Following
+            {data && (
+              <span className="text-xs font-bold text-muted-foreground">({data.length})</span>
+            )}
+          </SheetTitle>
+        </SheetHeader>
+
+        <div className="mt-4 space-y-2">
+          {isLoading ? (
+            <>
+              <Skeleton className="h-14 w-full rounded-2xl" />
+              <Skeleton className="h-14 w-full rounded-2xl" />
+              <Skeleton className="h-14 w-full rounded-2xl" />
+            </>
+          ) : !data || data.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              Not following anyone yet.
+            </p>
+          ) : (
+            data.map(p => (
+              <PlayerListRow
+                key={p.id}
+                player={p as PlayerStubRow}
+                testIdPrefix="following"
+                onViewProfile={pid => { if (pid !== viewerId) onViewProfile(pid); }}
+              />
+            ))
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 

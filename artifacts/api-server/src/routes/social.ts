@@ -1148,28 +1148,88 @@ router.get("/social/players/:id/mutual-following", requireAuth, attachPlayer, as
   res.json({ players, total, nextCursor });
 });
 
+// Shared-group helper: for the viewer, build a map of playerId -> groups they
+// both belong to. Single SQL round-trip via a self-join on group_members + groups
+// (indexed on (player_id, group_id)) so latency stays flat as the viewer's
+// group count grows. Used to populate `sharedGroups` on PlayerStub responses.
+async function loadSharedGroupsForViewer(
+  viewerId: number,
+  playerIds: number[],
+): Promise<Map<number, Array<{ id: number; name: string }>>> {
+  const out = new Map<number, Array<{ id: number; name: string }>>();
+  if (playerIds.length === 0) return out;
+  const viewerGm = alias(groupMembersTable, "viewer_gm");
+  const rows = await db
+    .select({
+      playerId: groupMembersTable.playerId,
+      groupId: groupsTable.id,
+      groupName: groupsTable.name,
+    })
+    .from(groupMembersTable)
+    .innerJoin(
+      viewerGm,
+      and(eq(viewerGm.groupId, groupMembersTable.groupId), eq(viewerGm.playerId, viewerId)),
+    )
+    .innerJoin(groupsTable, eq(groupsTable.id, groupMembersTable.groupId))
+    .where(inArray(groupMembersTable.playerId, playerIds));
+  for (const r of rows) {
+    const list = out.get(r.playerId) ?? [];
+    list.push({ id: r.groupId, name: r.groupName });
+    out.set(r.playerId, list);
+  }
+  return out;
+}
+
 // ── GET /social/players/:id/followers ──────────────────────────────────────
 
 router.get("/social/players/:id/followers", requireAuth, attachPlayer, async (req, res) => {
   const id = Number(req.params.id);
+  const viewerId = req.playerId!;
   const follows = await db.query.playerFollowsTable.findMany({ where: eq(playerFollowsTable.followeeId, id) });
-  const players = await Promise.all(follows.map(async f => {
-    const p = await db.query.playersTable.findFirst({ where: eq(playersTable.id, f.followerId) });
-    return p ? { id: p.id, username: p.username, displayName: p.displayName ?? null, avatarUrl: p.avatarUrl ?? null, creatorBadge: p.creatorBadge ?? null } : null;
-  }));
-  res.json(players.filter(Boolean));
+  const ids = follows.map(f => f.followerId);
+  if (ids.length === 0) { res.json([]); return; }
+  const playerRows = await db.query.playersTable.findMany({ where: inArray(playersTable.id, ids) });
+  const playerMap = new Map(playerRows.map(p => [p.id, p]));
+  const sharedGroupsByPlayer = await loadSharedGroupsForViewer(viewerId, ids);
+  const players = ids.flatMap(pid => {
+    const p = playerMap.get(pid);
+    if (!p) return [];
+    return [{
+      id: p.id,
+      username: p.username,
+      displayName: p.displayName ?? null,
+      avatarUrl: p.avatarUrl ?? null,
+      creatorBadge: p.creatorBadge ?? null,
+      sharedGroups: sharedGroupsByPlayer.get(p.id) ?? [],
+    }];
+  });
+  res.json(players);
 });
 
 // ── GET /social/players/:id/following ──────────────────────────────────────
 
 router.get("/social/players/:id/following", requireAuth, attachPlayer, async (req, res) => {
   const id = Number(req.params.id);
+  const viewerId = req.playerId!;
   const follows = await db.query.playerFollowsTable.findMany({ where: eq(playerFollowsTable.followerId, id) });
-  const players = await Promise.all(follows.map(async f => {
-    const p = await db.query.playersTable.findFirst({ where: eq(playersTable.id, f.followeeId) });
-    return p ? { id: p.id, username: p.username, displayName: p.displayName ?? null, avatarUrl: p.avatarUrl ?? null, creatorBadge: p.creatorBadge ?? null } : null;
-  }));
-  res.json(players.filter(Boolean));
+  const ids = follows.map(f => f.followeeId);
+  if (ids.length === 0) { res.json([]); return; }
+  const playerRows = await db.query.playersTable.findMany({ where: inArray(playersTable.id, ids) });
+  const playerMap = new Map(playerRows.map(p => [p.id, p]));
+  const sharedGroupsByPlayer = await loadSharedGroupsForViewer(viewerId, ids);
+  const players = ids.flatMap(pid => {
+    const p = playerMap.get(pid);
+    if (!p) return [];
+    return [{
+      id: p.id,
+      username: p.username,
+      displayName: p.displayName ?? null,
+      avatarUrl: p.avatarUrl ?? null,
+      creatorBadge: p.creatorBadge ?? null,
+      sharedGroups: sharedGroupsByPlayer.get(p.id) ?? [],
+    }];
+  });
+  res.json(players);
 });
 
 // ── GET /social/memories ────────────────────────────────────────────────────
