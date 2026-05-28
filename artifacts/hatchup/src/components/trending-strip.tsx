@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Eye, TrendingUp, ChevronRight, Flame } from "lucide-react";
 import { useGetTrendingPosts, getGetTrendingPostsQueryKey, type TrendingPost } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TrendingPostPreviewDialog } from "@/components/trending-post-preview-dialog";
 
 const POST_TYPE_ICON: Record<string, string> = {
   workout: "💪",
@@ -47,6 +48,7 @@ export function TrendingStrip({ playerId }: { playerId: number }) {
     query: { queryKey: getGetTrendingPostsQueryKey(params) },
   });
   const posts: TrendingPost[] = (data?.posts ?? []).slice(0, 5);
+  const [previewPostId, setPreviewPostId] = useState<number | null>(null);
 
   if (isLoading) {
     return (
@@ -101,7 +103,13 @@ export function TrendingStrip({ playerId }: { playerId: number }) {
                 className="snap-start flex-shrink-0 w-56"
                 data-testid={`trending-strip-card-${post.id}`}
               >
-                <Link href={`/post/${post.id}`}>
+                <button
+                  type="button"
+                  onClick={() => setPreviewPostId(post.id)}
+                  className="text-left w-full h-full"
+                  aria-label={`Preview trending post by ${post.authorName}`}
+                  data-testid={`button-trending-preview-${post.id}`}
+                >
                   <div className="group relative h-full rounded-2xl border border-white/10 bg-card/70 backdrop-blur p-3 hover:border-primary/50 hover:bg-card/90 transition-all cursor-pointer active:scale-[0.97] overflow-hidden">
                     <div className="absolute -top-1 left-3 z-10 inline-flex items-center gap-1 px-2 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-black shadow-lg shadow-primary/30">
                       <span>#{idx + 1}</span>
@@ -124,11 +132,11 @@ export function TrendingStrip({ playerId }: { playerId: number }) {
                         {post.engagementScore}
                       </span>
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary uppercase tracking-wider group-hover:translate-x-0.5 transition-transform">
-                        View <ChevronRight className="w-3 h-3" />
+                        Preview <ChevronRight className="w-3 h-3" />
                       </span>
                     </div>
                   </div>
-                </Link>
+                </button>
               </motion.div>
             );
           })}
@@ -148,6 +156,15 @@ export function TrendingStrip({ playerId }: { playerId: number }) {
           </motion.div>
         </div>
       </div>
+
+      <TrendingPostPreviewDialog
+        postId={previewPostId}
+        viewerId={playerId}
+        open={previewPostId != null}
+        onOpenChange={(open) => {
+          if (!open) setPreviewPostId(null);
+        }}
+      />
     </section>
   );
 }
