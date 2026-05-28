@@ -42,3 +42,15 @@ id = "M0S7U81QzifCEGYDBOH4-"
 uri = "file://artifacts/hatchup/public/opengraph.png"
 type = "image"
 title = "hatchup opengraph share card"
+
+[[generated]]
+id = "SOXvENsbHAtpQNcQU-TpO"
+uri = "file://artifacts/hatchup-mobile/assets/images/icon.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "uGB0h4glKhFn8oNB69aC5"
+uri = "file://artifacts/hatchup-mobile/assets/images/splash-icon.png"
+type = "image"
+title = "generated_image"
