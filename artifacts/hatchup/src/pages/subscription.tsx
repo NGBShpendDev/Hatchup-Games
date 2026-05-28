@@ -1,19 +1,55 @@
 import { useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
-import { Crown, Check, Sparkles, Trophy, X, ExternalLink, ArrowLeft, Loader2, Palette } from "lucide-react";
+import { Crown, Check, Sparkles, Trophy, X, ExternalLink, ArrowLeft, Loader2, Palette, Egg, Bot, Swords, MapPin } from "lucide-react";
 import { useSubscription, useStartCheckout, useOpenPortal } from "@/lib/subscription";
 import { useToast } from "@/hooks/use-toast";
 
-const UPSELL_SOURCE_COPY: Record<string, { eyebrow: string; title: string; body: string; icon: "palette" | "crown" }> = {
+type UpsellIcon = "palette" | "crown" | "egg" | "bot" | "swords" | "map";
+
+const UPSELL_SOURCE_COPY: Record<string, { eyebrow: string; title: string; body: string; icon: UpsellIcon; highlightFeature?: string }> = {
   accent: {
     eyebrow: "Cosmetic upgrade",
     title: "Unlock the full accent palette",
     body: "Premium unlocks every share-card accent gradient plus 12 customization slots so your posts, profile, and club cards stand out.",
     icon: "palette",
+    highlightFeature: "Premium cosmetics + 12 customization slots",
+  },
+  hatchling_cap: {
+    eyebrow: "Roster full",
+    title: "Hatch as many Pals as you want",
+    body: "Free accounts cap at 6 Hatchlings. Premium removes the cap so every egg you hatch can join your roster — no swapping, no goodbyes.",
+    icon: "egg",
+    highlightFeature: "Unlimited Hatchlings",
+  },
+  coach_cap: {
+    eyebrow: "Coach is tapped out",
+    title: "Unlimited AI coaching",
+    body: "Free accounts get 5 AI coach messages per day. Premium unlocks unlimited chats plus advanced analytics so Hatch can deep-dive on your training.",
+    icon: "bot",
+    highlightFeature: "Unlimited AI coach + advanced analytics",
+  },
+  battle_cap: {
+    eyebrow: "Daily battles used",
+    title: "Battle without the daily cap",
+    body: "Free accounts get 5 battle entries per day. Premium unlocks unlimited matches plus ranked play so you can keep climbing the ladder.",
+    icon: "swords",
+    highlightFeature: "Unlimited battles + ranked play",
+  },
+  leaderboard_scope: {
+    eyebrow: "Local boards locked",
+    title: "Compete in your city, county, and state",
+    body: "Free accounts see world and country leaderboards. Premium unlocks nearby, city, county, and state boards so you can see how you stack up locally.",
+    icon: "map",
+    highlightFeature: "Local leaderboards (nearby, city, county, state)",
+  },
+  customization_slot: {
+    eyebrow: "Customization locked",
+    title: "Unlock 12 customization slots",
+    body: "Free accounts get 2 customization slots. Premium opens 12 slots plus every cosmetic gradient so your posts, profile, and club cards stand out.",
+    icon: "palette",
+    highlightFeature: "Premium cosmetics + 12 customization slots",
   },
 };
-
-const COSMETIC_FEATURE = "Premium cosmetics + 12 customization slots";
 
 const FREE_FEATURES = [
   "Up to 6 Hatchlings in your roster",
@@ -30,6 +66,19 @@ const PREMIUM_FEATURES = [
   "Premium cosmetics + 12 customization slots",
   "Unlimited social posts and follows",
 ];
+
+function UpsellIconView({ icon }: { icon: UpsellIcon }) {
+  const cls = "w-5 h-5 text-amber-300";
+  switch (icon) {
+    case "palette": return <Palette className={cls} />;
+    case "egg":     return <Egg className={cls} />;
+    case "bot":     return <Bot className={cls} />;
+    case "swords":  return <Swords className={cls} />;
+    case "map":     return <MapPin className={cls} />;
+    case "crown":
+    default:        return <Crown className={cls} />;
+  }
+}
 
 export default function SubscriptionPage() {
   const [, setLocation] = useLocation();
@@ -111,11 +160,7 @@ export default function SubscriptionPage() {
           >
             <div className="flex items-start gap-3">
               <div className="shrink-0 w-10 h-10 rounded-2xl bg-amber-400/20 flex items-center justify-center">
-                {upsellCopy.icon === "palette" ? (
-                  <Palette className="w-5 h-5 text-amber-300" />
-                ) : (
-                  <Crown className="w-5 h-5 text-amber-300" />
-                )}
+                <UpsellIconView icon={upsellCopy.icon} />
               </div>
               <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-widest text-amber-300/80">
@@ -197,7 +242,7 @@ export default function SubscriptionPage() {
             </h3>
             <ul className="space-y-2">
               {PREMIUM_FEATURES.map(f => {
-                const highlight = upsellSource === "accent" && f === COSMETIC_FEATURE;
+                const highlight = !!upsellCopy?.highlightFeature && f === upsellCopy.highlightFeature;
                 return (
                   <li
                     key={f}
@@ -206,7 +251,7 @@ export default function SubscriptionPage() {
                         ? "text-amber-100 font-bold bg-amber-400/10 rounded-lg px-2 py-1 -mx-2 ring-1 ring-amber-400/30"
                         : "text-white/90"
                     }`}
-                    data-testid={highlight ? "feature-highlight-cosmetic" : undefined}
+                    data-testid={highlight ? `feature-highlight-${upsellSource}` : undefined}
                   >
                     <Check className={`w-4 h-4 mt-0.5 flex-shrink-0 ${highlight ? "text-amber-300" : "text-emerald-400"}`} />
                     {f}

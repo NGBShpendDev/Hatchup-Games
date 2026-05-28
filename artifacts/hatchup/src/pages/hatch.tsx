@@ -20,7 +20,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Egg as EggIcon, Sparkles, Plus, Footprints, Zap } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Link } from "wouter";
+import { ToastAction } from "@/components/ui/toast";
+import { Link, useLocation } from "wouter";
+import { ApiError } from "@workspace/api-client-react";
 import { ErrorCard } from "@/components/error-card";
 import { useEpicMomentQueue } from "@/components/epic-moment-overlay";
 
@@ -149,6 +151,7 @@ export default function Hatch() {
   const { toast } = useToast();
   const { playerId } = usePlayer();
   const pid = playerId ?? 0;
+  const [, setLocation] = useLocation();
 
   const { data: eggs, isLoading: isLoadingEggs, isError: isErrorEggs, refetch: refetchEggs } = useListEggs(
     { playerId: pid, hatched: false },
@@ -212,8 +215,28 @@ export default function Hatch() {
               }, 2000);
             }
           },
-          onError: () => {
+          onError: (err: unknown) => {
             setHatchPhase("idle");
+            if (
+              err instanceof ApiError &&
+              err.status === 402 &&
+              (err.data as { error?: string } | null)?.error === "hatchling_cap_reached"
+            ) {
+              const cap = (err.data as { cap?: number } | null)?.cap ?? 6;
+              toast({
+                title: "Roster full",
+                description: `Free accounts hold up to ${cap} Hatchlings. Upgrade for unlimited storage.`,
+                action: (
+                  <ToastAction
+                    altText="Upgrade to Premium"
+                    onClick={() => setLocation("/subscription?from=hatchling_cap")}
+                  >
+                    Upgrade
+                  </ToastAction>
+                ),
+              });
+              return;
+            }
             toast({ title: "Failed to hatch", variant: "destructive" });
           }
         }

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import {
   Send, RotateCcw, Bot, User,
-  Dumbbell, Zap, UsersRound, Trophy, ChevronRight, AlertTriangle,
+  Dumbbell, Zap, UsersRound, Trophy, ChevronRight, AlertTriangle, Crown,
 } from "lucide-react";
 
 interface DeepLink {
@@ -22,6 +22,7 @@ interface Message {
   timestamp: Date;
   streaming?: boolean;
   deepLinks?: DeepLink[];
+  capUpsell?: { cap: number };
 }
 
 const ALL_DEEP_LINKS: (DeepLink & { keywords: string[] })[] = [
@@ -121,6 +122,28 @@ export default function Coach() {
         body: JSON.stringify({ message: trimmed, history }),
         credentials: "include",
       });
+
+      if (res.status === 402) {
+        let cap = 5;
+        try {
+          const body = await res.json();
+          if (typeof body?.cap === "number") cap = body.cap;
+        } catch { /* keep default */ }
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: `You've used your ${cap} free AI coach messages for today. Upgrade to HatchUp Premium for unlimited coaching.`,
+                  streaming: false,
+                  capUpsell: { cap },
+                }
+              : m
+          )
+        );
+        setIsStreaming(false);
+        return;
+      }
 
       if (!res.ok || !res.body) throw new Error("Request failed");
 
@@ -281,6 +304,19 @@ export default function Coach() {
                           </div>
                         </Link>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Daily-cap upsell (assistant only) */}
+                  {msg.role === "assistant" && msg.capUpsell && (
+                    <div className="flex flex-wrap gap-1.5 px-1 pt-0.5" data-testid="coach-cap-upsell">
+                      <Link href="/subscription?from=coach_cap">
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-400/15 border border-amber-400/40 rounded-full text-[11px] font-bold text-amber-200 hover:bg-amber-400/25 transition-colors cursor-pointer whitespace-nowrap">
+                          <Crown className="w-3 h-3" />
+                          Upgrade for unlimited coaching
+                          <ChevronRight className="w-3 h-3" />
+                        </div>
+                      </Link>
                     </div>
                   )}
                 </div>

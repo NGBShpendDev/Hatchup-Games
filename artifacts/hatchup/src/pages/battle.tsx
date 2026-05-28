@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { useLocation, Link } from "wouter";
 import {
   Swords, Zap, Shield, Sparkles, Trophy, RotateCcw, ChevronLeft,
@@ -578,6 +579,22 @@ export default function BattlePage() {
       }
     }
     if (msg.type === "error") {
+      if (msg.error === "battle_daily_cap_reached") {
+        setPhase("select");
+        toast({
+          title: "Daily battles used",
+          description: String(msg.message),
+          action: (
+            <ToastAction
+              altText="Upgrade to Premium"
+              onClick={() => setLocation("/subscription?from=battle_cap")}
+            >
+              Upgrade
+            </ToastAction>
+          ),
+        });
+        return;
+      }
       toast({ title: "Battle error", description: String(msg.message), variant: "destructive" });
     }
   }

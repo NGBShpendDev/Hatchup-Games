@@ -23,7 +23,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePlayer } from "@/lib/playerContext";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import { ErrorCard } from "@/components/error-card";
+import { useSubscription } from "@/lib/subscription";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -125,6 +127,9 @@ export default function Leaderboard() {
   const { playerId } = usePlayer();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [, setLocation] = useLocation();
+  const { data: subscription } = useSubscription();
+  const allowedScopes = subscription?.features.allowedScopes ?? ["world", "country", "state", "county", "city", "nearby"];
   const [activeTab, setActiveTab]     = useState<TabKey>("rankings");
   const [scope, setScope]             = useState<ScopeKey>("world");
   const [metric, setMetric]           = useState<MetricKey>("xp");
@@ -354,20 +359,53 @@ export default function Leaderboard() {
 
               {/* Scope selector */}
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                {SCOPES.map(s => (
-                  <button
-                    key={s.key}
-                    onClick={() => setScope(s.key)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs border whitespace-nowrap transition-all flex-shrink-0 ${
-                      scope === s.key
-                        ? "bg-yellow-500/20 border-yellow-500/60 text-yellow-400"
-                        : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:border-white/30"
-                    }`}
-                  >
-                    {s.icon} {s.label}
-                  </button>
-                ))}
+                {SCOPES.map(s => {
+                  const locked = !allowedScopes.includes(s.key);
+                  return (
+                    <button
+                      key={s.key}
+                      onClick={() => setScope(s.key)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs border whitespace-nowrap transition-all flex-shrink-0 ${
+                        scope === s.key
+                          ? "bg-yellow-500/20 border-yellow-500/60 text-yellow-400"
+                          : "bg-white/5 border-white/10 text-white/50 hover:text-white hover:border-white/30"
+                      }`}
+                      data-testid={`scope-${s.key}`}
+                    >
+                      {s.icon} {s.label}
+                      {locked && <Crown className="w-3 h-3 text-amber-400" />}
+                    </button>
+                  );
+                })}
               </div>
+
+              {/* Locked scope upsell — shown instead of rankings when the
+                  selected scope is Premium-only for this player. */}
+              {!allowedScopes.includes(scope) && (
+                <button
+                  type="button"
+                  onClick={() => setLocation("/subscription?from=leaderboard_scope")}
+                  className="w-full text-left rounded-2xl p-5 border border-amber-400/40 bg-gradient-to-br from-amber-500/15 via-pink-500/10 to-violet-500/10 hover:from-amber-500/25 transition"
+                  data-testid="banner-leaderboard-scope-upsell"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 w-9 h-9 rounded-2xl bg-amber-400/20 flex items-center justify-center">
+                      <Crown className="w-4 h-4 text-amber-300" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-amber-300/80">
+                        Premium leaderboard
+                      </p>
+                      <p className="text-sm font-black mt-0.5">
+                        Unlock {SCOPES.find(s => s.key === scope)?.label ?? "local"} rankings
+                      </p>
+                      <p className="text-xs text-white/70 mt-1 leading-relaxed">
+                        Local boards (nearby, city, county, state) are a Premium feature. Upgrade to see how you stack up in your area.
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              )}
 
               {/* Metric dropdown */}
               <div className="relative">
