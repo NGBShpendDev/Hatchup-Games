@@ -14,17 +14,26 @@ const defaultLoader: OgPostLoader = async (id: number): Promise<OgLoadResult> =>
     isFlagged: row.isFlagged,
   };
   if (row.isFlagged) return { post, author: null };
-  const authorRow = await db.query.playersTable.findFirst({
-    where: eq(playersTable.id, row.playerId),
-  });
-  const author: OgAuthorInput | null = authorRow
-    ? { displayName: authorRow.displayName, username: authorRow.username }
-    : null;
-  return { post, author };
+  // Author lookup is best-effort — if the player row can't be read (e.g.
+  // unrelated schema drift on a column we don't care about) we still want
+  // to render a card with fallback author info.
+  try {
+    const authorRow = await db.query.playersTable.findFirst({
+      where: eq(playersTable.id, row.playerId),
+    });
+    const author: OgAuthorInput | null = authorRow
+      ? {
+          displayName: authorRow.displayName,
+          username: authorRow.username,
+          avatarUrl: authorRow.avatarUrl,
+        }
+      : null;
+    return { post, author };
+  } catch {
+    return { post, author: null };
+  }
 };
 
 const router = createOgRouter(defaultLoader);
 
 export default router;
-export { createOgRouter };
-export type { OgLoadResult, OgPostLoader };

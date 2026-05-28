@@ -113,7 +113,7 @@ describe("GET /post/:id — endpoint behaviour", () => {
     assert.doesNotMatch(html, /opengraph\.jpg/);
   });
 
-  it("falls back to /opengraph.jpg when mediaUrl is missing", async () => {
+  it("points at /post/:id/og.png when mediaUrl is missing", async () => {
     fixture.setPost({
       postType: "general",
       content: "Text-only",
@@ -123,8 +123,8 @@ describe("GET /post/:id — endpoint behaviour", () => {
 
     const res = await fetch(`${baseUrl}/post/3`);
     const html = await res.text();
-    assert.match(html, /og:image" content="http:\/\/127\.0\.0\.1:\d+\/opengraph\.jpg"/);
-    assert.match(html, /twitter:image" content="http:\/\/127\.0\.0\.1:\d+\/opengraph\.jpg"/);
+    assert.match(html, /og:image" content="http:\/\/127\.0\.0\.1:\d+\/post\/3\/og\.png"/);
+    assert.match(html, /twitter:image" content="http:\/\/127\.0\.0\.1:\d+\/post\/3\/og\.png"/);
   });
 
   it("falls back to /opengraph.jpg when the post does not exist", async () => {

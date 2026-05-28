@@ -8,6 +8,16 @@ const POST_TYPE_TAGS: Record<string, string> = {
   hatch_moment: "🥚 Hatch Moment",
 };
 
+const POST_TYPE_LABELS: Record<string, string> = {
+  general: "UPDATE",
+  gym_selfie: "GYM SELFIE",
+  evolution_reveal: "EVOLUTION REVEAL",
+  streak_milestone: "STREAK MILESTONE",
+  transformation: "TRANSFORMATION",
+  workout_stat: "WORKOUT STAT",
+  hatch_moment: "HATCH MOMENT",
+};
+
 function escapeHtml(input: string): string {
   return input
     .replace(/&/g, "&amp;")
@@ -19,6 +29,16 @@ function escapeHtml(input: string): string {
 
 function escapeAttr(input: string): string {
   return escapeHtml(input);
+}
+
+// SVG content lives inside <text> nodes so we only need to escape XML-significant chars.
+function escapeXml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
 function isAbsoluteUrl(url: string): boolean {
@@ -40,6 +60,7 @@ export interface OgPostInput {
 export interface OgAuthorInput {
   displayName?: string | null;
   username?: string | null;
+  avatarUrl?: string | null;
 }
 
 export interface RenderOgArgs {
@@ -82,6 +103,9 @@ export function renderOgHtml({ baseUrl, id, post, author }: RenderOgArgs): strin
       imageUrl = isAbsoluteUrl(post.mediaUrl)
         ? post.mediaUrl
         : `${baseUrl}${post.mediaUrl.startsWith("/") ? "" : "/"}${post.mediaUrl}`;
+    } else if (id != null && Number.isFinite(id)) {
+      // No attached media — point crawlers at the on-the-fly branded share card.
+      imageUrl = `${baseUrl}/post/${id}/og.png`;
     }
   }
 
@@ -106,6 +130,8 @@ export function renderOgHtml({ baseUrl, id, post, author }: RenderOgArgs): strin
   <meta property="og:title" content="${safeTitle}" />
   <meta property="og:description" content="${safeDescription}" />
   <meta property="og:image" content="${safeImage}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="${safeTitle}" />
 
   <meta name="twitter:card" content="summary_large_image" />
@@ -129,4 +155,132 @@ export function renderOgHtml({ baseUrl, id, post, author }: RenderOgArgs): strin
   <script>window.location.replace(${JSON.stringify(appUrl)});</script>
 </body>
 </html>`;
+}
+
+// ── Branded share-card SVG ───────────────────────────────────────────────────
+// Pure SVG builder so it can be unit tested without a rasterizer. The route
+// handler is responsible for handing the resulting SVG to resvg-js and
+// resolving the avatar <image href="..."> if one was emitted.
+
+export interface BuildOgSvgArgs {
+  authorName: string;
+  authorHandle: string;
+  postTypeLabel: string;
+  content: string;
+  avatarHref: string | null;
+}
+
+// Naive word-wrap for SVG <text> rendering. resvg does not lay out text, so we
+// have to break lines manually. The width estimate uses an average Inter glyph
+// advance of ~0.55 * fontSize, which is close enough for our 1200px canvas.
+function wrapText(text: string, maxWidth: number, fontSize: number, maxLines: number): string[] {
+  const charsPerLine = Math.max(1, Math.floor(maxWidth / (fontSize * 0.55)));
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length <= charsPerLine) {
+      current = candidate;
+    } else {
+      if (current) lines.push(current);
+      if (word.length > charsPerLine) {
+        let remaining = word;
+        while (remaining.length > charsPerLine) {
+          lines.push(remaining.slice(0, charsPerLine));
+          remaining = remaining.slice(charsPerLine);
+        }
+        current = remaining;
+      } else {
+        current = word;
+      }
+      if (lines.length >= maxLines) break;
+    }
+  }
+  if (current && lines.length < maxLines) lines.push(current);
+  if (lines.length > maxLines) lines.length = maxLines;
+  if (lines.length === maxLines) {
+    const last = lines[maxLines - 1] ?? "";
+    if (last.length > 4) {
+      lines[maxLines - 1] = last.slice(0, last.length - 1).trimEnd() + "…";
+    }
+  }
+  return lines;
+}
+
+function initialsFor(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return (parts[0]?.[0] ?? "?").toUpperCase();
+  return ((parts[0]?.[0] ?? "") + (parts[parts.length - 1]?.[0] ?? "")).toUpperCase();
+}
+
+export function buildOgSvg(opts: BuildOgSvgArgs): string {
+  const width = 1200;
+  const height = 630;
+  const padding = 80;
+  const innerWidth = width - padding * 2;
+
+  const contentLines = wrapText(opts.content, innerWidth, 56, 5);
+  const initials = initialsFor(opts.authorName);
+
+  const lineY = (i: number) => 310 + i * 74;
+  const contentTspans = contentLines
+    .map((line, i) => `<tspan x="${padding}" y="${lineY(i)}">${escapeXml(line)}</tspan>`)
+    .join("");
+
+  const avatarCx = padding + 40;
+  const avatarCy = height - padding - 24;
+  const avatarR = 40;
+  const avatarBlock = opts.avatarHref
+    ? `<defs>
+    <clipPath id="avatarClip"><circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}"/></clipPath>
+  </defs>
+  <circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR + 3}" fill="url(#accent)"/>
+  <image href="${escapeXml(opts.avatarHref)}" x="${avatarCx - avatarR}" y="${avatarCy - avatarR}" width="${avatarR * 2}" height="${avatarR * 2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#avatarClip)"/>`
+    : `<circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}" fill="url(#accent)"/>
+  <text x="${avatarCx}" y="${avatarCy + 10}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="32" fill="#ffffff">${escapeXml(initials)}</text>`;
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a0a0f"/>
+      <stop offset="100%" stop-color="#1a0a1a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ff3d8b"/>
+      <stop offset="100%" stop-color="#ff6b3d"/>
+    </linearGradient>
+  </defs>
+  <rect width="${width}" height="${height}" fill="url(#bg)"/>
+  <rect x="0" y="0" width="${width}" height="10" fill="url(#accent)"/>
+  <rect x="0" y="${height - 10}" width="${width}" height="10" fill="url(#accent)"/>
+
+  <!-- Brand mark -->
+  <text x="${padding}" y="${padding + 20}" font-family="Inter, sans-serif" font-weight="700" font-size="42" fill="#ffffff" letter-spacing="2">HATCHUP</text>
+  <text x="${padding}" y="${padding + 56}" font-family="Inter, sans-serif" font-weight="400" font-size="20" fill="#a1a1aa">Fitness Pals · Every step hatches a creature</text>
+
+  <!-- Post type tag pill -->
+  <rect x="${padding}" y="200" rx="28" ry="28" width="${Math.min(innerWidth, 80 + opts.postTypeLabel.length * 16)}" height="56" fill="url(#accent)" opacity="0.9"/>
+  <text x="${padding + 32}" y="237" font-family="Inter, sans-serif" font-weight="700" font-size="24" fill="#ffffff" letter-spacing="3">${escapeXml(opts.postTypeLabel)}</text>
+
+  <!-- Post content -->
+  <text font-family="Inter, sans-serif" font-weight="700" font-size="56" fill="#f5f5f7">
+    ${contentTspans}
+  </text>
+
+  <!-- Author block (bottom) -->
+  ${avatarBlock}
+  <text x="${padding + 100}" y="${height - padding - 32}" font-family="Inter, sans-serif" font-weight="700" font-size="28" fill="#ffffff">${escapeXml(opts.authorName)}</text>
+  <text x="${padding + 100}" y="${height - padding - 4}" font-family="Inter, sans-serif" font-weight="400" font-size="22" fill="#a1a1aa">@${escapeXml(opts.authorHandle)}</text>
+</svg>`;
+}
+
+export function postTypeLabel(postType: string): string {
+  return POST_TYPE_LABELS[postType] ?? POST_TYPE_LABELS.general!;
+}
+
+export function ogTruncate(text: string, max: number): string {
+  return truncate(text, max);
 }

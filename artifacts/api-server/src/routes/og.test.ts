@@ -106,15 +106,17 @@ describe("renderOgHtml — image selection", () => {
     assert.match(noLeading, /og:image" content="https:\/\/hatchup\.example\.com\/uploads\/b\.png"/);
   });
 
-  it("falls back to /opengraph.jpg when mediaUrl is missing", () => {
+  it("points at the dynamic /post/:id/og.png when mediaUrl is missing", () => {
     const html = renderOgHtml({
       baseUrl: BASE_URL,
       id: 1,
       post: basicPost({ mediaUrl: null }),
       author: basicAuthor(),
     });
-    assert.match(html, /og:image" content="https:\/\/hatchup\.example\.com\/opengraph\.jpg"/);
-    assert.match(html, /twitter:image" content="https:\/\/hatchup\.example\.com\/opengraph\.jpg"/);
+    assert.match(html, /og:image" content="https:\/\/hatchup\.example\.com\/post\/1\/og\.png"/);
+    assert.match(html, /twitter:image" content="https:\/\/hatchup\.example\.com\/post\/1\/og\.png"/);
+    assert.match(html, /<meta property="og:image:width" content="1200"/);
+    assert.match(html, /<meta property="og:image:height" content="630"/);
   });
 
   it("falls back to /opengraph.jpg when there is no post (unknown id)", () => {
