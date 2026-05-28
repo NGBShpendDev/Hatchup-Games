@@ -44,18 +44,42 @@ loads a pre-captured storage state from
 `HATCHUP_STORAGE_STATE`). If the file is missing every test is **skipped
 with a clear reason** rather than silently snapshotting a sign-in page.
 
-To capture the storage state locally:
+To capture the storage state automatically (no human in the loop):
 
 ```bash
-pnpm --filter @workspace/visual-tests exec playwright codegen \
-  --save-storage=tests/visual/auth/storageState.json \
-  http://localhost:3000
+# Requires CLERK_SECRET_KEY + DATABASE_URL in your env.
+# The frontend (@workspace/hatchup) must be running on
+# http://localhost:3000 (or set HATCHUP_BASE_URL).
+pnpm --filter @workspace/visual-tests run capture-auth
 ```
 
-Sign in once in the launched browser, close it, and commit the
-generated `storageState.json` (or wire it into CI as a secret-mounted
-file). The file is git-ignored by default — opt in by force-adding it
-or by storing it as a CI secret.
+What the script does:
+
+1. Ensures a dedicated Clerk test user exists
+   (default email: `visual-tests+clerk_test@hatchup.test`,
+   username: `visual_tester`). The `+clerk_test` suffix tells Clerk
+   to treat it as a test user in dev instances.
+2. Upserts a matching `players` row and a starter hatchling so
+   `/hatchlings` and the rest of the snapshot pages render with real
+   content instead of an empty state.
+3. Mints a one-shot Clerk sign-in token via the backend API and
+   drives a headless Chromium through `/sign-in?__clerk_ticket=…`
+   to obtain the authenticated cookies.
+4. Writes the browser storage state to
+   `tests/visual/auth/storageState.json`.
+
+The output file is git-ignored. For CI, run the same `capture-auth`
+script as a job step (with `CLERK_SECRET_KEY`, `DATABASE_URL`, and a
+running frontend) before `pnpm --filter @workspace/visual-tests run
+test`, or upload the generated `storageState.json` once as a
+secret-mounted file and point `HATCHUP_STORAGE_STATE` at it.
+
+Override the defaults with any of these env vars:
+
+- `HATCHUP_BASE_URL` — defaults to `http://localhost:3000`
+- `HATCHUP_STORAGE_STATE` — output path
+- `HATCHUP_TEST_EMAIL` / `HATCHUP_TEST_USERNAME` /
+  `HATCHUP_TEST_DISPLAY_NAME` — identity of the test account
 
 ## CI
 

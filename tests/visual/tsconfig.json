@@ -8,5 +8,5 @@
     "noEmit": true,
     "allowImportingTsExtensions": false
   },
-  "include": ["playwright.config.ts", "tests/**/*.ts"]
+  "include": ["playwright.config.ts", "tests/**/*.ts", "scripts/**/*.ts"]
 }
