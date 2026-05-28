@@ -17,6 +17,9 @@ import { useToast } from "@/hooks/use-toast";
 import { XpBar } from "@/components/xp-bar";
 import { SubscriptionChip } from "@/components/subscription-chip";
 import { LevelUpOverlay } from "@/components/level-up-overlay";
+import { ArtifactUnlockOverlay, type UnlockedArtifact } from "@/components/artifact-unlock-overlay";
+
+const OVERLAY_RARITIES = new Set(["Legendary", "Mythic", "Ancient", "Celestial"]);
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -94,6 +97,7 @@ export default function Home() {
   const [distanceMiles, setDistanceMiles] = useState("");
   const [levelUpShow, setLevelUpShow] = useState(false);
   const [levelUpData, setLevelUpData] = useState<{ level: number; newBadges: any[] }>({ level: 1, newBadges: [] });
+  const [artifactQueue, setArtifactQueue] = useState<UnlockedArtifact[]>([]);
   const [xpPopups, setXpPopups] = useState<{ id: number; amount: number }[]>([]);
 
   const spawnXpPopup = (amount: number) => {
@@ -125,13 +129,22 @@ export default function Home() {
           setDistanceMiles("");
 
           const prResult = (res as any).prResult;
-          const newArtifacts: Array<{ id: number; name: string; rarity: string }> = (res as any).newArtifacts ?? [];
+          const newArtifacts: UnlockedArtifact[] = (res as any).newArtifacts ?? [];
+          const epicUnlocks = newArtifacts.filter(a => OVERLAY_RARITIES.has(a.rarity));
+          const minorUnlocks = newArtifacts.filter(a => !OVERLAY_RARITIES.has(a.rarity));
+
+          if (epicUnlocks.length > 0) {
+            setArtifactQueue(epicUnlocks);
+          }
+
+          if (minorUnlocks.length > 0) {
+            for (const artifact of minorUnlocks) {
+              toast({ title: `✨ Artifact Unlocked!`, description: `${artifact.name} (${artifact.rarity}) — visit your Museum to equip it.` });
+            }
+          }
 
           if (newArtifacts.length > 0) {
-            for (const artifact of newArtifacts) {
-              const rarityEmoji = artifact.rarity === "Mythic" ? "🔴" : artifact.rarity === "Ancient" ? "🟠" : artifact.rarity === "Celestial" ? "🌟" : artifact.rarity === "Legendary" ? "🟡" : "✨";
-              toast({ title: `${rarityEmoji} Artifact Unlocked!`, description: `${artifact.name} (${artifact.rarity}) — visit your Museum to equip it.` });
-            }
+            // already handled above — skip generic toast paths
           } else if (prResult?.isNew) {
             const paceDesc = prResult.metric === "pace_seconds_per_mile"
               ? (() => { const s = prResult.value; return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")} /mi pace`; })()
@@ -191,6 +204,11 @@ export default function Home() {
         level={levelUpData.level}
         newBadges={levelUpData.newBadges}
         onDismiss={() => setLevelUpShow(false)}
+      />
+
+      <ArtifactUnlockOverlay
+        queue={artifactQueue}
+        onDismissAll={() => setArtifactQueue([])}
       />
 
       {/* Floating XP popups */}

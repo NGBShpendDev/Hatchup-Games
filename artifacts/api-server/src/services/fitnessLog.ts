@@ -70,7 +70,7 @@ export type LogActivityResult = {
   activity: typeof fitnessActivitiesTable.$inferSelect | null;
   newBadges?: BadgeDefinition[];
   prResult?: PrResult;
-  newArtifacts?: Array<{ id: number; name: string; rarity: string }>;
+  newArtifacts?: Array<{ id: number; name: string; rarity: string; lore: string; imageSlug: string }>;
 };
 
 /** Upsert a personal record. Returns whether it is a new/improved PR. */
@@ -345,6 +345,6 @@ export async function logFitnessActivity(
     activity: insertedRows[0]!,
     newBadges,
     prResult,
-    newArtifacts: newArtifacts.map(a => ({ id: a.id, name: a.name, rarity: a.rarity })),
+    newArtifacts: newArtifacts.map(a => ({ id: a.id, name: a.name, rarity: a.rarity, lore: a.lore, imageSlug: a.imageSlug })),
   };
 }
