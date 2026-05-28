@@ -187,8 +187,12 @@ router.post("/eggs/:id/hatch", requireAuth, attachPlayer, requirePlayerOwnership
   const config = EGG_TYPE_CONFIG[egg.eggType] ?? EGG_TYPE_CONFIG["balanced"];
 
   const rarityRoll = Math.random();
-  const rarity = egg.rarity === "Legendary" ? "Legendary"
+  const rarity = egg.rarity === "Celestial" ? "Celestial"
+    : egg.rarity === "Ancient" ? "Ancient"
+    : egg.rarity === "Legendary" ? "Legendary"
     : egg.eggType === "legendary" ? "Legendary"
+    : rarityRoll < 0.001 ? "Celestial"
+    : rarityRoll < 0.006 ? "Ancient"
     : rarityRoll < 0.02 ? "Mythic"
     : rarityRoll < 0.08 ? "Legendary"
     : rarityRoll < 0.20 ? "Epic"
@@ -266,7 +270,9 @@ router.post("/eggs/incubate", requireAuth, attachPlayer, requirePlayerOwnership,
 
   const rarityOverride = body.data.rarity;
   const rarity = rarityOverride ?? (Math.random() < 0.05 ? "Epic" : Math.random() < 0.20 ? "Rare" : "Common");
-  const stepsRequired = rarity === "Legendary" ? 50000
+  const stepsRequired = rarity === "Celestial" ? 100000
+    : rarity === "Ancient" ? 75000
+    : rarity === "Legendary" ? 50000
     : rarity === "Epic" ? 20000
     : config.stepsRequired;
 

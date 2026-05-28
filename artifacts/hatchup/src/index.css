@@ -136,3 +136,29 @@
 .artifact-glow-mythic    { animation: artifact-pulse-mythic 1.8s ease-in-out infinite; }
 .artifact-glow-ancient   { animation: artifact-pulse-ancient 1.6s ease-in-out infinite; }
 .artifact-glow-celestial { animation: artifact-pulse-celestial 1.4s ease-in-out infinite; }
+
+/* ── Hatchling rarity aura rings ─────────────────────────────────────────── */
+@keyframes pal-aura-legendary {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(234,179,8,0.5), 0 0 18px rgba(234,179,8,0.3); }
+  50%       { box-shadow: 0 0 0 3px rgba(234,179,8,0.9), 0 0 32px rgba(234,179,8,0.6); }
+}
+@keyframes pal-aura-mythic {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(236,72,153,0.55), 0 0 20px rgba(236,72,153,0.35); }
+  50%       { box-shadow: 0 0 0 3px rgba(236,72,153,0.95), 0 0 36px rgba(236,72,153,0.65); }
+}
+@keyframes pal-aura-ancient {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(20,184,166,0.6), 0 0 22px rgba(20,184,166,0.35), inset 0 0 12px rgba(20,184,166,0.08); }
+  50%       { box-shadow: 0 0 0 4px rgba(20,184,166,1), 0 0 40px rgba(20,184,166,0.7), inset 0 0 18px rgba(20,184,166,0.15); }
+}
+@keyframes pal-aura-celestial {
+  0%   { box-shadow: 0 0 0 2px rgba(34,211,238,0.7), 0 0 24px rgba(34,211,238,0.45); }
+  25%  { box-shadow: 0 0 0 3px rgba(167,139,250,0.8), 0 0 32px rgba(167,139,250,0.5); }
+  50%  { box-shadow: 0 0 0 4px rgba(244,114,182,0.9), 0 0 40px rgba(244,114,182,0.55); }
+  75%  { box-shadow: 0 0 0 3px rgba(52,211,153,0.8), 0 0 32px rgba(52,211,153,0.5); }
+  100% { box-shadow: 0 0 0 2px rgba(34,211,238,0.7), 0 0 24px rgba(34,211,238,0.45); }
+}
+
+.pal-aura-legendary { animation: pal-aura-legendary 2s ease-in-out infinite; }
+.pal-aura-mythic    { animation: pal-aura-mythic 1.8s ease-in-out infinite; }
+.pal-aura-ancient   { animation: pal-aura-ancient 1.5s ease-in-out infinite; }
+.pal-aura-celestial { animation: pal-aura-celestial 2.5s linear infinite; }

@@ -430,7 +430,18 @@ export default function HatchlingDetail() {
               <div className="flex gap-2 items-center flex-wrap">
                 <GlowBadge tone="violet">{hatchling.species}</GlowBadge>
                 <GlowBadge tone="primary">Level {hatchling.level}</GlowBadge>
-                <GlowBadge tone="cyan">{hatchling.rarity ?? "Common"}</GlowBadge>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-black border uppercase tracking-wider ${
+                  (() => {
+                    const r = (hatchling.rarity ?? "Common").toLowerCase();
+                    return r === "celestial" ? "border-cyan-400 text-cyan-300 bg-cyan-400/10"
+                      : r === "ancient" ? "border-teal-400 text-teal-300 bg-teal-400/10"
+                      : r === "mythic" ? "border-pink-500 text-pink-400 bg-pink-500/10"
+                      : r === "legendary" ? "border-yellow-500 text-yellow-400 bg-yellow-500/10"
+                      : r === "epic" ? "border-purple-500 text-purple-400 bg-purple-500/10"
+                      : r === "rare" ? "border-blue-500 text-blue-400 bg-blue-500/10"
+                      : "border-gray-500 text-gray-400 bg-gray-500/10";
+                  })()
+                }`}>{hatchling.rarity ?? "Common"}</span>
                 {isActivePartner && (
                   <GlowBadge tone="yellow" className="text-[11px]">
                     <Star className="w-3 h-3 fill-yellow-300" /> Active Partner
