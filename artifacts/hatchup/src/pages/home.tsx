@@ -129,7 +129,7 @@ export default function Home() {
     query: { queryKey: getGetPlayerDashboardQueryKey(pid), enabled: !!playerId }
   });
 
-  const { data: worldNotifs } = useQuery<Array<{ id: number; playerUsername: string; artifactName: string; rarity: string; challengeId: number | null; createdAt: string }>>({
+  const { data: worldNotifs } = useQuery<Array<{ id: number; playerId: number; playerUsername: string; artifactId: number; artifactName: string; rarity: string; challengeId: number | null; createdAt: string }>>({
     queryKey: ["artifact-world-notifications"],
     queryFn: () => fetch(`${BASE}/api/artifacts/world-notifications?limit=5`, { credentials: "include" }).then(r => r.json()),
     refetchInterval: 60_000,
@@ -1108,8 +1108,16 @@ export default function Home() {
                       ? "🟠"
                       : "🔴";
                 const verb = isChampion ? "won the tournament:" : "unlocked";
-                const subLabel = isChampion ? "Tournament Champion · Tap for recap" : `${notif.rarity} Artifact`;
-                const href = isChampion && notif.challengeId != null ? `/challenges/${notif.challengeId}` : null;
+                const href = isChampion && notif.challengeId != null
+                  ? `/challenges/${notif.challengeId}`
+                  : !isChampion && notif.playerId != null
+                    ? `/players/${notif.playerId}`
+                    : null;
+                const subLabel = isChampion
+                  ? "Tournament Champion · Tap for recap"
+                  : href
+                    ? `${notif.rarity} Artifact · Tap to view player`
+                    : `${notif.rarity} Artifact`;
                 const inner = (
                   <motion.div
                     initial={{ opacity: 0, x: -10 }}

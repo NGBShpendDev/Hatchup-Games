@@ -1104,7 +1104,9 @@ export const GetArtifactWorldNotificationsQueryParams = zod.object({
 
 export const GetArtifactWorldNotificationsResponseItem = zod.object({
   "id": zod.number(),
+  "playerId": zod.number(),
   "playerUsername": zod.string(),
+  "artifactId": zod.number(),
   "artifactName": zod.string(),
   "rarity": zod.string(),
   "challengeId": zod.number().nullish(),

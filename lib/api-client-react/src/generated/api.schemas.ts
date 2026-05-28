@@ -962,7 +962,9 @@ export interface FitnessBar {
 
 export interface ArtifactWorldNotification {
   id: number;
+  playerId: number;
   playerUsername: string;
+  artifactId: number;
   artifactName: string;
   rarity: string;
   challengeId?: number | null;

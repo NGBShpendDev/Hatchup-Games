@@ -5724,10 +5724,12 @@ components:
 
     ArtifactWorldNotification:
       type: object
-      required: [id, playerUsername, artifactName, rarity, createdAt]
+      required: [id, playerId, playerUsername, artifactId, artifactName, rarity, createdAt]
       properties:
         id:             { type: integer }
+        playerId:       { type: integer }
         playerUsername: { type: string }
+        artifactId:     { type: integer }
         artifactName:   { type: string }
         rarity:         { type: string }
         challengeId:    { type: integer, nullable: true }

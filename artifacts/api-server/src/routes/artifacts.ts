@@ -290,7 +290,9 @@ router.get("/artifacts/world-notifications", requireAuth, async (req, res) => {
   const notifications = await getRecentWorldNotifications(isNaN(limit) ? 10 : limit);
   res.json(notifications.map(n => ({
     id: n.id,
+    playerId: n.playerId,
     playerUsername: n.playerUsername,
+    artifactId: n.artifactId,
     artifactName: n.artifactName,
     rarity: n.rarity,
     challengeId: n.challengeId,
