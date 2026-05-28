@@ -5,11 +5,13 @@ import {
   Inter_700Bold,
   useFonts,
 } from "@expo-google-fonts/inter";
-import { setBaseUrl } from "@workspace/api-client-react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { ClerkProvider, useAuth } from "@clerk/clerk-expo";
+import { setBaseUrl, setAuthTokenGetter, type AuthTokenGetter } from "@workspace/api-client-react";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { ActivityIndicator, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -22,25 +24,75 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
-function RootLayoutNav() {
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+
+const SCREENS: Array<{ name: string }> = [
+  { name: "sign-in" },
+  { name: "(tabs)" },
+  { name: "hatchling/[id]" },
+  { name: "evolutions" },
+  { name: "leaderboard" },
+  { name: "events" },
+  { name: "clubs" },
+  { name: "feed" },
+  { name: "coach" },
+  { name: "fitness" },
+  { name: "my-pal" },
+  { name: "training" },
+  { name: "nutrition" },
+  { name: "nearby" },
+  { name: "subscription" },
+  { name: "notifications" },
+  { name: "settings" },
+];
+
+function AuthedStack() {
+  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+  const qc = useQueryClient();
+
+  // Set the token getter synchronously before the Stack renders any screen,
+  // so the first React Query fetch already has auth.
+  if (isLoaded && isSignedIn) {
+    setAuthTokenGetter(getToken as AuthTokenGetter);
+  } else if (isLoaded && !isSignedIn) {
+    setAuthTokenGetter(null);
+  }
+
+  // Clear cached data when sign-in status changes.
+  useEffect(() => {
+    qc.clear();
+  }, [isSignedIn]);
+
+  // Redirect after auth state settles.
+  useEffect(() => {
+    if (!isLoaded) return;
+    const onSignInScreen = segments[0] === "sign-in";
+    if (!isSignedIn && !onSignInScreen) {
+      router.replace("/sign-in" as any);
+    } else if (isSignedIn && onSignInScreen) {
+      router.replace("/" as any);
+    }
+  }, [isLoaded, isSignedIn, segments]);
+
+  // While Clerk is loading, show a splash-style indicator.
+  // This prevents the Stack from mounting (and firing queries) too early.
+  if (!isLoaded) {
+    return (
+      <View
+        style={{ flex: 1, backgroundColor: "#080912", justifyContent: "center", alignItems: "center" }}
+      >
+        <ActivityIndicator color="#ee2b8c" size="large" />
+      </View>
+    );
+  }
+
   return (
     <Stack screenOptions={{ headerShown: false, headerBackTitle: "Back" }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="hatchling/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="evolutions" options={{ headerShown: false }} />
-      <Stack.Screen name="leaderboard" options={{ headerShown: false }} />
-      <Stack.Screen name="events" options={{ headerShown: false }} />
-      <Stack.Screen name="clubs" options={{ headerShown: false }} />
-      <Stack.Screen name="feed" options={{ headerShown: false }} />
-      <Stack.Screen name="coach" options={{ headerShown: false }} />
-      <Stack.Screen name="fitness" options={{ headerShown: false }} />
-      <Stack.Screen name="my-pal" options={{ headerShown: false }} />
-      <Stack.Screen name="training" options={{ headerShown: false }} />
-      <Stack.Screen name="nutrition" options={{ headerShown: false }} />
-      <Stack.Screen name="nearby" options={{ headerShown: false }} />
-      <Stack.Screen name="subscription" options={{ headerShown: false }} />
-      <Stack.Screen name="notifications" options={{ headerShown: false }} />
-      <Stack.Screen name="settings" options={{ headerShown: false }} />
+      {SCREENS.map((s) => (
+        <Stack.Screen key={s.name} name={s.name} options={{ headerShown: false }} />
+      ))}
     </Stack>
   );
 }
@@ -64,13 +116,15 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <GestureHandlerRootView>
-            <KeyboardProvider>
-              <RootLayoutNav />
-            </KeyboardProvider>
-          </GestureHandlerRootView>
-        </QueryClientProvider>
+        <ClerkProvider publishableKey={publishableKey}>
+          <QueryClientProvider client={queryClient}>
+            <GestureHandlerRootView>
+              <KeyboardProvider>
+                <AuthedStack />
+              </KeyboardProvider>
+            </GestureHandlerRootView>
+          </QueryClientProvider>
+        </ClerkProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );
