@@ -6945,7 +6945,7 @@ export const getGetPostViewSeriesUrl = (id: number,
 }
 
 /**
- * @summary Hourly view counts for the last 24h (creator-only)
+ * @summary View counts bucketed over a trailing window (creator-only)
  */
 export const getPostViewSeries = async (id: number,
     params: GetPostViewSeriesParams, options?: RequestInit): Promise<PostViewSeries> => {
@@ -6995,7 +6995,7 @@ export type GetPostViewSeriesQueryError = ErrorType<void>
 
 
 /**
- * @summary Hourly view counts for the last 24h (creator-only)
+ * @summary View counts bucketed over a trailing window (creator-only)
  */
 
 export function useGetPostViewSeries<TData = Awaited<ReturnType<typeof getPostViewSeries>>, TError = ErrorType<void>>(

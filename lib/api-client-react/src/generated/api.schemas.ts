@@ -1439,17 +1439,33 @@ export interface ViewResult {
   counted: boolean;
 }
 
+/**
+ * Which trend window was returned.
+ */
+export type PostViewSeriesWindow = typeof PostViewSeriesWindow[keyof typeof PostViewSeriesWindow];
+
+
+export const PostViewSeriesWindow = {
+  day: 'day',
+  week: 'week',
+} as const;
+
 export type PostViewSeriesBucketsItem = {
-  /** ISO timestamp at the start of the hour (UTC) */
+  /** ISO timestamp at the start of the bucket (UTC). For `week` */
   hour: string;
   views: number;
 };
 
 export interface PostViewSeries {
+  /** Which trend window was returned. */
+  window: PostViewSeriesWindow;
+  /** Total hours covered by the series (24 for day */
   windowHours: number;
+  /** Hours per bucket (1 for day */
+  bucketHours: number;
   /** Total views across the returned buckets */
   total: number;
-  /** One bucket per hour, oldest first. Always windowHours entries (zero-filled). */
+  /** Buckets ordered oldest first, zero-filled. 24 entries for `day`, 7 for `week`. */
   buckets: PostViewSeriesBucketsItem[];
 }
 
@@ -2848,7 +2864,21 @@ export type GetPostViewSeriesParams = {
  * The viewing player — must be the post owner.
  */
 playerId: number;
+/**
+ * Trend window. `day` returns 24 hourly buckets (default).
+`week` returns 7 daily buckets so creators can see slower-burn momentum.
+
+ */
+window?: GetPostViewSeriesWindow;
 };
+
+export type GetPostViewSeriesWindow = typeof GetPostViewSeriesWindow[keyof typeof GetPostViewSeriesWindow];
+
+
+export const GetPostViewSeriesWindow = {
+  day: 'day',
+  week: 'week',
+} as const;
 
 export type DeletePostCommentParams = {
 playerId: number;

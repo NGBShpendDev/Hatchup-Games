@@ -62,8 +62,13 @@ function PostBody({ postId, viewerId }: { postId: number; viewerId: number | nul
               });
               if (viewerId != null) {
                 qc.invalidateQueries({ queryKey: getGetSocialFeedQueryKey({ playerId: viewerId }) });
+                // Invalidate both window variants so the sparkline refreshes
+                // regardless of which one the creator is currently viewing.
                 qc.invalidateQueries({
-                  queryKey: getGetPostViewSeriesQueryKey(postId, { playerId: viewerId }),
+                  queryKey: getGetPostViewSeriesQueryKey(postId, { playerId: viewerId, window: "day" }),
+                });
+                qc.invalidateQueries({
+                  queryKey: getGetPostViewSeriesQueryKey(postId, { playerId: viewerId, window: "week" }),
                 });
               }
             }

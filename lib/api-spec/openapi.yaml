@@ -1944,7 +1944,7 @@ paths:
     get:
       operationId: getPostViewSeries
       tags: [social]
-      summary: Hourly view counts for the last 24h (creator-only)
+      summary: View counts bucketed over a trailing window (creator-only)
       parameters:
         - name: id
           in: path
@@ -1957,6 +1957,16 @@ paths:
           description: The viewing player — must be the post owner.
           schema:
             type: integer
+        - name: window
+          in: query
+          required: false
+          description: |
+            Trend window. `day` returns 24 hourly buckets (default).
+            `week` returns 7 daily buckets so creators can see slower-burn momentum.
+          schema:
+            type: string
+            enum: [day, week]
+            default: day
       responses:
         "200":
           description: Hourly view series
@@ -5538,18 +5548,23 @@ components:
 
     PostViewSeries:
       type: object
-      required: [windowHours, buckets, total]
+      required: [window, windowHours, bucketHours, buckets, total]
       properties:
-        windowHours: { type: integer }
+        window:
+          type: string
+          enum: [day, week]
+          description: Which trend window was returned.
+        windowHours: { type: integer, description: Total hours covered by the series (24 for day, 168 for week). }
+        bucketHours: { type: integer, description: Hours per bucket (1 for day, 24 for week). }
         total:       { type: integer, description: Total views across the returned buckets }
         buckets:
           type: array
-          description: One bucket per hour, oldest first. Always windowHours entries (zero-filled).
+          description: Buckets ordered oldest first, zero-filled. 24 entries for `day`, 7 for `week`.
           items:
             type: object
             required: [hour, views]
             properties:
-              hour:  { type: string, description: ISO timestamp at the start of the hour (UTC) }
+              hour:  { type: string, description: ISO timestamp at the start of the bucket (UTC). For `week`, this is the start of the day. }
               views: { type: integer }
 
     PostInsight:

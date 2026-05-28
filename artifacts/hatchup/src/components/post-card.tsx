@@ -357,12 +357,27 @@ export function CommentRow({
   );
 }
 
-function ViewSparkline({ postId, playerId }: { postId: number; playerId: number }) {
-  const { data } = useGetPostViewSeries(postId, { playerId }, {
+function ViewSparkline({
+  postId,
+  playerId,
+  postCreatedAt,
+}: {
+  postId: number;
+  playerId: number;
+  postCreatedAt?: string | null;
+}) {
+  // Posts older than 24 hours auto-pick the 7-day window so creators of
+  // slower-burn content (evolutions, transformations, tournament wins) can
+  // see momentum that builds over days. Users can also tap to flip windows.
+  const ageMs = postCreatedAt ? Date.now() - new Date(postCreatedAt).getTime() : 0;
+  const autoWindow: "day" | "week" = ageMs > 24 * 3600_000 ? "week" : "day";
+  const [window, setWindow] = useState<"day" | "week">(autoWindow);
+
+  const { data } = useGetPostViewSeries(postId, { playerId, window }, {
     query: {
       staleTime: 60_000,
       refetchOnWindowFocus: false,
-      queryKey: getGetPostViewSeriesQueryKey(postId, { playerId }),
+      queryKey: getGetPostViewSeriesQueryKey(postId, { playerId, window }),
     },
   });
   const buckets = data?.buckets ?? [];
@@ -379,26 +394,40 @@ function ViewSparkline({ postId, playerId }: { postId: number; playerId: number 
   });
   const line = pts.join(" ");
   const area = `0,${height} ${line} ${width},${height}`;
+  const windowLabel = window === "week" ? "last 7 days" : "last 24 hours";
+  const toggleLabel = window === "week" ? "last 24 hours" : "last 7 days";
 
   return (
-    <svg
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      className="text-primary/80"
-      aria-label={`${data?.total ?? 0} views in the last 24 hours`}
-      data-testid={`sparkline-views-${postId}`}
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        setWindow(w => (w === "week" ? "day" : "week"));
+      }}
+      className="inline-flex items-center cursor-pointer bg-transparent border-0 p-0 m-0 leading-none"
+      title={`${data?.total ?? 0} views in the ${windowLabel} — tap for ${toggleLabel}`}
+      aria-label={`${data?.total ?? 0} views in the ${windowLabel}. Tap to switch to ${toggleLabel}.`}
+      data-testid={`button-sparkline-views-${postId}`}
+      data-window={window}
     >
-      <polygon points={area} fill="currentColor" opacity="0.18" />
-      <polyline
-        points={line}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.25"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-    </svg>
+      <svg
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        className="text-primary/80"
+        data-testid={`sparkline-views-${postId}`}
+      >
+        <polygon points={area} fill="currentColor" opacity="0.18" />
+        <polyline
+          points={line}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.25"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      </svg>
+    </button>
   );
 }
 
@@ -777,7 +806,13 @@ export function PostCard({
                 >
                   <Eye className="w-3.5 h-3.5" />
                   <span>{formatted}</span>
-                  {isOwn && views > 0 && <ViewSparkline postId={post.id} playerId={playerId!} />}
+                  {isOwn && views > 0 && (
+                    <ViewSparkline
+                      postId={post.id}
+                      playerId={playerId!}
+                      postCreatedAt={post.createdAt}
+                    />
+                  )}
                 </div>
               );
             })()}

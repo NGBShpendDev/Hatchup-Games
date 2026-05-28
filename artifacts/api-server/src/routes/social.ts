@@ -538,9 +538,14 @@ router.post("/social/posts/:id/view", postViewLimiter, async (req, res) => {
 });
 
 // ── GET /social/posts/:id/view-series ───────────────────────────────────────
-// Returns the last 24 hourly view buckets so the creator can render a small
-// trend chart next to their post. Owner-only (the chip is meant as an ambient
-// reward for the author, not a public stat).
+// Returns view buckets so the creator can render a small trend chart next to
+// their post. Owner-only (the chip is meant as an ambient reward for the
+// author, not a public stat).
+//
+// `?window=day` (default) → 24 hourly buckets covering the last 24h.
+// `?window=week`          → 7 daily buckets covering the last 7 days, useful
+//                           for slower-burn posts (evolutions, tournaments)
+//                           that pick up views over several days.
 
 router.get("/social/posts/:id/view-series", requireAuth, attachPlayer, async (req, res) => {
   const id = Number(req.params.id);
@@ -551,37 +556,49 @@ router.get("/social/posts/:id/view-series", requireAuth, attachPlayer, async (re
   if (!post || post.deletedAt != null) { res.status(404).json({ error: "Post not found" }); return; }
   if (post.playerId !== viewerId) { res.status(403).json({ error: "Not your post" }); return; }
 
-  const windowHours = 24;
+  const window = req.query.window === "week" ? "week" : "day";
+  const bucketHours = window === "week" ? 24 : 1;
+  const bucketCount = window === "week" ? 7 : 24;
+  const windowHours = bucketHours * bucketCount;
+  const bucketMs = bucketHours * 3600_000;
   const now = Date.now();
-  // Bucket start = top of the current hour, so buckets align cleanly.
-  const currentHourStart = new Date(now - (now % 3600_000));
-  const cutoff = new Date(currentHourStart.getTime() - (windowHours - 1) * 3600_000);
+  // Align the current bucket to the top of the hour/day so buckets line up
+  // with `date_trunc` output in Postgres.
+  const currentBucketStart = new Date(now - (now % bucketMs));
+  const cutoff = new Date(currentBucketStart.getTime() - (bucketCount - 1) * bucketMs);
+
+  // `date_trunc`'s unit must be a literal — using a bound parameter (`$1`)
+  // makes Postgres complain, so we splice it as a SQL fragment.
+  const truncExpr =
+    window === "week"
+      ? sql`date_trunc('day', ${postViewsTable.createdAt})`
+      : sql`date_trunc('hour', ${postViewsTable.createdAt})`;
 
   const rows = await db
     .select({
-      hour: sql<Date>`date_trunc('hour', ${postViewsTable.createdAt})`,
+      bucket: sql<Date>`${truncExpr}`,
       views: sql<number>`count(*)::int`,
     })
     .from(postViewsTable)
     .where(and(eq(postViewsTable.postId, id), gte(postViewsTable.createdAt, cutoff)))
-    .groupBy(sql`date_trunc('hour', ${postViewsTable.createdAt})`);
+    .groupBy(truncExpr);
 
-  const byHour = new Map<number, number>();
+  const byBucket = new Map<number, number>();
   for (const r of rows) {
-    const t = r.hour instanceof Date ? r.hour.getTime() : new Date(r.hour as unknown as string).getTime();
-    byHour.set(t, r.views);
+    const t = r.bucket instanceof Date ? r.bucket.getTime() : new Date(r.bucket as unknown as string).getTime();
+    byBucket.set(t, r.views);
   }
 
   const buckets: { hour: string; views: number }[] = [];
   let total = 0;
-  for (let i = 0; i < windowHours; i++) {
-    const t = cutoff.getTime() + i * 3600_000;
-    const views = byHour.get(t) ?? 0;
+  for (let i = 0; i < bucketCount; i++) {
+    const t = cutoff.getTime() + i * bucketMs;
+    const views = byBucket.get(t) ?? 0;
     total += views;
     buckets.push({ hour: new Date(t).toISOString(), views });
   }
 
-  res.json({ windowHours, total, buckets });
+  res.json({ window, windowHours, bucketHours, total, buckets });
 });
 
 // ── DELETE /social/posts/:id ────────────────────────────────────────────────
