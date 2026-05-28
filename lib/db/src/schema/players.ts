@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -34,6 +34,13 @@ export const playersTable = pgTable("players", {
   // Daily reward
   lastRewardClaimedAt: timestamp("last_reward_claimed_at", { withTimezone: true }),
   dailyRewardStreak: integer("daily_reward_streak").notNull().default(0),
+  // Safety & privacy
+  emergencyContactName: text("emergency_contact_name"),
+  emergencyContactPhone: text("emergency_contact_phone"),
+  locationVisibility: text("location_visibility").notNull().default("city"),
+  requireWorkoutApproval: boolean("require_workout_approval").notNull().default(false),
+  isAdmin: boolean("is_admin").notNull().default(false),
+  isVerified: boolean("is_verified").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

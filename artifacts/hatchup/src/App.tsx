@@ -21,6 +21,8 @@ import Race from "@/pages/race";
 import HealthSettings from "@/pages/health-settings";
 import NotFound from "@/pages/not-found";
 import Rewards from "@/pages/rewards";
+import SettingsPrivacy from "@/pages/settings-privacy";
+import AdminReports from "@/pages/admin-reports";
 
 const queryClient = new QueryClient();
 
@@ -216,6 +218,8 @@ function AppRoutes() {
         <Route path="/hatchlings/:id" component={HatchlingDetail} />
         <Route path="/compete/race" component={Race} />
         <Route path="/rewards" component={Rewards} />
+        <Route path="/settings/privacy" component={SettingsPrivacy} />
+        <Route path="/admin/reports" component={AdminReports} />
         <Route component={NotFound} />
       </Switch>
     </>

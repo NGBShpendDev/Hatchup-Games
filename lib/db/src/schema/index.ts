@@ -11,3 +11,4 @@ export * from "./training";
 export * from "./health";
 export * from "./groups";
 export * from "./badges";
+export * from "./safety";

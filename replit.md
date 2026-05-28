@@ -57,6 +57,35 @@ A creature-hatching game universe where players hatch and evolve creatures calle
 
 _Populate as you build — explicit user instructions worth remembering across sessions._
 
+## Safety Master Prompt
+
+HatchUp is a family-friendly social fitness platform. All agents must build with these safety-first constraints:
+
+### Core Safety Rules (non-negotiable)
+1. **Public locations only** — All workout partner meetups, group workouts, and live events must display the message "Meet in public locations only. Use caution when meeting new people." Any UI that facilitates real-world meetups must include a SafetyBanner component.
+2. **Block & Report** — Every user profile card, group member list, and social post must have a three-dot menu with "Report" and "Block" options. Reports queue in `user_reports` table for moderation review.
+3. **Privacy controls** — Users control their location visibility (exact / neighborhood / city / hidden). Default is `city`. Never expose exact location without user consent.
+4. **Workout request approval** — The `requireWorkoutApproval` toggle must be respected server-side before allowing anyone to add a user as a workout partner.
+5. **Emergency contact** — Users can designate an emergency contact (name + phone). This is stored in the players table and surfaced during live events.
+6. **Profile verification** — Opt-in identity verification flow adds a blue checkmark badge (isVerified). No real ID scanning — photo + date stamp only.
+7. **Anti-harassment** — All group chat and social post content runs through a basic profanity/filter check (isFiltered flag on group_messages). Flagged content is hidden with a "Message removed" placeholder.
+8. **Admin moderation** — `/admin/reports` page (isAdmin flag on player) lets admins review, resolve, or dismiss reports.
+
+### Safety Architecture
+- `user_reports` table: reporter_id, reported_user_id, reason, content_type, content_id, status (open/resolved/dismissed)
+- `blocked_users` table: blocker_id, blocked_id (unique pair)
+- Players table safety columns: emergencyContactName, emergencyContactPhone, locationVisibility, requireWorkoutApproval, isAdmin, isVerified
+- Safety components: SafetyBanner, SafetyGuidelinesSheet, ReportBlockMenu
+- Privacy settings page: `/settings/privacy`
+- Admin moderation: `/admin/reports`
+
+### Approved Safety Copy
+- "Meet in public locations only. Use caution when meeting new people."
+- "Always meet workout partners in public places like gyms, parks, or recreation centers."
+- "Report suspicious behavior immediately."
+- "This is a public event. Meet only in the listed public location."
+- "HatchUp is a safe, trusted, and family-friendly community."
+
 ## Gotchas
 
 - Vite `strictPort: true` was removed — it caused the workflow restart tool to fail with DIDNT_OPEN_A_PORT even though the server was running

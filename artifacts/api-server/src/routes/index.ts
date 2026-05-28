@@ -15,6 +15,7 @@ import healthSyncRouter from "./health-sync";
 import groupsRouter from "./groups";
 import badgesRouter from "./badges";
 import rewardsRouter from "./rewards";
+import safetyRouter from "./safety";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(healthSyncRouter);
 router.use(groupsRouter);
 router.use(badgesRouter);
 router.use(rewardsRouter);
+router.use(safetyRouter);
 
 export default router;

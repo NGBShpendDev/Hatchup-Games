@@ -42,7 +42,11 @@ import {
   LogIn,
   Dumbbell,
   Shield,
+  MoreVertical,
 } from "lucide-react";
+import { SafetyBanner } from "@/components/safety-banner";
+import { SafetyGuidelinesSheet } from "@/components/safety-guidelines-sheet";
+import { ReportBlockMenu } from "@/components/report-block-menu";
 
 const GROUP_TYPE_LABELS: Record<string, string> = {
   fitness_party: "Fitness Party",
@@ -260,6 +264,9 @@ function GroupDetail({ groupId, onBack }: { groupId: number; onBack: () => void 
         </div>
       </div>
 
+      {/* Safety Banner */}
+      <SafetyBanner variant="meetup" compact />
+
       {/* Stats Row */}
       <div className="grid grid-cols-3 gap-3">
         <Card className="bg-card border">
@@ -381,6 +388,18 @@ function GroupDetail({ groupId, onBack }: { groupId: number; onBack: () => void 
                     <Heart key={i} className="w-3 h-3 fill-pink-500 text-pink-500" />
                   ))}
                 </div>
+                {member.playerId !== pid && (
+                  <ReportBlockMenu
+                    trigger={
+                      <button className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+                    }
+                    targetPlayerId={member.playerId}
+                    targetName={member.displayName ?? member.username}
+                    contentType="profile"
+                  />
+                )}
               </CardContent>
             </Card>
           ))}
@@ -622,7 +641,16 @@ export default function Groups() {
             <Users className="text-primary w-7 h-7" /> Workout Groups
           </h1>
           <p className="text-muted-foreground font-medium text-sm">Team up, generate energy, and defeat raid bosses together.</p>
-          <div className="flex gap-3 mt-4">
+          <div className="flex items-center gap-2 mt-3">
+            <SafetyGuidelinesSheet
+              trigger={
+                <button className="flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors">
+                  <Shield className="w-3.5 h-3.5" /> Safety Guidelines
+                </button>
+              }
+            />
+          </div>
+          <div className="flex gap-3 mt-3">
             <Button onClick={() => setCreateModalOpen(true)} className="font-bold gap-2 active-elevate flex-1">
               <Plus className="w-4 h-4" /> Create Group
             </Button>
