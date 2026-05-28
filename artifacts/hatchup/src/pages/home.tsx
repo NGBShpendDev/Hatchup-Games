@@ -2,17 +2,28 @@ import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { useGetPlayerDashboard, getGetPlayerDashboardQueryKey, useLogActivity } from "@workspace/api-client-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { motion } from "framer-motion";
+import { Badge } from "@/components/ui/badge";
+import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { Zap, Flame, Trophy, Activity, Footprints, ChevronRight, PlusCircle, Star, Badge, Sparkles } from "lucide-react";
+import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { XpBar } from "@/components/xp-bar";
+import { LevelUpOverlay } from "@/components/level-up-overlay";
+
+const TIER_GLOW: Record<string, string> = {
+  Common:    "shadow-none",
+  Rare:      "shadow-[0_0_10px_rgba(59,130,246,0.6)]",
+  Epic:      "shadow-[0_0_10px_rgba(147,51,234,0.7)]",
+  Legendary: "shadow-[0_0_12px_rgba(234,179,8,0.8)]",
+  Mythic:    "shadow-[0_0_14px_rgba(236,72,153,0.9)]",
+};
 
 export default function Home() {
   const queryClient = useQueryClient();
@@ -25,22 +36,39 @@ export default function Home() {
   });
 
   const logActivity = useLogActivity();
-  
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [activityType, setActivityType] = useState("steps");
   const [activityValue, setActivityValue] = useState("");
+  const [levelUpShow, setLevelUpShow] = useState(false);
+  const [levelUpData, setLevelUpData] = useState<{ level: number; newBadges: any[] }>({ level: 1, newBadges: [] });
+  const [xpPopups, setXpPopups] = useState<{ id: number; amount: number }[]>([]);
+
+  const spawnXpPopup = (amount: number) => {
+    const id = Date.now();
+    setXpPopups(prev => [...prev, { id, amount }]);
+    setTimeout(() => setXpPopups(prev => prev.filter(p => p.id !== id)), 1500);
+  };
 
   const handleLogActivity = () => {
     if (!activityValue || isNaN(Number(activityValue))) return;
-    
+    const prevLevel = (dashboard as any)?.levelProgress?.level ?? 1;
+
     logActivity.mutate(
-      { data: { playerId: pid, type: activityType, value: Number(activityValue), unit: activityType === 'steps' ? 'count' : 'minutes', realm: "strength" } },
+      { data: { playerId: pid, type: activityType, value: Number(activityValue) } },
       {
         onSuccess: (res) => {
-          toast({ title: "Activity Logged!", description: `Earned ${res.xpEarned} XP!` });
+          spawnXpPopup((res as any).xpEarned ?? (res as any).fitnessXpEarned ?? 0);
           setLogModalOpen(false);
           setActivityValue("");
-          queryClient.invalidateQueries({ queryKey: getGetPlayerDashboardQueryKey(pid) });
+          queryClient.invalidateQueries({ queryKey: getGetPlayerDashboardQueryKey(pid) }).then(() => {
+            const newDash = queryClient.getQueryData(getGetPlayerDashboardQueryKey(pid)) as any;
+            const newLevel = newDash?.levelProgress?.level ?? prevLevel;
+            if (newLevel > prevLevel) {
+              setLevelUpData({ level: newLevel, newBadges: [] });
+              setLevelUpShow(true);
+            }
+          });
+          toast({ title: "Activity Logged! 🔥", description: `Keep moving, your Pals are thriving!` });
         }
       }
     );
@@ -63,30 +91,99 @@ export default function Home() {
 
   if (!dashboard) return null;
 
+  const dash = dashboard as any;
+  const levelProgress = dash.levelProgress ?? { level: dash.player.level, xpCurrentLevel: 0, xpForNextLevel: 150, xpPercent: 0 };
+  const prestige = dash.prestige ?? 0;
+  const dailyReward = dash.dailyReward;
+  const recentBadges: any[] = dash.recentBadges ?? [];
+  const badgeCount = dash.badgeCount ?? 0;
+  const streakFreezes = dash.streakFreezes ?? 0;
+
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto space-y-6 pb-12">
+      <LevelUpOverlay
+        show={levelUpShow}
+        level={levelUpData.level}
+        newBadges={levelUpData.newBadges}
+        onDismiss={() => setLevelUpShow(false)}
+      />
+
+      {/* Floating XP popups */}
+      <div className="fixed top-20 right-4 z-50 pointer-events-none">
+        <AnimatePresence>
+          {xpPopups.map(p => (
+            <motion.div
+              key={p.id}
+              initial={{ opacity: 0, y: 0, scale: 0.8 }}
+              animate={{ opacity: 1, y: -60, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="font-black text-yellow-400 text-lg drop-shadow-[0_0_8px_rgba(234,179,8,1)] mb-1"
+            >
+              +{p.amount} XP ⚡
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
+      <div className="max-w-5xl mx-auto space-y-5 pb-12">
         {/* Top Bar */}
         <header className="flex justify-between items-center py-2">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center border-2 border-primary/50 shadow-[0_0_15px_rgba(var(--primary),0.3)]">
-              <span className="font-black text-primary text-xl">L{dashboard.player.level}</span>
+            <div className="relative">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 ${
+                prestige > 0
+                  ? "bg-gradient-to-br from-yellow-500/30 to-pink-500/20 border-yellow-500/70 shadow-[0_0_15px_rgba(234,179,8,0.4)]"
+                  : "bg-primary/20 border-primary/50 shadow-[0_0_12px_rgba(var(--primary),0.3)]"
+              }`}>
+                <span className="font-black text-primary text-lg">L{levelProgress.level}</span>
+              </div>
+              {prestige > 0 && (
+                <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center border-2 border-background">
+                  <span className="text-[8px] font-black text-black">P{prestige}</span>
+                </div>
+              )}
             </div>
             <div>
-              <h1 className="font-black text-xl tracking-tight leading-none">{dashboard.player.displayName || dashboard.player.username}</h1>
-              <div className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1 mt-1">
-                <Trophy className="w-3 h-3 text-yellow-500" /> {dashboard.player.rank}
-              </div>
+              <h1 className="font-black text-xl tracking-tight leading-none">
+                {dashboard.player.displayName || dashboard.player.username}
+              </h1>
+              {dash.title ? (
+                <div className="text-xs font-bold text-yellow-500 uppercase flex items-center gap-1 mt-0.5">
+                  <Star className="w-3 h-3" /> {dash.title}
+                </div>
+              ) : (
+                <div className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1 mt-0.5">
+                  <Trophy className="w-3 h-3 text-yellow-500" /> {dashboard.player.rank}
+                </div>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-2 bg-card/80 backdrop-blur px-3 py-1.5 rounded-full border border-border">
-            <Flame className="w-4 h-4 text-orange-500" />
-            <span className="font-black text-sm">{dashboard.fitness.currentStreak} Day Streak</span>
+
+          <div className="flex items-center gap-2">
+            {streakFreezes > 0 && (
+              <div className="flex items-center gap-1 bg-blue-500/20 border border-blue-500/40 px-2 py-1 rounded-full">
+                <span className="text-sm">❄️</span>
+                <span className="font-black text-xs text-blue-400">{streakFreezes}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 bg-card/80 backdrop-blur px-3 py-1.5 rounded-full border border-border">
+              <Flame className={`w-4 h-4 ${(dashboard as any).fitness?.currentStreak >= 7 ? "text-orange-400" : "text-orange-500/70"}`} />
+              <span className="font-black text-sm">{(dashboard as any).fitness?.currentStreak ?? 0}d</span>
+            </div>
           </div>
         </header>
 
+        {/* XP Bar */}
+        <XpBar
+          level={levelProgress.level}
+          xpPercent={levelProgress.xpPercent}
+          xpCurrentLevel={levelProgress.xpCurrentLevel}
+          xpForNextLevel={levelProgress.xpForNextLevel}
+          prestige={prestige}
+        />
+
         {/* Hero Card */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-gradient-to-br from-primary to-purple-800 rounded-3xl p-6 text-white relative overflow-hidden shadow-2xl neon-glow"
@@ -94,21 +191,47 @@ export default function Home() {
           <div className="absolute top-0 right-0 -mt-10 -mr-10 opacity-20 pointer-events-none">
             <Zap className="w-64 h-64" />
           </div>
-          <div className="relative z-10 flex flex-col h-full justify-between gap-6">
+          <div className="relative z-10 flex flex-col h-full justify-between gap-5">
             <div>
               <h2 className="text-3xl font-black mb-1 drop-shadow-md">Keep Moving!</h2>
               <p className="text-white/80 font-medium text-sm">Your Pals are waiting to evolve.</p>
             </div>
-            
             <div className="space-y-2">
               <div className="flex justify-between text-sm font-bold">
                 <span className="flex items-center gap-1"><Footprints className="w-4 h-4"/> Today's Steps</span>
-                <span>{dashboard.fitness.todaySteps.toLocaleString()} / {dashboard.fitness.dailyStepGoal.toLocaleString()}</span>
+                <span>{(dashboard as any).fitness.todaySteps.toLocaleString()} / {(dashboard as any).fitness.dailyStepGoal.toLocaleString()}</span>
               </div>
-              <Progress value={dashboard.fitness.stepGoalPct} className="h-4 bg-black/20 [&>div]:bg-white" />
+              <Progress value={(dashboard as any).fitness.stepGoalPct} className="h-4 bg-black/20 [&>div]:bg-white" />
             </div>
           </div>
         </motion.div>
+
+        {/* Daily Reward CTA */}
+        {dailyReward && !dailyReward.alreadyClaimed && (
+          <Link href="/rewards">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex items-center gap-4 bg-gradient-to-r from-yellow-600/20 to-amber-500/10 border-2 border-yellow-500/50 rounded-2xl p-4 cursor-pointer active:scale-95 transition-transform shadow-[0_0_20px_rgba(234,179,8,0.15)]"
+            >
+              <motion.div
+                animate={{ scale: [1, 1.1, 1], rotate: [0, -5, 5, 0] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+                className="text-3xl"
+              >
+                🎁
+              </motion.div>
+              <div className="flex-1">
+                <p className="font-black text-sm text-yellow-400">Daily Reward Ready!</p>
+                <p className="text-xs text-muted-foreground font-bold">
+                  +{dailyReward.reward.coins} Coins • +{dailyReward.reward.xp} XP
+                  {dailyReward.reward.bonus === "rare_egg_voucher" && " • 🥚 Rare Egg!"}
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-yellow-500" />
+            </motion.div>
+          </Link>
+        )}
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4">
@@ -119,15 +242,15 @@ export default function Home() {
                   <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
                     <EggIcon className="w-6 h-6" />
                   </div>
-                  {dashboard.eggs.readyCount > 0 && (
+                  {(dashboard as any).eggs?.readyCount > 0 && (
                     <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-[10px] font-black text-white animate-pulse">
-                      {dashboard.eggs.readyCount}
+                      {(dashboard as any).eggs.readyCount}
                     </span>
                   )}
                 </div>
                 <div>
                   <h3 className="font-bold text-sm">Incubator</h3>
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase mt-1">{dashboard.eggs.totalActive} Active Eggs</p>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase mt-1">{(dashboard as any).eggs?.totalActive ?? 0} Active Eggs</p>
                 </div>
               </CardContent>
             </Card>
@@ -154,9 +277,9 @@ export default function Home() {
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-3 gap-2">
                   {['steps', 'running', 'weightlifting', 'yoga', 'cycling'].map(type => (
-                    <Button 
-                      key={type} 
-                      variant={activityType === type ? 'default' : 'outline'} 
+                    <Button
+                      key={type}
+                      variant={activityType === type ? 'default' : 'outline'}
                       onClick={() => setActivityType(type)}
                       className="capitalize font-bold text-xs h-12"
                     >
@@ -166,23 +289,68 @@ export default function Home() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold uppercase text-muted-foreground">Amount ({activityType === 'steps' ? 'count' : 'minutes'})</label>
-                  <Input 
-                    type="number" 
-                    value={activityValue} 
-                    onChange={e => setActivityValue(e.target.value)} 
-                    placeholder="e.g. 5000" 
+                  <Input
+                    type="number"
+                    value={activityValue}
+                    onChange={e => setActivityValue(e.target.value)}
+                    placeholder="e.g. 5000"
                     className="h-14 text-xl font-bold font-mono"
                   />
                 </div>
               </div>
               <DialogFooter>
                 <Button onClick={handleLogActivity} disabled={logActivity.isPending} className="w-full font-black text-lg h-14 active-elevate">
-                  {logActivity.isPending ? "Logging..." : "Log & Earn XP"}
+                  {logActivity.isPending ? "Logging..." : "Log & Earn XP ⚡"}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Badge Showcase */}
+        {recentBadges.length > 0 && (
+          <section>
+            <div className="flex justify-between items-end mb-3">
+              <h2 className="text-lg font-black flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-yellow-500" /> Badges
+                <Badge variant="outline" className="font-black text-xs">{badgeCount}</Badge>
+              </h2>
+              <Link href="/rewards" className="text-xs font-bold text-primary flex items-center hover:underline">
+                View All <ChevronRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-1 no-scrollbar">
+              {recentBadges.map((badge: any) => badge && (
+                <motion.div
+                  key={badge.key ?? badge.badgeKey}
+                  whileHover={{ scale: 1.08 }}
+                  className={`shrink-0 flex flex-col items-center gap-1 bg-card border-2 rounded-2xl p-3 min-w-[72px] ${
+                    TIER_GLOW[badge.tier] ?? ""
+                  }`}
+                >
+                  <span className="text-2xl">{badge.icon}</span>
+                  <span className="text-[9px] font-black text-center leading-tight max-w-[60px]">{badge.name}</span>
+                  <span className={`text-[8px] font-bold px-1 py-0.5 rounded-full ${
+                    badge.tier === "Mythic" ? "bg-pink-500/20 text-pink-400" :
+                    badge.tier === "Legendary" ? "bg-yellow-500/20 text-yellow-400" :
+                    badge.tier === "Epic" ? "bg-purple-500/20 text-purple-400" :
+                    badge.tier === "Rare" ? "bg-blue-500/20 text-blue-400" :
+                    "bg-muted text-muted-foreground"
+                  }`}>{badge.tier}</span>
+                </motion.div>
+              ))}
+              <Link href="/rewards">
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  className="shrink-0 flex flex-col items-center justify-center gap-1 bg-card/50 border-2 border-dashed border-border rounded-2xl p-3 min-w-[72px] h-full cursor-pointer"
+                >
+                  <Gift className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-[9px] font-bold text-muted-foreground text-center">All Rewards</span>
+                </motion.div>
+              </Link>
+            </div>
+          </section>
+        )}
 
         {/* Top Hatchling */}
         <section>
@@ -190,7 +358,7 @@ export default function Home() {
             <h2 className="text-xl font-black flex items-center gap-2"><Star className="w-5 h-5 text-yellow-500" /> Star Pal</h2>
             <Link href="/hatchlings" className="text-xs font-bold text-primary flex items-center hover:underline">View All <ChevronRight className="w-3 h-3" /></Link>
           </div>
-          
+
           {dashboard.topHatchling ? (
             <Link href={`/hatchlings/${dashboard.topHatchling.id}`}>
               <Card className="bg-card border-2 hover:border-primary/30 transition-colors cursor-pointer overflow-hidden group">
@@ -222,27 +390,14 @@ export default function Home() {
             </Card>
           )}
         </section>
-
       </div>
     </Layout>
   );
 }
 
-// Temporary inline EggIcon since lucide-react might not export Egg
 function EggIcon(props: any) {
   return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 22c6.23-.05 7.87-5.57 7.5-10-.36-4.34-3.95-9.96-7.5-10-3.55.04-7.14 5.66-7.5 10-.37 4.43 1.27 9.95 7.5 10z" />
     </svg>
   );

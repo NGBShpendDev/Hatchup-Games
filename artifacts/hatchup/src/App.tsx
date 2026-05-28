@@ -20,6 +20,7 @@ import HatchlingDetail from "@/pages/hatchling-detail";
 import Race from "@/pages/race";
 import HealthSettings from "@/pages/health-settings";
 import NotFound from "@/pages/not-found";
+import Rewards from "@/pages/rewards";
 
 const queryClient = new QueryClient();
 
@@ -214,6 +215,7 @@ function AppRoutes() {
         <Route path="/health-settings" component={HealthSettings} />
         <Route path="/hatchlings/:id" component={HatchlingDetail} />
         <Route path="/compete/race" component={Race} />
+        <Route path="/rewards" component={Rewards} />
         <Route component={NotFound} />
       </Switch>
     </>

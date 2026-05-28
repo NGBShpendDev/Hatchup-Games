@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable, eggsTable, fitnessActivitiesTable } from "@workspace/db";
+import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable, eggsTable, fitnessActivitiesTable, playerBadgesTable } from "@workspace/db";
 import { eq, desc, and, gte } from "drizzle-orm";
 import {
   CreatePlayerBody,
@@ -10,6 +10,7 @@ import {
   GetPlayerDashboardParams,
 } from "@workspace/api-zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { BADGE_MAP, computeLevelProgress, getDailyReward } from "../services/badgeService";
 
 const router = Router();
 
@@ -96,7 +97,7 @@ router.get("/players/:id/dashboard", requireAuth, attachPlayer, async (req, res)
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, params.data.id) });
   if (!player) { res.status(404).json({ error: "Player not found" }); return; }
 
-  const [hatchlings, recentComps, activeEvents, activeEggs, recentActivities] = await Promise.all([
+  const [hatchlings, recentComps, activeEvents, activeEggs, recentActivities, earnedBadges] = await Promise.all([
     db.query.hatchlingsTable.findMany({ where: eq(hatchlingsTable.playerId, params.data.id) }),
     db.query.competitionsTable.findMany({
       where: eq(competitionsTable.playerId, params.data.id),
@@ -114,6 +115,10 @@ router.get("/players/:id/dashboard", requireAuth, attachPlayer, async (req, res)
       where: eq(fitnessActivitiesTable.playerId, params.data.id),
       orderBy: [desc(fitnessActivitiesTable.createdAt)],
       limit: 5,
+    }),
+    db.query.playerBadgesTable.findMany({
+      where: eq(playerBadgesTable.playerId, params.data.id),
+      orderBy: (t, { desc: d }) => [d(t.earnedAt)],
     }),
   ]);
 
@@ -136,6 +141,28 @@ router.get("/players/:id/dashboard", requireAuth, attachPlayer, async (req, res)
     progressPct: Math.min(100, Math.round((e.stepsProgress / e.stepsRequired) * 100)),
     isReady: e.stepsProgress >= e.stepsRequired,
   }));
+
+  // XP level progress
+  const levelProgress = computeLevelProgress(player.xp);
+
+  // Badge showcase
+  const showcaseBadges = earnedBadges
+    .filter(b => b.isShowcase)
+    .map(b => ({ ...b, ...BADGE_MAP[b.badgeKey], earnedAt: b.earnedAt.toISOString() }));
+
+  const recentBadges = earnedBadges.slice(0, 3).map(b => ({
+    ...BADGE_MAP[b.badgeKey],
+    earnedAt: b.earnedAt.toISOString(),
+  }));
+
+  // Daily reward status
+  const now = new Date();
+  const lastClaimed = player.lastRewardClaimedAt;
+  const isSameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  const dailyAlreadyClaimed = lastClaimed ? isSameDay(new Date(lastClaimed), now) : false;
+  const nextRewardStreak = dailyAlreadyClaimed ? player.dailyRewardStreak : player.dailyRewardStreak + 1;
+  const todayReward = getDailyReward(nextRewardStreak);
 
   res.json({
     player,
@@ -170,6 +197,19 @@ router.get("/players/:id/dashboard", requireAuth, attachPlayer, async (req, res)
       active: eggsFormatted,
       readyCount: readyEggs.length,
       totalActive: activeEggs.length,
+    },
+    // Progression
+    levelProgress,
+    prestige: player.prestige ?? 0,
+    title: player.title ?? null,
+    streakFreezes: player.streakFreezes ?? 0,
+    badgeCount: earnedBadges.length,
+    showcaseBadges,
+    recentBadges,
+    dailyReward: {
+      alreadyClaimed: dailyAlreadyClaimed,
+      reward: todayReward,
+      streak: player.dailyRewardStreak,
     },
   });
 });

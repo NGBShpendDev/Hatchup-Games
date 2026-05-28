@@ -6,6 +6,7 @@ import {
   eggsTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { checkAndAwardBadges, type BadgeDefinition } from "./badgeService";
 
 export const ACTIVITY_CONFIG: Record<
   string,
@@ -42,6 +43,7 @@ export type LogActivityResult = {
   isNew: boolean;
   updatedPlayer: typeof playersTable.$inferSelect;
   activity: typeof fitnessActivitiesTable.$inferSelect | null;
+  newBadges?: import("./badgeService").BadgeDefinition[];
 };
 
 export async function logFitnessActivity(
@@ -150,5 +152,15 @@ export async function logFitnessActivity(
       .where(eq(fitnessQuestsTable.id, quest.id));
   }
 
-  return { fitnessXpEarned, eggsUpdated, isNew: true, updatedPlayer: updatedRows[0]!, activity: insertedRows[0]! };
+  // Check and award badges based on updated state
+  const updatedPlayer = updatedRows[0]!;
+  const activityHour = new Date().getHours();
+  const newBadges = await checkAndAwardBadges(playerId, {
+    totalSteps: updatedPlayer.totalSteps,
+    currentStreak: updatedPlayer.currentStreak,
+    totalWorkouts: updatedPlayer.totalWorkouts,
+    activityHour,
+  });
+
+  return { fitnessXpEarned, eggsUpdated, isNew: true, updatedPlayer, activity: insertedRows[0]!, newBadges };
 }

@@ -16,6 +16,9 @@ import { startPassiveSyncJob } from "./services/passiveSyncJob";
 
 const app: Express = express();
 
+// Trust Replit's reverse proxy so rate-limit / IP headers work correctly
+app.set("trust proxy", 1);
+
 // ── Security headers ─────────────────────────────────────────────────────────
 app.use(helmet());
 

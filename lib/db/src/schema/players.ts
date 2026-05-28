@@ -27,6 +27,13 @@ export const playersTable = pgTable("players", {
   lastActiveDate: date("last_active_date"),
   dailyStepGoal: integer("daily_step_goal").notNull().default(8000),
   passiveXpSinceLastVisit: integer("passive_xp_since_last_visit").notNull().default(0),
+  // Progression
+  prestige: integer("prestige").notNull().default(0),
+  title: text("title"),
+  streakFreezes: integer("streak_freezes").notNull().default(0),
+  // Daily reward
+  lastRewardClaimedAt: timestamp("last_reward_claimed_at", { withTimezone: true }),
+  dailyRewardStreak: integer("daily_reward_streak").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -13,6 +13,8 @@ import fitnessRouter from "./fitness";
 import trainingRouter from "./training";
 import healthSyncRouter from "./health-sync";
 import groupsRouter from "./groups";
+import badgesRouter from "./badges";
+import rewardsRouter from "./rewards";
 
 const router: IRouter = Router();
 
@@ -30,5 +32,7 @@ router.use(fitnessRouter);
 router.use(trainingRouter);
 router.use(healthSyncRouter);
 router.use(groupsRouter);
+router.use(badgesRouter);
+router.use(rewardsRouter);
 
 export default router;
