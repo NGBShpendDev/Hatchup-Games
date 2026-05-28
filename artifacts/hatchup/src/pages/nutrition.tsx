@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Heart, MessageCircle, Zap, Target, ChefHat, Plus, X, Sparkles, Droplets, Flame, Dumbbell } from "lucide-react";
+import { Heart, MessageCircle, Zap, ChefHat, Plus, X, Sparkles, Droplets, Flame, Dumbbell, MoreHorizontal, Compass, Trophy } from "lucide-react";
+import { ReportBlockMenu } from "@/components/report-block-menu";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -84,7 +85,7 @@ export default function Nutrition() {
   const qc = useQueryClient();
   const pid = playerId ?? 0;
 
-  const [activeTab, setActiveTab] = useState<"feed" | "challenges">("feed");
+  const [activeTab, setActiveTab] = useState<"feed" | "discover" | "challenges">("feed");
   const [showCreateSheet, setShowCreateSheet] = useState(false);
   const [showGoalPicker, setShowGoalPicker] = useState(false);
 
@@ -103,10 +104,11 @@ export default function Nutrition() {
   const [aiResult, setAiResult] = useState<{ quality_score?: number; suggestions?: string[] } | null>(null);
 
   // ── Queries ─────────────────────────────────────────────────────────────────
+  const feedMode = activeTab === "discover" ? "discover" : "feed";
   const { data: posts = [], isLoading: postsLoading } = useQuery<MealPost[]>({
-    queryKey: ["nutrition-posts", pid],
-    queryFn: () => fetch(`${BASE}/api/nutrition/posts?playerId=${pid}&limit=30`, { credentials: "include" }).then(r => r.json()),
-    enabled: !!pid,
+    queryKey: ["nutrition-posts", pid, feedMode],
+    queryFn: () => fetch(`${BASE}/api/nutrition/posts?playerId=${pid}&limit=30&mode=${feedMode}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!pid && activeTab !== "challenges",
   });
 
   const { data: challenges = [], isLoading: challengesLoading } = useQuery<NutritionChallenge[]>({
@@ -128,7 +130,6 @@ export default function Nutrition() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId: pid }),
       }).then(r => r.json()),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["nutrition-posts", pid] }),
   });
@@ -281,21 +282,33 @@ export default function Nutrition() {
 
         {/* Tabs */}
         <div className="flex gap-1 bg-muted/30 rounded-xl p-1 mb-4">
-          {(["feed", "challenges"] as const).map(tab => (
+          {([
+            { key: "feed",       label: "Feed",      icon: <ChefHat className="w-3.5 h-3.5" /> },
+            { key: "discover",   label: "Discover",  icon: <Compass className="w-3.5 h-3.5" /> },
+            { key: "challenges", label: "Challenges", icon: <Trophy className="w-3.5 h-3.5" /> },
+          ] as const).map(tab => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wide transition-all ${
-                activeTab === tab ? "bg-primary text-white shadow" : "text-muted-foreground"
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wide transition-all flex items-center justify-center gap-1.5 ${
+                activeTab === tab.key ? "bg-primary text-white shadow" : "text-muted-foreground"
               }`}
             >
-              {tab === "feed" ? "🍽️ Meal Feed" : "🏆 Challenges"}
+              {tab.icon} {tab.label}
             </button>
           ))}
         </div>
 
-        {/* ── FEED TAB ── */}
-        {activeTab === "feed" && (
+        {/* Discover-mode banner */}
+        {activeTab === "discover" && (
+          <div className="rounded-xl bg-purple-500/10 border border-purple-500/30 px-3 py-2 mb-3 flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            <p className="text-[11px] font-bold text-purple-300">Trending meals from the community — sorted by likes.</p>
+          </div>
+        )}
+
+        {/* ── FEED + DISCOVER TABS ── */}
+        {(activeTab === "feed" || activeTab === "discover") && (
           <div className="space-y-4">
             {postsLoading
               ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-2xl" />)
@@ -578,11 +591,14 @@ function MealCard({ post, index, onLike }: { post: MealPost; index: number; onLi
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ playerId: pid, content: newComment }),
+      body: JSON.stringify({ content: newComment }),
     });
     setNewComment("");
     refetch();
   };
+
+  const isOwnPost = post.playerId === pid;
+  const authorName = post.author.displayName ?? post.author.username;
 
   return (
     <motion.div
@@ -594,16 +610,29 @@ function MealCard({ post, index, onLike }: { post: MealPost; index: number; onLi
       {/* Post header */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-2">
         <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-black text-primary">
-          {(post.author.displayName ?? post.author.username)?.[0]?.toUpperCase()}
+          {authorName?.[0]?.toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-black text-sm truncate">{post.author.displayName ?? post.author.username}</p>
+          <p className="font-black text-sm truncate">{authorName}</p>
           <p className="text-[10px] text-muted-foreground">
             {new Date(post.createdAt).toLocaleDateString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
           </p>
         </div>
         {tag && (
           <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${tag.color}`}>{tag.label}</span>
+        )}
+        {!isOwnPost && (
+          <ReportBlockMenu
+            targetPlayerId={post.playerId}
+            targetName={authorName}
+            contentType="meal_post"
+            contentId={post.id}
+            trigger={
+              <button className="text-muted-foreground hover:text-foreground p-1 -mr-1" aria-label="Report or block">
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+            }
+          />
         )}
       </div>
 
