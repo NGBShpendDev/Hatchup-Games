@@ -474,6 +474,7 @@ async function notifyTournamentChampion(
         artifactId: artifact.id,
         artifactName: `Crown of the Bracket — ${challengeTitle}`,
         rarity: "Champion",
+        challengeId,
       });
     }
   } catch (err) {

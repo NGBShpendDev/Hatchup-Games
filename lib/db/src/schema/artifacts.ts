@@ -64,6 +64,7 @@ export const artifactWorldNotificationsTable = pgTable("artifact_world_notificat
   artifactId: integer("artifact_id").notNull(),
   artifactName: text("artifact_name").notNull(),
   rarity: text("rarity").notNull(),
+  challengeId: integer("challenge_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

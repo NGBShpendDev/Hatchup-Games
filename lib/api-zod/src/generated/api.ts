@@ -1107,6 +1107,7 @@ export const GetArtifactWorldNotificationsResponseItem = zod.object({
   "playerUsername": zod.string(),
   "artifactName": zod.string(),
   "rarity": zod.string(),
+  "challengeId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 export const GetArtifactWorldNotificationsResponse = zod.array(GetArtifactWorldNotificationsResponseItem)

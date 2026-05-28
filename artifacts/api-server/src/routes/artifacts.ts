@@ -293,6 +293,7 @@ router.get("/artifacts/world-notifications", requireAuth, async (req, res) => {
     playerUsername: n.playerUsername,
     artifactName: n.artifactName,
     rarity: n.rarity,
+    challengeId: n.challengeId,
     createdAt: n.createdAt.toISOString(),
   })));
 });

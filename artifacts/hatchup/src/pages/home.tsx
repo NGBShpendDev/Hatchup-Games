@@ -129,7 +129,7 @@ export default function Home() {
     query: { queryKey: getGetPlayerDashboardQueryKey(pid), enabled: !!playerId }
   });
 
-  const { data: worldNotifs } = useQuery<Array<{ id: number; playerUsername: string; artifactName: string; rarity: string; createdAt: string }>>({
+  const { data: worldNotifs } = useQuery<Array<{ id: number; playerUsername: string; artifactName: string; rarity: string; challengeId: number | null; createdAt: string }>>({
     queryKey: ["artifact-world-notifications"],
     queryFn: () => fetch(`${BASE}/api/artifacts/world-notifications?limit=5`, { credentials: "include" }).then(r => r.json()),
     refetchInterval: 60_000,
@@ -1108,13 +1108,13 @@ export default function Home() {
                       ? "🟠"
                       : "🔴";
                 const verb = isChampion ? "won the tournament:" : "unlocked";
-                const subLabel = isChampion ? "Tournament Champion" : `${notif.rarity} Artifact`;
-                return (
+                const subLabel = isChampion ? "Tournament Champion · Tap for recap" : `${notif.rarity} Artifact`;
+                const href = isChampion && notif.challengeId != null ? `/challenges/${notif.challengeId}` : null;
+                const inner = (
                   <motion.div
-                    key={notif.id}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className={`flex items-center gap-3 border rounded-xl px-3 py-2.5 ${s}`}
+                    className={`flex items-center gap-3 border rounded-xl px-3 py-2.5 ${s} ${href ? "cursor-pointer hover:brightness-110 transition" : ""}`}
                   >
                     <span className="text-xl flex-shrink-0">{emoji}</span>
                     <div className="flex-1 min-w-0">
@@ -1122,6 +1122,11 @@ export default function Home() {
                       <p className="text-[10px] opacity-60">{subLabel} · {new Date(notif.createdAt).toLocaleDateString()}</p>
                     </div>
                   </motion.div>
+                );
+                return href ? (
+                  <Link key={notif.id} href={href} data-testid={`link-world-drop-${notif.id}`}>{inner}</Link>
+                ) : (
+                  <div key={notif.id}>{inner}</div>
                 );
               })}
             </div>

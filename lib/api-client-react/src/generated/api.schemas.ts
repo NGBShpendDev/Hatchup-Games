@@ -955,6 +955,7 @@ export interface ArtifactWorldNotification {
   playerUsername: string;
   artifactName: string;
   rarity: string;
+  challengeId?: number | null;
   createdAt: string;
 }
 

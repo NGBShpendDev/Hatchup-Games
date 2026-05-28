@@ -5609,6 +5609,7 @@ components:
         playerUsername: { type: string }
         artifactName:   { type: string }
         rarity:         { type: string }
+        challengeId:    { type: integer, nullable: true }
         createdAt:      { type: string }
 
     SpeedLeaderboardEntry:
