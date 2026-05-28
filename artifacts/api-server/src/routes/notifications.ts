@@ -14,6 +14,11 @@ const ALLOWED_TYPES = new Set([
   "club_invite",
   "artifact_unlock",
   "rematch_invite",
+  "post_reaction",
+  "post_comment",
+  "post_mention",
+  "comment_mention",
+  "new_follower",
   "generic",
 ]);
 

@@ -1,5 +1,26 @@
 import { Link, useLocation } from "wouter";
-import { Bell, CheckCheck, ChevronRight } from "lucide-react";
+import {
+  Bell,
+  CheckCheck,
+  ChevronRight,
+  Mail,
+  Clock,
+  Trophy,
+  Users,
+  Sparkles,
+  Swords,
+  ShieldAlert,
+  ShieldCheck,
+  BadgeCheck,
+  Apple,
+  Crown,
+  Medal,
+  Heart,
+  MessageCircle,
+  AtSign,
+  UserPlus,
+  ThumbsUp,
+} from "lucide-react";
 import {
   useGetUnreadNotificationCount,
   getGetUnreadNotificationCountQueryKey,
@@ -62,6 +83,33 @@ export function NotificationsBell() {
 
   const items = notifications ?? [];
 
+  const iconFor = (type: string) => {
+    switch (type) {
+      case "challenge_invite": return { Icon: Mail, color: "text-pink-400" };
+      case "challenge_ending": return { Icon: Clock, color: "text-amber-400" };
+      case "challenge_complete": return { Icon: Trophy, color: "text-emerald-400" };
+      case "club_invite":
+      case "club_mention": return { Icon: Users, color: "text-indigo-400" };
+      case "artifact_unlock": return { Icon: Sparkles, color: "text-fuchsia-400" };
+      case "rematch_invite": return { Icon: Swords, color: "text-red-400" };
+      case "account_suspended": return { Icon: ShieldAlert, color: "text-red-500" };
+      case "account_restored": return { Icon: ShieldCheck, color: "text-emerald-500" };
+      case "account_verified": return { Icon: BadgeCheck, color: "text-sky-400" };
+      case "nutrition_recap":
+      case "nutrition_recap_preview": return { Icon: Apple, color: "text-lime-400" };
+      case "tournament_advanced": return { Icon: Medal, color: "text-yellow-400" };
+      case "tournament_eliminated": return { Icon: Swords, color: "text-slate-400" };
+      case "tournament_champion": return { Icon: Crown, color: "text-amber-400" };
+      case "post_reaction": return { Icon: Heart, color: "text-rose-400" };
+      case "post_comment": return { Icon: MessageCircle, color: "text-sky-400" };
+      case "post_mention":
+      case "comment_mention": return { Icon: AtSign, color: "text-purple-400" };
+      case "new_follower": return { Icon: UserPlus, color: "text-cyan-400" };
+      case "comment_like": return { Icon: ThumbsUp, color: "text-rose-400" };
+      default: return { Icon: Bell, color: "text-muted-foreground" };
+    }
+  };
+
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -101,7 +149,9 @@ export function NotificationsBell() {
               You're all caught up.
             </div>
           ) : (
-            items.map((n: Notification) => (
+            items.map((n: Notification) => {
+              const { Icon, color } = iconFor(n.type);
+              return (
               <button
                 key={n.id}
                 onClick={() => handleOpen(n)}
@@ -111,6 +161,11 @@ export function NotificationsBell() {
                 data-testid={`notification-item-${n.id}`}
               >
                 <div className="flex items-start gap-2">
+                  <span
+                    className={`shrink-0 mt-0.5 w-7 h-7 rounded-md bg-card/80 border border-border/30 flex items-center justify-center ${color}`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                  </span>
                   {!n.read && (
                     <span className="mt-1.5 w-2 h-2 rounded-full bg-primary shrink-0 shadow-[0_0_6px_rgba(var(--primary),0.8)]" />
                   )}
@@ -127,7 +182,8 @@ export function NotificationsBell() {
                   </div>
                 </div>
               </button>
-            ))
+              );
+            })
           )}
         </div>
         <div className="border-t border-border/40">

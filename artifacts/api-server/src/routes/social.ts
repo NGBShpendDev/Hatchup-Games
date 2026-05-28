@@ -34,6 +34,7 @@ import {
 } from "./sharedGroups.ts";
 import { sendPushToPlayer } from "../services/pushNotifications.ts";
 import { notificationsTable } from "@workspace/db";
+import { resolveMentionedPlayers } from "../services/mentions.ts";
 import { createHmac } from "node:crypto";
 import { logger } from "../lib/logger.ts";
 import {
@@ -497,6 +498,38 @@ router.post("/social/posts", requireAuth, attachPlayer, socialWriteLimiter, bloc
       .where(eq(hatchlingsTable.playerId, playerId));
   }
 
+  // Notify any @mentioned players in the post body.
+  const mentioned = await resolveMentionedPlayers(post.content, playerId);
+  if (mentioned.length > 0) {
+    const poster = await db.query.playersTable.findFirst({
+      where: eq(playersTable.id, playerId),
+    });
+    const posterName = poster?.displayName ?? poster?.username ?? "Someone";
+    const snippet = post.content.length > 80
+      ? `${post.content.slice(0, 77)}…`
+      : post.content;
+    const link = `/post/${post.id}`;
+    for (const m of mentioned) {
+      const title = "You were mentioned";
+      const body = `${posterName} mentioned you in a post: "${snippet}"`;
+      await db.insert(notificationsTable).values({
+        playerId: m.id,
+        type: "post_mention",
+        title,
+        body,
+        link,
+        sourceId: post.id,
+      });
+      void sendPushToPlayer(m.id, {
+        title,
+        body,
+        link,
+        category: "invites",
+        tag: `post-mention-${post.id}-${m.id}`,
+      });
+    }
+  }
+
   const enriched = await enrichPost(post, playerId);
   res.status(201).json(enriched);
 });
@@ -836,6 +869,51 @@ router.post("/social/posts/:id/react", requireAuth, attachPlayer, socialWriteLim
     added = true;
   }
 
+  // Notify the post author when someone else reacts. Dedupe per (author,
+  // post, reactor) so flipping between reaction types or quickly toggling
+  // doesn't spam the bell.
+  if (added && targetPost.playerId !== playerId) {
+    const link = `/post/${postId}?reactFrom=${playerId}`;
+    const duplicate = await db.query.notificationsTable.findFirst({
+      where: and(
+        eq(notificationsTable.playerId, targetPost.playerId),
+        eq(notificationsTable.type, "post_reaction"),
+        eq(notificationsTable.sourceId, postId),
+        eq(notificationsTable.link, link),
+      ),
+    });
+    if (!duplicate) {
+      const reactor = await db.query.playersTable.findFirst({
+        where: eq(playersTable.id, playerId),
+      });
+      const name = reactor?.displayName ?? reactor?.username ?? "Someone";
+      const REACTION_VERB: Record<string, string> = {
+        like: "liked",
+        encourage: "cheered on",
+        fire: "fire-reacted to",
+        flex: "flexed on",
+      };
+      const verb = REACTION_VERB[reactionType] ?? "reacted to";
+      const title = "New reaction on your post";
+      const bodyText = `${name} ${verb} your post`;
+      await db.insert(notificationsTable).values({
+        playerId: targetPost.playerId,
+        type: "post_reaction",
+        title,
+        body: bodyText,
+        link,
+        sourceId: postId,
+      });
+      void sendPushToPlayer(targetPost.playerId, {
+        title,
+        body: bodyText,
+        link,
+        category: "invites",
+        tag: `post-reaction-${postId}-${playerId}`,
+      });
+    }
+  }
+
   const totalReactions = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(postReactionsTable)
@@ -1001,6 +1079,57 @@ router.post("/social/posts/:id/comments", requireAuth, attachPlayer, socialWrite
   if (post) await maybeGrantCreatorBadge(post.playerId);
 
   const author = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
+
+  // Notify the post author that someone replied. Skip self-replies.
+  const commentLink = `/post/${postId}#comment-${comment.id}`;
+  const snippet = comment.content.length > 80
+    ? `${comment.content.slice(0, 77)}…`
+    : comment.content;
+  const commenterName = author?.displayName ?? author?.username ?? "Someone";
+  if (parentPost.playerId !== playerId) {
+    const replyTitle = "New reply on your post";
+    const replyBody = `${commenterName}: "${snippet}"`;
+    await db.insert(notificationsTable).values({
+      playerId: parentPost.playerId,
+      type: "post_comment",
+      title: replyTitle,
+      body: replyBody,
+      link: commentLink,
+      sourceId: comment.id,
+    });
+    void sendPushToPlayer(parentPost.playerId, {
+      title: replyTitle,
+      body: replyBody,
+      link: commentLink,
+      category: "invites",
+      tag: `post-comment-${comment.id}`,
+    });
+  }
+
+  // Notify any @mentioned players. Skip the comment author and the post
+  // author (who already got the reply notification above).
+  const mentioned = await resolveMentionedPlayers(comment.content, playerId);
+  for (const m of mentioned) {
+    if (m.id === parentPost.playerId) continue;
+    const mTitle = "You were mentioned";
+    const mBody = `${commenterName} mentioned you in a comment: "${snippet}"`;
+    await db.insert(notificationsTable).values({
+      playerId: m.id,
+      type: "comment_mention",
+      title: mTitle,
+      body: mBody,
+      link: commentLink,
+      sourceId: comment.id,
+    });
+    void sendPushToPlayer(m.id, {
+      title: mTitle,
+      body: mBody,
+      link: commentLink,
+      category: "invites",
+      tag: `comment-mention-${comment.id}-${m.id}`,
+    });
+  }
+
   res.status(201).json({
     ...comment,
     authorName: author?.displayName ?? author?.username ?? "Trainer",
@@ -1232,6 +1361,41 @@ router.post("/social/follow", requireAuth, attachPlayer, socialWriteLimiter, blo
   if (existing) { res.json({ success: true }); return; }
 
   await db.insert(playerFollowsTable).values({ followerId, followeeId });
+
+  // Notify the followee. Dedupe per (followee, follower) so unfollow/refollow
+  // cycles don't create repeat pings.
+  const duplicate = await db.query.notificationsTable.findFirst({
+    where: and(
+      eq(notificationsTable.playerId, followeeId),
+      eq(notificationsTable.type, "new_follower"),
+      eq(notificationsTable.sourceId, followerId),
+    ),
+  });
+  if (!duplicate) {
+    const follower = await db.query.playersTable.findFirst({
+      where: eq(playersTable.id, followerId),
+    });
+    const followerName = follower?.displayName ?? follower?.username ?? "Someone";
+    const title = "New follower";
+    const bodyText = `${followerName} started following you`;
+    const link = `/players/${followerId}`;
+    await db.insert(notificationsTable).values({
+      playerId: followeeId,
+      type: "new_follower",
+      title,
+      body: bodyText,
+      link,
+      sourceId: followerId,
+    });
+    void sendPushToPlayer(followeeId, {
+      title,
+      body: bodyText,
+      link,
+      category: "invites",
+      tag: `new-follower-${followerId}`,
+    });
+  }
+
   res.json({ success: true });
 });
 

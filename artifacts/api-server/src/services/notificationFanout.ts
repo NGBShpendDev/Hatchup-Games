@@ -25,6 +25,11 @@ export const NOTIFICATION_TYPE_TO_PUSH_CATEGORY: Record<string, PushCategory> = 
   rematch_invite: "invites",
   comment_like: "invites",
   club_mention: "invites",
+  post_reaction: "invites",
+  post_comment: "invites",
+  post_mention: "invites",
+  comment_mention: "invites",
+  new_follower: "invites",
   artifact_unlock: "invites",
   generic: "invites",
   // Account / moderation pings reuse the invites opt-in so silencing

@@ -18,7 +18,7 @@ import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Bell, CheckCheck, Mail, Trophy, Clock, Sparkles, Users, Swords, Check, X, Loader2, ShieldAlert, ShieldCheck, BadgeCheck, Apple, Crown, Medal } from "lucide-react";
+import { Bell, CheckCheck, Mail, Trophy, Clock, Sparkles, Users, Swords, Check, X, Loader2, ShieldAlert, ShieldCheck, BadgeCheck, Apple, Crown, Medal, Heart, MessageCircle, AtSign, UserPlus, ThumbsUp } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
@@ -112,6 +112,12 @@ const TYPE_META: Record<string, { icon: typeof Bell; color: string }> = {
   tournament_advanced:  { icon: Medal,  color: "from-yellow-500 to-amber-500" },
   tournament_eliminated:{ icon: Swords, color: "from-zinc-500 to-slate-600" },
   tournament_champion:  { icon: Crown,  color: "from-amber-400 to-yellow-500" },
+  post_reaction:    { icon: Heart,          color: "from-rose-500 to-pink-500" },
+  post_comment:     { icon: MessageCircle,  color: "from-sky-500 to-cyan-500" },
+  post_mention:     { icon: AtSign,         color: "from-purple-500 to-fuchsia-500" },
+  comment_mention:  { icon: AtSign,         color: "from-purple-500 to-fuchsia-500" },
+  new_follower:     { icon: UserPlus,       color: "from-cyan-500 to-teal-500" },
+  comment_like:     { icon: ThumbsUp,       color: "from-rose-400 to-pink-500" },
 };
 
 function iconFor(type: string) {
