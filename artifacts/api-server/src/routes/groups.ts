@@ -121,15 +121,21 @@ router.get("/groups/mine", requireAuth, attachPlayer, async (req, res) => {
     res.status(403).json({ error: "Forbidden" }); return;
   }
 
+  const hiddenIds = await getHiddenPlayerIds(req.playerId!);
+
   const memberships = await db.query.groupMembersTable.findMany({
     where: eq(groupMembersTable.playerId, req.playerId!),
   });
   const groupIds = memberships.map(m => m.groupId);
   if (groupIds.length === 0) { res.json([]); return; }
 
-  const groups = await db.query.groupsTable.findMany({
+  const allGroups = await db.query.groupsTable.findMany({
     where: sql`${groupsTable.id} = ANY(${sql.raw(`ARRAY[${groupIds.join(",")}]`)})`,
   });
+  // Filter out groups created by blocked users (bi-directional)
+  const groups = hiddenIds.length > 0
+    ? allGroups.filter(g => !hiddenIds.includes(g.creatorPlayerId))
+    : allGroups;
 
   const result = await Promise.all(groups.map(async (g) => {
     const members = await db.query.groupMembersTable.findMany({ where: eq(groupMembersTable.groupId, g.id) });

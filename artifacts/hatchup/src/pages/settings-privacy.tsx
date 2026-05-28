@@ -51,6 +51,7 @@ export default function SettingsPrivacy() {
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [verifySubmitting, setVerifySubmitting] = useState(false);
   const [verifyPending, setVerifyPending] = useState(false);
+  const [verifyPhotoName, setVerifyPhotoName] = useState<string | null>(null);
   const todayLabel = useMemo(() => new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }), []);
 
   useEffect(() => {
@@ -171,23 +172,39 @@ export default function SettingsPrivacy() {
                 Complete these steps, then submit. Our team will review within 24 hours:
               </p>
               <ol className="space-y-2 text-sm font-medium list-decimal list-inside">
-                <li>Take a clear selfie photo of yourself.</li>
-                <li>Hold up a handwritten note showing today's date:</li>
+                <li>Take a selfie holding a handwritten note with today's date:</li>
               </ol>
               <div className="bg-muted/40 rounded-xl px-4 py-3 text-center font-black text-blue-300 text-sm border border-blue-500/20">
                 {todayLabel}
               </div>
-              <li className="font-medium text-sm list-none">3. Submit below — our team verifies the photo manually.</li>
+              <div>
+                <p className="text-sm font-bold mb-2">2. Attach your photo:</p>
+                <label className={`flex items-center gap-2 px-4 py-3 rounded-xl border cursor-pointer transition-all ${
+                  verifyPhotoName ? "border-green-500 bg-green-500/10" : "border-dashed border-blue-500/40 bg-blue-500/5 hover:bg-blue-500/10"
+                }`}>
+                  <Camera className="w-4 h-4 text-blue-400 shrink-0" />
+                  <span className="text-sm font-medium truncate">
+                    {verifyPhotoName ?? "Tap to attach selfie photo"}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="user"
+                    className="hidden"
+                    onChange={e => setVerifyPhotoName(e.target.files?.[0]?.name ?? null)}
+                  />
+                </label>
+              </div>
               <p className="text-xs text-muted-foreground italic">
-                HatchUp is a safe, trusted, and family-friendly community. No government ID is collected.
+                3. Submit — our team reviews manually within 24 hours. No government ID is collected.
               </p>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setVerifyOpen(false)} className="flex-1">Cancel</Button>
               <Button
                 onClick={handleVerifySubmit}
-                disabled={verifySubmitting}
-                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-black"
+                disabled={verifySubmitting || !verifyPhotoName}
+                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-black disabled:opacity-50"
               >
                 {verifySubmitting ? "Submitting..." : "Submit for Review"}
               </Button>

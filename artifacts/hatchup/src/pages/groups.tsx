@@ -444,7 +444,7 @@ function GroupDetail({ groupId, onBack }: { groupId: number; onBack: () => void 
                   key={msg.id}
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`flex gap-2 ${msg.playerId === pid ? "flex-row-reverse" : ""}`}
+                  className={`flex gap-2 group ${msg.playerId === pid ? "flex-row-reverse" : ""}`}
                 >
                   <div className={`px-3 py-1.5 rounded-2xl text-sm font-medium max-w-[75%] ${
                     msg.playerId === pid
@@ -456,6 +456,19 @@ function GroupDetail({ groupId, onBack }: { groupId: number; onBack: () => void 
                     )}
                     {msg.content}
                   </div>
+                  {msg.playerId !== pid && (
+                    <ReportBlockMenu
+                      trigger={
+                        <button className="self-center p-1 rounded-lg hover:bg-muted transition-colors text-muted-foreground opacity-0 group-hover:opacity-100">
+                          <MoreVertical className="w-3 h-3" />
+                        </button>
+                      }
+                      targetPlayerId={msg.playerId}
+                      targetName={msg.playerName ?? "Trainer"}
+                      contentType="message"
+                      contentId={msg.id}
+                    />
+                  )}
                 </motion.div>
               ))
             ) : (

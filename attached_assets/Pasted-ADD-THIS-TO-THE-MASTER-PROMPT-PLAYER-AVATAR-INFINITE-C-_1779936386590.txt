@@ -1,0 +1,196 @@
+ADD THIS TO THE MASTER PROMPT:
+
+========================================
+
+PLAYER AVATAR + INFINITE CUSTOMIZATION SYSTEM
+
+Allow every user to create their own personal avatar character that represents them inside the HatchUp universe.
+
+The avatar should act as:
+- the player identity
+- social profile
+- fitness persona
+- battle arena character
+- progression showcase
+
+The avatar should be fully integrated into:
+- battle arenas
+- social hubs
+- rankings
+- tournaments
+- local meetups
+- guilds
+- competitions
+- cutscenes
+- victory screens
+
+========================================
+
+DEEP AVATAR CUSTOMIZATION
+
+Create an extremely advanced avatar creator with near-infinite combinations.
+
+Users should customize:
+- body type
+- height
+- skin tone
+- hairstyles
+- facial features
+- facial hair
+- eye color
+- tattoos
+- accessories
+- animations
+- emotes
+- voice effects
+- aura effects
+
+Allow users to create:
+- realistic versions of themselves
+- anime-inspired characters
+- futuristic athletes
+- fantasy-style competitors
+- elite fitness warriors
+
+========================================
+
+WEARABLE + FASHION SYSTEM
+
+Create one of the deepest fitness fashion systems ever made.
+
+Include:
+- workout gear
+- sneakers
+- compression wear
+- gym shorts
+- joggers
+- hoodies
+- tank tops
+- athletic jackets
+- gloves
+- hats
+- headbands
+- jewelry
+- watches
+- glasses
+- headphones
+- backpacks
+- sleeves
+- socks
+- elite armor-inspired cosmetics
+
+Users should unlock cosmetics through:
+- leveling up
+- tournaments
+- fitness streaks
+- challenges
+- seasonal events
+- artifacts
+- battle passes
+- elite achievements
+
+========================================
+
+REAL-WORLD INSPIRED FASHION
+
+Take inspiration from real-world fashion trends and fitness culture.
+
+Create styles inspired by:
+- streetwear
+- athletic fashion
+- gym culture
+- futuristic techwear
+- anime aesthetics
+- luxury fashion
+- running culture
+- bodybuilding culture
+- esports fashion
+
+Allow:
+- custom colors
+- patterns
+- logos
+- glow effects
+- animated cosmetics
+- rare materials
+- reactive clothing effects
+
+========================================
+
+INFINITE COMBINATION SYSTEM
+
+Build a modular cosmetic engine allowing millions of possible combinations.
+
+Every item should support:
+- custom colors
+- rarity variants
+- animated effects
+- matching sets
+- layering systems
+
+Players should constantly chase:
+- rare cosmetics
+- exclusive drops
+- limited event gear
+- elite fashion pieces
+
+========================================
+
+AVATAR PROGRESSION
+
+As players level up, their avatars become more prestigious.
+
+Unlock:
+- elite poses
+- animated intros
+- custom emotes
+- aura effects
+- prestige animations
+- mythic cosmetics
+- legendary outfits
+- champion crowns
+
+Higher-ranked players should visually stand out.
+
+========================================
+
+BATTLE ARENA AVATAR INTEGRATION
+
+Allow avatars to appear during:
+- battle intros
+- celebrations
+- emotes
+- arena entrances
+- victory screens
+- team animations
+
+Avatars should feel like:
+- fitness champions
+- anime protagonists
+- esports competitors
+- elite trainers
+
+========================================
+
+SOCIAL FLEX SYSTEM
+
+Allow players to:
+- inspect outfits
+- save cosmetic presets
+- flex rare fashion
+- trade style ideas
+- rate outfits
+- create style collections
+
+Include:
+- fashion leaderboards
+- best dressed competitions
+- seasonal cosmetic rankings
+- creator cosmetics
+- limited-edition drops
+
+========================================
+
+MAIN GOAL
+
+Create an avatar and cosmetic system so deep and addictive that players feel emotionally attached to their personal character identity and constantly grind to unlock new fashion, prestige cosmetics, and elite wearable combinations.
