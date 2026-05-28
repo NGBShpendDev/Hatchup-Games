@@ -19,6 +19,65 @@ function containsFlaggedContent(text: string): boolean {
   return BAD_WORDS.some(w => lower.includes(w));
 }
 
+// ── Elimination round advancement ──────────────────────────────────────────
+// For elimination tournaments: when the current round window expires, sort
+// active participants by progress, eliminate the bottom half, reset progress
+// for the survivors, increment currentRound, and extend endAt by another
+// durationDays window. Returns true if a new round was started (challenge
+// should stay active), false if the bracket has resolved to ≤1 survivor and
+// the caller should finalize normally.
+async function advanceEliminationRound(challengeId: number): Promise<boolean> {
+  const challenge = await db.query.challengesTable.findFirst({
+    where: eq(challengesTable.id, challengeId),
+  });
+  if (!challenge || !challenge.isElimination) return false;
+
+  const active = await db.query.challengeParticipantsTable.findMany({
+    where: and(
+      eq(challengeParticipantsTable.challengeId, challengeId),
+      eq(challengeParticipantsTable.eliminated, false),
+    ),
+    orderBy: [desc(challengeParticipantsTable.currentValue)],
+  });
+
+  // Need at least 2 active players to have anything to eliminate.
+  if (active.length <= 1) return false;
+
+  // Bottom half gets eliminated. For head-to-head (2 players) we drop the
+  // loser so a single champion remains. For odd counts we keep the extra
+  // survivor (e.g. 5 → keep top 3, drop bottom 2).
+  const surviveCount = active.length === 2 ? 1 : Math.ceil(active.length / 2);
+  const survivors = active.slice(0, surviveCount);
+  const eliminated = active.slice(surviveCount);
+
+  const currentRound = challenge.currentRound;
+
+  if (eliminated.length > 0) {
+    await db.update(challengeParticipantsTable)
+      .set({ eliminated: true, eliminatedRound: currentRound })
+      .where(inArray(challengeParticipantsTable.id, eliminated.map(p => p.id)));
+  }
+
+  // If only one survivor remains, the bracket is resolved — let the caller
+  // run normal finalization (ranking + reward payout) for the champion.
+  // Do NOT reset their progress or extend the timer.
+  if (survivors.length <= 1) return false;
+
+  // Reset survivor progress so the next round is a fresh race.
+  await db.update(challengeParticipantsTable)
+    .set({ currentValue: 0 })
+    .where(inArray(challengeParticipantsTable.id, survivors.map(p => p.id)));
+
+  // Extend the challenge window by another durationDays for the next round.
+  const nextEndAt = new Date(Date.now() + challenge.durationDays * 24 * 60 * 60 * 1000);
+
+  await db.update(challengesTable)
+    .set({ currentRound: currentRound + 1, endAt: nextEndAt })
+    .where(eq(challengesTable.id, challengeId));
+
+  return true;
+}
+
 // ── Reward distribution helper ─────────────────────────────────────────────
 async function finalizeChallenge(challengeId: number) {
   const challenge = await db.query.challengesTable.findFirst({
@@ -26,6 +85,13 @@ async function finalizeChallenge(challengeId: number) {
   });
   if (!challenge || challenge.status !== "active") return;
   if (new Date() < new Date(challenge.endAt)) return;
+
+  // For elimination tournaments, try to advance to the next round instead of
+  // finalizing. If a new round started, leave the challenge active.
+  if (challenge.isElimination) {
+    const advanced = await advanceEliminationRound(challengeId);
+    if (advanced) return;
+  }
 
   // Rank participants by currentValue desc
   const participants = await db.query.challengeParticipantsTable.findMany({
@@ -141,10 +207,30 @@ router.get("/challenges/:id", requireAuth, attachPlayer, async (req, res) => {
     await finalizeChallenge(id);
   }
 
-  const participants = await db.query.challengeParticipantsTable.findMany({
+  const rawParticipants = await db.query.challengeParticipantsTable.findMany({
     where: eq(challengeParticipantsTable.challengeId, id),
     orderBy: [desc(challengeParticipantsTable.currentValue)],
   });
+
+  // For elimination tournaments, eliminated players keep stale historical
+  // values while survivors get reset each round — so a raw currentValue
+  // sort would put losers above the champion. Order active players first
+  // (by currentValue desc), then eliminated players grouped by latest
+  // round eliminated (later eliminations rank higher), then by their last
+  // recorded currentValue. For non-elimination challenges, the raw sort
+  // is already correct.
+  const participants = challenge.isElimination
+    ? [...rawParticipants].sort((a, b) => {
+        if (a.eliminated !== b.eliminated) return a.eliminated ? 1 : -1;
+        if (a.eliminated && b.eliminated) {
+          const ar = a.eliminatedRound ?? 0;
+          const br = b.eliminatedRound ?? 0;
+          if (ar !== br) return br - ar;
+        }
+        if (a.rank != null && b.rank != null && a.rank !== b.rank) return a.rank - b.rank;
+        return (b.currentValue ?? 0) - (a.currentValue ?? 0);
+      })
+    : rawParticipants;
 
   const playerIds = participants.map(p => p.playerId);
   const players = playerIds.length
@@ -274,6 +360,9 @@ router.post("/challenges/:id/progress", requireAuth, attachPlayer, async (req, r
     where: and(eq(challengeParticipantsTable.challengeId, id), eq(challengeParticipantsTable.playerId, req.playerId!)),
   });
   if (!participant) { res.status(404).json({ error: "Not a participant" }); return; }
+  if (participant.eliminated) {
+    res.status(403).json({ error: "You have been eliminated from this tournament" }); return;
+  }
 
   const newValue = Math.max(0, (participant.currentValue ?? 0) + value);
   const [updated] = await db.update(challengeParticipantsTable)

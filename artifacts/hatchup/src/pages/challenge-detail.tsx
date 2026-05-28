@@ -30,7 +30,7 @@ import { motion } from "framer-motion";
 import {
   Trophy, Users, Clock, Zap, Coins, Target, ArrowLeft,
   MapPin, Share2, CheckCircle2, Medal, Crown,
-  Plus, Minus, MoreVertical, UserPlus, Search, Check,
+  Plus, Minus, MoreVertical, UserPlus, Search, Check, Swords, XCircle,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -153,7 +153,7 @@ export default function ChallengeDetail() {
     );
   }
 
-  type LeaderboardEntry = { id: number; playerId: number; currentValue: number; eliminated: boolean; rank?: number; joinedAt: string; player?: { id: number; username: string; displayName?: string | null; avatarUrl?: string | null } | null };
+  type LeaderboardEntry = { id: number; playerId: number; currentValue: number; eliminated: boolean; eliminatedRound?: number | null; rank?: number; joinedAt: string; player?: { id: number; username: string; displayName?: string | null; avatarUrl?: string | null } | null };
   type RichChallenge = typeof challenge & { isJoined?: boolean; leaderboard?: LeaderboardEntry[]; creator?: { id: number; username: string; displayName?: string | null; avatarUrl?: string | null } | null };
   const rich = challenge as unknown as RichChallenge;
   const metric = METRIC_META[rich.metric] ?? { label: rich.metric, icon: "🏆", unit: "units" };
@@ -172,6 +172,35 @@ export default function ChallengeDetail() {
   const leaderboard: LeaderboardEntry[] = rich.leaderboard ?? [];
   const myEntry = leaderboard.find(e => e.playerId === player?.id);
   const targetValue = rich.targetValue;
+  const isElimination = (rich as { isElimination?: boolean }).isElimination ?? false;
+  const currentRound = (rich as { currentRound?: number }).currentRound ?? 1;
+
+  // Build bracket rounds: each round shows the players who were in it.
+  // Survivors of round N appear in round N+1; players eliminated in round N
+  // appear once in round N marked as eliminated.
+  const bracketRounds: { round: number; entries: LeaderboardEntry[] }[] = [];
+  if (isElimination) {
+    const maxRound = Math.max(
+      currentRound,
+      ...leaderboard.map(e => e.eliminatedRound ?? 0),
+    );
+    for (let r = 1; r <= maxRound; r++) {
+      const entries = leaderboard.filter(e => {
+        if (e.eliminated) {
+          return (e.eliminatedRound ?? 0) >= r;
+        }
+        return true;
+      });
+      // Within a round, eliminated players (those leaving this round) go to the bottom.
+      const sorted = [...entries].sort((a, b) => {
+        const aOut = a.eliminated && (a.eliminatedRound ?? 0) === r ? 1 : 0;
+        const bOut = b.eliminated && (b.eliminatedRound ?? 0) === r ? 1 : 0;
+        if (aOut !== bOut) return aOut - bOut;
+        return (b.currentValue ?? 0) - (a.currentValue ?? 0);
+      });
+      bracketRounds.push({ round: r, entries: sorted });
+    }
+  }
 
   const shareText = `I'm competing in "${challenge.title}" on HatchUp! ${myEntry ? `My progress: ${myEntry.currentValue}/${targetValue} ${metric.unit}` : "Join me!"} 🏆`;
   const handleShare = () => {
@@ -352,6 +381,79 @@ export default function ChallengeDetail() {
                   );
                 })}
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Elimination bracket */}
+        {isElimination && bracketRounds.length > 0 && (
+          <Card className="border-purple-500/20 bg-purple-950/10">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-black text-purple-300 flex items-center gap-2">
+                  <Swords className="w-5 h-5" />
+                  Tournament Bracket
+                </h3>
+                <Badge variant="secondary" className="text-xs">
+                  {isCompleted ? `Final · ${bracketRounds.length} round${bracketRounds.length === 1 ? "" : "s"}` : `Round ${currentRound}`}
+                </Badge>
+              </div>
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
+                {bracketRounds.map(({ round, entries }) => (
+                  <div key={round} className="shrink-0 w-56 space-y-2">
+                    <div className="flex items-center justify-between px-1">
+                      <p className="text-xs font-black text-purple-200 uppercase tracking-wider">
+                        Round {round}
+                      </p>
+                      <span className="text-[10px] text-muted-foreground font-bold">
+                        {entries.length} {entries.length === 1 ? "player" : "players"}
+                      </span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {entries.map((entry) => {
+                        const outThisRound = entry.eliminated && (entry.eliminatedRound ?? 0) === round;
+                        const isMe = entry.playerId === player?.id;
+                        const name = entry.player?.displayName ?? entry.player?.username ?? `Player ${entry.playerId}`;
+                        return (
+                          <div
+                            key={`${round}-${entry.id}`}
+                            className={`flex items-center gap-2 p-2 rounded-lg border text-sm ${
+                              outThisRound
+                                ? "bg-destructive/10 border-destructive/30 opacity-60"
+                                : isMe
+                                  ? "bg-primary/10 border-primary/30"
+                                  : "bg-muted/30 border-border/40"
+                            }`}
+                          >
+                            <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-black shrink-0 overflow-hidden">
+                              {entry.player?.avatarUrl ? (
+                                <img src={entry.player.avatarUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                name.charAt(0).toUpperCase()
+                              )}
+                            </div>
+                            <p className={`flex-1 min-w-0 truncate text-xs font-bold ${outThisRound ? "line-through text-muted-foreground" : isMe ? "text-primary" : "text-foreground"}`}>
+                              {name}{isMe && !outThisRound && <span className="text-[10px] ml-1 text-primary/70">(you)</span>}
+                            </p>
+                            {outThisRound ? (
+                              <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                            ) : round === bracketRounds.length && isCompleted && entries.length === 1 ? (
+                              <Crown className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+                            ) : (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-green-400/70 shrink-0" />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {!isCompleted && (
+                <p className="text-[11px] text-muted-foreground mt-3 text-center">
+                  Bottom half is eliminated when the round timer ends. Progress resets each round.
+                </p>
+              )}
             </CardContent>
           </Card>
         )}
