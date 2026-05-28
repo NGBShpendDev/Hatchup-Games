@@ -2528,6 +2528,17 @@ export const NutritionMealIdeaFillsMacro = {
   calories: 'calories',
 } as const;
 
+/**
+ * Which path produced this idea — `ai` from the AI nutritionist, `catalog` from the static fallback.
+ */
+export type NutritionMealIdeaSource = typeof NutritionMealIdeaSource[keyof typeof NutritionMealIdeaSource];
+
+
+export const NutritionMealIdeaSource = {
+  ai: 'ai',
+  catalog: 'catalog',
+} as const;
+
 export interface NutritionMealIdea {
   name: string;
   emoji: string;
@@ -2540,6 +2551,12 @@ export interface NutritionMealIdea {
   proteinG: number;
   carbsG: number;
   fatG: number;
+  /** Which path produced this idea — `ai` from the AI nutritionist, `catalog` from the static fallback. */
+  source: NutritionMealIdeaSource;
+  /** Optional one-line coaching tip from the AI nutritionist. */
+  tip?: string;
+  /** Optional dietary/style tags (e.g. vegan, high-protein) the idea respects. */
+  tags?: string[];
 }
 
 /**
@@ -2563,6 +2580,10 @@ export interface NutritionNextMealSuggestion {
   suggestion: NutritionMealIdea | null;
   tolerance: number;
   goal: string;
+  /** True when AI personalization was attempted for this request (regardless of whether it succeeded). */
+  usedAi?: boolean;
+  /** Present when AI was attempted but failed; the catalog fallback was used. */
+  aiError?: string;
 }
 
 export interface NutritionRecapSendResult {
@@ -3721,6 +3742,15 @@ to avoid re-suggesting ideas already shown this session.
  * @maxLength 1000
  */
 exclude?: string;
+/**
+ * Free-text list of ingredients the player has on hand. Implies `useAi=true` when non-empty.
+ * @maxLength 300
+ */
+pantry?: string;
+/**
+ * Opt in to AI personalization even without a pantry string.
+ */
+useAi?: boolean;
 };
 
 export type ListBattleHistoryParams = {

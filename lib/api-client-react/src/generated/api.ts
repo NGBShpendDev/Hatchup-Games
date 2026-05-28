@@ -13071,6 +13071,13 @@ will pick a different template that still targets the same macro
 gap; if every template in the matching pool has been excluded the
 exclusion is ignored so the player still gets a suggestion.
 
+When `useAi=true` or a non-empty `pantry` string is supplied, the
+server tries the AI nutritionist first — personalizing the idea to
+the player's frequent meal tags (e.g. vegan, high-protein), physique
+goal, and any ingredients on hand. The static catalog is used as a
+deterministic fallback when the AI call fails or is unavailable.
+The `source` field in the suggestion reports which path produced it.
+
  * @summary Suggest the next meal to fill today's macro gaps
  */
 export const getNutritionSuggestNext = async (params?: GetNutritionSuggestNextParams, options?: RequestInit): Promise<NutritionNextMealSuggestion> => {

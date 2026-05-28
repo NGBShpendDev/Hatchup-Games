@@ -3905,6 +3905,13 @@ paths:
         will pick a different template that still targets the same macro
         gap; if every template in the matching pool has been excluded the
         exclusion is ignored so the player still gets a suggestion.
+
+        When `useAi=true` or a non-empty `pantry` string is supplied, the
+        server tries the AI nutritionist first — personalizing the idea to
+        the player's frequent meal tags (e.g. vegan, high-protein), physique
+        goal, and any ingredients on hand. The static catalog is used as a
+        deterministic fallback when the AI call fails or is unavailable.
+        The `source` field in the suggestion reports which path produced it.
       parameters:
         - name: exclude
           in: query
@@ -3916,6 +3923,16 @@ paths:
             Comma-separated list of meal `name` values to exclude from the
             suggestion (case-insensitive). Used by the "Try another" button
             to avoid re-suggesting ideas already shown this session.
+        - name: pantry
+          in: query
+          required: false
+          schema: { type: string, maxLength: 300 }
+          description: Free-text list of ingredients the player has on hand. Implies `useAi=true` when non-empty.
+        - name: useAi
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: Opt in to AI personalization even without a pantry string.
       responses:
         "200":
           description: Next-meal suggestion
@@ -7159,7 +7176,7 @@ components:
 
     NutritionMealIdea:
       type: object
-      required: [name, emoji, description, summary, servings, fillsMacro, calories, proteinG, carbsG, fatG]
+      required: [name, emoji, description, summary, servings, fillsMacro, calories, proteinG, carbsG, fatG, source]
       properties:
         name:        { type: string }
         emoji:       { type: string }
@@ -7171,6 +7188,17 @@ components:
         proteinG:    { type: number }
         carbsG:      { type: number }
         fatG:        { type: number }
+        source:
+          type: string
+          enum: [ai, catalog]
+          description: Which path produced this idea — `ai` from the AI nutritionist, `catalog` from the static fallback.
+        tip:
+          type: string
+          description: Optional one-line coaching tip from the AI nutritionist.
+        tags:
+          type: array
+          items: { type: string }
+          description: Optional dietary/style tags (e.g. vegan, high-protein) the idea respects.
 
     NutritionNextMealSuggestion:
       type: object
@@ -7187,6 +7215,12 @@ components:
             - { type: "null" }
         tolerance:    { type: number }
         goal:         { type: string }
+        usedAi:
+          type: boolean
+          description: True when AI personalization was attempted for this request (regardless of whether it succeeded).
+        aiError:
+          type: string
+          description: Present when AI was attempted but failed; the catalog fallback was used.
 
     NutritionRecapSendResult:
       type: object

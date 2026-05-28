@@ -245,9 +245,24 @@ export default function Nutrition() {
   // so the server can rotate through alternatives that still target the same
   // macro gap. Resets on page reload (or when a meal is actually logged).
   const [excludedMeals, setExcludedMeals] = useState<string[]>([]);
-  const excludeParam = excludedMeals.length > 0 ? { exclude: excludedMeals.join(",") } : undefined;
-  const { data: nextMeal, isFetching: nextMealFetching } = useGetNutritionSuggestNext(excludeParam, {
-    query: { enabled: !!pid, queryKey: getGetNutritionSuggestNextQueryKey(excludeParam) },
+  // Pantry input drives optional AI personalization of the next-meal idea.
+  // Empty pantry + ai-off keeps the request on the cheap deterministic catalog
+  // path; the user opts in by adding ingredients or tapping "Personalize".
+  const [pantry, setPantry] = useState("");
+  const [submittedPantry, setSubmittedPantry] = useState("");
+  const [aiOptedIn, setAiOptedIn] = useState(false);
+
+  const suggestParams = (() => {
+    const p: { exclude?: string; useAi?: true; pantry?: string } = {};
+    if (excludedMeals.length > 0) p.exclude = excludedMeals.join(",");
+    if (aiOptedIn || submittedPantry.length > 0) {
+      p.useAi = true;
+      if (submittedPantry) p.pantry = submittedPantry;
+    }
+    return Object.keys(p).length > 0 ? p : undefined;
+  })();
+  const { data: nextMeal, isFetching: nextMealFetching } = useGetNutritionSuggestNext(suggestParams, {
+    query: { enabled: !!pid, queryKey: getGetNutritionSuggestNextQueryKey(suggestParams) },
   });
 
   // ── Mutations ────────────────────────────────────────────────────────────────
@@ -302,7 +317,14 @@ export default function Nutrition() {
         qc.invalidateQueries({ queryKey: getListNutritionPostsQueryKey({ limit: 30, mode: feedMode }) });
         qc.invalidateQueries({ queryKey: getGetNutritionSummaryQueryKey() });
         qc.invalidateQueries({ queryKey: getGetNutritionStreakQueryKey() });
-        qc.invalidateQueries({ queryKey: getGetNutritionSuggestNextQueryKey() });
+        // Suggest-next has a variable query key (exclude/pantry/useAi params),
+        // so invalidate by URL prefix rather than the no-args key.
+        qc.invalidateQueries({
+          predicate: (q) =>
+            Array.isArray(q.queryKey) &&
+            typeof q.queryKey[0] === "string" &&
+            q.queryKey[0].startsWith("/api/nutrition/suggest-next"),
+        });
         // Reset the per-session "Try another" exclusion list after a successful
         // log — macro gaps have shifted, so prior dismissals no longer apply.
         setExcludedMeals([]);
@@ -531,13 +553,19 @@ export default function Nutrition() {
         {nextMeal && nextMeal.hasGap && nextMeal.suggestion && (
           <NextMealSuggestion
             data={nextMeal}
+            pantry={pantry}
+            onPantryChange={setPantry}
+            onPersonalize={() => {
+              setAiOptedIn(true);
+              setSubmittedPantry(pantry.trim());
+            }}
             isFetching={nextMealFetching}
             onLog={() => {
               const s = nextMeal.suggestion!;
               setForm({
                 name: s.name,
                 emoji: s.emoji,
-                tag: "healthy-snack",
+                tag: (s.tags && s.tags[0]) ?? "healthy-snack",
                 description: s.description,
                 calories: String(s.calories),
                 proteinG: String(s.proteinG),
@@ -1014,20 +1042,28 @@ export default function Nutrition() {
 
 function NextMealSuggestion({
   data,
+  pantry,
+  onPantryChange,
+  onPersonalize,
+  isFetching,
   onLog,
   onSkip,
-  isFetching,
 }: {
   data: NutritionNextMealSuggestion;
+  pantry: string;
+  onPantryChange: (v: string) => void;
+  onPersonalize: () => void;
+  isFetching: boolean;
   onLog: () => void;
   onSkip: () => void;
-  isFetching: boolean;
 }) {
   const s = data.suggestion!;
   const primary = data.primaryMacro ?? "calories";
   const primaryLabel: Record<string, string> = {
     protein: "protein gap", carbs: "carb gap", fat: "fat gap", calories: "calorie gap",
   };
+  const isAi = s.source === "ai";
+  const [pantryOpen, setPantryOpen] = useState(false);
   return (
     <motion.div
       key={s.name}
@@ -1036,7 +1072,14 @@ function NextMealSuggestion({
       className="rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/10 to-pink-500/5 p-4 mb-4"
     >
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] font-black uppercase tracking-wider text-primary">What to eat next</p>
+        <div className="flex items-center gap-2">
+          <p className="text-[10px] font-black uppercase tracking-wider text-primary">What to eat next</p>
+          {isAi && (
+            <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40">
+              AI
+            </span>
+          )}
+        </div>
         <p className="text-[10px] font-bold text-muted-foreground">fills your {primaryLabel[primary]}</p>
       </div>
       <div className="flex items-center gap-3">
@@ -1046,6 +1089,18 @@ function NextMealSuggestion({
         <div className="flex-1 min-w-0">
           <p className="font-black text-sm leading-tight">{s.name}<span className="text-muted-foreground"> — {s.summary}</span></p>
           <p className="text-[11px] text-muted-foreground font-medium leading-tight mt-0.5">{s.description}</p>
+          {s.tags && s.tags.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {s.tags.map((t) => (
+                <span key={t} className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground border border-border">
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+          {s.tip && (
+            <p className="text-[11px] text-fuchsia-300 font-semibold leading-tight mt-1.5">💡 {s.tip}</p>
+          )}
         </div>
         <div className="flex flex-col gap-1.5 shrink-0">
           <button
@@ -1064,6 +1119,45 @@ function NextMealSuggestion({
             {isFetching ? "…" : "Try another"}
           </button>
         </div>
+      </div>
+
+      {/* Personalize controls — pantry text + opt-in to the AI nutritionist. */}
+      <div className="mt-3 pt-3 border-t border-border/40">
+        {!pantryOpen ? (
+          <button
+            onClick={() => setPantryOpen(true)}
+            className="text-[11px] font-bold text-fuchsia-300 hover:text-fuchsia-200 transition-colors"
+          >
+            {isAi ? "✨ Refine with what's on hand" : "✨ Personalize with AI"}
+          </button>
+        ) : (
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+              What I have on hand (optional)
+            </label>
+            <div className="flex items-stretch gap-2">
+              <input
+                type="text"
+                value={pantry}
+                onChange={(e) => onPantryChange(e.target.value)}
+                placeholder="e.g. eggs, spinach, oats"
+                maxLength={300}
+                className="flex-1 min-w-0 rounded-lg bg-black/30 border border-border px-3 py-2 text-xs font-medium placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary"
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onPersonalize(); } }}
+              />
+              <button
+                onClick={onPersonalize}
+                disabled={isFetching}
+                className="shrink-0 px-3 py-2 rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-50 text-white text-[11px] font-black uppercase tracking-wide shadow"
+              >
+                {isFetching ? "…" : "Suggest"}
+              </button>
+            </div>
+            {data.aiError && (
+              <p className="text-[10px] text-amber-300 font-medium">{data.aiError}</p>
+            )}
+          </div>
+        )}
       </div>
     </motion.div>
   );

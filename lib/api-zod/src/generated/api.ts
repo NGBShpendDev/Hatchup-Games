@@ -4419,14 +4419,25 @@ will pick a different template that still targets the same macro
 gap; if every template in the matching pool has been excluded the
 exclusion is ignored so the player still gets a suggestion.
 
+When `useAi=true` or a non-empty `pantry` string is supplied, the
+server tries the AI nutritionist first — personalizing the idea to
+the player's frequent meal tags (e.g. vegan, high-protein), physique
+goal, and any ingredients on hand. The static catalog is used as a
+deterministic fallback when the AI call fails or is unavailable.
+The `source` field in the suggestion reports which path produced it.
+
  * @summary Suggest the next meal to fill today's macro gaps
  */
 export const getNutritionSuggestNextQueryExcludeMax = 1000;
 
+export const getNutritionSuggestNextQueryPantryMax = 300;
+
 
 
 export const GetNutritionSuggestNextQueryParams = zod.object({
-  "exclude": zod.coerce.string().max(getNutritionSuggestNextQueryExcludeMax).optional().describe('Comma-separated list of meal `name` values to exclude from the\nsuggestion (case-insensitive). Used by the \"Try another\" button\nto avoid re-suggesting ideas already shown this session.\n')
+  "exclude": zod.coerce.string().max(getNutritionSuggestNextQueryExcludeMax).optional().describe('Comma-separated list of meal `name` values to exclude from the\nsuggestion (case-insensitive). Used by the \"Try another\" button\nto avoid re-suggesting ideas already shown this session.\n'),
+  "pantry": zod.coerce.string().max(getNutritionSuggestNextQueryPantryMax).optional().describe('Free-text list of ingredients the player has on hand. Implies `useAi=true` when non-empty.'),
+  "useAi": zod.coerce.boolean().optional().describe('Opt in to AI personalization even without a pantry string.')
 })
 
 export const GetNutritionSuggestNextResponse = zod.object({
@@ -4448,10 +4459,15 @@ export const GetNutritionSuggestNextResponse = zod.object({
   "calories": zod.number(),
   "proteinG": zod.number(),
   "carbsG": zod.number(),
-  "fatG": zod.number()
+  "fatG": zod.number(),
+  "source": zod.enum(['ai', 'catalog']).describe('Which path produced this idea — `ai` from the AI nutritionist, `catalog` from the static fallback.'),
+  "tip": zod.string().optional().describe('Optional one-line coaching tip from the AI nutritionist.'),
+  "tags": zod.array(zod.string()).optional().describe('Optional dietary\/style tags (e.g. vegan, high-protein) the idea respects.')
 }),zod.null()]),
   "tolerance": zod.number(),
-  "goal": zod.string()
+  "goal": zod.string(),
+  "usedAi": zod.boolean().optional().describe('True when AI personalization was attempted for this request (regardless of whether it succeeded).'),
+  "aiError": zod.string().optional().describe('Present when AI was attempted but failed; the catalog fallback was used.')
 })
 
 

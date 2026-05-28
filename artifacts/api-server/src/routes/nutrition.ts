@@ -554,6 +554,19 @@ function pickNextMealSuggestion(
 // ── GET /nutrition/suggest-next ───────────────────────────────────────────────
 // Recommends a concrete meal idea sized to fill today's biggest macro gap.
 // Reuses the same daily totals + target logic as /nutrition/streak.
+//
+// When `pantry` or `useAi=true` query params are supplied, we try the AI
+// nutritionist first — personalizing on physique goal, frequent meal tags,
+// macro gap, and ingredients on hand. The static catalog is the deterministic
+// fallback if the AI call fails, returns an unusable shape, or is disabled.
+const SuggestNextQuery = z.object({
+  pantry: z.string().trim().max(300).optional(),
+  useAi: z
+    .union([z.string(), z.boolean()])
+    .optional()
+    .transform((v) => v === true || v === "true" || v === "1"),
+});
+
 router.get("/nutrition/suggest-next", requireAuth, attachPlayer, async (req, res) => {
   const playerId = req.playerId!;
 
@@ -568,6 +581,12 @@ router.get("/nutrition/suggest-next", requireAuth, attachPlayer, async (req, res
       .map(s => s.trim().toLowerCase())
       .filter(s => s.length > 0),
   );
+
+  // Parse the optional AI personalization inputs (`pantry`, `useAi`).
+  const parsedQuery = SuggestNextQuery.safeParse(req.query);
+  if (!parsedQuery.success) { res.status(400).json({ error: "Invalid query" }); return; }
+  const pantry = parsedQuery.data.pantry?.trim() ?? "";
+  const wantAi = parsedQuery.data.useAi === true || pantry.length > 0;
 
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
   const goal = player?.physiqueGoal ?? "lean_athlete";
@@ -593,13 +612,137 @@ router.get("/nutrition/suggest-next", requireAuth, attachPlayer, async (req, res
     excludeNames,
   );
 
+  // Default: static-catalog suggestion. Tag it with a `source` so the UI can
+  // show provenance even when AI isn't requested.
+  const catalogSuggestion = result.suggestion
+    ? { ...result.suggestion, source: "catalog" as const }
+    : null;
+
+  type SuggestionOut =
+    | (Omit<NonNullable<typeof catalogSuggestion>, "source"> & {
+        source: "ai" | "catalog";
+        tip?: string;
+        tags?: string[];
+      })
+    | null;
+  let suggestion: SuggestionOut = catalogSuggestion;
+  let aiError: string | undefined;
+
+  if (wantAi && result.hasGap && result.suggestion && result.primaryMacro) {
+    // Pull the player's most frequent meal tags from the last 30 days. Drives
+    // the "respects vegan / high-protein" personalization without the model
+    // having to guess from name+description.
+    const tagRows = await db.execute(sql`
+      SELECT tag, COUNT(*)::int AS cnt
+      FROM meal_posts
+      WHERE player_id = ${playerId}
+        AND tag IS NOT NULL
+        AND created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY tag
+      ORDER BY cnt DESC
+      LIMIT 5
+    `);
+    const frequentTags = (tagRows.rows as Array<{ tag: string | null }>)
+      .map((r) => r.tag)
+      .filter((t): t is string => !!t);
+
+    const gap = result.gaps;
+    const primary = result.primaryMacro;
+    const fallback = result.suggestion;
+
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5-mini",
+        max_completion_tokens: 350,
+        messages: [
+          {
+            role: "system",
+            content:
+              `You are a sports nutritionist. Suggest ONE realistic meal idea for the player's next meal. ` +
+              `It must (a) primarily fill the player's biggest macro gap, (b) respect the player's frequent meal tags ` +
+              `(dietary preferences like vegan/keto/high-protein), and (c) use ingredients the player has on hand when provided. ` +
+              `Return ONLY valid JSON with these fields: name (short string), emoji (one food emoji), description (1 short sentence), ` +
+              `summary (short tag like "~25g protein, vegan"), servings (number, 0.5-2), ` +
+              `calories (number), protein_g (number), carbs_g (number), fat_g (number), ` +
+              `tip (one short coaching sentence under 100 chars), tags (array of 1-4 short dietary/style tags). ` +
+              `No markdown, no extra text.`,
+          },
+          {
+            role: "user",
+            content:
+              `Physique goal: ${goal}.\n` +
+              `Daily target — calories ${target.calories}, protein ${target.protein}g, carbs ${target.carbs}g, fat ${target.fat}g.\n` +
+              `Eaten so far today — calories ${Math.round(totals.calories)}, protein ${Math.round(totals.protein)}g, carbs ${Math.round(totals.carbs)}g, fat ${Math.round(totals.fat)}g.\n` +
+              `Biggest remaining gap: ${primary} (about ${Math.round(gap[primary])}${primary === "calories" ? " kcal" : "g"} to go).\n` +
+              `Player's frequent meal tags (last 30 days): ${frequentTags.length > 0 ? frequentTags.join(", ") : "none yet"}.\n` +
+              `Ingredients on hand: ${pantry || "(not specified — pick something realistic and easy)"}.\n` +
+              `Pick a meal that fits.`,
+          },
+        ],
+      });
+      const raw = completion.choices[0]?.message?.content ?? "{}";
+      const parsed = JSON.parse(raw) as {
+        name?: string;
+        emoji?: string;
+        description?: string;
+        summary?: string;
+        servings?: number;
+        calories?: number;
+        protein_g?: number;
+        carbs_g?: number;
+        fat_g?: number;
+        tip?: string;
+        tags?: unknown;
+      };
+
+      if (
+        typeof parsed.name === "string" && parsed.name.length > 0 &&
+        typeof parsed.calories === "number" &&
+        typeof parsed.protein_g === "number" &&
+        typeof parsed.carbs_g === "number" &&
+        typeof parsed.fat_g === "number"
+      ) {
+        const aiTags = Array.isArray(parsed.tags)
+          ? parsed.tags.filter((t): t is string => typeof t === "string" && t.length > 0).slice(0, 4)
+          : undefined;
+        suggestion = {
+          name: parsed.name.slice(0, 80),
+          emoji: (parsed.emoji && parsed.emoji.length <= 8) ? parsed.emoji : fallback.emoji,
+          description: (parsed.description ?? fallback.description).slice(0, 240),
+          summary: (parsed.summary ?? fallback.summary).slice(0, 80),
+          servings: typeof parsed.servings === "number" && parsed.servings > 0
+            ? Math.max(0.5, Math.min(3, Math.round(parsed.servings * 2) / 2))
+            : 1,
+          fillsMacro: primary,
+          calories: Math.max(0, Math.round(parsed.calories)),
+          proteinG: Math.max(0, Math.round(parsed.protein_g)),
+          carbsG:   Math.max(0, Math.round(parsed.carbs_g)),
+          fatG:     Math.max(0, Math.round(parsed.fat_g)),
+          source: "ai" as const,
+          ...(typeof parsed.tip === "string" && parsed.tip.trim().length > 0
+            ? { tip: parsed.tip.trim().slice(0, 140) }
+            : {}),
+          ...(aiTags && aiTags.length > 0 ? { tags: aiTags } : {}),
+        };
+      } else {
+        aiError = "AI returned an unusable shape; using static suggestion.";
+        req.log.warn({ raw }, "suggest-next AI parse: missing required fields");
+      }
+    } catch (err) {
+      aiError = "AI service unavailable; using static suggestion.";
+      req.log.warn({ err }, "suggest-next AI call failed; falling back to catalog");
+    }
+  }
+
   res.json({
     hasGap: result.hasGap,
     primaryMacro: result.primaryMacro,
     gaps: result.gaps,
-    suggestion: result.suggestion,
+    suggestion,
     tolerance: MACRO_TOLERANCE,
     goal,
+    usedAi: wantAi,
+    ...(aiError ? { aiError } : {}),
   });
 });
 
