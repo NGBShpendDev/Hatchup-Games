@@ -42,7 +42,8 @@ import {
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, ArrowDown, ArrowUp, Check, Crown, LogOut, Mail, Search, Shield, ShieldCheck, Trophy, UserMinus, UserPlus, Users, X } from "lucide-react";
+import { ArrowLeft, ArrowDown, ArrowUp, Check, Crown, LogOut, Mail, Search, Share2, Shield, ShieldCheck, Trophy, UserMinus, UserPlus, Users, X } from "lucide-react";
+import { ShareCardDialog, buildClubOgImageUrl, buildClubShareUrl } from "@/components/share-card-dialog";
 import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 
@@ -83,6 +84,7 @@ export default function ClubDetail() {
   const [transferAlsoLeave, setTransferAlsoLeave] = useState(false);
   const [confirmTransferId, setConfirmTransferId] = useState<number | null>(null);
   const [kickTarget, setKickTarget] = useState<{ id: number; name: string } | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   const [inviteSearch, setInviteSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [invitedIds, setInvitedIds] = useState<Set<number>>(new Set());
@@ -315,6 +317,14 @@ export default function ClubDetail() {
                     <Crown className="w-4 h-4" /> Transfer ownership
                   </Button>
                 )}
+                <Button
+                  variant="outline"
+                  onClick={() => setShareOpen(true)}
+                  className="font-bold gap-2 border-2"
+                  data-testid="button-share-club"
+                >
+                  <Share2 className="w-4 h-4" /> Share
+                </Button>
                 {isMember && (
                   <Button
                     variant="outline"
@@ -482,6 +492,17 @@ export default function ClubDetail() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {Number.isFinite(id) && (
+          <ShareCardDialog
+            open={shareOpen}
+            onOpenChange={setShareOpen}
+            ogImageUrl={buildClubOgImageUrl(id)}
+            shareUrl={buildClubShareUrl(id)}
+            shareText={`Check out ${club?.name ?? "this club"} on HatchUp`}
+            title={`Share ${club?.name ?? "this club"}`}
+          />
+        )}
 
         <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
           <AlertDialogContent>

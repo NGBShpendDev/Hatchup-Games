@@ -3,7 +3,7 @@ import { useRoute, useLocation, Link } from "wouter";
 import { Show, useClerk } from "@clerk/react";
 import { Layout } from "@/components/layout";
 import { PostCard, buildPostShareUrl } from "@/components/post-card";
-import { ShareCardDialog } from "@/components/share-card-dialog";
+import { ShareCardDialog, buildPostOgImageUrl } from "@/components/share-card-dialog";
 import { ImageIcon } from "lucide-react";
 import { PlayerProvider, usePlayer } from "@/lib/playerContext";
 import { Button } from "@/components/ui/button";
@@ -197,10 +197,10 @@ function SharePreviewAffordance({ post }: { post: { id: number; authorName?: str
       <ShareCardDialog
         open={open}
         onOpenChange={setOpen}
-        postId={post.id}
+        ogImageUrl={buildPostOgImageUrl(post.id)}
         shareUrl={shareUrl}
         shareText={shareText}
-        triggerLabel="Share card preview"
+        title="Share card preview"
       />
     </div>
   );

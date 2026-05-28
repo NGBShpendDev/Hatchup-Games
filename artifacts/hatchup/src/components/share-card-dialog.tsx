@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,24 +16,51 @@ export function buildPostOgImageUrl(postId: number): string {
   return `${window.location.origin}/post/${postId}/og.png`;
 }
 
+export function buildPlayerOgImageUrl(username: string): string {
+  if (typeof window === "undefined") return "";
+  return `${window.location.origin}/player/${encodeURIComponent(username)}/og.png`;
+}
+
+export function buildPlayerShareUrl(username: string): string {
+  if (typeof window === "undefined") return "";
+  return `${window.location.origin}/player/${encodeURIComponent(username)}`;
+}
+
+export function buildClubOgImageUrl(clubId: number): string {
+  if (typeof window === "undefined") return "";
+  return `${window.location.origin}/club/${clubId}/og.png`;
+}
+
+export function buildClubShareUrl(clubId: number): string {
+  if (typeof window === "undefined") return "";
+  return `${window.location.origin}/club/${clubId}`;
+}
+
 export function ShareCardDialog({
   open,
   onOpenChange,
-  postId,
+  ogImageUrl,
   shareUrl,
   shareText,
-  triggerLabel,
+  title,
+  description,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  postId: number;
+  ogImageUrl: string;
   shareUrl: string;
   shareText: string;
-  triggerLabel?: string;
+  title?: string;
+  description?: string;
 }) {
   const { toast } = useToast();
   const [imgState, setImgState] = useState<"loading" | "loaded" | "error">("loading");
-  const imgSrc = buildPostOgImageUrl(postId);
+
+  // Reset the preview state when a different image URL is shown so we don't
+  // briefly flash the previous card's loaded state.
+  useEffect(() => {
+    setImgState("loading");
+  }, [ogImageUrl]);
 
   async function handleShare() {
     const canNativeShare =
@@ -60,16 +87,16 @@ export function ShareCardDialog({
         return;
       } catch {}
     }
-    toast({ title: "Could not share post", variant: "destructive" });
+    toast({ title: "Could not share", variant: "destructive" });
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md" data-testid="dialog-share-card">
         <DialogHeader>
-          <DialogTitle>{triggerLabel ?? "Share this post"}</DialogTitle>
+          <DialogTitle>{title ?? "Share"}</DialogTitle>
           <DialogDescription>
-            This is exactly what your friends will see in their feed when you share.
+            {description ?? "This is exactly what your friends will see in their feed when you share."}
           </DialogDescription>
         </DialogHeader>
 
@@ -88,7 +115,7 @@ export function ShareCardDialog({
             </div>
           ) : (
             <img
-              src={imgSrc}
+              src={ogImageUrl}
               alt="Share card preview"
               className={`w-full h-full object-cover transition-opacity ${imgState === "loaded" ? "opacity-100" : "opacity-0"}`}
               onLoad={() => setImgState("loaded")}

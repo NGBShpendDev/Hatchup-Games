@@ -42,7 +42,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import { ReportBlockMenu } from "@/components/report-block-menu";
-import { ShareCardDialog } from "@/components/share-card-dialog";
+import { ShareCardDialog, buildPostOgImageUrl } from "@/components/share-card-dialog";
 import { usePlayer } from "@/lib/playerContext";
 
 export const POST_TYPES = [
@@ -1114,9 +1114,10 @@ export function PostCard({
       <ShareCardDialog
         open={showShareCard}
         onOpenChange={setShowShareCard}
-        postId={post.id}
+        ogImageUrl={buildPostOgImageUrl(post.id)}
         shareUrl={shareUrl}
         shareText={shareText}
+        title="Share this post"
       />
     </motion.div>
   );

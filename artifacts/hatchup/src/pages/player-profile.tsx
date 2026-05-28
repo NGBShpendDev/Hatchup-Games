@@ -12,7 +12,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { motion, Reorder } from "framer-motion";
 import { usePlayer } from "@/lib/playerContext";
 import { toast } from "@/hooks/use-toast";
-import { BadgeCheck, Flame, Trophy, Sparkles, ArrowLeft, Settings, GripVertical, X, Plus, Lock, BarChart3, Eye, Heart, MessageCircle, Repeat2, Crown, Ban, Swords, ChevronRight, Star } from "lucide-react";
+import { BadgeCheck, Flame, Trophy, Sparkles, ArrowLeft, Settings, GripVertical, X, Plus, Lock, BarChart3, Eye, Heart, MessageCircle, Repeat2, Crown, Ban, Swords, ChevronRight, Star, Share2 } from "lucide-react";
+import { ShareCardDialog, buildPlayerOgImageUrl, buildPlayerShareUrl } from "@/components/share-card-dialog";
 import { rankHatchlingsForRematch } from "@/lib/rematchSuggestions";
 import { useGetMyPostInsights, getGetMyPostInsightsQueryKey } from "@workspace/api-client-react";
 import type { PostInsight } from "@workspace/api-client-react";
@@ -265,12 +266,32 @@ export default function PlayerProfilePage() {
 function ProfileHeader({ profile, viewerIsAdmin, isOwnProfile }: { profile: PlayerProfile; viewerIsAdmin: boolean; isOwnProfile: boolean }) {
   const [, navigate] = useLocation();
   const mutualPartners = profile.mutualWorkoutPartners ?? [];
+  const [shareOpen, setShareOpen] = useState(false);
+  const displayName = profile.displayName ?? profile.username;
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-card border border-border rounded-3xl p-6 text-center space-y-3"
+      className="bg-card border border-border rounded-3xl p-6 text-center space-y-3 relative"
     >
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setShareOpen(true)}
+        className="absolute top-4 right-4 rounded-full font-bold gap-1.5"
+        data-testid="button-share-player"
+      >
+        <Share2 className="w-3.5 h-3.5" /> Share
+      </Button>
+      <ShareCardDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        ogImageUrl={buildPlayerOgImageUrl(profile.username)}
+        shareUrl={buildPlayerShareUrl(profile.username)}
+        shareText={`Check out ${displayName} on HatchUp`}
+        title={`Share ${displayName}'s profile`}
+      />
       <div className="flex justify-center">
         {profile.avatarUrl ? (
           <img
