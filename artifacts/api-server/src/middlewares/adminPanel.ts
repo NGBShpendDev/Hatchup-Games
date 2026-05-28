@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { createHash, timingSafeEqual } from "node:crypto";
+import { clerkClient } from "@clerk/express";
 import { db } from "@workspace/db";
 import {
   playersTable,
@@ -10,6 +11,33 @@ import {
 } from "@workspace/db/schema";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { logger } from "../lib/logger.ts";
+
+// Cache Clerk primary-email lookups for 60s so the gate doesn't hit Clerk
+// on every admin request. The whitelist is the authoritative ground truth;
+// short caching just keeps latency reasonable.
+const CLERK_EMAIL_CACHE_TTL_MS = 60_000;
+const clerkEmailCache = new Map<string, { email: string | null; expiresAt: number }>();
+
+export async function getClerkPrimaryEmail(clerkUserId: string): Promise<string | null> {
+  const now = Date.now();
+  const cached = clerkEmailCache.get(clerkUserId);
+  if (cached && cached.expiresAt > now) return cached.email;
+  try {
+    const user = await clerkClient.users.getUser(clerkUserId);
+    const primaryId = user.primaryEmailAddressId;
+    const primary = user.emailAddresses.find((e) => e.id === primaryId);
+    const email = primary?.emailAddress ? normalizeEmail(primary.emailAddress) : null;
+    clerkEmailCache.set(clerkUserId, { email, expiresAt: now + CLERK_EMAIL_CACHE_TTL_MS });
+    return email;
+  } catch (err) {
+    logger.warn({ err, clerkUserId }, "clerk getUser failed during admin gate");
+    return null;
+  }
+}
+
+export function _resetClerkEmailCacheForTest(): void {
+  clerkEmailCache.clear();
+}
 
 export const ADMIN_SESSION_COOKIE = "hatchup_admin_session";
 export const ADMIN_SESSION_TTL_MS = 30 * 60 * 1000;
@@ -100,7 +128,9 @@ export const requireAdminPanel: RequestHandler = async (req, res, next) => {
     res.status(403).json({ error: "not_admin" });
     return;
   }
-  const email = player.email ? normalizeEmail(player.email) : null;
+  // Whitelist is checked against the Clerk-authenticated primary email, not
+  // the (mutable, self-updatable) `players.email` column.
+  const email = req.clerkUserId ? await getClerkPrimaryEmail(req.clerkUserId) : null;
   if (!email) {
     await logGateDenial(playerId, "not_whitelisted", req);
     res.status(403).json({ error: "not_whitelisted" });
@@ -165,7 +195,7 @@ export const requireSuperAdminBasic: RequestHandler = async (req, res, next) => 
     res.status(403).json({ error: "not_super_admin" });
     return;
   }
-  const email = player.email ? normalizeEmail(player.email) : null;
+  const email = req.clerkUserId ? await getClerkPrimaryEmail(req.clerkUserId) : null;
   if (!email) {
     res.status(403).json({ error: "not_whitelisted" });
     return;

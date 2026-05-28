@@ -20,6 +20,7 @@ import { hardDeletePosts, RETENTION_DAYS } from "../services/postPurgeJob.ts";
 import { detectViewAbuse } from "../services/viewAbuseDetection.ts";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { requireAdminPanel } from "../middlewares/adminPanel.ts";
 import { filterDiscoverableCandidates, getHiddenPlayerIds } from "./safety.ts";
 import { buildPeopleDiscoveryFilter } from "./peopleDiscovery.ts";
 import { attachEntitlement, requirePremium } from "../services/subscriptionGuards.ts";
@@ -2153,24 +2154,11 @@ router.get("/social/memories", requireAuth, attachPlayer, async (req, res) => {
 // a post a user deleted by mistake. These endpoints power the moderation UI
 // at `/admin/reports` → "Deleted Posts".
 
-async function requireAdmin(playerId: number | undefined): Promise<boolean> {
-  if (!playerId) return false;
-  const caller = await db.query.playersTable.findFirst({
-    where: eq(playersTable.id, playerId),
-  });
-  return !!caller?.isAdmin;
-}
-
 // GET /api/admin/social/deleted-posts
 // Lists every post with `deletedAt IS NOT NULL` (most recently deleted first),
 // including author info, original content, deletion time, and the moderation
 // reports filed against the post — so admins have full context in one place.
-router.get("/admin/social/deleted-posts", requireAuth, attachPlayer, async (req, res) => {
-  if (!(await requireAdmin(req.playerId))) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
-
+router.get("/admin/social/deleted-posts", requireAuth, attachPlayer, requireAdminPanel, async (req, res) => {
   const deleted = await db
     .select()
     .from(postsTable)
@@ -2243,11 +2231,7 @@ router.get("/admin/social/deleted-posts", requireAuth, attachPlayer, async (req,
 // POST /api/admin/social/posts/:id/restore
 // Clears `deletedAt`, re-surfacing the post in feeds, profile pages, trending,
 // and share previews (all read paths filter on `deletedAt IS NULL`).
-router.post("/admin/social/posts/:id/restore", requireAuth, attachPlayer, async (req, res) => {
-  if (!(await requireAdmin(req.playerId))) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
+router.post("/admin/social/posts/:id/restore", requireAuth, attachPlayer, requireAdminPanel, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
@@ -2272,12 +2256,7 @@ router.post("/admin/social/posts/:id/restore", requireAuth, attachPlayer, async 
 // Lists posts whose view counter has been frozen by the anomaly detector so
 // admins can review burst-attack victims and either confirm or undo the
 // freeze. Newest freezes surface first.
-router.get("/admin/social/frozen-posts", requireAuth, attachPlayer, async (req, res) => {
-  if (!(await requireAdmin(req.playerId))) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
-
+router.get("/admin/social/frozen-posts", requireAuth, attachPlayer, requireAdminPanel, async (req, res) => {
   const frozen = await db
     .select()
     .from(postsTable)
@@ -2320,11 +2299,7 @@ router.get("/admin/social/frozen-posts", requireAuth, attachPlayer, async (req, 
 // Clears `viewsFrozenAt` so the post starts accruing views again. Use when
 // the anomaly detector caught a real burst that turned out to be legitimate
 // (e.g. a creator went viral on another platform).
-router.post("/admin/social/posts/:id/unfreeze", requireAuth, attachPlayer, async (req, res) => {
-  if (!(await requireAdmin(req.playerId))) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
+router.post("/admin/social/posts/:id/unfreeze", requireAuth, attachPlayer, requireAdminPanel, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
@@ -2348,11 +2323,7 @@ router.post("/admin/social/posts/:id/unfreeze", requireAuth, attachPlayer, async
 // Hard-deletes a soft-deleted post (and all dependents) before the scheduled
 // retention window expires. Refuses to purge posts that haven't been
 // soft-deleted yet — admins should use the user-facing delete first.
-router.delete("/admin/social/posts/:id/purge", requireAuth, attachPlayer, async (req, res) => {
-  if (!(await requireAdmin(req.playerId))) {
-    res.status(403).json({ error: "Admin access required" });
-    return;
-  }
+router.delete("/admin/social/posts/:id/purge", requireAuth, attachPlayer, requireAdminPanel, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 

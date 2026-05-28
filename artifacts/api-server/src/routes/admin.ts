@@ -21,6 +21,7 @@ import {
   requireAdminPanel,
   requireSuperAdminBasic,
   requireSuperAdminPanel,
+  getClerkPrimaryEmail,
 } from "../middlewares/adminPanel.ts";
 import { adminUnlockLimiter } from "../middlewares/rateLimiters.ts";
 import { logger } from "../lib/logger.ts";
@@ -71,7 +72,7 @@ router.get("/admin/session", requireAuth, attachPlayer, async (req, res) => {
   });
   const isAdmin = !!player?.isAdmin;
   const isSuperAdmin = !!player?.isSuperAdmin;
-  const email = player?.email ? normalizeEmail(player.email) : null;
+  const email = req.clerkUserId ? await getClerkPrimaryEmail(req.clerkUserId) : null;
   const allow = email
     ? await db.query.adminAllowlistTable.findFirst({ where: eq(adminAllowlistTable.email, email) })
     : null;
@@ -132,7 +133,7 @@ router.post(
       res.status(403).json({ error: "not_admin" });
       return;
     }
-    const email = player.email ? normalizeEmail(player.email) : null;
+    const email = req.clerkUserId ? await getClerkPrimaryEmail(req.clerkUserId) : null;
     if (!email) {
       res.status(403).json({ error: "not_whitelisted" });
       return;
@@ -208,6 +209,52 @@ router.get("/admin/hub/counts", requireAuth, attachPlayer, requireAdminPanel, as
     suspendedUsers: suspended[0]?.c ?? 0,
   });
 });
+
+// ── Session activity (super-admin only) ──────────────────────────────────────
+// Powers the "Recent unlocks" panel in /admin/settings so super-admins can
+// audit who unlocked the panel and from where.
+router.get(
+  "/admin/sessions/recent",
+  requireAuth,
+  attachPlayer,
+  requireAdminPanel,
+  requireSuperAdminPanel,
+  async (_req, res) => {
+    const rows = await db
+      .select({
+        id: adminSessionsTable.id,
+        playerId: adminSessionsTable.playerId,
+        unlockedAt: adminSessionsTable.unlockedAt,
+        expiresAt: adminSessionsTable.expiresAt,
+        lastSeenAt: adminSessionsTable.lastSeenAt,
+        revokedAt: adminSessionsTable.revokedAt,
+        ip: adminSessionsTable.ip,
+        userAgent: adminSessionsTable.userAgent,
+        username: playersTable.username,
+        displayName: playersTable.displayName,
+      })
+      .from(adminSessionsTable)
+      .leftJoin(playersTable, eq(playersTable.id, adminSessionsTable.playerId))
+      .orderBy(desc(adminSessionsTable.unlockedAt))
+      .limit(50);
+    const now = Date.now();
+    res.json(
+      rows.map((r) => ({
+        id: r.id,
+        playerId: r.playerId,
+        username: r.username,
+        displayName: r.displayName,
+        ip: r.ip,
+        userAgent: r.userAgent,
+        unlockedAt: r.unlockedAt.toISOString(),
+        expiresAt: r.expiresAt.toISOString(),
+        lastSeenAt: r.lastSeenAt ? r.lastSeenAt.toISOString() : null,
+        revokedAt: r.revokedAt ? r.revokedAt.toISOString() : null,
+        active: !r.revokedAt && r.expiresAt.getTime() > now,
+      })),
+    );
+  },
+);
 
 // ── Allowlist (super-admin only) ─────────────────────────────────────────────
 

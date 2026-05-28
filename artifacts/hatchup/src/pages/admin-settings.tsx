@@ -8,7 +8,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { AdminGate, AdminSessionChip, useAdminSession } from "@/components/admin-gate";
-import { Settings, Mail, KeyRound, Users, ArrowLeft, Trash2, Copy } from "lucide-react";
+import { Settings, Mail, KeyRound, Users, ArrowLeft, Trash2, Copy, Clock } from "lucide-react";
 
 interface AllowlistEntry {
   id: number;
@@ -264,6 +264,97 @@ function AdminsSection() {
   );
 }
 
+interface AdminSessionRow {
+  id: number;
+  playerId: number;
+  username: string | null;
+  displayName: string | null;
+  ip: string | null;
+  userAgent: string | null;
+  unlockedAt: string;
+  expiresAt: string;
+  lastSeenAt: string | null;
+  revokedAt: string | null;
+  active: boolean;
+}
+
+function formatRelative(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 60_000) return "just now";
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function RecentSessionsSection() {
+  const { data, isLoading } = useQuery<AdminSessionRow[]>({
+    queryKey: ["admin-sessions-recent"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/sessions/recent", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    refetchInterval: 30_000,
+  });
+  return (
+    <GlassCard className="p-5 space-y-4" data-testid="section-recent-sessions">
+      <div className="flex items-center gap-2">
+        <Clock className="w-4 h-4 text-red-300" />
+        <h2 className="font-black text-base">Recent unlocks</h2>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        The last 50 admin-panel unlocks. Use this to audit who has been inside the panel and from where.
+      </p>
+      {isLoading ? (
+        <Skeleton className="h-24 w-full" />
+      ) : (
+        <ul className="divide-y divide-border/40">
+          {(data ?? []).map((row) => (
+            <li
+              key={row.id}
+              className="py-2 flex items-start justify-between gap-3 text-sm"
+              data-testid={`row-session-${row.id}`}
+            >
+              <div className="min-w-0">
+                <p className="font-bold truncate">
+                  @{row.username ?? `player-${row.playerId}`}
+                  {row.active && (
+                    <span className="ml-2 inline-block rounded-full bg-green-500/20 text-green-200 text-[10px] px-2 py-0.5 align-middle">
+                      active
+                    </span>
+                  )}
+                  {row.revokedAt && (
+                    <span className="ml-2 inline-block rounded-full bg-muted text-muted-foreground text-[10px] px-2 py-0.5 align-middle">
+                      locked
+                    </span>
+                  )}
+                </p>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  {formatRelative(row.unlockedAt)} · {row.ip ?? "ip unknown"}
+                </p>
+                {row.userAgent && (
+                  <p className="text-[10px] text-muted-foreground/70 truncate" title={row.userAgent}>
+                    {row.userAgent}
+                  </p>
+                )}
+              </div>
+              <div className="text-right text-[11px] text-muted-foreground shrink-0">
+                <p>expires {formatRelative(row.expiresAt)}</p>
+                {row.lastSeenAt && <p>seen {formatRelative(row.lastSeenAt)}</p>}
+              </div>
+            </li>
+          ))}
+          {(!data || data.length === 0) && (
+            <li className="py-4 text-xs text-muted-foreground text-center">No admin unlocks yet.</li>
+          )}
+        </ul>
+      )}
+    </GlassCard>
+  );
+}
+
 function AdminSettingsInner() {
   const session = useAdminSession();
   if (!session.data?.isSuperAdmin) {
@@ -300,6 +391,7 @@ function AdminSettingsInner() {
         <AllowlistSection />
         <AccessCodeSection />
         <AdminsSection />
+        <RecentSessionsSection />
       </div>
     </Layout>
   );

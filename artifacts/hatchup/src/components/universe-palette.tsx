@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { useAdminSession } from "@/components/admin-gate";
 import {
   CommandDialog,
   CommandEmpty,
@@ -19,7 +20,7 @@ interface Item {
   label: string;
   href: string;
   icon: React.ReactNode;
-  group: "Beginner" | "Play" | "Social" | "Coach" | "Account";
+  group: "Beginner" | "Play" | "Social" | "Coach" | "Account" | "Admin";
   keywords?: string[];
 }
 
@@ -68,7 +69,21 @@ export function UniversePalette() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const groups = Array.from(new Set(ITEMS.map((i) => i.group)));
+  const { data: adminSession } = useAdminSession();
+  const items = useMemo<Item[]>(() => {
+    if (!adminSession?.unlocked) return ITEMS;
+    const adminItems: Item[] = [
+      { label: "Admin panel", href: "/admin", icon: <Shield className="w-4 h-4" />, group: "Admin", keywords: ["moderation", "reports"] },
+      { label: "Reports & moderation", href: "/admin/reports", icon: <Shield className="w-4 h-4" />, group: "Admin" },
+      { label: "Suspended users", href: "/admin/suspended", icon: <Shield className="w-4 h-4" />, group: "Admin" },
+      { label: "Audit log", href: "/admin/audit", icon: <ScrollText className="w-4 h-4" />, group: "Admin" },
+    ];
+    if (adminSession.isSuperAdmin) {
+      adminItems.push({ label: "Admin settings", href: "/admin/settings", icon: <Settings className="w-4 h-4" />, group: "Admin", keywords: ["allowlist", "rotate", "code"] });
+    }
+    return [...ITEMS, ...adminItems];
+  }, [adminSession?.unlocked, adminSession?.isSuperAdmin]);
+  const groups = Array.from(new Set(items.map((i) => i.group)));
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
@@ -79,7 +94,7 @@ export function UniversePalette() {
           <div key={g}>
             {gi > 0 && <CommandSeparator />}
             <CommandGroup heading={g}>
-              {ITEMS.filter((i) => i.group === g).map((item) => (
+              {items.filter((i) => i.group === g).map((item) => (
                 <CommandItem
                   key={item.label + item.href}
                   value={`${item.label} ${item.keywords?.join(" ") ?? ""}`}
