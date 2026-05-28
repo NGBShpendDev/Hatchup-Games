@@ -283,6 +283,76 @@ router.post("/fitness/log", fitnessLogLimiter, requireAuth, attachPlayer, requir
     ? { ...result.activity, createdAt: result.activity.createdAt.toISOString() }
     : null;
 
+  // ── Cross-feature reward fan-out ──────────────────────────────────────────
+  // The client renders a unified RewardSummaryModal, but the *source of truth*
+  // for what ripple-effects fired is the server. We synthesize a structured
+  // list of every cross-feature reward this activity triggered so any future
+  // surface (mobile, web, AI assistant recap) can reflect the same outcome
+  // without re-deriving it from the raw response shape.
+  type RewardEntry =
+    | { kind: "xp"; label: string; value: number; detail?: string }
+    | { kind: "hatchling"; label: string; value: number; detail?: string }
+    | { kind: "streak"; label: string; value: number; detail?: string }
+    | { kind: "leaderboard"; label: string; value?: string; detail?: string }
+    | { kind: "artifact"; label: string; value?: string; detail?: string }
+    | { kind: "challenge"; label: string; value?: string; detail?: string };
+  const rewardSummary: RewardEntry[] = [];
+  if (result.fitnessXpEarned > 0) {
+    rewardSummary.push({
+      kind: "xp",
+      label: "Fitness XP",
+      value: result.fitnessXpEarned,
+      detail: "Granted to your active Hatchling.",
+    });
+  }
+  if (groupBonusXp > 0) {
+    rewardSummary.push({
+      kind: "xp",
+      label: `Group bonus (+${groupXpBonusPct}%)`,
+      value: groupBonusXp,
+      detail: "Team energy increased.",
+    });
+  }
+  if ((result.eggsUpdated ?? 0) > 0) {
+    rewardSummary.push({
+      kind: "hatchling",
+      label: "Egg progress",
+      value: result.eggsUpdated,
+      detail: "Your incubator advanced toward hatching.",
+    });
+  }
+  const streakAfter = result.updatedPlayer.currentStreak ?? 0;
+  if (streakAfter > 0) {
+    rewardSummary.push({
+      kind: "streak",
+      label: `${streakAfter}-day streak`,
+      value: streakAfter,
+      detail: "Keep the chain alive tomorrow.",
+    });
+  }
+  if (result.prResult?.isNew) {
+    rewardSummary.push({
+      kind: "leaderboard",
+      label: "New Personal Record",
+      value: String(result.prResult.value ?? ""),
+      detail: `${result.prResult.activityType} — leaderboard standing improved.`,
+    });
+  }
+  for (const a of result.newArtifacts ?? []) {
+    rewardSummary.push({
+      kind: "artifact",
+      label: a.name,
+      value: a.rarity,
+      detail: "Minted to your Museum.",
+    });
+  }
+  for (const b of result.newBadges ?? []) {
+    rewardSummary.push({
+      kind: "challenge",
+      label: `Badge: ${b.name ?? "Achievement"}`,
+    });
+  }
+
   res.status(201).json({
     activity: activityFormatted,
     fitnessXpEarned: result.fitnessXpEarned + groupBonusXp,
@@ -293,6 +363,7 @@ router.post("/fitness/log", fitnessLogLimiter, requireAuth, attachPlayer, requir
     prResult: result.prResult ?? null,
     newArtifacts: result.newArtifacts ?? [],
     newBadges: result.newBadges ?? [],
+    rewardSummary,
   });
 });
 

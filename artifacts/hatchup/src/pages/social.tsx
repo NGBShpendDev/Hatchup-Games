@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { Layout } from "@/components/layout";
+import { ForYouStrip } from "@/components/for-you-strip";
 import { usePlayer } from "@/lib/playerContext";
 import {
   useGetSocialFeed,
@@ -810,6 +811,16 @@ export default function Social() {
             <Plus className="w-5 h-5" />
           </Button>
         </div>
+
+        <ForYouStrip
+          heading="For You"
+          items={[
+            { id: "follow-friends", title: "Find friends to follow", subtitle: "Discover players in your realm.", href: "/social", icon: <Users className="w-4 h-4" />, tone: "cyan", tag: "Social" },
+            { id: "join-group", title: "Join a workout group", subtitle: "Train with others in your city.", href: "/groups", icon: <Users className="w-4 h-4" />, tone: "violet", tag: "Group" },
+            { id: "start-challenge", title: "Start a public challenge", subtitle: "Invite friends and stake a goal.", href: "/challenges/create", icon: <Zap className="w-4 h-4" />, tone: "primary", tag: "Compete" },
+            { id: "share-pr", title: "Share your latest PR", subtitle: "Post a record to your feed.", href: "/records", icon: <Flame className="w-4 h-4" />, tone: "yellow", tag: "Brag" },
+          ]}
+        />
 
         {/* Feed */}
         {isLoading ? (

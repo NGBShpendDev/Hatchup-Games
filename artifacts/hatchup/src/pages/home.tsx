@@ -18,6 +18,9 @@ import { XpBar } from "@/components/xp-bar";
 import { SubscriptionChip } from "@/components/subscription-chip";
 import { LevelUpOverlay } from "@/components/level-up-overlay";
 import { ArtifactUnlockOverlay, type UnlockedArtifact } from "@/components/artifact-unlock-overlay";
+import { ForYouStrip, type ForYouItem } from "@/components/for-you-strip";
+import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
+import { Bot as BotIcon, Salad as SaladIcon, Swords as SwordsIcon, Users as UsersIcon, Trophy as TrophyIcon, Egg as EggLucide } from "lucide-react";
 
 const OVERLAY_RARITIES = new Set(["Legendary", "Mythic", "Ancient", "Celestial"]);
 
@@ -126,6 +129,7 @@ export default function Home() {
   const [levelUpData, setLevelUpData] = useState<{ level: number; newBadges: any[] }>({ level: 1, newBadges: [] });
   const [artifactQueue, setArtifactQueue] = useState<UnlockedArtifact[]>([]);
   const [xpPopups, setXpPopups] = useState<{ id: number; amount: number }[]>([]);
+  const [rewardSummary, setRewardSummary] = useState<{ open: boolean; entries: RewardEntry[] }>({ open: false, entries: [] });
 
   const spawnXpPopup = (amount: number) => {
     const id = Date.now();
@@ -157,34 +161,50 @@ export default function Home() {
 
           const prResult = (res as any).prResult;
           const newArtifacts: UnlockedArtifact[] = (res as any).newArtifacts ?? [];
+          const newBadges: Array<{ id?: number; name?: string; rarity?: string }> = (res as any).newBadges ?? [];
+          const groupBonusXp = (res as any).groupBonusXp ?? 0;
+          const eggsUpdated = (res as any).eggsUpdated ?? 0;
+          const streakAfter = (res as any).player?.currentStreak ?? null;
+
+          // Epic artifact unlocks get the dedicated celebratory overlay;
+          // everything else funnels through the unified reward summary.
           const epicUnlocks = newArtifacts.filter(a => OVERLAY_RARITIES.has(a.rarity));
           const minorUnlocks = newArtifacts.filter(a => !OVERLAY_RARITIES.has(a.rarity));
-
           if (epicUnlocks.length > 0) {
             setArtifactQueue(epicUnlocks);
           }
 
-          if (minorUnlocks.length > 0) {
-            for (const artifact of minorUnlocks) {
-              toast({ title: `✨ Artifact Unlocked!`, description: `${artifact.name} (${artifact.rarity}) — visit your Museum to equip it.` });
-            }
-          }
-
-          if (newArtifacts.length > 0) {
-            // already handled above — skip generic toast paths
-          } else if (prResult?.isNew) {
+          // Build a unified cross-feature reward summary that reflects the
+          // server-side fan-out (XP → Pals, challenge progress, leaderboard,
+          // streak, artifact mint) in a single celebratory modal.
+          const entries: RewardEntry[] = [];
+          if (xpEarned > 0) entries.push({ kind: "xp", label: "Fitness XP", value: xpEarned, detail: "Granted to your active Hatchling." });
+          if (groupBonusXp > 0) entries.push({ kind: "xp", label: "Group bonus XP", value: groupBonusXp });
+          if (eggsUpdated > 0) entries.push({ kind: "hatchling", label: "Egg progress", value: `+${eggsUpdated}`, detail: "Your incubator advanced." });
+          if (streakAfter && streakAfter > 0) entries.push({ kind: "streak", label: `${streakAfter}-day streak`, detail: "Keep the chain alive tomorrow." });
+          if (prResult?.isNew) {
             const paceDesc = prResult.metric === "pace_seconds_per_mile"
-              ? (() => { const s = prResult.value; return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")} /mi pace`; })()
+              ? (() => { const s = prResult.value; return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")} /mi`; })()
               : prResult.metric === "speed_mph_x10"
-              ? `${(prResult.value / 10).toFixed(1)} mph avg`
+              ? `${(prResult.value / 10).toFixed(1)} mph`
               : `${prResult.value} reps`;
-            toast({
-              title: "🏆 New Personal Record!",
-              description: `${REP_TYPE_LABELS[prResult.activityType] ?? prResult.activityType}: ${paceDesc}`,
+            entries.push({
+              kind: "leaderboard",
+              label: "New Personal Record",
+              value: paceDesc,
+              detail: `${REP_TYPE_LABELS[prResult.activityType] ?? prResult.activityType} — your leaderboard entry just climbed.`,
             });
-          } else {
-            toast({ title: "Activity Logged! 🔥", description: "Keep moving, your Pals are thriving!" });
           }
+          for (const artifact of minorUnlocks) {
+            entries.push({ kind: "artifact", label: artifact.name, value: artifact.rarity, detail: "Equip it from the Museum." });
+          }
+          for (const badge of newBadges) {
+            if (badge?.name) entries.push({ kind: "challenge", label: `Badge: ${badge.name}`, detail: badge.rarity ?? "" });
+          }
+          if (entries.length === 0) {
+            entries.push({ kind: "xp", label: "Activity logged", detail: "Your Pals are thriving!" });
+          }
+          setRewardSummary({ open: true, entries });
 
           queryClient.invalidateQueries({ queryKey: getGetPlayerDashboardQueryKey(pid) }).then(() => {
             const newDash = queryClient.getQueryData(getGetPlayerDashboardQueryKey(pid)) as any;
@@ -236,6 +256,13 @@ export default function Home() {
       <ArtifactUnlockOverlay
         queue={artifactQueue}
         onDismissAll={() => setArtifactQueue([])}
+      />
+
+      <RewardSummaryModal
+        open={rewardSummary.open}
+        onClose={() => setRewardSummary({ open: false, entries: [] })}
+        title="Reward Summary"
+        rewards={rewardSummary.entries}
       />
 
       {/* Floating XP popups */}
@@ -390,6 +417,88 @@ export default function Home() {
             </div>
           </section>
         )}
+
+        {/* For You — personalized recommendations across the universe */}
+        <ForYouStrip
+          items={(() => {
+            const items: ForYouItem[] = [];
+            const fitness = (dashboard as any).fitness ?? {};
+            const eggs = (dashboard as any).eggs ?? {};
+            const streak = fitness.currentStreak ?? 0;
+            const stepPct = fitness.stepGoalPct ?? 0;
+
+            if (eggs.readyCount > 0) {
+              items.push({
+                id: "hatch-ready",
+                title: `${eggs.readyCount} egg${eggs.readyCount > 1 ? "s" : ""} ready to hatch`,
+                subtitle: "Open it now to grow your collection.",
+                href: "/hatch",
+                icon: <EggLucide className="w-4 h-4" />,
+                tone: "yellow",
+                tag: "Now",
+              });
+            }
+            if (stepPct < 100) {
+              items.push({
+                id: "log-activity",
+                title: "Hit today's step goal",
+                subtitle: `${Math.max(0, 100 - Math.round(stepPct))}% to go. Log a quick activity.`,
+                href: "/",
+                icon: <Zap className="w-4 h-4" />,
+                tone: "primary",
+                tag: "Daily",
+              });
+            }
+            items.push({
+              id: "battle-ready",
+              title: "Test battle readiness",
+              subtitle: "See how your nutrition + workouts power your Pals.",
+              href: "/compete/battle",
+              icon: <SwordsIcon className="w-4 h-4" />,
+              tone: "violet",
+              tag: "Compete",
+            });
+            items.push({
+              id: "fuel-up",
+              title: "Fuel up with a meal",
+              subtitle: "Logging meals raises battle readiness.",
+              href: "/nutrition",
+              icon: <SaladIcon className="w-4 h-4" />,
+              tone: "green",
+              tag: "Nutrition",
+            });
+            if (streak >= 3) {
+              items.push({
+                id: "streak-share",
+                title: `${streak}-day streak — share it`,
+                subtitle: "Post your streak to your feed.",
+                href: "/social",
+                icon: <UsersIcon className="w-4 h-4" />,
+                tone: "cyan",
+                tag: "Social",
+              });
+            }
+            items.push({
+              id: "ai-coach",
+              title: "Ask the AI Coach",
+              subtitle: "Get a personalized plan based on your day.",
+              href: "/coach",
+              icon: <BotIcon className="w-4 h-4" />,
+              tone: "primary",
+              tag: "AI",
+            });
+            items.push({
+              id: "climb-board",
+              title: "Climb the leaderboard",
+              subtitle: "Your local placement also boosts the global board.",
+              href: "/social",
+              icon: <TrophyIcon className="w-4 h-4" />,
+              tone: "yellow",
+              tag: "Ranks",
+            });
+            return items;
+          })()}
+        />
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4">

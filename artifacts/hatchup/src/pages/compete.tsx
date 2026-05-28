@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { Swords, Trophy, Zap, Crown } from "lucide-react";
+import { Swords, Trophy, Zap, Crown, Salad, Dumbbell, Bot } from "lucide-react";
+import { ForYouStrip } from "@/components/for-you-strip";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -44,6 +45,16 @@ export default function Compete() {
   return (
     <Layout>
       <div className="max-w-6xl mx-auto space-y-6 pb-24 px-2">
+
+        <ForYouStrip
+          heading="Power Up For Battle"
+          items={[
+            { id: "battle-ready", title: "Check battle readiness", subtitle: "How fueled your Pals are today.", href: "/compete/battle", icon: <Swords className="w-4 h-4" />, tone: "violet", tag: "Stats" },
+            { id: "fuel-meal", title: "Log a meal first", subtitle: "Nutrition raises battle stats.", href: "/nutrition", icon: <Salad className="w-4 h-4" />, tone: "green", tag: "Fuel" },
+            { id: "warm-up", title: "Quick warm-up workout", subtitle: "Earn XP before queueing.", href: "/training", icon: <Dumbbell className="w-4 h-4" />, tone: "primary", tag: "Train" },
+            { id: "ask-coach", title: "Ask the AI Coach", subtitle: "Get the best match for your strengths.", href: "/coach", icon: <Bot className="w-4 h-4" />, tone: "primary", tag: "AI" },
+          ]}
+        />
 
         {/* ── Battle Arena CTA ── */}
         <motion.div

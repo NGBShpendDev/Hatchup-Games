@@ -36,6 +36,7 @@ import Onboarding from "@/pages/onboarding";
 import FamilyPage from "@/pages/family";
 import SubscriptionPage from "@/pages/subscription";
 import PlayerProfile from "@/pages/player-profile";
+import { PageTransition } from "@/components/page-transition";
 
 const queryClient = new QueryClient();
 
@@ -224,6 +225,7 @@ function AppRoutes() {
       <div id="passive-xp-toast" className="hidden" aria-hidden="true" />
       <PassiveXpBanner />
       <PassiveXpNudge />
+      <PageTransition>
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/explore" component={Explore} />
@@ -251,6 +253,7 @@ function AppRoutes() {
         <Route path="/subscription" component={SubscriptionPage} />
         <Route component={NotFound} />
       </Switch>
+      </PageTransition>
     </>
   );
 }

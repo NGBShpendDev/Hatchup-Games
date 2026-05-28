@@ -2,10 +2,12 @@ import { Layout } from "@/components/layout";
 import { useListRealms, getListRealmsQueryKey } from "@workspace/api-client-react";
 import { usePlayer } from "@/lib/playerContext";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { Map, Lock, Zap } from "lucide-react";
+import { Map, Lock, Zap, Egg, Sparkles, Trophy } from "lucide-react";
+import { ForYouStrip } from "@/components/for-you-strip";
+import { GlassCard } from "@/components/ui/glass-card";
 
 export default function Explore() {
   const { playerId } = usePlayer();
@@ -27,6 +29,15 @@ export default function Explore() {
           </p>
         </div>
 
+        <ForYouStrip
+          heading="Grow Your Pals"
+          items={[
+            { id: "hatch", title: "Hatch a new egg", subtitle: "Open a fresh Pal for your collection.", href: "/hatch", icon: <Egg className="w-4 h-4" />, tone: "yellow", tag: "Hatch" },
+            { id: "evolve", title: "Browse evolutions", subtitle: "Plan what your Pals can become.", href: "/explore", icon: <Sparkles className="w-4 h-4" />, tone: "violet", tag: "Plan" },
+            { id: "compete", title: "Take them to battle", subtitle: "Test your strongest Pal.", href: "/compete/battle", icon: <Trophy className="w-4 h-4" />, tone: "primary", tag: "Compete" },
+          ]}
+        />
+
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[...Array(4)].map((_, i) => (
@@ -43,11 +54,10 @@ export default function Explore() {
                   whileHover={!isLocked ? { y: -5 } : {}}
                   className="h-full"
                 >
-                  <Card 
-                    className={`overflow-hidden border-2 h-full transition-all duration-300 ${
-                      isLocked 
-                        ? 'border-border/50 opacity-60 grayscale' 
-                        : 'border-border hover:border-primary/50'
+                  <GlassCard
+                    glow={isLocked ? "none" : "primary"}
+                    className={`overflow-hidden h-full transition-all duration-300 ${
+                      isLocked ? "opacity-60 grayscale" : ""
                     }`}
                   >
                     <div 
@@ -102,7 +112,7 @@ export default function Explore() {
                         </div>
                       </div>
                     </CardContent>
-                  </Card>
+                  </GlassCard>
                 </motion.div>
               );
             })}
