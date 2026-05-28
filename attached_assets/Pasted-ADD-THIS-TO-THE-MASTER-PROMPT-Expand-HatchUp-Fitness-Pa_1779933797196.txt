@@ -1,0 +1,278 @@
+ADD THIS TO THE MASTER PROMPT:
+
+Expand HatchUp Fitness Pals into a next-generation online multiplayer fitness battle universe with elite graphics, advanced progression systems, addictive dopamine reward loops, and enterprise-grade security.
+
+Allow players to battle their HatchUp creatures against real players worldwide in real-time online multiplayer combat.
+
+The battle system should combine:
+- strategy
+- timing
+- creature abilities
+- fitness progression
+- reaction speed
+- ultimate attacks
+- team composition
+
+Include:
+- ranked matchmaking
+- casual battles
+- guild wars
+- tournament brackets
+- seasonal world championships
+- spectator mode
+- replay systems
+- friend battles
+- raid bosses
+- team battles
+- online arenas
+
+Battles should feature:
+- anime-style cinematic attacks
+- dodge mechanics
+- combo chains
+- critical hits
+- ultimate abilities
+- elemental advantages
+- cooldown systems
+- energy bars
+- cinematic finishers
+- advanced AI combat behavior
+
+The game should feel competitive enough for:
+- esports
+- livestreams
+- viral TikTok clips
+- social media content
+
+========================================
+
+TOP-TIER GRAPHICS:
+
+Build premium AAA-quality mobile graphics with:
+- high-quality 3D creature models
+- cinematic lighting
+- dynamic shadows
+- particle systems
+- weather systems
+- animated environments
+- premium shaders
+- ultra-smooth animations
+- console-quality textures
+- dramatic battle cinematics
+- dynamic camera angles
+
+Each HatchUp creature should have:
+- emotional reactions
+- idle animations
+- personality-based movement
+- victory dances
+- rage animations
+- evolution cinematics
+- custom attack visuals
+
+Battle arenas should feel alive and immersive.
+
+========================================
+
+REAL FITNESS = REAL POWER:
+
+Real-world fitness directly affects gameplay progression.
+
+Fitness impacts:
+- stamina
+- speed
+- attack power
+- endurance
+- buffs
+- passive abilities
+- move unlocks
+
+Examples:
+- cardio improves stamina
+- strength training increases attack power
+- walking improves agility
+- consistency streaks unlock passive abilities
+- hydration improves recovery
+- sleep improves energy regeneration
+
+========================================
+
+ADVANCED XP + LEVELING SYSTEM:
+
+Create layered progression systems.
+
+PLAYER ACCOUNT LEVEL:
+Players gain XP from:
+- workouts
+- steps
+- battles
+- mini games
+- tournaments
+- streaks
+- challenges
+- social activity
+
+HATCHUP CREATURE LEVEL:
+Each HatchUp levels independently through:
+- training
+- bonding
+- battles
+- workouts
+- quests
+- evolution progression
+
+PRESTIGE SYSTEM:
+After max level players can prestige to unlock:
+- glowing usernames
+- prestige evolutions
+- elite cosmetics
+- legendary animations
+- rare badges
+- exclusive arenas
+- mythic aura effects
+
+========================================
+
+GOAL-BASED MOVE UNLOCKS:
+
+Fitness milestones unlock abilities.
+
+STEP GOALS:
+- 5k steps unlocks Quick Dash
+- 10k steps unlocks Speed Strike
+- 25k steps unlocks Lightning Rush
+
+CARDIO GOALS:
+- run milestones unlock wind attacks
+- endurance streaks unlock storm abilities
+
+STRENGTH GOALS:
+- pushups unlock slam attacks
+- squats unlock earthquake attacks
+- strength streaks unlock titan powers
+
+RECOVERY GOALS:
+- hydration unlocks healing moves
+- sleep unlocks recovery buffs
+
+CONSISTENCY GOALS:
+- long streaks unlock legendary transformations
+
+Rare moves should feel prestigious and difficult to earn.
+
+========================================
+
+DOPAMINE REWARD ENGINE:
+
+Create constant satisfying feedback loops.
+
+Include:
+- XP explosions
+- glowing reward animations
+- surprise loot drops
+- mystery eggs
+- jackpot moments
+- evolving creatures
+- random rare encounters
+- streak bonuses
+- animated unlock screens
+- satisfying sounds
+- haptic vibration feedback
+
+Every action should feel rewarding.
+
+========================================
+
+BADGE + FLEX CULTURE:
+
+Players should obsess over collecting badges and flexing progression.
+
+Badge types:
+- Founder
+- Mythic
+- Tournament Champion
+- Legendary Grinder
+- Elite Trainer
+- Raid Champion
+- Fitness Beast
+
+Badge rarities:
+- Common
+- Rare
+- Epic
+- Legendary
+- Mythic
+
+Badges should:
+- glow
+- animate
+- display beside usernames
+- increase social status
+- unlock cosmetics
+
+========================================
+
+SOCIAL + COMPETITIVE FEATURES:
+
+Include:
+- global leaderboards
+- local rankings
+- guild systems
+- live spectating
+- player profiles
+- streaming support
+- battle sharing
+- creature showcases
+- social hubs
+- friend systems
+
+Players should constantly compare:
+- levels
+- creatures
+- streaks
+- badges
+- battle stats
+- rankings
+- evolutions
+
+========================================
+
+ADVANCED SECURITY + ANTI-CHEAT:
+
+Build enterprise-grade security systems.
+
+Include:
+- encrypted user data
+- secure cloud infrastructure
+- MFA authentication
+- protected APIs
+- secure matchmaking
+- anti-cheat systems
+- exploit prevention
+- fake GPS detection
+- step spoofing prevention
+- fraud monitoring
+- bot detection
+- secure payment systems
+- moderation tools
+- reporting systems
+- parental controls
+- child-safe protections
+
+Protect:
+- fitness data
+- health data
+- payment data
+- multiplayer systems
+- account systems
+
+The game should feel secure, trusted, fair, and safe for all ages.
+
+========================================
+
+MAIN GOAL:
+
+Create the most addictive, motivating, competitive, secure, and visually impressive fitness game ever built.
+
+The final experience should feel like:
+“Pokémon meets Fortnite meets Strava in a next-generation online fitness universe.”

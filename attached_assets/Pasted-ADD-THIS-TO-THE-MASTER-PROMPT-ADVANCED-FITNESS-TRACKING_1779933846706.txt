@@ -1,0 +1,233 @@
+ADD THIS TO THE MASTER PROMPT:
+
+========================================
+
+ADVANCED FITNESS TRACKING + COMPETITION EXPANSION
+
+Expand the fitness progression system to include advanced athletic tracking, AI body analysis, real-world challenge systems, and recorded competitive events between players.
+
+========================================
+
+RUNNING + CYCLING SPEED SYSTEM
+
+Track and reward:
+- top sprint speed
+- fastest mile pace
+- fastest 5k pace
+- longest runs
+- cycling speed
+- endurance milestones
+- distance records
+
+Create elite performance badges and rankings for runners and cyclists.
+
+RUNNING BADGES:
+- Speed Demon
+- Sub 6 Minute Mile
+- Marathon Beast
+- Endurance King
+- Lightning Runner
+- Hill Destroyer
+
+CYCLING BADGES:
+- Road Warrior
+- Velocity Rider
+- Sprint Cyclist
+- Mountain Crusher
+- Endurance Cycler
+
+Allow players to:
+- track personal records
+- compete against friends
+- climb speed leaderboards
+- earn prestige titles
+- unlock exclusive cosmetics
+
+Create level systems specifically for:
+- running
+- cycling
+- endurance
+- speed training
+
+========================================
+
+PUSHUP + BURPEE + STRENGTH CHALLENGES
+
+Add real-world strength competitions.
+
+Include:
+- pushup challenges
+- burpee challenges
+- squat challenges
+- pull-up challenges
+- plank challenges
+- sit-up competitions
+
+Allow:
+- live competitions
+- challenge invitations
+- tournament brackets
+- guild fitness wars
+- daily challenge modes
+
+Fitness challenge battles should be:
+- recorded
+- verified
+- replayable
+- shareable
+
+Users should be able to upload or live record challenges directly in-app.
+
+Include AI movement verification to:
+- count reps accurately
+- prevent cheating
+- verify form quality
+- validate competition results
+
+========================================
+
+XP + MONEY CHALLENGE SYSTEM
+
+Create an extremely addictive “Earn XP Through Effort” system.
+
+Every completed exercise gives XP.
+
+Examples:
+- 1 pushup = 1 XP
+- 1 burpee = 1 XP
+- 1 squat = 1 XP
+- 1 pull-up = 1 XP
+
+Create milestone systems up to:
+- 1,000 reps
+- 10,000 reps
+- 50,000 reps
+- 100,000 reps
+
+Unlock:
+- elite badges
+- rare creatures
+- mythic cosmetics
+- legendary titles
+- prestige rewards
+
+Create:
+- global rep leaderboards
+- monthly competitions
+- seasonal grind rankings
+- workout streak multipliers
+
+========================================
+
+AI BODY SCAN SYSTEM
+
+Implement advanced AI-powered body analysis.
+
+Allow users to:
+- scan their body using phone camera
+- estimate body fat percentage
+- estimate muscle mass
+- estimate physique type
+- estimate posture
+- track progress over time
+
+The AI should generate:
+- realistic physique analysis
+- fitness improvement recommendations
+- workout plans
+- calorie guidance
+- muscle-building suggestions
+- fat loss recommendations
+- recovery advice
+
+Allow users to choose:
+- desired physique goal
+- athletic goals
+- transformation goals
+
+Examples:
+- lean athlete
+- bodybuilder
+- shredded physique
+- slim thick
+- power athlete
+- endurance runner
+
+AI should generate:
+- realistic timelines
+- progress tracking
+- visual transformation simulations
+- personalized improvement plans
+
+========================================
+
+RECORDED COMPETITIONS + VERIFICATION
+
+All competitive challenges should support:
+- video recording
+- AI verification
+- replay systems
+- moderation systems
+- anti-cheat validation
+
+Allow:
+- live pushup battles
+- live burpee races
+- live squat competitions
+- timed fitness duels
+- guild competitions
+- seasonal championships
+
+Create:
+- replay highlights
+- viral clips
+- social sharing
+- battle commentary
+- fitness announcers
+- crowd reactions
+
+Recorded competitions should feel:
+- competitive
+- intense
+- entertaining
+- viral
+- esports-ready
+
+========================================
+
+FITNESS SOCIAL MEDIA FEATURES
+
+Allow users to:
+- upload fitness clips
+- share transformations
+- post achievements
+- flex badges
+- showcase records
+- stream competitions
+
+Include:
+- likes
+- comments
+- reactions
+- follower systems
+- creator profiles
+- trending clips
+- viral challenges
+
+========================================
+
+MAIN GOAL
+
+Create the most advanced fitness gaming platform ever built.
+
+The app should combine:
+- fitness
+- AI
+- competition
+- creature collecting
+- social media
+- esports
+- progression systems
+- addictive rewards
+
+The experience should motivate millions of people worldwide to improve themselves while having fun competing and evolving their HatchUps.

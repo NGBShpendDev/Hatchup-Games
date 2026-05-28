@@ -1,0 +1,179 @@
+ADD THIS TO THE MASTER PROMPT:
+
+========================================
+
+HATCHUP NUTRITION + MEAL FLEX SOCIAL SYSTEM
+
+Create a dedicated social nutrition section where users can share meals, recipes, transformations, and diet strategies to help others:
+- lose weight
+- bulk up
+- build muscle
+- cut fat
+- improve performance
+- eat healthier
+
+The nutrition section should feel:
+- motivating
+- social
+- visually satisfying
+- educational
+- competitive
+- community-driven
+
+========================================
+
+MEAL FLEX FEED
+
+Allow users to upload:
+- meal photos
+- recipes
+- calorie breakdowns
+- macro breakdowns
+- protein intake
+- grocery hauls
+- meal prep videos
+- cooking tutorials
+- transformation meals
+
+Users should be able to tag meals as:
+- weight loss
+- lean bulk
+- muscle gain
+- keto
+- high protein
+- vegan
+- athlete meals
+- cheap meals
+- healthy snacks
+- pre-workout
+- post-workout
+
+========================================
+
+AI NUTRITION ANALYSIS
+
+Use AI to analyze meals from photos.
+
+The AI should estimate:
+- calories
+- protein
+- carbs
+- fats
+- sodium
+- portion sizes
+- meal quality
+
+AI should give suggestions like:
+- healthier alternatives
+- macro improvements
+- calorie adjustments
+- muscle-building tips
+- fat-loss advice
+- hydration recommendations
+
+========================================
+
+BODY GOAL NUTRITION SYSTEM
+
+Allow users to choose physique goals:
+- shredded
+- lean athletic
+- muscle gain
+- slim thick
+- strength athlete
+- endurance runner
+- weight loss
+- body recomposition
+
+Based on goals, AI should generate:
+- meal suggestions
+- calorie targets
+- grocery lists
+- meal timing recommendations
+- macro plans
+- weekly nutrition strategies
+
+========================================
+
+SOCIAL FLEX + VIRAL FEATURES
+
+Allow users to:
+- flex meals
+- post transformation progress
+- show cheat meals
+- share meal prep setups
+- compete in nutrition challenges
+- earn meal badges
+
+Include:
+- likes
+- comments
+- saves
+- reposts
+- trending meals
+- featured creators
+- recipe leaderboards
+- healthy streaks
+
+========================================
+
+NUTRITION CHALLENGES
+
+Create:
+- meal prep competitions
+- healthy eating streaks
+- hydration challenges
+- calorie goal challenges
+- protein intake challenges
+- transformation contests
+
+Reward users with:
+- XP
+- badges
+- cosmetics
+- rare HatchUp boosts
+- nutrition-themed cosmetics
+
+========================================
+
+MEAL BADGES + TITLES
+
+Examples:
+- Protein King
+- Macro Master
+- Meal Prep Legend
+- Lean Machine
+- Bulk Beast
+- Hydration Hero
+- Healthy Streak Champion
+
+Badges should:
+- glow
+- animate
+- display on profiles
+- increase prestige
+
+========================================
+
+COMMUNITY + DISCOVERY
+
+Allow users to:
+- follow creators
+- save meals
+- discover recipes
+- search by fitness goals
+- filter by calorie range
+- join nutrition communities
+- create meal groups
+
+Create:
+- trending recipes
+- viral healthy meals
+- featured transformations
+- creator rankings
+
+========================================
+
+MAIN GOAL
+
+Turn nutrition and meal sharing into a fun, addictive, motivational social experience that helps users stay consistent while flexing their healthy lifestyle and physique progress.
