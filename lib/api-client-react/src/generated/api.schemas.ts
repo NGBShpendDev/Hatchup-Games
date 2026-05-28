@@ -369,6 +369,18 @@ export interface Club {
   createdAt: string;
 }
 
+/**
+ * @nullable
+ */
+export type ClubMemberClubRole = typeof ClubMemberClubRole[keyof typeof ClubMemberClubRole] | null;
+
+
+export const ClubMemberClubRole = {
+  owner: 'owner',
+  officer: 'officer',
+  member: 'member',
+} as const;
+
 export interface ClubMember {
   id: number;
   username: string;
@@ -380,7 +392,20 @@ export interface ClubMember {
   rank: string;
   totalWins: number;
   /** @nullable */
-  clubRole?: string | null;
+  clubRole?: ClubMemberClubRole;
+}
+
+export type UpdateClubMemberRoleInputClubRole = typeof UpdateClubMemberRoleInputClubRole[keyof typeof UpdateClubMemberRoleInputClubRole];
+
+
+export const UpdateClubMemberRoleInputClubRole = {
+  owner: 'owner',
+  officer: 'officer',
+  member: 'member',
+} as const;
+
+export interface UpdateClubMemberRoleInput {
+  clubRole: UpdateClubMemberRoleInputClubRole;
 }
 
 export interface ClubInput {

@@ -13,6 +13,7 @@ import {
   useListClubPendingInvites,
   getListClubPendingInvitesQueryKey,
   useCancelClubInvite,
+  useUpdateClubMemberRole,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePlayer } from "@/lib/playerContext";
@@ -27,7 +28,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, Check, Crown, Mail, Search, Shield, ShieldCheck, Trophy, UserPlus, Users, X } from "lucide-react";
+import { ArrowLeft, ArrowDown, ArrowUp, Check, Crown, Mail, Search, Shield, ShieldCheck, Trophy, UserPlus, Users, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 
@@ -138,6 +139,31 @@ export default function ClubDetail() {
 
   const myMembership = player ? (members ?? []).find((m) => m.id === player.id) : null;
   const canInvite = myMembership?.clubRole === "owner" || myMembership?.clubRole === "officer";
+  const isOwner = myMembership?.clubRole === "owner";
+
+  const updateRole = useUpdateClubMemberRole({
+    mutation: {
+      onSuccess: (_, vars) => {
+        const nextRole = vars.data.clubRole;
+        toast({
+          title:
+            nextRole === "owner"
+              ? "Ownership transferred"
+              : nextRole === "officer"
+              ? "Promoted to officer"
+              : "Demoted to member",
+        });
+        queryClient.invalidateQueries({ queryKey: getListClubMembersQueryKey(id) });
+      },
+      onError: (err: { response?: { data?: { error?: string } } }) => {
+        toast({
+          title: "Could not update role",
+          description: err?.response?.data?.error ?? "Try again",
+          variant: "destructive",
+        });
+      },
+    },
+  });
 
   const memberIds = new Set((members ?? []).map((m) => m.id));
   const inviteResults: PlayerStub[] = (searchResults ?? []).filter(
@@ -284,6 +310,10 @@ export default function ClubDetail() {
               {sortedMembers.map((member, index) => {
                 const role = roleStyle(member.clubRole);
                 const name = member.displayName || member.username;
+                const memberRole = (member.clubRole ?? "member") as "owner" | "officer" | "member";
+                const showRoleControls = isOwner && member.id !== player?.id && memberRole !== "owner";
+                const isMutating =
+                  updateRole.isPending && updateRole.variables?.playerId === member.id;
                 return (
                   <motion.div
                     key={member.id}
@@ -291,10 +321,10 @@ export default function ClubDetail() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.03 }}
                   >
-                    <Link href={`/players/${member.id}`}>
-                      <a className="block">
-                        <Card className="hover:border-primary transition-colors border-2 cursor-pointer">
-                          <CardContent className="p-4 flex items-center gap-4">
+                    <Card className="hover:border-primary transition-colors border-2">
+                      <CardContent className="p-4 flex items-center gap-4">
+                        <Link href={`/players/${member.id}`}>
+                          <a className="flex items-center gap-4 flex-1 min-w-0 cursor-pointer">
                             <Avatar className="h-12 w-12 border-2 border-border">
                               {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt={name} />}
                               <AvatarFallback className="font-bold">{initials(name)}</AvatarFallback>
@@ -317,10 +347,51 @@ export default function ClubDetail() {
                                 <span>{member.totalWins} wins</span>
                               </div>
                             </div>
-                          </CardContent>
-                        </Card>
-                      </a>
-                    </Link>
+                          </a>
+                        </Link>
+                        {showRoleControls && (
+                          <div className="flex flex-col gap-1 shrink-0">
+                            {memberRole === "member" ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={isMutating}
+                                onClick={() =>
+                                  updateRole.mutate({
+                                    id,
+                                    playerId: member.id,
+                                    data: { clubRole: "officer" },
+                                  })
+                                }
+                                className="gap-1 font-bold"
+                                data-testid={`button-promote-member-${member.id}`}
+                              >
+                                <ArrowUp className="w-3.5 h-3.5" />
+                                {isMutating ? "…" : "Promote"}
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={isMutating}
+                                onClick={() =>
+                                  updateRole.mutate({
+                                    id,
+                                    playerId: member.id,
+                                    data: { clubRole: "member" },
+                                  })
+                                }
+                                className="gap-1 font-bold"
+                                data-testid={`button-demote-member-${member.id}`}
+                              >
+                                <ArrowDown className="w-3.5 h-3.5" />
+                                {isMutating ? "…" : "Demote"}
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   </motion.div>
                 );
               })}

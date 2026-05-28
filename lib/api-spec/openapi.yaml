@@ -1157,6 +1157,42 @@ paths:
         "404":
           description: Club not found
 
+  /clubs/{id}/members/{playerId}:
+    patch:
+      operationId: updateClubMemberRole
+      tags: [clubs]
+      summary: Promote or demote a club member (owner only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: playerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateClubMemberRoleInput"
+      responses:
+        "200":
+          description: Updated member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClubMember"
+        "400":
+          description: Invalid input
+        "403":
+          description: Only the club owner can change roles
+        "404":
+          description: Club or member not found
+
   /clubs/{id}/join:
     post:
       operationId: joinClub
@@ -4593,7 +4629,17 @@ components:
         level:       { type: integer }
         rank:        { type: string }
         totalWins:   { type: integer }
-        clubRole:    { type: ["string", "null"] }
+        clubRole:
+          type: ["string", "null"]
+          enum: [owner, officer, member, null]
+
+    UpdateClubMemberRoleInput:
+      type: object
+      required: [clubRole]
+      properties:
+        clubRole:
+          type: string
+          enum: [owner, officer, member]
 
     ClubInput:
       type: object

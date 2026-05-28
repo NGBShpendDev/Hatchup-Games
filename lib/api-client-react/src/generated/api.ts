@@ -235,6 +235,7 @@ import type {
   ToggleOwnedArtifactBody,
   TrendingPage,
   UnsubscribePushBody,
+  UpdateClubMemberRoleInput,
   UpdateMealPostInput,
   UploadUrlRequest,
   UploadUrlResponse,
@@ -4341,6 +4342,80 @@ export function useListClubMembers<TData = Awaited<ReturnType<typeof listClubMem
 
 
 
+
+export const getUpdateClubMemberRoleUrl = (id: number,
+    playerId: number,) => {
+
+
+
+
+  return `/api/clubs/${id}/members/${playerId}`
+}
+
+/**
+ * @summary Promote or demote a club member (owner only)
+ */
+export const updateClubMemberRole = async (id: number,
+    playerId: number,
+    updateClubMemberRoleInput: UpdateClubMemberRoleInput, options?: RequestInit): Promise<ClubMember> => {
+
+  return customFetch<ClubMember>(getUpdateClubMemberRoleUrl(id,playerId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateClubMemberRoleInput,)
+  }
+);}
+
+
+
+
+export const getUpdateClubMemberRoleMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateClubMemberRole>>, TError,{id: number;playerId: number;data: BodyType<UpdateClubMemberRoleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateClubMemberRole>>, TError,{id: number;playerId: number;data: BodyType<UpdateClubMemberRoleInput>}, TContext> => {
+
+const mutationKey = ['updateClubMemberRole'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateClubMemberRole>>, {id: number;playerId: number;data: BodyType<UpdateClubMemberRoleInput>}> = (props) => {
+          const {id,playerId,data} = props ?? {};
+
+          return  updateClubMemberRole(id,playerId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateClubMemberRoleMutationResult = NonNullable<Awaited<ReturnType<typeof updateClubMemberRole>>>
+    export type UpdateClubMemberRoleMutationBody = BodyType<UpdateClubMemberRoleInput>
+    export type UpdateClubMemberRoleMutationError = ErrorType<void>
+
+    /**
+ * @summary Promote or demote a club member (owner only)
+ */
+export const useUpdateClubMemberRole = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateClubMemberRole>>, TError,{id: number;playerId: number;data: BodyType<UpdateClubMemberRoleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateClubMemberRole>>,
+        TError,
+        {id: number;playerId: number;data: BodyType<UpdateClubMemberRoleInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateClubMemberRoleMutationOptions(options));
+    }
 
 export const getJoinClubUrl = (id: number,) => {
 

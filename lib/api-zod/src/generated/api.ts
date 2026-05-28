@@ -1413,9 +1413,33 @@ export const ListClubMembersResponseItem = zod.object({
   "level": zod.number(),
   "rank": zod.string(),
   "totalWins": zod.number(),
-  "clubRole": zod.string().nullish()
+  "clubRole": zod.union([zod.literal('owner'),zod.literal('officer'),zod.literal('member'),zod.literal(null)]).nullish()
 })
 export const ListClubMembersResponse = zod.array(ListClubMembersResponseItem)
+
+
+/**
+ * @summary Promote or demote a club member (owner only)
+ */
+export const UpdateClubMemberRoleParams = zod.object({
+  "id": zod.coerce.number(),
+  "playerId": zod.coerce.number()
+})
+
+export const UpdateClubMemberRoleBody = zod.object({
+  "clubRole": zod.enum(['owner', 'officer', 'member'])
+})
+
+export const UpdateClubMemberRoleResponse = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "level": zod.number(),
+  "rank": zod.string(),
+  "totalWins": zod.number(),
+  "clubRole": zod.union([zod.literal('owner'),zod.literal('officer'),zod.literal('member'),zod.literal(null)]).nullish()
+})
 
 
 /**

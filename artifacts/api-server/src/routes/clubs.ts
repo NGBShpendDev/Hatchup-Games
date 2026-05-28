@@ -8,6 +8,8 @@ import {
   GetClubParams,
   JoinClubParams,
   JoinClubBody,
+  UpdateClubMemberRoleParams,
+  UpdateClubMemberRoleBody,
 } from "@workspace/api-zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { sendPushToPlayer } from "../services/pushNotifications.ts";
@@ -322,6 +324,97 @@ router.get("/club-invites", requireAuth, attachPlayer, async (req, res) => {
   }));
 
   res.json(enriched);
+});
+
+// ── Promote / demote / transfer ownership of a club member (owner only) ───
+router.patch("/clubs/:id/members/:playerId", requireAuth, attachPlayer, async (req, res) => {
+  const params = UpdateClubMemberRoleParams.safeParse({
+    id: Number(req.params.id),
+    playerId: Number(req.params.playerId),
+  });
+  if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
+  const body = UpdateClubMemberRoleBody.safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
+
+  const club = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, params.data.id) });
+  if (!club) { res.status(404).json({ error: "Club not found" }); return; }
+
+  const viewer = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!viewer || viewer.clubId !== params.data.id) {
+    res.status(403).json({ error: "Only the club owner can change roles" });
+    return;
+  }
+  const viewerRole = (viewer.clubRole ?? "").toLowerCase();
+  if (viewerRole !== "owner") {
+    res.status(403).json({ error: "Only the club owner can change roles" });
+    return;
+  }
+
+  const target = await db.query.playersTable.findFirst({
+    where: eq(playersTable.id, params.data.playerId),
+  });
+  if (!target || target.clubId !== params.data.id) {
+    res.status(404).json({ error: "Member not found in this club" });
+    return;
+  }
+
+  const targetRole = (target.clubRole ?? "member").toLowerCase();
+  const nextRole = body.data.clubRole;
+
+  // Owner role can only be transferred, not removed. If the viewer is trying
+  // to change their own role to anything other than owner, reject.
+  if (target.id === viewer.id && nextRole !== "owner") {
+    res.status(403).json({
+      error: "Owner role can only be transferred to another member, not removed",
+    });
+    return;
+  }
+
+  // No-op: nothing to update.
+  if (targetRole === nextRole) {
+    res.json({
+      id: target.id,
+      username: target.username,
+      displayName: target.displayName,
+      avatarUrl: target.avatarUrl,
+      level: target.level,
+      rank: target.rank,
+      totalWins: target.totalWins,
+      clubRole: target.clubRole,
+    });
+    return;
+  }
+
+  if (nextRole === "owner") {
+    // Transfer ownership: target becomes owner, current owner becomes officer.
+    await db.transaction(async (tx) => {
+      await tx.update(playersTable)
+        .set({ clubRole: "officer" })
+        .where(eq(playersTable.id, viewer.id));
+      await tx.update(playersTable)
+        .set({ clubRole: "owner" })
+        .where(eq(playersTable.id, target.id));
+    });
+  } else {
+    await db.update(playersTable)
+      .set({ clubRole: nextRole })
+      .where(eq(playersTable.id, target.id));
+  }
+
+  const updated = await db.query.playersTable.findFirst({
+    where: eq(playersTable.id, target.id),
+    columns: {
+      id: true,
+      username: true,
+      displayName: true,
+      avatarUrl: true,
+      level: true,
+      rank: true,
+      totalWins: true,
+      clubRole: true,
+    },
+  });
+  res.json(updated);
 });
 
 export default router;
