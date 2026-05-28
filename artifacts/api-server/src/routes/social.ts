@@ -14,6 +14,7 @@ import {
   groupsTable,
 } from "@workspace/db";
 import { eq, and, desc, sql, or, ne, inArray, ilike } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
 import { blockMinorSocialWrite } from "../middlewares/minorGuard";
 import { socialWriteLimiter } from "../middlewares/rateLimiters";
@@ -1079,27 +1080,28 @@ router.get("/social/discover", requireAuth, attachPlayer, async (req, res) => {
   const followerCounts = new Map(followerRows.map(r => [r.followeeId, r.count]));
 
   // Shared groups per candidate: groups where both viewer and the candidate are members.
+  // Single SQL round-trip via a self-join on group_members + groups (indexed on
+  // (player_id, group_id)) so latency stays flat as the viewer's group count grows.
   const sharedGroupsByPlayer = new Map<number, Array<{ id: number; name: string }>>();
   if (myGroupIds.length > 0) {
-    const candidateMemberships = await db.query.groupMembersTable.findMany({
-      where: and(
-        inArray(groupMembersTable.playerId, ranked.map(c => c.id)),
-        inArray(groupMembersTable.groupId, myGroupIds),
-      ),
-    });
-    if (candidateMemberships.length > 0) {
-      const referencedGroupIds = Array.from(new Set(candidateMemberships.map(m => m.groupId)));
-      const groupRows = await db.query.groupsTable.findMany({
-        where: inArray(groupsTable.id, referencedGroupIds),
-      });
-      const groupNameMap = new Map(groupRows.map(g => [g.id, g.name]));
-      for (const m of candidateMemberships) {
-        const name = groupNameMap.get(m.groupId);
-        if (!name) continue;
-        const list = sharedGroupsByPlayer.get(m.playerId) ?? [];
-        list.push({ id: m.groupId, name });
-        sharedGroupsByPlayer.set(m.playerId, list);
-      }
+    const viewerGm = alias(groupMembersTable, "viewer_gm");
+    const sharedRows = await db
+      .select({
+        playerId: groupMembersTable.playerId,
+        groupId: groupsTable.id,
+        groupName: groupsTable.name,
+      })
+      .from(groupMembersTable)
+      .innerJoin(
+        viewerGm,
+        and(eq(viewerGm.groupId, groupMembersTable.groupId), eq(viewerGm.playerId, viewerId)),
+      )
+      .innerJoin(groupsTable, eq(groupsTable.id, groupMembersTable.groupId))
+      .where(inArray(groupMembersTable.playerId, ranked.map(c => c.id)));
+    for (const r of sharedRows) {
+      const list = sharedGroupsByPlayer.get(r.playerId) ?? [];
+      list.push({ id: r.groupId, name: r.groupName });
+      sharedGroupsByPlayer.set(r.playerId, list);
     }
   }
 
@@ -1156,31 +1158,28 @@ router.get("/social/search", requireAuth, attachPlayer, async (req, res) => {
   const followerCounts = new Map(followerRows.map(r => [r.followeeId, r.count]));
 
   // Shared groups per match: groups where both viewer and the match are members.
+  // Single SQL round-trip via a self-join on group_members + groups (indexed on
+  // (player_id, group_id)) so latency stays flat as the viewer's group count grows.
   const sharedGroupsByPlayer = new Map<number, Array<{ id: number; name: string }>>();
-  const viewerMemberships = await db.query.groupMembersTable.findMany({
-    where: eq(groupMembersTable.playerId, viewerId),
-  });
-  const viewerGroupIds = viewerMemberships.map(m => m.groupId);
-  if (viewerGroupIds.length > 0) {
-    const matchMemberships = await db.query.groupMembersTable.findMany({
-      where: and(
-        inArray(groupMembersTable.playerId, ids),
-        inArray(groupMembersTable.groupId, viewerGroupIds),
-      ),
-    });
-    if (matchMemberships.length > 0) {
-      const referencedGroupIds = Array.from(new Set(matchMemberships.map(m => m.groupId)));
-      const groupRows = await db.query.groupsTable.findMany({
-        where: inArray(groupsTable.id, referencedGroupIds),
-      });
-      const groupNameMap = new Map(groupRows.map(g => [g.id, g.name]));
-      for (const m of matchMemberships) {
-        const name = groupNameMap.get(m.groupId);
-        if (!name) continue;
-        const list = sharedGroupsByPlayer.get(m.playerId) ?? [];
-        list.push({ id: m.groupId, name });
-        sharedGroupsByPlayer.set(m.playerId, list);
-      }
+  {
+    const viewerGm = alias(groupMembersTable, "viewer_gm");
+    const sharedRows = await db
+      .select({
+        playerId: groupMembersTable.playerId,
+        groupId: groupsTable.id,
+        groupName: groupsTable.name,
+      })
+      .from(groupMembersTable)
+      .innerJoin(
+        viewerGm,
+        and(eq(viewerGm.groupId, groupMembersTable.groupId), eq(viewerGm.playerId, viewerId)),
+      )
+      .innerJoin(groupsTable, eq(groupsTable.id, groupMembersTable.groupId))
+      .where(inArray(groupMembersTable.playerId, ids));
+    for (const r of sharedRows) {
+      const list = sharedGroupsByPlayer.get(r.playerId) ?? [];
+      list.push({ id: r.groupId, name: r.groupName });
+      sharedGroupsByPlayer.set(r.playerId, list);
     }
   }
 

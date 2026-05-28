@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -23,7 +23,10 @@ export const groupMembersTable = pgTable("group_members", {
   coWorkoutCount: integer("co_workout_count").notNull().default(0),
   lastWorkoutTogether: timestamp("last_workout_together", { withTimezone: true }),
   joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  index("group_members_player_group_idx").on(t.playerId, t.groupId),
+  index("group_members_group_player_idx").on(t.groupId, t.playerId),
+]);
 
 export const groupChallengesTable = pgTable("group_challenges", {
   id: serial("id").primaryKey(),
