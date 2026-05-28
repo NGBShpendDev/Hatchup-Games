@@ -10,6 +10,7 @@ import {
   postTypeLabel,
   ogTruncate,
   isOgHidden,
+  isOgCrawlerUserAgent,
   buildPlayerOgSvg,
   buildClubOgSvg,
   renderPlayerOgHtml,
@@ -173,6 +174,19 @@ export function createOgRouter(loader: OgPostLoader): Router {
   router.get("/post/:id", async (req, res) => {
     const id = Number(req.params.id);
     const baseUrl = getBaseUrl(req);
+    const isCrawler = isOgCrawlerUserAgent(req.headers["user-agent"]);
+
+    // Real browsers should never see the OG HTML — bounce them straight to
+    // the SPA's /p/:id route so they land on the actual post. Only crawlers
+    // and unfurl bots get the meta-tag payload.
+    if (!isCrawler) {
+      const target = Number.isFinite(id) && id > 0
+        ? `${baseUrl}/p/${id}`
+        : `${baseUrl}/`;
+      res.setHeader("Cache-Control", "no-store");
+      res.redirect(302, target);
+      return;
+    }
 
     let post: OgPostInput | null = null;
     let author: OgAuthorInput | null = null;

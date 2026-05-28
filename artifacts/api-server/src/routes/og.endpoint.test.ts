@@ -62,6 +62,12 @@ after(async () => {
   await closeServer();
 });
 
+// Crawler UA that triggers the OG HTML response. Most asserts below use this
+// so they exercise the meta-tag path; browser-UA behaviour has its own block.
+const CRAWLER_UA = "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)";
+const BROWSER_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
 describe("GET /post/:id — endpoint behaviour", () => {
   it("returns 200 with HTML content-type and a cache header", async () => {
     fixture.setPost({
@@ -71,7 +77,7 @@ describe("GET /post/:id — endpoint behaviour", () => {
       isFlagged: false,
     }, { displayName: "Dragon", username: "d" });
 
-    const res = await fetch(`${baseUrl}/post/1`);
+    const res = await fetch(`${baseUrl}/post/1`, { headers: { "user-agent": CRAWLER_UA } });
     assert.equal(res.status, 200);
     assert.match(res.headers.get("content-type") ?? "", /text\/html/);
     assert.match(res.headers.get("cache-control") ?? "", /max-age=\d+/);
@@ -85,7 +91,7 @@ describe("GET /post/:id — endpoint behaviour", () => {
       isFlagged: false,
     }, { displayName: "Dragon", username: "d" });
 
-    const res = await fetch(`${baseUrl}/post/42`);
+    const res = await fetch(`${baseUrl}/post/42`, { headers: { "user-agent": CRAWLER_UA } });
     const html = await res.text();
 
     assert.match(html, /<meta property="og:title" content="[^"]+"/);
@@ -106,7 +112,7 @@ describe("GET /post/:id — endpoint behaviour", () => {
       isFlagged: false,
     }, { displayName: "Dragon", username: "d" });
 
-    const res = await fetch(`${baseUrl}/post/2`);
+    const res = await fetch(`${baseUrl}/post/2`, { headers: { "user-agent": CRAWLER_UA } });
     const html = await res.text();
     assert.match(html, /og:image" content="https:\/\/cdn\.example\.com\/leg-day\.jpg"/);
     assert.match(html, /twitter:image" content="https:\/\/cdn\.example\.com\/leg-day\.jpg"/);
@@ -121,7 +127,7 @@ describe("GET /post/:id — endpoint behaviour", () => {
       isFlagged: false,
     }, { displayName: "Dragon", username: "d" });
 
-    const res = await fetch(`${baseUrl}/post/3`);
+    const res = await fetch(`${baseUrl}/post/3`, { headers: { "user-agent": CRAWLER_UA } });
     const html = await res.text();
     assert.match(html, /og:image" content="http:\/\/127\.0\.0\.1:\d+\/post\/3\/og\.png"/);
     assert.match(html, /twitter:image" content="http:\/\/127\.0\.0\.1:\d+\/post\/3\/og\.png"/);
@@ -130,7 +136,7 @@ describe("GET /post/:id — endpoint behaviour", () => {
   it("falls back to /opengraph.jpg when the post does not exist", async () => {
     fixture.setPost(null, null);
 
-    const res = await fetch(`${baseUrl}/post/999`);
+    const res = await fetch(`${baseUrl}/post/999`, { headers: { "user-agent": CRAWLER_UA } });
     assert.equal(res.status, 200);
     const html = await res.text();
     assert.match(html, /og:image" content="http:\/\/127\.0\.0\.1:\d+\/opengraph\.jpg"/);
@@ -146,7 +152,7 @@ describe("GET /post/:id — endpoint behaviour", () => {
       isFlagged: true,
     }, { displayName: "Reported User", username: "reported" });
 
-    const res = await fetch(`${baseUrl}/post/13`);
+    const res = await fetch(`${baseUrl}/post/13`, { headers: { "user-agent": CRAWLER_UA } });
     assert.equal(res.status, 200);
     const html = await res.text();
     assert.ok(!html.includes(sensitive), "flagged content must not appear in HTML");
@@ -159,7 +165,7 @@ describe("GET /post/:id — endpoint behaviour", () => {
   it("falls back to the neutral default if the loader throws", async () => {
     fixture.loaderError = new Error("db is down");
     try {
-      const res = await fetch(`${baseUrl}/post/77`);
+      const res = await fetch(`${baseUrl}/post/77`, { headers: { "user-agent": CRAWLER_UA } });
       assert.equal(res.status, 200);
       const html = await res.text();
       assert.match(html, /og:title" content="HatchUp"/);
@@ -178,9 +184,9 @@ describe("GET /post/:id — endpoint behaviour", () => {
     });
     const before = fixture.loaderCalls.length;
 
-    const notANumber = await fetch(`${baseUrl}/post/abc`);
+    const notANumber = await fetch(`${baseUrl}/post/abc`, { headers: { "user-agent": CRAWLER_UA } });
     assert.equal(notANumber.status, 200);
-    const zero = await fetch(`${baseUrl}/post/0`);
+    const zero = await fetch(`${baseUrl}/post/0`, { headers: { "user-agent": CRAWLER_UA } });
     assert.equal(zero.status, 200);
 
     assert.equal(
@@ -195,7 +201,114 @@ describe("GET /post/:id — endpoint behaviour", () => {
   it("passes the parsed id to the loader for valid requests", async () => {
     fixture.setPost(null, null);
     const before = fixture.loaderCalls.length;
-    await fetch(`${baseUrl}/post/123`);
+    await fetch(`${baseUrl}/post/123`, { headers: { "user-agent": CRAWLER_UA } });
     assert.equal(fixture.loaderCalls[before], 123);
+  });
+});
+
+// ── Crawler-vs-browser routing ──────────────────────────────────────────────
+// Crawlers (link-unfurl bots, social previews) must receive the OG HTML with
+// meta tags so WhatsApp/Slack/Discord can render a rich preview. Real
+// browsers must be 302'd to the SPA's `/p/:id` route so the user actually
+// lands on the post they clicked, with no flash of unfurl HTML in between.
+describe("GET /post/:id — crawler vs browser routing", () => {
+  const crawlerUas = [
+    "facebookexternalhit/1.1",
+    "Twitterbot/1.0",
+    "WhatsApp/2.23.20.0 A",
+    "Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)",
+    "Discordbot/2.0 (+https://discordapp.com)",
+    "TelegramBot (like TwitterBot)",
+    "LinkedInBot/1.0 (compatible; Mozilla/5.0; Jakarta Commons-HttpClient/3.1 +http://www.linkedin.com)",
+  ];
+
+  for (const ua of crawlerUas) {
+    it(`returns 200 OG HTML for crawler UA: ${ua.slice(0, 30)}…`, async () => {
+      fixture.setPost({
+        postType: "gym_selfie",
+        content: "Hello crawlers",
+        mediaUrl: null,
+        isFlagged: false,
+      }, { displayName: "Dragon", username: "d" });
+
+      const res = await fetch(`${baseUrl}/post/55`, {
+        headers: { "user-agent": ua },
+        redirect: "manual",
+      });
+      assert.equal(res.status, 200, `expected 200 for UA ${ua}`);
+      assert.match(res.headers.get("content-type") ?? "", /text\/html/);
+      const html = await res.text();
+      assert.match(html, /<meta property="og:title" content="[^"]+"/);
+      assert.match(html, /<meta property="og:image" content="[^"]+"/);
+      assert.match(html, /<meta name="twitter:card" content="summary_large_image"/);
+    });
+  }
+
+  const browserUas = [
+    // Chrome on macOS
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    // Safari on iPhone
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+    // Firefox on Windows
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+  ];
+
+  for (const ua of browserUas) {
+    it(`returns 302 to /p/:id for browser UA: ${ua.slice(0, 30)}…`, async () => {
+      fixture.setPost({
+        postType: "general",
+        content: "Hello browsers",
+        mediaUrl: null,
+        isFlagged: false,
+      }, { displayName: "Dragon", username: "d" });
+
+      const res = await fetch(`${baseUrl}/post/99`, {
+        headers: { "user-agent": ua },
+        redirect: "manual",
+      });
+      assert.equal(res.status, 302, `expected 302 for UA ${ua}`);
+      const location = res.headers.get("location") ?? "";
+      assert.match(location, /\/p\/99$/, `Location header should point at /p/99, got ${location}`);
+    });
+  }
+
+  it("does not run the post loader when a browser hits the route", async () => {
+    fixture.setPost({
+      postType: "general",
+      content: "irrelevant",
+      mediaUrl: null,
+      isFlagged: false,
+    });
+    const before = fixture.loaderCalls.length;
+    const res = await fetch(`${baseUrl}/post/200`, {
+      headers: { "user-agent": BROWSER_UA },
+      redirect: "manual",
+    });
+    assert.equal(res.status, 302);
+    assert.equal(
+      fixture.loaderCalls.length,
+      before,
+      "loader must be skipped for the browser-redirect path",
+    );
+  });
+
+  it("redirects browsers to '/' when the id is invalid", async () => {
+    const res = await fetch(`${baseUrl}/post/abc`, {
+      headers: { "user-agent": BROWSER_UA },
+      redirect: "manual",
+    });
+    assert.equal(res.status, 302);
+    const location = res.headers.get("location") ?? "";
+    assert.match(location, /^http:\/\/127\.0\.0\.1:\d+\/$/, `expected base URL, got ${location}`);
+  });
+
+  it("treats requests with no User-Agent as browsers (302)", async () => {
+    // Most real crawlers send a UA; missing UA is more typical of curl/scripts
+    // and we'd rather err on the side of redirecting than serving HTML.
+    const res = await fetch(`${baseUrl}/post/300`, {
+      headers: { "user-agent": "" },
+      redirect: "manual",
+    });
+    assert.equal(res.status, 302);
   });
 });

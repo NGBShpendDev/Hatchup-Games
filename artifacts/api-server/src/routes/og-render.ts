@@ -304,6 +304,66 @@ export function ogTruncate(text: string, max: number): string {
   return truncate(text, max);
 }
 
+// ── Crawler detection ────────────────────────────────────────────────────────
+// Link-unfurl crawlers (WhatsApp, Slack, Discord, Twitter/X, Facebook, etc.)
+// fetch the URL once with their own User-Agent and parse the <meta> tags.
+// Real browsers should be sent straight to the SPA so users don't see a
+// flash of OG HTML before the redirect happens.
+//
+// Substring match against a lowercased UA. Patterns lifted from the well-known
+// public list of OG/unfurl crawlers — kept conservative on purpose: when in
+// doubt we'd rather treat the request as a browser and 302 it.
+const CRAWLER_UA_PATTERNS: readonly string[] = [
+  "facebookexternalhit",
+  "facebookcatalog",
+  "facebookbot",
+  "twitterbot",
+  "x-bot",
+  "slackbot",
+  "slack-imgproxy",
+  "discordbot",
+  "linkedinbot",
+  "whatsapp",
+  "telegrambot",
+  "pinterest",
+  "redditbot",
+  "embedly",
+  "skypeuripreview",
+  "applebot",
+  "vkshare",
+  "viber",
+  "line-poker",
+  "google-inspectiontool",
+  "bingpreview",
+  "duckduckbot",
+  "googlebot",
+  "bingbot",
+  "yahoo! slurp",
+  "yandexbot",
+  "baiduspider",
+  "ia_archiver",
+  "qwantify",
+  "msnbot",
+  "iframely",
+  "snapchat",
+  "tumblr",
+];
+
+/**
+ * True when the given User-Agent string belongs to a known link-unfurl or
+ * search-engine crawler that needs the OG HTML response. Real browsers
+ * (Chrome / Safari / Firefox / Edge) return false and should be 302'd to the
+ * SPA route instead.
+ */
+export function isOgCrawlerUserAgent(ua: string | null | undefined): boolean {
+  if (!ua) return false;
+  const lower = ua.toLowerCase();
+  for (const needle of CRAWLER_UA_PATTERNS) {
+    if (lower.includes(needle)) return true;
+  }
+  return false;
+}
+
 // ── Player / Club share cards ────────────────────────────────────────────────
 // Reuse the same SVG-to-PNG pipeline as post share cards so every HatchUp link
 // (post, player profile, or club page) unfurls with the same on-brand visual.

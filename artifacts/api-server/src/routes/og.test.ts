@@ -1,6 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { renderOgHtml, type OgPostInput, type OgAuthorInput } from "./og-render.ts";
+import {
+  renderOgHtml,
+  isOgCrawlerUserAgent,
+  type OgPostInput,
+  type OgAuthorInput,
+} from "./og-render.ts";
 
 const BASE_URL = "https://hatchup.example.com";
 
@@ -239,6 +244,71 @@ describe("renderOgHtml — suspended/blocked authors do not leak content", () =>
       assert.match(html, /Visible/, `isSuspended=${String(isSuspended)} should not hide post`);
       assert.match(html, /Normal User/);
     }
+  });
+});
+
+describe("isOgCrawlerUserAgent", () => {
+  it("detects common link-unfurl crawlers", () => {
+    const crawlers = [
+      "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+      "facebookcatalog/1.0",
+      "Twitterbot/1.0",
+      "WhatsApp/2.23.20.0 A",
+      "Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)",
+      "Slack-ImgProxy 1.144 (+https://api.slack.com/robots)",
+      "Discordbot/2.0 (+https://discordapp.com)",
+      "TelegramBot (like TwitterBot)",
+      "LinkedInBot/1.0 (compatible; Mozilla/5.0; Apache-HttpClient +http://www.linkedin.com)",
+      "Mozilla/5.0 (compatible; Iframely/1.3.1; +https://iframely.com/docs/about)",
+      "Mozilla/5.0 (compatible; Embedly/0.2; +http://support.embed.ly)",
+      "SkypeUriPreview Preview/0.5",
+      "Applebot/0.1 (+http://www.apple.com/go/applebot)",
+      "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+      "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
+      "Mozilla/5.0 (compatible; Pinterest/0.2; +http://www.pinterest.com/)",
+      "redditbot/1.0 (+http://www.reddit.com)",
+    ];
+    for (const ua of crawlers) {
+      assert.equal(
+        isOgCrawlerUserAgent(ua),
+        true,
+        `expected ${ua} to be detected as a crawler`,
+      );
+    }
+  });
+
+  it("does not match real browser User-Agents", () => {
+    const browsers = [
+      // Chrome / macOS
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      // Safari / iPhone
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+      // Firefox / Windows
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+      // Edge / Windows
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0",
+      // Chrome / Android
+      "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+    ];
+    for (const ua of browsers) {
+      assert.equal(
+        isOgCrawlerUserAgent(ua),
+        false,
+        `expected ${ua} to NOT be detected as a crawler`,
+      );
+    }
+  });
+
+  it("returns false for empty / null / undefined UAs", () => {
+    assert.equal(isOgCrawlerUserAgent(""), false);
+    assert.equal(isOgCrawlerUserAgent(null), false);
+    assert.equal(isOgCrawlerUserAgent(undefined), false);
+  });
+
+  it("is case-insensitive", () => {
+    assert.equal(isOgCrawlerUserAgent("FACEBOOKEXTERNALHIT/1.1"), true);
+    assert.equal(isOgCrawlerUserAgent("twitterBOT/2.0"), true);
+    assert.equal(isOgCrawlerUserAgent("WhatsApp/2.0"), true);
   });
 });
 
