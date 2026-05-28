@@ -166,22 +166,61 @@ function themeFor(event: EpicMomentEvent): Theme {
       };
     }
     case "hatch": {
-      const isMythic = event.rarity === "Mythic";
-      const glow = isMythic ? "artifact-glow-mythic" : "artifact-glow-legendary";
-      const baseColor = event.realmColor ?? (isMythic ? "#ec4899" : "#eab308");
+      const r = event.rarity;
+      if (r === "Celestial") {
+        return {
+          glowClass: "artifact-glow-celestial",
+          textColor: "text-white",
+          borderColor: "border-white/70",
+          particleColor: "bg-white",
+          radialColor: "rgba(255,255,255,0.35)",
+          label: "🌌 Celestial Hatch",
+          headline: event.species,
+          subheadline: "A once-in-a-lifetime spirit has chosen you.",
+          emoji: event.realmEmoji ?? "🌌",
+          bigEmoji: "✨",
+        };
+      }
+      if (r === "Ancient") {
+        return {
+          glowClass: "artifact-glow-ancient",
+          textColor: "text-teal-300",
+          borderColor: "border-teal-400/70",
+          particleColor: "bg-teal-400",
+          radialColor: "rgba(20,184,166,0.45)",
+          label: "🏺 Ancient Hatch",
+          headline: event.species,
+          subheadline: "An ancient spirit awakens from the depths of time.",
+          emoji: event.realmEmoji ?? "🏺",
+          bigEmoji: "🏺",
+        };
+      }
+      if (r === "Mythic") {
+        return {
+          glowClass: "artifact-glow-mythic",
+          textColor: "text-red-300",
+          borderColor: "border-red-500/70",
+          particleColor: "bg-red-500",
+          radialColor: "rgba(239,68,68,0.45)",
+          label: "🔴 Mythic Hatch",
+          headline: event.species,
+          subheadline: "An impossibly rare spirit just joined your team.",
+          emoji: event.realmEmoji ?? "🔴",
+          bigEmoji: "🥚",
+        };
+      }
+      const baseColor = event.realmColor ?? "#eab308";
       return {
-        glowClass: glow,
-        textColor: isMythic ? "text-pink-300" : "text-yellow-300",
-        borderColor: isMythic ? "border-pink-400/70" : "border-yellow-400/70",
-        particleColor: isMythic ? "bg-pink-400" : "bg-yellow-400",
+        glowClass: "artifact-glow-legendary",
+        textColor: "text-yellow-300",
+        borderColor: "border-yellow-400/70",
+        particleColor: "bg-yellow-400",
         radialColor: `${baseColor}80`,
-        label: isMythic ? "🌌 Mythic Hatch" : "🟡 Legendary Hatch",
+        label: "🟡 Legendary Hatch",
         headline: event.species,
-        subheadline: isMythic
-          ? "An impossibly rare spirit just joined your team."
-          : "A legendary creature joined your team.",
-        emoji: event.realmEmoji ?? (isMythic ? "🌌" : "🟡"),
-        bigEmoji: event.realmEmoji ?? "🥚",
+        subheadline: "A legendary creature joined your team.",
+        emoji: event.realmEmoji ?? "🟡",
+        bigEmoji: "🥚",
       };
     }
   }

@@ -7,6 +7,7 @@ import { Zap, Heart, Star } from "lucide-react";
 import { Link } from "wouter";
 import { usePlayer } from "@/lib/playerContext";
 import { useToast } from "@/hooks/use-toast";
+import { getRarityTokens } from "@/lib/rarityTokens";
 
 import lavaDragonImg from "@/assets/images/lava-dragon.png";
 import cyberCreatureImg from "@/assets/images/cyber-creature.png";
@@ -58,29 +59,6 @@ const REALM_STYLES: Record<string, { gradient: string; border: string; badge: st
   },
 };
 
-const RARITY_COLORS: Record<string, string> = {
-  celestial: "border-cyan-400 text-cyan-300",
-  ancient: "border-teal-400 text-teal-300",
-  mythic: "border-pink-500 text-pink-400",
-  legendary: "border-yellow-500 text-yellow-400",
-  epic: "border-purple-500 text-purple-400",
-  rare: "border-blue-500 text-blue-400",
-  uncommon: "border-emerald-500 text-emerald-400",
-  common: "border-gray-500 text-gray-400",
-};
-
-const RARITY_AURA: Record<string, string> = {
-  celestial: "pal-aura-celestial",
-  ancient: "pal-aura-ancient",
-  mythic: "pal-aura-mythic",
-  legendary: "pal-aura-legendary",
-};
-
-const RARITY_BORDER_OVERRIDE: Record<string, string> = {
-  celestial: "border-cyan-400",
-  ancient: "border-teal-400",
-};
-
 function MoodIndicator({ moodState }: { moodState: string }) {
   if (moodState === "celebrating") {
     return (
@@ -112,9 +90,9 @@ function MoodIndicator({ moodState }: { moodState: string }) {
 export function HatchlingCard({ hatchling, onClick }: HatchlingCardProps) {
   const realm = (hatchling.realm as string | undefined) ?? "balance";
   const realmStyle = REALM_STYLES[realm] ?? REALM_STYLES["balance"];
-  const rarityKey = (hatchling.rarity ?? "common").toLowerCase();
-  const rarityColor = RARITY_COLORS[rarityKey] ?? RARITY_COLORS["common"];
-  const rarityAura = RARITY_AURA[rarityKey] ?? "";
+  const rarityTokens = getRarityTokens(hatchling.rarity);
+  const rarityColor = `${rarityTokens.border} ${rarityTokens.text}`;
+  const rarityAura = rarityTokens.aura;
   const moodState = (hatchling.moodState as string | undefined) ?? "happy";
   const { player, refetch } = usePlayer();
   const { toast } = useToast();
@@ -154,7 +132,7 @@ export function HatchlingCard({ hatchling, onClick }: HatchlingCardProps) {
   const CardContent = (
     <motion.div
       whileHover={{ y: -8, scale: 1.02 }}
-      className={`relative overflow-hidden rounded-2xl border-2 ${isActive ? "border-yellow-400 shadow-yellow-400/40" : (RARITY_BORDER_OVERRIDE[rarityKey] ?? realmStyle.border)} bg-card p-4 shadow-lg hover:shadow-2xl ${isActive ? "" : realmStyle.glow} ${rarityAura} cursor-pointer group transition-all`}
+      className={`relative overflow-hidden rounded-2xl border-2 ${isActive ? "border-yellow-400 shadow-yellow-400/40" : rarityTokens.border} bg-card p-4 shadow-lg hover:shadow-2xl ${rarityAura} cursor-pointer group transition-all`}
       onClick={onClick}
       data-testid={`hatchling-card-${hatchling.id}`}
     >
