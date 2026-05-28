@@ -795,6 +795,7 @@ export default function Groups() {
               <DialogTitle className="font-black text-xl">Join a Group</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-2">
+              <SafetyBanner variant="meetup" compact />
               <div className="space-y-2">
                 <label className="text-sm font-bold text-muted-foreground uppercase">Invite Code</label>
                 <Input

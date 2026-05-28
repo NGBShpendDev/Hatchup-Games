@@ -23,6 +23,7 @@ import NotFound from "@/pages/not-found";
 import Rewards from "@/pages/rewards";
 import SettingsPrivacy from "@/pages/settings-privacy";
 import AdminReports from "@/pages/admin-reports";
+import SafetyGuidelines from "@/pages/safety-guidelines";
 
 const queryClient = new QueryClient();
 
@@ -220,6 +221,7 @@ function AppRoutes() {
         <Route path="/rewards" component={Rewards} />
         <Route path="/settings/privacy" component={SettingsPrivacy} />
         <Route path="/admin/reports" component={AdminReports} />
+        <Route path="/safety/guidelines" component={SafetyGuidelines} />
         <Route component={NotFound} />
       </Switch>
     </>

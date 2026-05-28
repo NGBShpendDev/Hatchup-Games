@@ -4,6 +4,7 @@ import { playersTable, hatchlingsTable } from "@workspace/db";
 import { desc, eq, notInArray } from "drizzle-orm";
 import { GetGlobalLeaderboardQueryParams, GetModeLeaderboardQueryParams } from "@workspace/api-zod";
 import { getHiddenPlayerIds } from "./safety";
+import { requireAuth, attachPlayer } from "../middlewares/auth";
 
 const router = Router();
 
@@ -17,12 +18,12 @@ const RANK_COLORS: Record<string, string> = {
   Legendary: "#FF6B35",
 };
 
-router.get("/leaderboards/global", async (req, res) => {
+// Block filtering is derived from authenticated session — never trust client-supplied viewerId.
+router.get("/leaderboards/global", requireAuth, attachPlayer, async (req, res) => {
   const query = GetGlobalLeaderboardQueryParams.safeParse({ limit: req.query.limit ? Number(req.query.limit) : 50 });
   if (!query.success) { res.status(400).json({ error: "Invalid query" }); return; }
 
-  const viewerId = req.query.viewerId ? Number(req.query.viewerId) : null;
-  const hiddenIds = viewerId ? await getHiddenPlayerIds(viewerId) : [];
+  const hiddenIds = req.playerId ? await getHiddenPlayerIds(req.playerId) : [];
 
   const players = hiddenIds.length > 0
     ? await db.select().from(playersTable).where(notInArray(playersTable.id, hiddenIds)).orderBy(desc(playersTable.rankScore), desc(playersTable.totalWins)).limit(query.data.limit ?? 50)
@@ -49,12 +50,11 @@ router.get("/leaderboards/global", async (req, res) => {
   res.json(result);
 });
 
-router.get("/leaderboards/by-mode", async (req, res) => {
+router.get("/leaderboards/by-mode", requireAuth, attachPlayer, async (req, res) => {
   const query = GetModeLeaderboardQueryParams.safeParse({ mode: req.query.mode as string, limit: req.query.limit ? Number(req.query.limit) : 50 });
   if (!query.success) { res.status(400).json({ error: "Invalid query" }); return; }
 
-  const viewerId = req.query.viewerId ? Number(req.query.viewerId) : null;
-  const hiddenIds = viewerId ? await getHiddenPlayerIds(viewerId) : [];
+  const hiddenIds = req.playerId ? await getHiddenPlayerIds(req.playerId) : [];
 
   const players = hiddenIds.length > 0
     ? await db.select().from(playersTable).where(notInArray(playersTable.id, hiddenIds)).orderBy(desc(playersTable.totalWins)).limit(query.data.limit ?? 50)

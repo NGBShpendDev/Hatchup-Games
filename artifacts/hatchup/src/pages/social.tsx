@@ -24,11 +24,9 @@ export default function Social() {
   const { playerId } = usePlayer();
   const pid = playerId ?? 0;
   const { data: leaderboard, isLoading: isLoadingLeaderboard } = useQuery({
-    queryKey: ["leaderboard", "global", pid],
+    queryKey: ["leaderboard", "global"],
     queryFn: async () => {
-      const params = new URLSearchParams({ limit: "10" });
-      if (pid) params.set("viewerId", String(pid));
-      const res = await fetch(`/api/leaderboards/global?${params}`, { credentials: "include" });
+      const res = await fetch("/api/leaderboards/global?limit=10", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load leaderboard");
       return res.json() as Promise<Array<{ position: number; playerId: number; username: string; displayName: string | null; avatarUrl: string | null; rank: string; score: number; wins: number; hatchlingName: string; hatchlingCategory: string }>>;
     },

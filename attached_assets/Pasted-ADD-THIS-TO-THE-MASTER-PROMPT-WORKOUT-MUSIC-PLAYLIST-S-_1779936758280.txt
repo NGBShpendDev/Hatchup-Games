@@ -1,0 +1,118 @@
+ADD THIS TO THE MASTER PROMPT:
+
+========================================
+
+WORKOUT MUSIC + PLAYLIST SYSTEM
+
+Create a fully integrated workout music system inside HatchUp Fitness Pals that allows users to:
+- connect playlists
+- stream workout music
+- discover songs
+- share playlists
+- receive AI music recommendations
+- sync music with workouts and battles
+
+The music system should feel:
+- immersive
+- motivational
+- social
+- cinematic
+- personalized
+- high energy
+
+========================================
+
+PLAYLIST FEATURES
+
+Allow users to:
+- create workout playlists
+- connect Spotify playlists
+- connect Apple Music playlists
+- connect YouTube Music playlists
+- save favorite songs
+- share playlists publicly
+- follow creators’ playlists
+- build gym mixes
+- create battle playlists
+- create cardio playlists
+- create focus playlists
+
+========================================
+
+AI MUSIC RECOMMENDATION SYSTEM
+
+Use AI to recommend music based on:
+- workout intensity
+- heart rate
+- activity type
+- mood
+- fitness goals
+- battle type
+- streak energy
+- personal music taste
+
+Examples:
+- aggressive lifting music
+- cardio motivation music
+- anime workout playlists
+- running tempo playlists
+- focus gym music
+- hype battle music
+- recovery/chill music
+
+========================================
+
+DYNAMIC MUSIC SYSTEM
+
+Music should dynamically change based on gameplay.
+
+Examples:
+- intense music during battles
+- faster BPM during sprinting
+- cinematic music during evolutions
+- victory music after wins
+- emotional music during milestones
+- adrenaline music during streaks
+
+========================================
+
+COMMUNITY PLAYLISTS
+
+Allow users to:
+- upload playlists
+- rank playlists
+- create trending workout mixes
+- compete for top playlist creator
+- share battle music
+- discover viral gym songs
+
+Include:
+- likes
+- saves
+- comments
+- trending music charts
+- featured playlists
+
+========================================
+
+WORKOUT + BPM MATCHING
+
+Allow AI to match songs to workout pacing.
+
+Examples:
+- running cadence matching
+- sprint intervals
+- lifting tempo music
+- cycling rhythm syncing
+
+Music should help users:
+- stay motivated
+- maintain pace
+- improve focus
+- push harder
+
+========================================
+
+MAIN GOAL
+
+Turn music into a core part of the HatchUp experience, making workouts, battles, and progression feel more emotional, immersive, and addictive.
