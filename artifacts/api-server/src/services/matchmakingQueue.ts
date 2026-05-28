@@ -350,7 +350,7 @@ async function finalizeBattle(battleId: number) {
 
     // Award XP to the participating hatchlings so level-ups can cross the
     // evolution thresholds (5 and 15) that trigger the share prompt.
-    await Promise.all([
+    const [palXp1, palXp2] = await Promise.all([
       applyHatchlingXp(state.fighter1.hatchlingId, r1.xp).catch(() => undefined),
       state.fighter2.hatchlingId && !state.fighter2.isBot
         ? applyHatchlingXp(state.fighter2.hatchlingId, computeRewards(state, 2).xp).catch(() => undefined)
@@ -383,6 +383,7 @@ async function finalizeBattle(battleId: number) {
       eloChange,
       artifactXp: artifactXpP1,
       state: sanitizeState(state),
+      ...(palXp1 ? { hatchlingXp: { xpDelta: palXp1.xpDelta, prevLevel: palXp1.prevLevel, newLevel: palXp1.newLevel, newXp: palXp1.newXp } } : {}),
     });
 
     if (battle.ws2 && !state.fighter2.isBot) {
@@ -395,6 +396,7 @@ async function finalizeBattle(battleId: number) {
         eloChange: -eloChange,
         artifactXp: artifactXpP2,
         state: sanitizeState(state),
+        ...(palXp2 ? { hatchlingXp: { xpDelta: palXp2.xpDelta, prevLevel: palXp2.prevLevel, newLevel: palXp2.newLevel, newXp: palXp2.newXp } } : {}),
       });
     }
   } catch (err) {

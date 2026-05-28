@@ -99,6 +99,26 @@ export interface Competition {
   /** @nullable */
   coinsEarned?: number | null;
   createdAt: string;
+  /**
+     * XP awarded to the Pal this race/competition.
+     * @nullable
+     */
+  hatchlingXpDelta?: number | null;
+  /**
+     * Pal level before the XP was applied.
+     * @nullable
+     */
+  hatchlingPrevLevel?: number | null;
+  /**
+     * Pal level after XP was applied.
+     * @nullable
+     */
+  hatchlingNewLevel?: number | null;
+  /**
+     * Pal total XP after the reward.
+     * @nullable
+     */
+  hatchlingNewXp?: number | null;
 }
 
 export interface LiveEvent {
@@ -3180,6 +3200,17 @@ export interface BattleWsArtifactXpGain {
   xpGained: number;
 }
 
+export interface BattleWsHatchlingXp {
+  /** XP awarded to the Pal. */
+  xpDelta: number;
+  /** Pal level before XP was applied. */
+  prevLevel: number;
+  /** Pal level after XP was applied. */
+  newLevel: number;
+  /** Pal total XP after the reward. */
+  newXp: number;
+}
+
 export type BattleWsBattleEndMessageType = typeof BattleWsBattleEndMessageType[keyof typeof BattleWsBattleEndMessageType];
 
 
@@ -3212,6 +3243,8 @@ export interface BattleWsBattleEndMessage {
   eloChange: number;
   artifactXp: BattleWsArtifactXpGain[];
   state: BattleState;
+  /** Pal XP delta and level progression for the receiving player's Hatchling. */
+  hatchlingXp?: BattleWsHatchlingXp;
 }
 
 export type BattleWsReconnectedMessageType = typeof BattleWsReconnectedMessageType[keyof typeof BattleWsReconnectedMessageType];

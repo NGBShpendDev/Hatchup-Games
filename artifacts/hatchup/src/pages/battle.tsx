@@ -13,7 +13,7 @@ import { ToastAction } from "@/components/ui/toast";
 import { useLocation, Link } from "wouter";
 import {
   Swords, Zap, Shield, Sparkles, Trophy, RotateCcw, ChevronLeft,
-  Share2, Bookmark, Trash2, Star, Plus, X, Send, Repeat,
+  Share2, Bookmark, Trash2, Star, Plus, X, Send, Repeat, TrendingUp,
 } from "lucide-react";
 import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
 import {
@@ -373,6 +373,7 @@ export default function BattlePage() {
   const [yourSlot, setYourSlot] = useState<1 | 2>(1);
   const [lastTurn, setLastTurn] = useState<TurnResult | null>(null);
   const [rewards, setRewards] = useState<{ xp: number; coins: number; eloChange: number } | null>(null);
+  const [palXp, setPalXp] = useState<{ xpDelta: number; prevLevel: number; newLevel: number; newXp: number } | null>(null);
   const [artifactXpGains, setArtifactXpGains] = useState<ArtifactXpGain[]>([]);
   const [queueSecs, setQueueSecs] = useState(0);
   const [rewardSummary, setRewardSummary] = useState<{ open: boolean; entries: RewardEntry[]; title?: string }>({ open: false, entries: [] });
@@ -553,6 +554,16 @@ export default function BattlePage() {
         newStage:   g.newStage,
       }));
       setArtifactXpGains(gains);
+      if (msg.hatchlingXp) {
+        setPalXp({
+          xpDelta:   msg.hatchlingXp.xpDelta,
+          prevLevel: msg.hatchlingXp.prevLevel,
+          newLevel:  msg.hatchlingXp.newLevel,
+          newXp:     msg.hatchlingXp.newXp,
+        });
+      } else {
+        setPalXp(null);
+      }
       setLastTurn(null);
       setPhase("result");
 
@@ -870,6 +881,7 @@ export default function BattlePage() {
     setBattleState(null);
     setLastTurn(null);
     setRewards(null);
+    setPalXp(null);
     setArtifactXpGains([]);
     setSelectedHatchling(null);
     setLoadoutSlots({ major: null, minor1: null, minor2: null });
@@ -1516,6 +1528,47 @@ export default function BattlePage() {
                       </p>
                     </div>
                   )}
+                </motion.div>
+              )}
+
+              {/* Pal XP progress */}
+              {palXp && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="bg-white/5 border border-white/10 rounded-xl p-4 text-left"
+                  data-testid="battle-pal-xp-block"
+                >
+                  {palXp.newLevel > palXp.prevLevel && (
+                    <motion.div
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", delay: 0.6 }}
+                      className="flex items-center gap-2 justify-center mb-3 px-3 py-2 bg-yellow-400/15 border border-yellow-400/30 rounded-xl"
+                      data-testid="battle-level-up-banner"
+                    >
+                      <TrendingUp className="w-4 h-4 text-yellow-400 shrink-0" />
+                      <span className="font-black text-yellow-300 text-sm">
+                        LEVEL UP! Lv.{palXp.prevLevel} → Lv.{palXp.newLevel}
+                      </span>
+                    </motion.div>
+                  )}
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-bold text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Zap className="w-3 h-3 text-green-400" /> Pal XP
+                    </p>
+                    <span className="text-xs font-black text-green-400">+{palXp.xpDelta} XP</span>
+                  </div>
+                  <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+                    <span>Lv.{palXp.newLevel}</span>
+                    <span>{palXp.newXp % 100}/{100} XP to next level</span>
+                  </div>
+                  <Progress
+                    value={((palXp.newXp % 100) / 100) * 100}
+                    className="h-2 bg-white/10 [&>div]:bg-gradient-to-r [&>div]:from-green-500 [&>div]:to-emerald-400"
+                    data-testid="battle-pal-xp-bar"
+                  />
                 </motion.div>
               )}
 

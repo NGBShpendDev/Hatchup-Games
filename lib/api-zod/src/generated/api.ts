@@ -337,7 +337,11 @@ export const GetPlayerDashboardResponse = zod.object({
   "duration": zod.number().nullish(),
   "xpEarned": zod.number().nullish(),
   "coinsEarned": zod.number().nullish(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "hatchlingXpDelta": zod.number().nullish().describe('XP awarded to the Pal this race\/competition.'),
+  "hatchlingPrevLevel": zod.number().nullish().describe('Pal level before the XP was applied.'),
+  "hatchlingNewLevel": zod.number().nullish().describe('Pal level after XP was applied.'),
+  "hatchlingNewXp": zod.number().nullish().describe('Pal total XP after the reward.')
 })),
   "activeEvents": zod.array(zod.object({
   "id": zod.number(),
@@ -791,7 +795,11 @@ export const ListCompetitionsResponseItem = zod.object({
   "duration": zod.number().nullish(),
   "xpEarned": zod.number().nullish(),
   "coinsEarned": zod.number().nullish(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "hatchlingXpDelta": zod.number().nullish().describe('XP awarded to the Pal this race\/competition.'),
+  "hatchlingPrevLevel": zod.number().nullish().describe('Pal level before the XP was applied.'),
+  "hatchlingNewLevel": zod.number().nullish().describe('Pal level after XP was applied.'),
+  "hatchlingNewXp": zod.number().nullish().describe('Pal total XP after the reward.')
 })
 export const ListCompetitionsResponse = zod.array(ListCompetitionsResponseItem)
 
@@ -826,7 +834,11 @@ export const GetCompetitionResponse = zod.object({
   "duration": zod.number().nullish(),
   "xpEarned": zod.number().nullish(),
   "coinsEarned": zod.number().nullish(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "hatchlingXpDelta": zod.number().nullish().describe('XP awarded to the Pal this race\/competition.'),
+  "hatchlingPrevLevel": zod.number().nullish().describe('Pal level before the XP was applied.'),
+  "hatchlingNewLevel": zod.number().nullish().describe('Pal level after XP was applied.'),
+  "hatchlingNewXp": zod.number().nullish().describe('Pal total XP after the reward.')
 })
 
 
@@ -857,7 +869,11 @@ export const SubmitCompetitionResultResponse = zod.object({
   "duration": zod.number().nullish(),
   "xpEarned": zod.number().nullish(),
   "coinsEarned": zod.number().nullish(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "hatchlingXpDelta": zod.number().nullish().describe('XP awarded to the Pal this race\/competition.'),
+  "hatchlingPrevLevel": zod.number().nullish().describe('Pal level before the XP was applied.'),
+  "hatchlingNewLevel": zod.number().nullish().describe('Pal level after XP was applied.'),
+  "hatchlingNewXp": zod.number().nullish().describe('Pal total XP after the reward.')
 })
 
 
@@ -5278,7 +5294,13 @@ export const DocsValidateBattleWsServerMessageBody = zod.union([zod.object({
   "p1EnergyAfter": zod.number(),
   "p2EnergyAfter": zod.number()
 }))
-})
+}),
+  "hatchlingXp": zod.object({
+  "xpDelta": zod.number().describe('XP awarded to the Pal.'),
+  "prevLevel": zod.number().describe('Pal level before XP was applied.'),
+  "newLevel": zod.number().describe('Pal level after XP was applied.'),
+  "newXp": zod.number().describe('Pal total XP after the reward.')
+}).optional().describe('Pal XP delta and level progression for the receiving player\'s Hatchling.')
 }),zod.object({
   "type": zod.enum(['reconnected']),
   "battleId": zod.number(),

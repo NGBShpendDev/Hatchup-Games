@@ -123,11 +123,19 @@ router.post("/competitions/:id/result", requireAuth, attachPlayer, async (req, r
 
   // Award XP to the participating hatchling so level-ups can cross
   // the evolution thresholds (5 and 15) that trigger the share prompt.
-  await applyHatchlingXp(comp.hatchlingId, xpEarned).catch(() => undefined);
+  const palXpResult = await applyHatchlingXp(comp.hatchlingId, xpEarned).catch(() => undefined);
 
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, comp.playerId) });
   const hatchling = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, comp.hatchlingId) });
-  res.json({ ...updated[0], playerName: player?.username ?? null, hatchlingName: hatchling?.name ?? null });
+  res.json({
+    ...updated[0],
+    playerName: player?.username ?? null,
+    hatchlingName: hatchling?.name ?? null,
+    hatchlingXpDelta: palXpResult?.xpDelta ?? null,
+    hatchlingPrevLevel: palXpResult?.prevLevel ?? null,
+    hatchlingNewLevel: palXpResult?.newLevel ?? null,
+    hatchlingNewXp: palXpResult?.newXp ?? null,
+  });
 });
 
 export default router;

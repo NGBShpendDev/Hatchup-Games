@@ -4980,6 +4980,10 @@ components:
         xpEarned:    { type: ["integer", "null"] }
         coinsEarned: { type: ["integer", "null"] }
         createdAt:   { type: string }
+        hatchlingXpDelta:  { type: ["integer", "null"], description: "XP awarded to the Pal this race/competition." }
+        hatchlingPrevLevel: { type: ["integer", "null"], description: "Pal level before the XP was applied." }
+        hatchlingNewLevel:  { type: ["integer", "null"], description: "Pal level after XP was applied." }
+        hatchlingNewXp:     { type: ["integer", "null"], description: "Pal total XP after the reward." }
 
     CompetitionInput:
       type: object
@@ -7994,6 +7998,14 @@ components:
         artifactId: { type: integer }
         newStage:   { type: integer }
         xpGained:   { type: integer }
+    BattleWsHatchlingXp:
+      type: object
+      required: [xpDelta, prevLevel, newLevel, newXp]
+      properties:
+        xpDelta:   { type: integer, description: "XP awarded to the Pal." }
+        prevLevel: { type: integer, description: "Pal level before XP was applied." }
+        newLevel:  { type: integer, description: "Pal level after XP was applied." }
+        newXp:     { type: integer, description: "Pal total XP after the reward." }
     BattleWsBattleEndMessage:
       type: object
       required: [type, battleId, winner, rewards, eloChange, artifactXp, state]
@@ -8010,6 +8022,9 @@ components:
           type: array
           items: { $ref: "#/components/schemas/BattleWsArtifactXpGain" }
         state:      { $ref: "#/components/schemas/BattleState" }
+        hatchlingXp:
+          $ref: "#/components/schemas/BattleWsHatchlingXp"
+          description: "Pal XP delta and level progression for the receiving player's Hatchling."
     BattleWsReconnectedMessage:
       type: object
       required: [type, battleId, yourSlot, state]
