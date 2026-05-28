@@ -18,6 +18,7 @@ import {
   ListMyGroupsQueryParams,
 } from "@workspace/api-zod";
 import { logFitnessActivity } from "../services/fitnessLog";
+import { requireAuth, attachPlayer } from "../middlewares/auth";
 
 const router = Router();
 
@@ -114,12 +115,13 @@ async function dealRaidDamage(groupId: number, damage: number) {
 }
 
 // GET /groups/mine
-router.get("/groups/mine", async (req, res) => {
-  const query = ListMyGroupsQueryParams.safeParse({ playerId: Number(req.query.playerId) });
-  if (!query.success) { res.status(400).json({ error: "playerId required" }); return; }
+router.get("/groups/mine", requireAuth, attachPlayer, async (req, res) => {
+  if (req.query.playerId && Number(req.query.playerId) !== req.playerId) {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
 
   const memberships = await db.query.groupMembersTable.findMany({
-    where: eq(groupMembersTable.playerId, query.data.playerId),
+    where: eq(groupMembersTable.playerId, req.playerId!),
   });
   const groupIds = memberships.map(m => m.groupId);
   if (groupIds.length === 0) { res.json([]); return; }
@@ -142,20 +144,21 @@ router.get("/groups/mine", async (req, res) => {
 });
 
 // POST /groups
-router.post("/groups", async (req, res) => {
+router.post("/groups", requireAuth, attachPlayer, async (req, res) => {
   const body = CreateGroupBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
+  if (body.data.creatorPlayerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
 
   const inviteCode = generateInviteCode();
   const [group] = await db.insert(groupsTable).values({
     name: body.data.name,
     type: body.data.type ?? "fitness_party",
     inviteCode,
-    creatorPlayerId: body.data.creatorPlayerId,
+    creatorPlayerId: req.playerId!,
     maxMembers: body.data.maxMembers ?? 10,
   }).returning();
 
-  await db.insert(groupMembersTable).values({ groupId: group.id, playerId: body.data.creatorPlayerId });
+  await db.insert(groupMembersTable).values({ groupId: group.id, playerId: req.playerId! });
 
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   await db.insert(groupChallengesTable).values({
@@ -175,22 +178,22 @@ router.post("/groups", async (req, res) => {
 });
 
 // POST /groups/join-by-code — join without knowing the group ID
-router.post("/groups/join-by-code", async (req, res) => {
-  const { playerId, inviteCode } = req.body;
-  if (!playerId || !inviteCode) { res.status(400).json({ error: "playerId and inviteCode required" }); return; }
+router.post("/groups/join-by-code", requireAuth, attachPlayer, async (req, res) => {
+  const { inviteCode } = req.body;
+  if (!inviteCode) { res.status(400).json({ error: "inviteCode required" }); return; }
 
   const group = await db.query.groupsTable.findFirst({ where: eq(groupsTable.inviteCode, String(inviteCode).toUpperCase()) });
   if (!group) { res.status(404).json({ error: "Group not found" }); return; }
 
   const existing = await db.query.groupMembersTable.findFirst({
-    where: and(eq(groupMembersTable.groupId, group.id), eq(groupMembersTable.playerId, Number(playerId))),
+    where: and(eq(groupMembersTable.groupId, group.id), eq(groupMembersTable.playerId, req.playerId!)),
   });
   if (existing) { res.status(409).json({ error: "Already a member" }); return; }
 
   const members = await db.query.groupMembersTable.findMany({ where: eq(groupMembersTable.groupId, group.id) });
   if (members.length >= group.maxMembers) { res.status(400).json({ error: "Group is full" }); return; }
 
-  await db.insert(groupMembersTable).values({ groupId: group.id, playerId: Number(playerId) });
+  await db.insert(groupMembersTable).values({ groupId: group.id, playerId: req.playerId! });
 
   const challenges = await db.query.groupChallengesTable.findMany({ where: and(eq(groupChallengesTable.groupId, group.id), eq(groupChallengesTable.isCompleted, false)) });
   const raid = await db.query.groupRaidsTable.findFirst({ where: and(eq(groupRaidsTable.groupId, group.id), eq(groupRaidsTable.status, "active")) });
@@ -202,19 +205,14 @@ router.post("/groups/join-by-code", async (req, res) => {
 });
 
 // GET /groups/:id — membership required via playerId query param
-router.get("/groups/:id", async (req, res) => {
+router.get("/groups/:id", requireAuth, attachPlayer, async (req, res) => {
   const params = GetGroupParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
-
-  const viewerId = req.query.playerId ? Number(req.query.playerId) : null;
-  if (!viewerId || isNaN(viewerId)) {
-    res.status(400).json({ error: "playerId query param required" }); return;
-  }
 
   const group = await db.query.groupsTable.findFirst({ where: eq(groupsTable.id, params.data.id) });
   if (!group) { res.status(404).json({ error: "Group not found" }); return; }
 
-  const isMember = await checkMembership(params.data.id, viewerId);
+  const isMember = await checkMembership(params.data.id, req.playerId!);
   if (!isMember) { res.status(403).json({ error: "Not a group member" }); return; }
 
   const members = await db.query.groupMembersTable.findMany({ where: eq(groupMembersTable.groupId, group.id) });
@@ -253,11 +251,12 @@ router.get("/groups/:id", async (req, res) => {
 });
 
 // POST /groups/:id/join
-router.post("/groups/:id/join", async (req, res) => {
+router.post("/groups/:id/join", requireAuth, attachPlayer, async (req, res) => {
   const params = GetGroupParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const body = JoinGroupBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
+  if (body.data.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
 
   const group = await db.query.groupsTable.findFirst({ where: eq(groupsTable.id, params.data.id) });
   if (!group) { res.status(404).json({ error: "Group not found" }); return; }
@@ -267,41 +266,40 @@ router.post("/groups/:id/join", async (req, res) => {
   }
 
   const existing = await db.query.groupMembersTable.findFirst({
-    where: and(eq(groupMembersTable.groupId, params.data.id), eq(groupMembersTable.playerId, body.data.playerId)),
+    where: and(eq(groupMembersTable.groupId, params.data.id), eq(groupMembersTable.playerId, req.playerId!)),
   });
   if (existing) { res.status(409).json({ error: "Already a member" }); return; }
 
   const members = await db.query.groupMembersTable.findMany({ where: eq(groupMembersTable.groupId, params.data.id) });
   if (members.length >= group.maxMembers) { res.status(400).json({ error: "Group is full" }); return; }
 
-  await db.insert(groupMembersTable).values({ groupId: params.data.id, playerId: body.data.playerId });
+  await db.insert(groupMembersTable).values({ groupId: params.data.id, playerId: req.playerId! });
   res.json({ success: true, memberCount: members.length + 1 });
 });
 
 // POST /groups/:id/leave
-router.post("/groups/:id/leave", async (req, res) => {
+router.post("/groups/:id/leave", requireAuth, attachPlayer, async (req, res) => {
   const params = GetGroupParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { playerId } = req.body;
-  if (!playerId) { res.status(400).json({ error: "playerId required" }); return; }
 
   await db.delete(groupMembersTable).where(
-    and(eq(groupMembersTable.groupId, params.data.id), eq(groupMembersTable.playerId, Number(playerId)))
+    and(eq(groupMembersTable.groupId, params.data.id), eq(groupMembersTable.playerId, req.playerId!))
   );
   res.json({ success: true });
 });
 
 // POST /groups/:id/workout — log a group workout; persists fitness activity + XP; membership required
-router.post("/groups/:id/workout", async (req, res) => {
+router.post("/groups/:id/workout", requireAuth, attachPlayer, async (req, res) => {
   const params = GetGroupParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const body = LogGroupWorkoutBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
+  if (body.data.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
 
   const group = await db.query.groupsTable.findFirst({ where: eq(groupsTable.id, params.data.id) });
   if (!group) { res.status(404).json({ error: "Group not found" }); return; }
 
-  const isMember = await checkMembership(params.data.id, body.data.playerId);
+  const isMember = await checkMembership(params.data.id, req.playerId!);
   if (!isMember) { res.status(403).json({ error: "Not a group member" }); return; }
 
   const members = await db.query.groupMembersTable.findMany({ where: eq(groupMembersTable.groupId, params.data.id) });
@@ -383,16 +381,16 @@ router.post("/groups/:id/workout", async (req, res) => {
 });
 
 // POST /groups/:id/challenge-progress — directly contribute to challenges; membership required
-router.post("/groups/:id/challenge-progress", async (req, res) => {
+router.post("/groups/:id/challenge-progress", requireAuth, attachPlayer, async (req, res) => {
   const params = GetGroupParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { playerId, progressValue } = req.body;
-  if (!playerId || progressValue === undefined) { res.status(400).json({ error: "playerId and progressValue required" }); return; }
+  const { progressValue } = req.body;
+  if (progressValue === undefined) { res.status(400).json({ error: "progressValue required" }); return; }
 
   const group = await db.query.groupsTable.findFirst({ where: eq(groupsTable.id, params.data.id) });
   if (!group) { res.status(404).json({ error: "Group not found" }); return; }
 
-  const isMember = await checkMembership(params.data.id, Number(playerId));
+  const isMember = await checkMembership(params.data.id, req.playerId!);
   if (!isMember) { res.status(403).json({ error: "Not a group member" }); return; }
 
   const { challengesAdvanced, challenges } = await advanceChallenges(params.data.id, Number(progressValue));
@@ -400,13 +398,13 @@ router.post("/groups/:id/challenge-progress", async (req, res) => {
 });
 
 // POST /groups/:id/raid/attack — deal raid damage directly; membership required
-router.post("/groups/:id/raid/attack", async (req, res) => {
+router.post("/groups/:id/raid/attack", requireAuth, attachPlayer, async (req, res) => {
   const params = GetGroupParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { playerId, damage } = req.body;
-  if (!playerId || damage === undefined) { res.status(400).json({ error: "playerId and damage required" }); return; }
+  const { damage } = req.body;
+  if (damage === undefined) { res.status(400).json({ error: "damage required" }); return; }
 
-  const isMember = await checkMembership(params.data.id, Number(playerId));
+  const isMember = await checkMembership(params.data.id, req.playerId!);
   if (!isMember) { res.status(403).json({ error: "Not a group member" }); return; }
 
   const { raid } = await dealRaidDamage(params.data.id, Number(damage));
@@ -416,16 +414,11 @@ router.post("/groups/:id/raid/attack", async (req, res) => {
 });
 
 // GET /groups/:id/messages — membership required
-router.get("/groups/:id/messages", async (req, res) => {
+router.get("/groups/:id/messages", requireAuth, attachPlayer, async (req, res) => {
   const params = GetGroupParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const viewerId = req.query.playerId ? Number(req.query.playerId) : null;
-  if (!viewerId || isNaN(viewerId)) {
-    res.status(400).json({ error: "playerId query param required" }); return;
-  }
-
-  const isMember = await checkMembership(params.data.id, viewerId);
+  const isMember = await checkMembership(params.data.id, req.playerId!);
   if (!isMember) { res.status(403).json({ error: "Not a group member" }); return; }
 
   const messages = await db.query.groupMessagesTable.findMany({
@@ -438,21 +431,22 @@ router.get("/groups/:id/messages", async (req, res) => {
 });
 
 // POST /groups/:id/messages — membership required
-router.post("/groups/:id/messages", async (req, res) => {
+router.post("/groups/:id/messages", requireAuth, attachPlayer, async (req, res) => {
   const params = GetGroupParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const body = SendGroupMessageBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
+  if (body.data.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
 
-  const isMember = await checkMembership(params.data.id, body.data.playerId);
+  const isMember = await checkMembership(params.data.id, req.playerId!);
   if (!isMember) { res.status(403).json({ error: "Not a group member" }); return; }
 
-  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, body.data.playerId) });
+  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
   const { content, isFiltered } = basicProfanityFilter(body.data.content.trim().slice(0, 280));
 
   const [msg] = await db.insert(groupMessagesTable).values({
     groupId: params.data.id,
-    playerId: body.data.playerId,
+    playerId: req.playerId!,
     playerName: player?.displayName ?? player?.username ?? "Trainer",
     content,
     isFiltered,

@@ -41,12 +41,13 @@ router.post("/clubs/:id/join", requireAuth, attachPlayer, async (req, res) => {
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const body = JoinClubBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
+  if (body.data.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
 
   const club = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, params.data.id) });
   if (!club) { res.status(404).json({ error: "Club not found" }); return; }
 
   await db.update(clubsTable).set({ memberCount: club.memberCount + 1 }).where(eq(clubsTable.id, params.data.id));
-  await db.update(playersTable).set({ clubId: params.data.id }).where(eq(playersTable.id, body.data.playerId));
+  await db.update(playersTable).set({ clubId: params.data.id }).where(eq(playersTable.id, req.playerId!));
 
   const updated = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, params.data.id) });
   res.json({ ...updated!, createdAt: updated!.createdAt.toISOString() });

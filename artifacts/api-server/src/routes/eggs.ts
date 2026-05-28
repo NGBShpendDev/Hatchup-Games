@@ -172,6 +172,7 @@ router.post("/eggs/:id/hatch", requireAuth, attachPlayer, requirePlayerOwnership
 
   const egg = await db.query.eggsTable.findFirst({ where: eq(eggsTable.id, params.data.id) });
   if (!egg) { res.status(404).json({ error: "Egg not found" }); return; }
+  if (egg.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
   if (egg.isHatched) { res.status(400).json({ error: "Egg already hatched" }); return; }
   if (egg.stepsProgress < egg.stepsRequired) {
     res.status(400).json({ error: `Egg needs ${egg.stepsRequired - egg.stepsProgress} more steps to hatch` });

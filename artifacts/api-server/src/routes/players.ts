@@ -69,7 +69,7 @@ router.post("/players", async (req, res) => {
   res.status(201).json(player[0]);
 });
 
-router.get("/players/:id", async (req, res) => {
+router.get("/players/:id", requireAuth, async (req, res) => {
   const params = GetPlayerParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, params.data.id) });
