@@ -11,6 +11,7 @@ import {
   GetMealPlanQueryParams,
 } from "@workspace/api-zod";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth.ts";
+import { applyHatchlingXp, getActivePalId } from "../services/hatchlingXp.ts";
 
 const router = Router();
 
@@ -287,7 +288,15 @@ router.post("/training/log-session", requireAuth, attachPlayer, requirePlayerOwn
     })
     .where(eq(playersTable.id, body.data.playerId));
 
-  res.status(201).json({ ...session[0], createdAt: session[0].createdAt.toISOString() });
+  // Award Pal XP to the active hatchling
+  const palId = await getActivePalId(body.data.playerId);
+  const palXpResult = palId ? await applyHatchlingXp(palId, xpEarned) : null;
+
+  res.status(201).json({
+    ...session[0],
+    createdAt: session[0].createdAt.toISOString(),
+    palXpResult: palXpResult ?? null,
+  });
 });
 
 // GET /training/sessions

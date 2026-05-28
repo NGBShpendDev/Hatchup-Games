@@ -513,6 +513,21 @@ export type ActivityLogResultPrResult = {
   isNew: boolean;
 } | null;
 
+/**
+ * XP awarded to the active Pal from this fitness activity, if applicable.
+ */
+export type ActivityLogResultPalXpResult = {
+  hatchlingId: number;
+  /** XP awarded to the Pal. */
+  xpDelta: number;
+  /** Pal level before XP was applied. */
+  prevLevel: number;
+  /** Pal level after XP was applied. */
+  newLevel: number;
+  /** Pal total XP after the reward. */
+  newXp: number;
+} | null;
+
 export type BadgeDefinitionTier = typeof BadgeDefinitionTier[keyof typeof BadgeDefinitionTier];
 
 
@@ -574,6 +589,8 @@ export interface ActivityLogResult {
   newBadges?: BadgeDefinition[];
   /** Artifact rewards newly unlocked by this activity log. */
   newArtifacts?: ArtifactUnlock[];
+  /** XP awarded to the active Pal from this fitness activity, if applicable. */
+  palXpResult?: ActivityLogResultPalXpResult;
 }
 
 export interface FitnessQuest {
@@ -637,6 +654,21 @@ export interface WorkoutPlan {
   days: WorkoutDay[];
 }
 
+/**
+ * XP awarded to the active Pal from this training session, if applicable.
+ */
+export type WorkoutSessionPalXpResult = {
+  hatchlingId: number;
+  /** XP awarded to the Pal. */
+  xpDelta: number;
+  /** Pal level before XP was applied. */
+  prevLevel: number;
+  /** Pal level after XP was applied. */
+  newLevel: number;
+  /** Pal total XP after the reward. */
+  newXp: number;
+} | null;
+
 export interface WorkoutSession {
   id: number;
   playerId: number;
@@ -649,6 +681,8 @@ export interface WorkoutSession {
   /** @nullable */
   notes?: string | null;
   createdAt: string;
+  /** XP awarded to the active Pal from this training session, if applicable. */
+  palXpResult?: WorkoutSessionPalXpResult;
 }
 
 export interface MealItem {

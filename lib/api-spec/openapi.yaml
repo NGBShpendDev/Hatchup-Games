@@ -5359,6 +5359,17 @@ components:
           type: array
           description: "Artifact rewards newly unlocked by this activity log."
           items: { $ref: "#/components/schemas/ArtifactUnlock" }
+        palXpResult:
+          nullable: true
+          type: object
+          description: "XP awarded to the active Pal from this fitness activity, if applicable."
+          required: [hatchlingId, xpDelta, prevLevel, newLevel, newXp]
+          properties:
+            hatchlingId: { type: integer }
+            xpDelta:     { type: integer, description: "XP awarded to the Pal." }
+            prevLevel:   { type: integer, description: "Pal level before XP was applied." }
+            newLevel:    { type: integer, description: "Pal level after XP was applied." }
+            newXp:       { type: integer, description: "Pal total XP after the reward." }
 
     BadgeDefinition:
       type: object
@@ -5479,6 +5490,17 @@ components:
         realm:               { type: string }
         notes:               { type: ["string", "null"] }
         createdAt:           { type: string }
+        palXpResult:
+          nullable: true
+          type: object
+          description: "XP awarded to the active Pal from this training session, if applicable."
+          required: [hatchlingId, xpDelta, prevLevel, newLevel, newXp]
+          properties:
+            hatchlingId: { type: integer }
+            xpDelta:     { type: integer, description: "XP awarded to the Pal." }
+            prevLevel:   { type: integer, description: "Pal level before XP was applied." }
+            newLevel:    { type: integer, description: "Pal level after XP was applied." }
+            newXp:       { type: integer, description: "Pal total XP after the reward." }
 
     MealItem:
       type: object

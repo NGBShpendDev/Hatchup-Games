@@ -20,11 +20,21 @@ import { NeonButton } from "@/components/ui/neon-button";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dumbbell, Target, Utensils, History, Zap, CheckCircle2, Trophy, Clock } from "lucide-react";
+import { Dumbbell, Target, Utensils, History, Zap, CheckCircle2, Trophy, Clock, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+
+const XP_PER_LEVEL = 100;
+
+type PalXpResult = {
+  hatchlingId: number;
+  xpDelta: number;
+  prevLevel: number;
+  newLevel: number;
+  newXp: number;
+};
 
 export default function Training() {
   const queryClient = useQueryClient();
@@ -32,6 +42,8 @@ export default function Training() {
   const { playerId, player } = usePlayer();
   const pid = playerId ?? 0;
   const [reaction, setReaction] = useState<HatchlingReactionData | null>(null);
+  const [palXp, setPalXp] = useState<PalXpResult | null>(null);
+  const [lastSessionXp, setLastSessionXp] = useState<number | null>(null);
 
   const { data: ownedHatchlings } = useListHatchlings(
     { playerId: pid },
@@ -80,12 +92,18 @@ export default function Training() {
   };
 
   const handleLogSession = (type: string, duration: number) => {
+    setPalXp(null);
+    setLastSessionXp(null);
     logSession.mutate(
       { data: { playerId: pid, workoutType: type, durationMinutes: duration, exercisesCompleted: 5 } },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
           toast({ title: "Workout logged!", description: "XP and coins earned." });
           queryClient.invalidateQueries({ queryKey: getListWorkoutSessionsQueryKey({ playerId: pid, limit: 10 }) });
+          setLastSessionXp(data.xpEarned);
+          if (data.palXpResult) {
+            setPalXp(data.palXpResult as PalXpResult);
+          }
           const activeId = player?.activeHatchlingId;
           const partner =
             (activeId && ownedHatchlings?.find((h) => h.id === activeId)) ||
@@ -101,6 +119,9 @@ export default function Training() {
       }
     );
   };
+
+  const palXpProgress = palXp ? ((palXp.newXp % XP_PER_LEVEL) / XP_PER_LEVEL) * 100 : null;
+  const leveledUp = palXp ? palXp.newLevel > palXp.prevLevel : false;
 
   return (
     <Layout>
@@ -172,11 +193,88 @@ export default function Training() {
                         </div>
                       ))}
                     </div>
-                    <NeonButton size="lg" className="w-full" onClick={() => handleLogSession(workoutPlan.days[0]?.name || "workout", workoutPlan.days[0]?.durationMinutes || 30)}>
-                      Log Workout Session
+                    <NeonButton
+                      size="lg"
+                      className="w-full"
+                      onClick={() => handleLogSession(workoutPlan.days[0]?.name || "workout", workoutPlan.days[0]?.durationMinutes || 30)}
+                      disabled={logSession.isPending}
+                    >
+                      {logSession.isPending ? "Logging…" : "Log Workout Session"}
                     </NeonButton>
                   </div>
                 </GlassCard>
+
+                {/* Workout result: XP summary + Pal XP block */}
+                <AnimatePresence>
+                  {(lastSessionXp != null || palXp) && (
+                    <motion.div
+                      key="workout-result"
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.35 }}
+                      className="space-y-3"
+                      data-testid="training-result-block"
+                    >
+                      {lastSessionXp != null && (
+                        <div className="flex gap-3">
+                          <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+                            <p className="text-xs font-bold text-muted-foreground uppercase mb-1">Player XP</p>
+                            <p className="text-3xl font-black text-green-400">+{lastSessionXp}</p>
+                          </div>
+                          <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+                            <p className="text-xs font-bold text-muted-foreground uppercase mb-1">Coins</p>
+                            <p className="text-3xl font-black text-yellow-400">+{Math.round(lastSessionXp / 2)}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {palXp && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.15 }}
+                          className="bg-white/5 border border-white/10 rounded-2xl p-4"
+                          data-testid="training-pal-xp-block"
+                        >
+                          {leveledUp && (
+                            <motion.div
+                              initial={{ scale: 0.8, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              transition={{ type: "spring", delay: 0.25 }}
+                              className="flex items-center gap-2 justify-center mb-3 px-3 py-2 bg-yellow-400/15 border border-yellow-400/30 rounded-xl"
+                              data-testid="training-level-up-banner"
+                            >
+                              <TrendingUp className="w-4 h-4 text-yellow-400 shrink-0" />
+                              <span className="font-black text-yellow-300 text-sm">
+                                LEVEL UP! Lv.{palXp.prevLevel} → Lv.{palXp.newLevel}
+                              </span>
+                            </motion.div>
+                          )}
+
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                              <Zap className="w-3 h-3 text-green-400" /> Pal XP
+                            </span>
+                            <span className="text-xs font-black text-green-400" data-testid="training-pal-xp-delta">
+                              +{palXp.xpDelta} XP
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+                            <span>Lv.{palXp.newLevel}</span>
+                            <span>{palXp.newXp % XP_PER_LEVEL}/{XP_PER_LEVEL} XP to next level</span>
+                          </div>
+                          <Progress
+                            value={palXpProgress ?? 0}
+                            className="h-2 bg-white/10 [&>div]:bg-gradient-to-r [&>div]:from-green-500 [&>div]:to-emerald-400"
+                            data-testid="training-pal-xp-bar"
+                          />
+                        </motion.div>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             )}
           </TabsContent>

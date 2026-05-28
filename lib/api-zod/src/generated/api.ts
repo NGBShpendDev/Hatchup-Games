@@ -2126,7 +2126,14 @@ export const ListWorkoutSessionsResponseItem = zod.object({
   "coinsEarned": zod.number(),
   "realm": zod.string(),
   "notes": zod.string().nullish(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "palXpResult": zod.object({
+  "hatchlingId": zod.number(),
+  "xpDelta": zod.number().describe('XP awarded to the Pal.'),
+  "prevLevel": zod.number().describe('Pal level before XP was applied.'),
+  "newLevel": zod.number().describe('Pal level after XP was applied.'),
+  "newXp": zod.number().describe('Pal total XP after the reward.')
+}).nullish().describe('XP awarded to the active Pal from this training session, if applicable.')
 })
 export const ListWorkoutSessionsResponse = zod.array(ListWorkoutSessionsResponseItem)
 
