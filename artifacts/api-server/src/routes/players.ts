@@ -1,7 +1,9 @@
 import { Router } from "express";
+import { createDecipheriv, createHash } from "crypto";
 import { db } from "@workspace/db";
-import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable, eggsTable, fitnessActivitiesTable, playerBadgesTable, playerArtifactsTable, artifactsTable } from "@workspace/db";
-import { eq, desc, and, gte, or, ilike, ne } from "drizzle-orm";
+import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable, eggsTable, fitnessActivitiesTable, playerBadgesTable, playerArtifactsTable, artifactsTable, playerLocationTable } from "@workspace/db";
+import { eq, desc, and, gte, or, ilike, ne, inArray } from "drizzle-orm";
+import { getHiddenPlayerIds } from "./safety";
 import {
   CreatePlayerBody,
   UpdatePlayerBody,
@@ -115,6 +117,140 @@ router.get("/players/search", requireAuth, attachPlayer, async (req, res) => {
     avatarUrl: p.avatarUrl ?? null,
     creatorBadge: p.creatorBadge ?? null,
   })));
+});
+
+// GET /players/nearby — players in the viewer's city, respecting privacy/blocking/minor rules.
+// Returns only a coarse distance bucket; raw coords are never decrypted into the response.
+function deriveLocationKey(): Buffer | null {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || secret.length < 16) return null;
+  return createHash("sha256").update(secret).digest();
+}
+
+function decryptCoord(blob: string | null | undefined, key: Buffer): number | null {
+  if (!blob) return null;
+  try {
+    const [ivB64, tagB64, ctB64] = blob.split(":");
+    if (!ivB64 || !tagB64 || !ctB64) return null;
+    const iv = Buffer.from(ivB64, "base64");
+    const tag = Buffer.from(tagB64, "base64");
+    const ct = Buffer.from(ctB64, "base64");
+    const d = createDecipheriv("aes-256-gcm", key, iv);
+    d.setAuthTag(tag);
+    const out = Buffer.concat([d.update(ct), d.final()]).toString("utf8");
+    const n = Number(out);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+function bucketFromKm(km: number): "under_1km" | "under_5km" | "under_25km" | "same_city" {
+  if (km < 1) return "under_1km";
+  if (km < 5) return "under_5km";
+  if (km < 25) return "under_25km";
+  return "same_city";
+}
+
+router.get("/players/nearby", requireAuth, attachPlayer, async (req, res) => {
+  const viewerId = req.playerId!;
+  const rawLimit = Number(req.query.limit);
+  const limit = Math.min(50, Math.max(1, Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : 12));
+
+  const viewer = await db.query.playersTable.findFirst({ where: eq(playersTable.id, viewerId) });
+  const viewerLoc = await db.query.playerLocationTable.findFirst({
+    where: eq(playerLocationTable.playerId, viewerId),
+  });
+
+  // No city → cannot compute nearby. Tell the client to prompt for location.
+  if (!viewerLoc?.city) {
+    res.json({ entries: [], city: null, locationRequired: true });
+    return;
+  }
+
+  // Viewers with hidden visibility don't get a nearby feed either —
+  // mirrors the canAppearInScope policy from the leaderboards/local-challenges modules.
+  if ((viewer?.locationVisibility ?? viewerLoc.visibility) === "hidden") {
+    res.json({ entries: [], city: viewerLoc.city, locationRequired: false });
+    return;
+  }
+
+  const candidates = await db.query.playerLocationTable.findMany({
+    where: and(
+      eq(playerLocationTable.city, viewerLoc.city),
+      eq(playerLocationTable.state, viewerLoc.state ?? ""),
+      ne(playerLocationTable.playerId, viewerId),
+    ),
+  });
+
+  if (candidates.length === 0) {
+    res.json({ entries: [], city: viewerLoc.city, locationRequired: false });
+    return;
+  }
+
+  const candidateIds = candidates.map(c => c.playerId);
+  const hiddenIds = new Set(await getHiddenPlayerIds(viewerId));
+
+  const candidatePlayers = await db.query.playersTable.findMany({
+    where: inArray(playersTable.id, candidateIds),
+  });
+
+  // Privacy filters:
+  //   - exclude blocked (either direction)
+  //   - exclude visibility=hidden (per canAppearInScope policy)
+  //   - exclude minors entirely from people-discovery surfaces
+  const allowed = candidatePlayers.filter(p =>
+    !hiddenIds.has(p.id) &&
+    p.locationVisibility !== "hidden" &&
+    !p.isMinor,
+  );
+
+  // Compute distance buckets — only when BOTH sides opted into "exact" visibility.
+  const key = deriveLocationKey();
+  const viewerExact =
+    (viewer?.locationVisibility === "exact" || viewerLoc.visibility === "exact") && key !== null;
+  const vLat = viewerExact ? decryptCoord(viewerLoc.latEncrypted, key!) : null;
+  const vLng = viewerExact ? decryptCoord(viewerLoc.lngEncrypted, key!) : null;
+  const locMap = new Map(candidates.map(c => [c.playerId, c]));
+
+  const sortedAllowed = [...allowed].sort((a, b) => {
+    const al = locMap.get(a.id);
+    const bl = locMap.get(b.id);
+    return (bl?.updatedAt?.getTime() ?? 0) - (al?.updatedAt?.getTime() ?? 0);
+  });
+
+  const entries = sortedAllowed.slice(0, limit).map(p => {
+    const loc = locMap.get(p.id)!;
+    let bucket: "under_1km" | "under_5km" | "under_25km" | "same_city" = "same_city";
+    if (viewerExact && vLat != null && vLng != null && p.locationVisibility === "exact" && key) {
+      const tLat = decryptCoord(loc.latEncrypted, key);
+      const tLng = decryptCoord(loc.lngEncrypted, key);
+      if (tLat != null && tLng != null) {
+        bucket = bucketFromKm(haversineKm(vLat, vLng, tLat, tLng));
+      }
+    }
+    return {
+      id: p.id,
+      username: p.username,
+      displayName: p.displayName ?? null,
+      avatarUrl: p.avatarUrl ?? null,
+      city: loc.city ?? null,
+      distanceBucket: bucket,
+    };
+  });
+
+  res.json({ entries, city: viewerLoc.city, locationRequired: false });
 });
 
 router.get("/players/:id", requireAuth, attachPlayer, async (req, res) => {

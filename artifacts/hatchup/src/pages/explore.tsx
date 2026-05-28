@@ -2,8 +2,8 @@ import { Layout } from "@/components/layout";
 import {
   useListRealms,
   getListRealmsQueryKey,
-  useGetScopedLeaderboard,
-  getGetScopedLeaderboardQueryKey,
+  useListNearbyPlayers,
+  getListNearbyPlayersQueryKey,
 } from "@workspace/api-client-react";
 import { usePlayer } from "@/lib/playerContext";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,12 +23,18 @@ export default function Explore() {
     { query: { queryKey: getListRealmsQueryKey({ playerId: pid }), enabled: !!playerId } }
   );
 
-  const nearbyParams = { scope: "nearby" as const, metric: "xp" as const, limit: 8 };
-  const { data: nearby, isLoading: nearbyLoading } = useGetScopedLeaderboard(
+  const nearbyParams = { limit: 8 };
+  const { data: nearby, isLoading: nearbyLoading } = useListNearbyPlayers(
     nearbyParams,
-    { query: { queryKey: getGetScopedLeaderboardQueryKey(nearbyParams), enabled: !!playerId } }
+    { query: { queryKey: getListNearbyPlayersQueryKey(nearbyParams), enabled: !!playerId } }
   );
-  const nearbyEntries = nearby?.entries?.filter((e) => !e.isMe).slice(0, 6) ?? [];
+  const nearbyEntries = nearby?.entries ?? [];
+  const distanceLabel: Record<string, string> = {
+    under_1km: "< 1 km away",
+    under_5km: "< 5 km away",
+    under_25km: "< 25 km away",
+    same_city: nearby?.city ? `In ${nearby.city}` : "In your city",
+  };
 
   return (
     <Layout>
@@ -59,10 +65,10 @@ export default function Explore() {
                       const name = entry.displayName ?? entry.username;
                       return (
                         <Link
-                          key={entry.playerId}
-                          href={`/players/${entry.playerId}`}
+                          key={entry.id}
+                          href={`/players/${entry.id}`}
                           className="snap-start flex-shrink-0 w-36"
-                          data-testid={`link-profile-${entry.playerId}`}
+                          data-testid={`link-profile-${entry.id}`}
                         >
                           <div className="group h-full rounded-2xl border border-white/10 bg-card/70 backdrop-blur p-3 hover:border-primary/50 hover:bg-card/90 transition-all active:scale-[0.97]">
                             <div className="flex items-center gap-2">
@@ -78,8 +84,11 @@ export default function Explore() {
                                 <p className="text-[10px] text-muted-foreground truncate">@{entry.username}</p>
                               </div>
                             </div>
-                            <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-primary">
-                              #{entry.position} · {entry.metricValue.toLocaleString()} XP
+                            <p
+                              className="mt-2 text-[10px] font-bold uppercase tracking-wider text-primary truncate"
+                              data-testid={`text-distance-${entry.id}`}
+                            >
+                              {distanceLabel[entry.distanceBucket] ?? "Nearby"}
                             </p>
                           </div>
                         </Link>

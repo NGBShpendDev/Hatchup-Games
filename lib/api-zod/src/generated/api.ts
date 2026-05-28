@@ -125,6 +125,38 @@ export const SearchPlayersResponse = zod.array(SearchPlayersResponseItem)
 
 
 /**
+ * Returns players in the viewer's city (the "nearby" geographic scope),
+excluding the viewer, blocked users (in either direction), minors, and
+anyone whose locationVisibility is `hidden`. Each entry carries a
+privacy-safe distance bucket — never a raw coordinate or precise
+distance. Empty array if the viewer has no stored city/location.
+
+ * @summary List players near the viewer
+ */
+export const listNearbyPlayersQueryLimitDefault = 12;
+export const listNearbyPlayersQueryLimitMax = 50;
+
+
+
+export const ListNearbyPlayersQueryParams = zod.object({
+  "limit": zod.coerce.number().min(1).max(listNearbyPlayersQueryLimitMax).default(listNearbyPlayersQueryLimitDefault)
+})
+
+export const ListNearbyPlayersResponse = zod.object({
+  "entries": zod.array(zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "city": zod.string().nullable(),
+  "distanceBucket": zod.enum(['under_1km', 'under_5km', 'under_25km', 'same_city']).describe('Privacy-safe distance label. One of: `under_1km`, `under_5km`,\n`under_25km`, `same_city`. Distance is only computed when both\nthe viewer and the target opted into `exact` visibility; in every\nother case the bucket is `same_city`.\n')
+})),
+  "city": zod.string().nullable().describe('Viewer\'s stored city, or null if not set.'),
+  "locationRequired": zod.boolean().describe('True if the viewer has no city set and must update their location to see nearby players.')
+})
+
+
+/**
  * @summary Get player by ID
  */
 export const GetPlayerParams = zod.object({

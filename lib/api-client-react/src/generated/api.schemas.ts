@@ -1245,6 +1245,40 @@ export interface PlayerStub {
   creatorBadge: string | null;
 }
 
+/**
+ * Privacy-safe distance label. One of: `under_1km`, `under_5km`,
+`under_25km`, `same_city`. Distance is only computed when both
+the viewer and the target opted into `exact` visibility; in every
+other case the bucket is `same_city`.
+
+ */
+export type NearbyPlayerDistanceBucket = typeof NearbyPlayerDistanceBucket[keyof typeof NearbyPlayerDistanceBucket];
+
+
+export const NearbyPlayerDistanceBucket = {
+  under_1km: 'under_1km',
+  under_5km: 'under_5km',
+  under_25km: 'under_25km',
+  same_city: 'same_city',
+} as const;
+
+export interface NearbyPlayer {
+  id: number;
+  username: string;
+  /** @nullable */
+  displayName: string | null;
+  /** @nullable */
+  avatarUrl: string | null;
+  /** @nullable */
+  city: string | null;
+  /** Privacy-safe distance label. One of: `under_1km`, `under_5km`,
+  `under_25km`, `same_city`. Distance is only computed when both
+  the viewer and the target opted into `exact` visibility; in every
+  other case the bucket is `same_city`.
+   */
+  distanceBucket: NearbyPlayerDistanceBucket;
+}
+
 export interface SharedGroup {
   id: number;
   name: string;
@@ -1961,6 +1995,25 @@ q: string;
  * @maximum 50
  */
 limit?: number;
+};
+
+export type ListNearbyPlayersParams = {
+/**
+ * @minimum 1
+ * @maximum 50
+ */
+limit?: number;
+};
+
+export type ListNearbyPlayers200 = {
+  entries: NearbyPlayer[];
+  /**
+     * Viewer's stored city, or null if not set.
+     * @nullable
+     */
+  city: string | null;
+  /** True if the viewer has no city set and must update their location to see nearby players. */
+  locationRequired: boolean;
 };
 
 export type ListHatchlingsParams = {

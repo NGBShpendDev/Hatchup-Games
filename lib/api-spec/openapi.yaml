@@ -222,6 +222,45 @@ paths:
                 items:
                   $ref: "#/components/schemas/PlayerStub"
 
+  /players/nearby:
+    get:
+      operationId: listNearbyPlayers
+      tags: [players]
+      summary: List players near the viewer
+      description: |
+        Returns players in the viewer's city (the "nearby" geographic scope),
+        excluding the viewer, blocked users (in either direction), minors, and
+        anyone whose locationVisibility is `hidden`. Each entry carries a
+        privacy-safe distance bucket — never a raw coordinate or precise
+        distance. Empty array if the viewer has no stored city/location.
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 12
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: Nearby players
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries, city, locationRequired]
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NearbyPlayer"
+                  city:
+                    type: ["string", "null"]
+                    description: Viewer's stored city, or null if not set.
+                  locationRequired:
+                    type: boolean
+                    description: True if the viewer has no city set and must update their location to see nearby players.
+
   /players/{id}:
     get:
       operationId: getPlayer
@@ -4682,6 +4721,24 @@ components:
         displayName: { type: ["string", "null"] }
         avatarUrl:   { type: ["string", "null"] }
         creatorBadge: { type: ["string", "null"] }
+
+    NearbyPlayer:
+      type: object
+      required: [id, username, displayName, avatarUrl, distanceBucket, city]
+      properties:
+        id:             { type: integer }
+        username:       { type: string }
+        displayName:    { type: ["string", "null"] }
+        avatarUrl:      { type: ["string", "null"] }
+        city:           { type: ["string", "null"] }
+        distanceBucket:
+          type: string
+          description: |
+            Privacy-safe distance label. One of: `under_1km`, `under_5km`,
+            `under_25km`, `same_city`. Distance is only computed when both
+            the viewer and the target opted into `exact` visibility; in every
+            other case the bucket is `same_city`.
+          enum: [under_1km, under_5km, under_25km, same_city]
 
     DiscoverablePlayer:
       type: object

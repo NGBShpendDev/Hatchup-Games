@@ -124,6 +124,8 @@ import type {
   ListItemsParams,
   ListMutualFollowersParams,
   ListMyGroupsParams,
+  ListNearbyPlayers200,
+  ListNearbyPlayersParams,
   ListNotificationsParams,
   ListNutritionPostsParams,
   ListRealmsParams,
@@ -738,6 +740,96 @@ export function useSearchPlayers<TData = Awaited<ReturnType<typeof searchPlayers
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getSearchPlayersQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListNearbyPlayersUrl = (params?: ListNearbyPlayersParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/players/nearby?${stringifiedParams}` : `/api/players/nearby`
+}
+
+/**
+ * Returns players in the viewer's city (the "nearby" geographic scope),
+excluding the viewer, blocked users (in either direction), minors, and
+anyone whose locationVisibility is `hidden`. Each entry carries a
+privacy-safe distance bucket — never a raw coordinate or precise
+distance. Empty array if the viewer has no stored city/location.
+
+ * @summary List players near the viewer
+ */
+export const listNearbyPlayers = async (params?: ListNearbyPlayersParams, options?: RequestInit): Promise<ListNearbyPlayers200> => {
+
+  return customFetch<ListNearbyPlayers200>(getListNearbyPlayersUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListNearbyPlayersQueryKey = (params?: ListNearbyPlayersParams,) => {
+    return [
+    `/api/players/nearby`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListNearbyPlayersQueryOptions = <TData = Awaited<ReturnType<typeof listNearbyPlayers>>, TError = ErrorType<unknown>>(params?: ListNearbyPlayersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNearbyPlayers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListNearbyPlayersQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listNearbyPlayers>>> = ({ signal }) => listNearbyPlayers(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listNearbyPlayers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListNearbyPlayersQueryResult = NonNullable<Awaited<ReturnType<typeof listNearbyPlayers>>>
+export type ListNearbyPlayersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List players near the viewer
+ */
+
+export function useListNearbyPlayers<TData = Awaited<ReturnType<typeof listNearbyPlayers>>, TError = ErrorType<unknown>>(
+ params?: ListNearbyPlayersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNearbyPlayers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListNearbyPlayersQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
