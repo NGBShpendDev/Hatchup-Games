@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -44,10 +44,13 @@ export const personalRecordsTable = pgTable("personal_records", {
   id: serial("id").primaryKey(),
   playerId: integer("player_id").notNull(),
   activityType: text("activity_type").notNull(),  // e.g. "running", "pushups"
-  metric: text("metric").notNull(),               // e.g. "reps", "pace_sec_per_mile", "distance_miles"
-  value: integer("value").notNull(),              // integer (reps, seconds, hundredths of miles, etc.)
+  metric: text("metric").notNull(),               // e.g. "reps", "session_minutes"
+  value: integer("value").notNull(),              // integer (reps, minutes, etc.)
   achievedAt: timestamp("achieved_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  // Unique constraint: one PR record per player/activity/metric combination
+  uniq: unique("personal_records_player_id_activity_type_metric_key").on(t.playerId, t.activityType, t.metric),
+}));
 
 export const insertPersonalRecordSchema = createInsertSchema(personalRecordsTable).omit({ id: true, achievedAt: true });
 export type InsertPersonalRecord = z.infer<typeof insertPersonalRecordSchema>;

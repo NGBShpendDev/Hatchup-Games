@@ -159,8 +159,9 @@ export async function checkAndAwardBadges(playerId: number, triggers: {
   lifetimeSquats?: number;
   sessionReps?: number;
   activityType?: string;
-  // Running triggers (values in hundredths of miles for int storage)
+  // Running triggers
   cumulativeRunMiles?: number;
+  monthlyRunMiles?: number;
   paceMinsPerMile?: number;
 }): Promise<BadgeDefinition[]> {
   const awarded: BadgeDefinition[] = [];
@@ -174,7 +175,7 @@ export async function checkAndAwardBadges(playerId: number, triggers: {
     hatchlingCount, hasEvolved, hasMythicHatchling, hasPrestige,
     activityHour, hasNamedDragon, dailyRewardStreak,
     totalReps, lifetimePushups, lifetimeSquats, sessionReps, activityType,
-    cumulativeRunMiles, paceMinsPerMile,
+    cumulativeRunMiles, monthlyRunMiles, paceMinsPerMile,
   } = triggers;
 
   if (totalSteps !== undefined) {
@@ -231,8 +232,11 @@ export async function checkAndAwardBadges(playerId: number, triggers: {
 
   // Running / speed badges
   if (cumulativeRunMiles !== undefined) {
-    if (cumulativeRunMiles >= 2620)  await tryAward("MARATHON_BEAST");   // 26.20 miles
-    if (cumulativeRunMiles >= 10000) await tryAward("LIGHTNING_RUNNER"); // 100 miles
+    if (cumulativeRunMiles >= 26.2)  await tryAward("MARATHON_BEAST");   // 26.2 miles cumulative
+    if (cumulativeRunMiles >= 100)   await tryAward("LIGHTNING_RUNNER"); // 100 miles cumulative
+  }
+  if (monthlyRunMiles !== undefined) {
+    if (monthlyRunMiles >= 50) await tryAward("ENDURANCE_KING"); // 50+ miles in a month
   }
   if (paceMinsPerMile !== undefined) {
     if (paceMinsPerMile < 8)  await tryAward("SPEED_DEMON");

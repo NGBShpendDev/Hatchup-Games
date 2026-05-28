@@ -6,12 +6,13 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
-import { Trophy, Zap, Footprints, Dumbbell } from "lucide-react";
+import { Trophy, Zap, Footprints, Dumbbell, Timer } from "lucide-react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { usePlayer } from "@/lib/playerContext";
 
 type TabKey = "global" | "speed";
+type SpeedMode = "steps" | "pace";
 
 interface SpeedEntry {
   position: number;
@@ -20,14 +21,16 @@ interface SpeedEntry {
   displayName: string | null;
   avatarUrl: string | null;
   rank: string;
-  totalSteps: number;
-  totalReps: number;
+  metricValue: number;
+  metricLabel: string;
   currentStreak: number;
+  achievedAt: string;
 }
 
 export default function Leaderboard() {
   const { playerId } = usePlayer();
   const [activeTab, setActiveTab] = useState<TabKey>("global");
+  const [speedMode, setSpeedMode] = useState<SpeedMode>("steps");
 
   const { data: leaderboard, isLoading: globalLoading } = useGetGlobalLeaderboard(
     { limit: 50 },
@@ -37,10 +40,10 @@ export default function Leaderboard() {
   const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
   const { data: speedBoard, isLoading: speedLoading } = useQuery<SpeedEntry[]>({
-    queryKey: ["leaderboard-speed"],
+    queryKey: ["leaderboard-speed", speedMode],
     queryFn: async () => {
-      const res = await fetch(`${basePath}/api/leaderboards/speed?limit=25`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load speed leaderboard");
+      const res = await fetch(`${basePath}/api/leaderboards/speed?mode=${speedMode}&limit=25`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load fitness leaderboard");
       return res.json();
     },
     enabled: activeTab === "speed" && !!playerId,
@@ -49,6 +52,11 @@ export default function Leaderboard() {
   const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
     { key: "global", label: "Global Rank", icon: <Trophy className="w-4 h-4" /> },
     { key: "speed",  label: "Fitness",     icon: <Zap className="w-4 h-4" /> },
+  ];
+
+  const speedModes: { key: SpeedMode; label: string; icon: React.ReactNode }[] = [
+    { key: "steps", label: "Top Daily Steps", icon: <Footprints className="w-3.5 h-3.5" /> },
+    { key: "pace",  label: "Best Run",        icon: <Timer className="w-3.5 h-3.5" /> },
   ];
 
   return (
@@ -133,9 +141,26 @@ export default function Leaderboard() {
           </>
         )}
 
-        {/* Speed / Fitness Leaderboard */}
+        {/* Fitness Leaderboard with sub-mode switcher */}
         {activeTab === "speed" && (
           <>
+            {/* Sub-mode switcher */}
+            <div className="flex gap-2">
+              {speedModes.map(m => (
+                <button
+                  key={m.key}
+                  onClick={() => setSpeedMode(m.key)}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-sm border transition-all ${
+                    speedMode === m.key
+                      ? "bg-primary/20 border-primary text-primary"
+                      : "bg-card border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {m.icon} {m.label}
+                </button>
+              ))}
+            </div>
+
             {speedLoading ? (
               <div className="space-y-3">
                 {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-2xl" />)}
@@ -144,9 +169,14 @@ export default function Leaderboard() {
               <div className="bg-card rounded-3xl shadow-xl overflow-hidden border border-border">
                 <div className="grid grid-cols-12 gap-3 p-4 border-b border-border bg-muted/50 text-xs font-bold text-muted-foreground uppercase tracking-wider">
                   <div className="col-span-1 text-center">#</div>
-                  <div className="col-span-4">Player</div>
-                  <div className="col-span-3 text-right flex items-center justify-end gap-1"><Footprints className="w-3 h-3" /> Steps</div>
-                  <div className="col-span-2 text-right flex items-center justify-end gap-1"><Dumbbell className="w-3 h-3" /> Reps</div>
+                  <div className="col-span-5">Player</div>
+                  <div className="col-span-4 text-right">
+                    {speedMode === "steps" ? (
+                      <span className="flex items-center justify-end gap-1"><Footprints className="w-3 h-3" /> Steps Today</span>
+                    ) : (
+                      <span className="flex items-center justify-end gap-1"><Timer className="w-3 h-3" /> Best Run</span>
+                    )}
+                  </div>
                   <div className="col-span-2 text-right">Streak</div>
                 </div>
                 <div className="divide-y divide-border">
@@ -161,7 +191,7 @@ export default function Leaderboard() {
                       <div className="col-span-1 text-center font-black text-xl text-muted-foreground">
                         {entry.position === 1 ? "🥇" : entry.position === 2 ? "🥈" : entry.position === 3 ? "🥉" : `#${entry.position}`}
                       </div>
-                      <div className="col-span-4 flex items-center gap-3">
+                      <div className="col-span-5 flex items-center gap-3">
                         <Avatar className="h-9 w-9 border-2 border-border">
                           <AvatarImage src={entry.avatarUrl || undefined} />
                           <AvatarFallback className="font-bold text-xs">{entry.username.substring(0, 2).toUpperCase()}</AvatarFallback>
@@ -171,8 +201,9 @@ export default function Leaderboard() {
                           <p className="text-[10px] font-bold text-muted-foreground uppercase">{entry.rank}</p>
                         </div>
                       </div>
-                      <div className="col-span-3 text-right font-black text-base text-blue-400">{entry.totalSteps.toLocaleString()}</div>
-                      <div className="col-span-2 text-right font-black text-base text-primary">{entry.totalReps.toLocaleString()}</div>
+                      <div className="col-span-4 text-right font-black text-base text-blue-400">
+                        {entry.metricLabel}
+                      </div>
                       <div className="col-span-2 text-right font-bold text-sm text-orange-400">{entry.currentStreak}🔥</div>
                     </motion.div>
                   ))}

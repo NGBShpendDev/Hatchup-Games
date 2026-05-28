@@ -6,7 +6,7 @@ import {
   eggsTable,
   personalRecordsTable,
 } from "@workspace/db";
-import { eq, and, sum } from "drizzle-orm";
+import { eq, and, gte } from "drizzle-orm";
 import { checkAndAwardBadges, type BadgeDefinition } from "./badgeService";
 
 export const STRENGTH_TYPES = new Set(["pushups", "burpees", "squats", "pullups", "planks", "situps"]);
@@ -112,8 +112,22 @@ async function getCumulativeRunMiles(playerId: number): Promise<number> {
       eq(fitnessActivitiesTable.type, "running"),
     ),
   });
-  const totalMinutes = rows.reduce((s, r) => s + r.value, 0);
-  return totalMinutes * RUNNING_MILES_PER_MINUTE;
+  return rows.reduce((s, r) => s + r.value * RUNNING_MILES_PER_MINUTE, 0);
+}
+
+/** Compute monthly running miles for a player (current calendar month). */
+async function getMonthlyRunMiles(playerId: number): Promise<number> {
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const rows = await db.query.fitnessActivitiesTable.findMany({
+    where: and(
+      eq(fitnessActivitiesTable.playerId, playerId),
+      eq(fitnessActivitiesTable.type, "running"),
+      gte(fitnessActivitiesTable.createdAt, monthStart),
+    ),
+  });
+  return rows.reduce((s, r) => s + r.value * RUNNING_MILES_PER_MINUTE, 0);
 }
 
 export async function logFitnessActivity(
@@ -260,16 +274,18 @@ export async function logFitnessActivity(
     prResult = await detectAndSavePr(playerId, "cycling", "session_minutes", value, true);
   }
 
-  // Compute cumulative running miles for badge checks (runs once after a running log)
+  // Compute cumulative and monthly running miles for badge checks
   let cumulativeRunMiles: number | undefined;
+  let monthlyRunMiles: number | undefined;
   if (type === "running") {
     cumulativeRunMiles = await getCumulativeRunMiles(playerId);
+    monthlyRunMiles = await getMonthlyRunMiles(playerId);
   }
 
-  // Estimate pace badge based on session effort: a 60+ min session → likely sub-10 pace
-  // A 45 min session → approx sub-8 pace assumption for engaged runners
+  // Estimate pace badge based on session effort (longer sustained run → better endurance)
+  // >= 60 min session proxy for sub-6 min/mile effort; >= 45 min for sub-8 min/mile
   const runPaceBadgeTrigger =
-    type === "running" ? (value >= 45 ? 7.9 : value >= 60 ? 5.9 : undefined) : undefined;
+    type === "running" ? (value >= 60 ? 5.9 : value >= 45 ? 7.9 : undefined) : undefined;
 
   // Check and award badges
   const activityHour = new Date().getHours();
@@ -284,6 +300,7 @@ export async function logFitnessActivity(
     sessionReps: isStrength ? value : 0,
     activityType: type,
     cumulativeRunMiles,
+    monthlyRunMiles,
     paceMinsPerMile: runPaceBadgeTrigger,
   });
 

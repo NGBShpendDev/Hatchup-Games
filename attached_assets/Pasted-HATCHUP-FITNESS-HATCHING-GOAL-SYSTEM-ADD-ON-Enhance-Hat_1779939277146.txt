@@ -1,0 +1,188 @@
+HATCHUP FITNESS HATCHING GOAL SYSTEM ADD-ON
+
+Enhance HatchUp Fitness Pals with a balanced real-world fitness progression system where eggs hatch through achievable workout goals that motivate both beginners and experienced fitness users.
+
+The system should feel:
+- rewarding
+- motivating
+- fair
+- addictive
+- beginner-friendly
+- challenging for advanced users
+
+====================================
+CORE HATCHING SYSTEM
+====================================
+
+Eggs hatch by completing real-life fitness activities.
+
+Base hatch goals should be achievable for beginners while still rewarding dedicated fitness users.
+
+Examples of beginner-friendly hatch goals:
+- 5,000 daily steps
+- 100 pushups
+- 100 squats
+- 100 sit-ups or abs exercises
+- 20 minutes of cardio
+- 30 minutes of walking
+- 15 minutes of stretching
+- completing a beginner workout class
+- drinking daily hydration goals
+- completing meditation or recovery sessions
+
+Users can complete:
+- one large goal
+OR
+- combine smaller goals to hatch eggs faster.
+
+Examples:
+- 2,500 steps + 50 pushups + hydration goal
+- cardio + stretching + meditation
+- upper body + lower body + recovery session
+
+====================================
+ALL FITNESS STYLES SHOULD COUNT
+====================================
+
+Allow all forms of movement and wellness to contribute toward progression.
+
+Supported fitness styles:
+- bodybuilding
+- walking
+- running
+- cycling
+- yoga
+- stretching
+- calisthenics
+- sports training
+- HIIT
+- dance fitness
+- swimming
+- mobility work
+- rehab/recovery
+- meditation and wellness
+
+The app should never make users feel excluded based on fitness level.
+
+====================================
+DIFFICULTY SCALING SYSTEM
+====================================
+
+Create adaptive AI scaling.
+
+BEGINNER USERS:
+- easier goals
+- motivational guidance
+- lower barriers to progression
+- more frequent rewards
+- confidence-building challenges
+
+ADVANCED USERS:
+- harder challenges
+- elite achievements
+- bonus XP multipliers
+- rare egg opportunities
+- legendary evolutions
+- prestige rewards
+
+Examples of advanced hatch goals:
+- 15,000 steps
+- 500 pushups
+- endurance challenges
+- marathon-style events
+- heavy lifting milestones
+- elite streak quests
+
+====================================
+SMART AI FITNESS BALANCING
+====================================
+
+The AI should:
+- analyze user fitness level
+- adapt goals dynamically
+- prevent burnout
+- encourage consistency
+- reward effort fairly
+- personalize challenges
+
+The system should reward:
+- consistency over perfection
+- healthy habits
+- long-term growth
+- effort and participation
+
+====================================
+WORKOUT CATEGORY GOALS
+====================================
+
+Different workout styles should unlock different progression paths.
+
+Examples:
+
+STRENGTH PATH:
+- pushups
+- squats
+- lifting
+- resistance training
+
+CARDIO PATH:
+- running
+- walking
+- cycling
+- endurance goals
+
+MIND & RECOVERY PATH:
+- yoga
+- stretching
+- sleep
+- meditation
+- hydration
+
+SPORTS PATH:
+- basketball
+- soccer
+- martial arts
+- agility drills
+
+Different workout paths unlock:
+- unique evolutions
+- specialized creatures
+- exclusive cosmetics
+- elemental abilities
+- hidden forms
+
+====================================
+BONUS COMBO SYSTEM
+====================================
+
+Reward balanced lifestyles.
+
+Examples:
+- workout + hydration bonus
+- cardio + sleep bonus
+- meditation + stretching combo
+- strength + recovery multiplier
+
+Combo bonuses grant:
+- bonus XP
+- faster egg hatching
+- rare evolution chances
+- streak boosts
+
+====================================
+EMOTIONAL REWARD SYSTEM
+====================================
+
+Every completed hatch goal should feel exciting.
+
+Include:
+- dramatic hatch animations
+- creature celebrations
+- level-up effects
+- sound effects
+- achievement moments
+- livestream crowd reactions
+- progression fireworks
+- social share moments
+
+The goal is to make users emotionally attached to improving their health while making fitness feel like an exciting game instead of a chore.

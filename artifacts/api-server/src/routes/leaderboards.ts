@@ -136,8 +136,8 @@ router.get("/leaderboards/speed", requireAuth, attachPlayer, async (req, res) =>
   const limit = Math.min(50, Number(req.query.limit ?? 25));
   const hiddenIds = req.playerId ? await getHiddenPlayerIds(req.playerId) : [];
 
-  if (mode === "runs") {
-    // Best single running session ranked by session_minutes PR
+  if (mode === "pace") {
+    // Best single running session ranked by session_minutes PR (longer = better endurance)
     const runPrs = await db.query.personalRecordsTable.findMany({
       where: and(
         eq(personalRecordsTable.activityType, "running"),
