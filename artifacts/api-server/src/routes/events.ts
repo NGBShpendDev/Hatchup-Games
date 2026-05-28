@@ -153,7 +153,19 @@ router.post("/events/:id/join", requireAuth, attachPlayer, async (req, res) => {
 
   const event = await db.query.liveEventsTable.findFirst({ where: eq(liveEventsTable.id, params.data.id) });
   if (!event) { res.status(404).json({ error: "Event not found" }); return; }
-  if (event.status !== "active") { res.status(409).json({ error: "Event not currently active" }); return; }
+
+  // Allow joins within a short grace window after the event ends so that
+  // players whose requests arrive just after the status flips to "ended"
+  // aren't unfairly rejected. The grace window is 60 seconds past endsAt.
+  const GRACE_MS = 60_000;
+  const now = Date.now();
+  const withinGrace =
+    event.status === "ended" && now - event.endsAt.getTime() <= GRACE_MS;
+
+  if (event.status !== "active" && !withinGrace) {
+    res.status(409).json({ error: "Event not currently active" });
+    return;
+  }
 
   // Idempotency gate: insert the participant row first. If a row already
   // exists for (event, player), onConflictDoNothing returns no rows and

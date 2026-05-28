@@ -117,6 +117,19 @@ async function seedUpcomingEvent(): Promise<number> {
   return row!.id;
 }
 
+async function seedEndedEvent(endsAt: Date): Promise<number> {
+  const [row] = await db.insert(liveEventsTable).values({
+    name: `TestEvent_ended_${TAG}`,
+    description: "Ended event",
+    type: "fitness",
+    status: "ended",
+    startsAt: new Date(endsAt.getTime() - 3_600_000),
+    endsAt,
+  }).returning();
+  createdEventIds.push(row!.id);
+  return row!.id;
+}
+
 async function cleanup() {
   if (createdParticipantEventIds.length > 0) {
     await db.delete(eventParticipantsTable).where(
@@ -352,5 +365,52 @@ describe("POST /events/:id/join — error cases", () => {
     const res = await asPlayer<JoinResp>(playerId, `/events/${eventId}/join`);
     assert.equal(res.status, 200);
     assert.equal(res.body.xpEarned, 0, "no hatchling means no XP, but join must still succeed");
+  });
+});
+
+describe("POST /events/:id/join — grace-period boundary", () => {
+  it("grants XP when the event ended less than 60 seconds ago (within grace window)", async () => {
+    const playerId = await seedPlayer();
+    const hatchlingId = await seedHatchling(playerId, { xp: 0, level: 1 });
+    await setActiveHatchling(playerId, hatchlingId);
+    // Event ended 30 seconds ago — still within the 60-second grace window.
+    const endsAt = new Date(Date.now() - 30_000);
+    const eventId = await seedEndedEvent(endsAt);
+    createdParticipantEventIds.push(eventId);
+
+    const res = await asPlayer<JoinResp>(playerId, `/events/${eventId}/join`);
+
+    assert.equal(res.status, 200, "join within grace window must succeed");
+    assert.equal(res.body.xpEarned, 100, "XP must be granted within grace window");
+  });
+
+  it("persists the XP grant to the hatchling when joining within the grace window", async () => {
+    const playerId = await seedPlayer();
+    const hatchlingId = await seedHatchling(playerId, { xp: 0, level: 1 });
+    await setActiveHatchling(playerId, hatchlingId);
+    const endsAt = new Date(Date.now() - 30_000);
+    const eventId = await seedEndedEvent(endsAt);
+    createdParticipantEventIds.push(eventId);
+
+    await asPlayer<JoinResp>(playerId, `/events/${eventId}/join`);
+
+    const hatchling = await db.query.hatchlingsTable.findFirst({
+      where: eq(hatchlingsTable.id, hatchlingId),
+      columns: { xp: true, level: true },
+    });
+    assert.ok(hatchling);
+    assert.equal(hatchling!.xp, 100, "hatchling XP must be updated after grace-window join");
+    assert.equal(hatchling!.level, 2, "hatchling must level up after grace-window XP grant");
+  });
+
+  it("returns 409 when the event ended more than 60 seconds ago (beyond grace window)", async () => {
+    const playerId = await seedPlayer();
+    // Event ended 90 seconds ago — beyond the 60-second grace window.
+    const endsAt = new Date(Date.now() - 90_000);
+    const eventId = await seedEndedEvent(endsAt);
+
+    const res = await asPlayer(playerId, `/events/${eventId}/join`);
+
+    assert.equal(res.status, 409, "join beyond grace window must be rejected");
   });
 });
