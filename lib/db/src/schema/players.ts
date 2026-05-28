@@ -55,6 +55,8 @@ export const playersTable = pgTable("players", {
   // Battle Arena
   battleElo: integer("battle_elo").notNull().default(1000),
   totalBattleWins: integer("total_battle_wins").notNull().default(0),
+  // Social
+  creatorBadge: text("creator_badge"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

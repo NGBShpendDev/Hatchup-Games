@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Compass, Egg, Salad, Swords } from "lucide-react";
+import { Home, Egg, Salad, Swords, MessageSquare } from "lucide-react";
 import { usePlayer } from "@/lib/playerContext";
 
 export function BottomNav() {
@@ -9,7 +9,7 @@ export function BottomNav() {
 
   const navItems = [
     { href: "/", label: "Home", icon: <Home className="w-6 h-6" />, badge: hasPassiveXp },
-    { href: "/explore", label: "Explore", icon: <Compass className="w-6 h-6" />, badge: false },
+    { href: "/social", label: "Feed", icon: <MessageSquare className="w-6 h-6" />, badge: false },
     { href: "/hatch", label: "Hatch", icon: <Egg className="w-6 h-6" />, badge: false },
     { href: "/challenges", label: "Compete", icon: <Swords className="w-6 h-6" />, badge: false },
     { href: "/nutrition", label: "Nutrition", icon: <Salad className="w-6 h-6" />, badge: false },

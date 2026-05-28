@@ -1930,6 +1930,434 @@ export const SendGroupMessageBody = zod.object({
 
 
 /**
+ * @summary Get social feed (followed + global, scored by algorithm)
+ */
+export const getSocialFeedQueryLimitDefault = 20;
+
+export const GetSocialFeedQueryParams = zod.object({
+  "playerId": zod.coerce.number(),
+  "cursor": zod.coerce.number().optional(),
+  "limit": zod.coerce.number().default(getSocialFeedQueryLimitDefault)
+})
+
+export const GetSocialFeedResponse = zod.object({
+  "posts": zod.array(zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "authorName": zod.string(),
+  "authorAvatar": zod.string().nullish(),
+  "creatorBadge": zod.string().nullish(),
+  "content": zod.string(),
+  "mediaUrl": zod.string().nullish(),
+  "postType": zod.string(),
+  "creatureId": zod.number().nullish(),
+  "creatureName": zod.string().nullish(),
+  "xpEarned": zod.number(),
+  "energyEarned": zod.number(),
+  "isFlagged": zod.boolean(),
+  "engagementScore": zod.number(),
+  "createdAt": zod.string(),
+  "reactionCounts": zod.object({
+  "like": zod.number().optional(),
+  "encourage": zod.number().optional(),
+  "fire": zod.number().optional(),
+  "flex": zod.number().optional()
+}),
+  "commentCount": zod.number(),
+  "myReaction": zod.string().nullable(),
+  "comments": zod.array(zod.object({
+  "id": zod.number(),
+  "postId": zod.number(),
+  "playerId": zod.number(),
+  "authorName": zod.string(),
+  "authorAvatar": zod.string().nullish(),
+  "content": zod.string(),
+  "isFlagged": zod.boolean(),
+  "createdAt": zod.string()
+})).optional()
+})),
+  "nextCursor": zod.number().nullable(),
+  "total": zod.number().optional()
+})
+
+
+/**
+ * @summary Create a new post
+ */
+export const createPostBodyContentMax = 500;
+
+
+
+export const CreatePostBody = zod.object({
+  "playerId": zod.number(),
+  "content": zod.string().min(1).max(createPostBodyContentMax),
+  "mediaUrl": zod.string().optional(),
+  "postType": zod.string().optional(),
+  "creatureId": zod.number().optional()
+})
+
+
+/**
+ * @summary Get a single post with comments
+ */
+export const GetPostParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetPostQueryParams = zod.object({
+  "playerId": zod.coerce.number().optional()
+})
+
+export const GetPostResponse = zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "authorName": zod.string(),
+  "authorAvatar": zod.string().nullish(),
+  "creatorBadge": zod.string().nullish(),
+  "content": zod.string(),
+  "mediaUrl": zod.string().nullish(),
+  "postType": zod.string(),
+  "creatureId": zod.number().nullish(),
+  "creatureName": zod.string().nullish(),
+  "xpEarned": zod.number(),
+  "energyEarned": zod.number(),
+  "isFlagged": zod.boolean(),
+  "engagementScore": zod.number(),
+  "createdAt": zod.string(),
+  "reactionCounts": zod.object({
+  "like": zod.number().optional(),
+  "encourage": zod.number().optional(),
+  "fire": zod.number().optional(),
+  "flex": zod.number().optional()
+}),
+  "commentCount": zod.number(),
+  "myReaction": zod.string().nullable(),
+  "comments": zod.array(zod.object({
+  "id": zod.number(),
+  "postId": zod.number(),
+  "playerId": zod.number(),
+  "authorName": zod.string(),
+  "authorAvatar": zod.string().nullish(),
+  "content": zod.string(),
+  "isFlagged": zod.boolean(),
+  "createdAt": zod.string()
+})).optional()
+})
+
+
+/**
+ * @summary Delete own post
+ */
+export const DeletePostParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeletePostQueryParams = zod.object({
+  "playerId": zod.coerce.number()
+})
+
+
+/**
+ * @summary Toggle a reaction on a post
+ */
+export const ReactToPostParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ReactToPostBody = zod.object({
+  "playerId": zod.number(),
+  "reactionType": zod.enum(['like', 'encourage', 'fire', 'flex'])
+})
+
+export const ReactToPostResponse = zod.object({
+  "added": zod.boolean(),
+  "reactionType": zod.string(),
+  "reactionCounts": zod.object({
+  "like": zod.number().optional(),
+  "encourage": zod.number().optional(),
+  "fire": zod.number().optional(),
+  "flex": zod.number().optional()
+})
+})
+
+
+/**
+ * @summary List comments on a post
+ */
+export const ListPostCommentsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListPostCommentsResponseItem = zod.object({
+  "id": zod.number(),
+  "postId": zod.number(),
+  "playerId": zod.number(),
+  "authorName": zod.string(),
+  "authorAvatar": zod.string().nullish(),
+  "content": zod.string(),
+  "isFlagged": zod.boolean(),
+  "createdAt": zod.string()
+})
+export const ListPostCommentsResponse = zod.array(ListPostCommentsResponseItem)
+
+
+/**
+ * @summary Add a comment to a post
+ */
+export const AddPostCommentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const addPostCommentBodyContentMax = 280;
+
+
+
+export const AddPostCommentBody = zod.object({
+  "playerId": zod.number(),
+  "content": zod.string().min(1).max(addPostCommentBodyContentMax)
+})
+
+
+/**
+ * @summary Delete own comment
+ */
+export const DeletePostCommentParams = zod.object({
+  "id": zod.coerce.number(),
+  "commentId": zod.coerce.number()
+})
+
+export const DeletePostCommentQueryParams = zod.object({
+  "playerId": zod.coerce.number()
+})
+
+
+/**
+ * @summary Toggle a repost (share) of a post
+ */
+export const RepostPostParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RepostPostBody = zod.object({
+  "playerId": zod.number()
+})
+
+export const RepostPostResponse = zod.object({
+  "reposted": zod.boolean(),
+  "repostCount": zod.number()
+})
+
+
+/**
+ * @summary Follow a player
+ */
+export const FollowPlayerBody = zod.object({
+  "followerId": zod.number(),
+  "followeeId": zod.number()
+})
+
+export const FollowPlayerResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Unfollow a player
+ */
+export const UnfollowPlayerBody = zod.object({
+  "followerId": zod.number(),
+  "followeeId": zod.number()
+})
+
+export const UnfollowPlayerResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Get player social profile with timeline posts and memories
+ */
+export const GetPlayerSocialProfileParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetPlayerSocialProfileQueryParams = zod.object({
+  "viewerId": zod.coerce.number().optional()
+})
+
+export const GetPlayerSocialProfileResponse = zod.object({
+  "player": zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
+}),
+  "posts": zod.array(zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "authorName": zod.string(),
+  "authorAvatar": zod.string().nullish(),
+  "creatorBadge": zod.string().nullish(),
+  "content": zod.string(),
+  "mediaUrl": zod.string().nullish(),
+  "postType": zod.string(),
+  "creatureId": zod.number().nullish(),
+  "creatureName": zod.string().nullish(),
+  "xpEarned": zod.number(),
+  "energyEarned": zod.number(),
+  "isFlagged": zod.boolean(),
+  "engagementScore": zod.number(),
+  "createdAt": zod.string(),
+  "reactionCounts": zod.object({
+  "like": zod.number().optional(),
+  "encourage": zod.number().optional(),
+  "fire": zod.number().optional(),
+  "flex": zod.number().optional()
+}),
+  "commentCount": zod.number(),
+  "myReaction": zod.string().nullable(),
+  "comments": zod.array(zod.object({
+  "id": zod.number(),
+  "postId": zod.number(),
+  "playerId": zod.number(),
+  "authorName": zod.string(),
+  "authorAvatar": zod.string().nullish(),
+  "content": zod.string(),
+  "isFlagged": zod.boolean(),
+  "createdAt": zod.string()
+})).optional()
+})),
+  "followerCount": zod.number(),
+  "followingCount": zod.number(),
+  "isFollowing": zod.boolean(),
+  "memory": zod.union([zod.object({
+  "post": zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "authorName": zod.string(),
+  "authorAvatar": zod.string().nullish(),
+  "creatorBadge": zod.string().nullish(),
+  "content": zod.string(),
+  "mediaUrl": zod.string().nullish(),
+  "postType": zod.string(),
+  "creatureId": zod.number().nullish(),
+  "creatureName": zod.string().nullish(),
+  "xpEarned": zod.number(),
+  "energyEarned": zod.number(),
+  "isFlagged": zod.boolean(),
+  "engagementScore": zod.number(),
+  "createdAt": zod.string(),
+  "reactionCounts": zod.object({
+  "like": zod.number().optional(),
+  "encourage": zod.number().optional(),
+  "fire": zod.number().optional(),
+  "flex": zod.number().optional()
+}),
+  "commentCount": zod.number(),
+  "myReaction": zod.string().nullable(),
+  "comments": zod.array(zod.object({
+  "id": zod.number(),
+  "postId": zod.number(),
+  "playerId": zod.number(),
+  "authorName": zod.string(),
+  "authorAvatar": zod.string().nullish(),
+  "content": zod.string(),
+  "isFlagged": zod.boolean(),
+  "createdAt": zod.string()
+})).optional()
+}),
+  "memoryType": zod.string(),
+  "yearsAgo": zod.number(),
+  "label": zod.string()
+}),zod.null()])
+})
+
+
+/**
+ * @summary List followers of a player
+ */
+export const ListFollowersParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListFollowersResponseItem = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
+})
+export const ListFollowersResponse = zod.array(ListFollowersResponseItem)
+
+
+/**
+ * @summary List players a player is following
+ */
+export const ListFollowingParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListFollowingResponseItem = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
+})
+export const ListFollowingResponse = zod.array(ListFollowingResponseItem)
+
+
+/**
+ * @summary Get today's memory post for the player (anniversary or milestone)
+ */
+export const GetDailyMemoryQueryParams = zod.object({
+  "playerId": zod.coerce.number()
+})
+
+export const GetDailyMemoryResponse = zod.union([zod.object({
+  "post": zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "authorName": zod.string(),
+  "authorAvatar": zod.string().nullish(),
+  "creatorBadge": zod.string().nullish(),
+  "content": zod.string(),
+  "mediaUrl": zod.string().nullish(),
+  "postType": zod.string(),
+  "creatureId": zod.number().nullish(),
+  "creatureName": zod.string().nullish(),
+  "xpEarned": zod.number(),
+  "energyEarned": zod.number(),
+  "isFlagged": zod.boolean(),
+  "engagementScore": zod.number(),
+  "createdAt": zod.string(),
+  "reactionCounts": zod.object({
+  "like": zod.number().optional(),
+  "encourage": zod.number().optional(),
+  "fire": zod.number().optional(),
+  "flex": zod.number().optional()
+}),
+  "commentCount": zod.number(),
+  "myReaction": zod.string().nullable(),
+  "comments": zod.array(zod.object({
+  "id": zod.number(),
+  "postId": zod.number(),
+  "playerId": zod.number(),
+  "authorName": zod.string(),
+  "authorAvatar": zod.string().nullish(),
+  "content": zod.string(),
+  "isFlagged": zod.boolean(),
+  "createdAt": zod.string()
+})).optional()
+}),
+  "memoryType": zod.string(),
+  "yearsAgo": zod.number(),
+  "label": zod.string()
+}),zod.null()])
+
+
+/**
  * @summary List the player's health platform connections
  */
 export const ListHealthConnectionsResponseItem = zod.object({

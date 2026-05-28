@@ -40,6 +40,8 @@ tags:
     description: AI Fitness Coach chat
   - name: challenges
     description: User-generated fitness challenges
+  - name: social
+    description: Social feed, posts, reactions, comments, follows, and creator profiles
 
 paths:
   /coach/chat:
@@ -1503,6 +1505,352 @@ paths:
               schema:
                 $ref: "#/components/schemas/GroupMessage"
 
+  # ── Social Feed ───────────────────────────────────────────────────────────
+  /social/feed:
+    get:
+      operationId: getSocialFeed
+      tags: [social]
+      summary: Get social feed (followed + global, scored by algorithm)
+      parameters:
+        - name: playerId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Feed posts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedPage"
+
+  /social/posts:
+    post:
+      operationId: createPost
+      tags: [social]
+      summary: Create a new post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostInput"
+      responses:
+        "201":
+          description: Created post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedPost"
+        "422":
+          description: Content flagged by moderation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationError"
+
+  /social/posts/{id}:
+    get:
+      operationId: getPost
+      tags: [social]
+      summary: Get a single post with comments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: playerId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Post detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedPost"
+        "404":
+          description: Not found
+    delete:
+      operationId: deletePost
+      tags: [social]
+      summary: Delete own post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: playerId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /social/posts/{id}/react:
+    post:
+      operationId: reactToPost
+      tags: [social]
+      summary: Toggle a reaction on a post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReactToPostInput"
+      responses:
+        "200":
+          description: Reaction toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReactionResult"
+
+  /social/posts/{id}/comments:
+    get:
+      operationId: listPostComments
+      tags: [social]
+      summary: List comments on a post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostComment"
+    post:
+      operationId: addPostComment
+      tags: [social]
+      summary: Add a comment to a post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddCommentInput"
+      responses:
+        "201":
+          description: Comment added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostComment"
+        "422":
+          description: Content flagged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationError"
+
+  /social/posts/{id}/comments/{commentId}:
+    delete:
+      operationId: deletePostComment
+      tags: [social]
+      summary: Delete own comment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: playerId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /social/posts/{id}/repost:
+    post:
+      operationId: repostPost
+      tags: [social]
+      summary: Toggle a repost (share) of a post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RepostInput"
+      responses:
+        "200":
+          description: Repost toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepostResult"
+
+  /social/follow:
+    post:
+      operationId: followPlayer
+      tags: [social]
+      summary: Follow a player
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FollowInput"
+      responses:
+        "200":
+          description: Followed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResult"
+
+  /social/unfollow:
+    post:
+      operationId: unfollowPlayer
+      tags: [social]
+      summary: Unfollow a player
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FollowInput"
+      responses:
+        "200":
+          description: Unfollowed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResult"
+
+  /social/players/{id}/profile:
+    get:
+      operationId: getPlayerSocialProfile
+      tags: [social]
+      summary: Get player social profile with timeline posts and memories
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: viewerId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Player social profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerSocialProfile"
+
+  /social/players/{id}/followers:
+    get:
+      operationId: listFollowers
+      tags: [social]
+      summary: List followers of a player
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Followers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlayerStub"
+
+  /social/players/{id}/following:
+    get:
+      operationId: listFollowing
+      tags: [social]
+      summary: List players a player is following
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Following
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlayerStub"
+
+  /social/memories:
+    get:
+      operationId: getDailyMemory
+      tags: [social]
+      summary: Get today's memory post for the player (anniversary or milestone)
+      parameters:
+        - name: playerId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Memory post or null
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/MemoryPost"
+                  - type: "null"
+
   # ── Health Sync ───────────────────────────────────────────────────────────
   /health/connections:
     get:
@@ -2900,3 +3248,166 @@ components:
       required: [status]
       properties:
         status: { type: string, enum: [accepted, declined] }
+
+    # ── Social ────────────────────────────────────────────────────────────────
+    FeedPost:
+      type: object
+      required: [id, playerId, content, postType, xpEarned, energyEarned, isFlagged, engagementScore, createdAt, authorName, reactionCounts, commentCount, myReaction]
+      properties:
+        id:              { type: integer }
+        playerId:        { type: integer }
+        authorName:      { type: string }
+        authorAvatar:    { type: ["string", "null"] }
+        creatorBadge:    { type: ["string", "null"] }
+        content:         { type: string }
+        mediaUrl:        { type: ["string", "null"] }
+        postType:        { type: string }
+        creatureId:      { type: ["integer", "null"] }
+        creatureName:    { type: ["string", "null"] }
+        xpEarned:        { type: integer }
+        energyEarned:    { type: integer }
+        isFlagged:       { type: boolean }
+        engagementScore: { type: integer }
+        createdAt:       { type: string }
+        reactionCounts:
+          type: object
+          properties:
+            like:      { type: integer }
+            encourage: { type: integer }
+            fire:      { type: integer }
+            flex:      { type: integer }
+        commentCount:   { type: integer }
+        myReaction:     { type: ["string", "null"] }
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/PostComment"
+
+    FeedPage:
+      type: object
+      required: [posts, nextCursor]
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedPost"
+        nextCursor: { type: ["integer", "null"] }
+        total:      { type: integer }
+
+    PostComment:
+      type: object
+      required: [id, postId, playerId, content, isFlagged, createdAt, authorName]
+      properties:
+        id:         { type: integer }
+        postId:     { type: integer }
+        playerId:   { type: integer }
+        authorName: { type: string }
+        authorAvatar: { type: ["string", "null"] }
+        content:    { type: string }
+        isFlagged:  { type: boolean }
+        createdAt:  { type: string }
+
+    PlayerStub:
+      type: object
+      required: [id, username, displayName, avatarUrl, creatorBadge]
+      properties:
+        id:          { type: integer }
+        username:    { type: string }
+        displayName: { type: ["string", "null"] }
+        avatarUrl:   { type: ["string", "null"] }
+        creatorBadge: { type: ["string", "null"] }
+
+    PlayerSocialProfile:
+      type: object
+      required: [player, posts, followerCount, followingCount, isFollowing, memory]
+      properties:
+        player:
+          $ref: "#/components/schemas/PlayerStub"
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedPost"
+        followerCount:  { type: integer }
+        followingCount: { type: integer }
+        isFollowing:    { type: boolean }
+        memory:
+          oneOf:
+            - $ref: "#/components/schemas/MemoryPost"
+            - type: "null"
+
+    MemoryPost:
+      type: object
+      required: [post, memoryType, yearsAgo, label]
+      properties:
+        post:       { $ref: "#/components/schemas/FeedPost" }
+        memoryType: { type: string }
+        yearsAgo:   { type: integer }
+        label:      { type: string }
+
+    RepostInput:
+      type: object
+      required: [playerId]
+      properties:
+        playerId: { type: integer }
+
+    RepostResult:
+      type: object
+      required: [reposted, repostCount]
+      properties:
+        reposted:    { type: boolean }
+        repostCount: { type: integer }
+
+    ReactionResult:
+      type: object
+      required: [added, reactionType, reactionCounts]
+      properties:
+        added:        { type: boolean }
+        reactionType: { type: string }
+        reactionCounts:
+          type: object
+          properties:
+            like:      { type: integer }
+            encourage: { type: integer }
+            fire:      { type: integer }
+            flex:      { type: integer }
+
+    ModerationError:
+      type: object
+      required: [error, flaggedTerms]
+      properties:
+        error:        { type: string }
+        flaggedTerms:
+          type: array
+          items:
+            type: string
+
+    CreatePostInput:
+      type: object
+      required: [playerId, content]
+      properties:
+        playerId:   { type: integer }
+        content:    { type: string, minLength: 1, maxLength: 500 }
+        mediaUrl:   { type: string }
+        postType:   { type: string }
+        creatureId: { type: integer }
+
+    ReactToPostInput:
+      type: object
+      required: [playerId, reactionType]
+      properties:
+        playerId:     { type: integer }
+        reactionType: { type: string, enum: [like, encourage, fire, flex] }
+
+    AddCommentInput:
+      type: object
+      required: [playerId, content]
+      properties:
+        playerId: { type: integer }
+        content:  { type: string, minLength: 1, maxLength: 280 }
+
+    FollowInput:
+      type: object
+      required: [followerId, followeeId]
+      properties:
+        followerId: { type: integer }
+        followeeId: { type: integer }

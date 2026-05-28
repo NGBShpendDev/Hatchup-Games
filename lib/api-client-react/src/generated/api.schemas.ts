@@ -1039,6 +1039,155 @@ export interface RespondToInviteBody {
   status: RespondToInviteBodyStatus;
 }
 
+export type FeedPostReactionCounts = {
+  like?: number;
+  encourage?: number;
+  fire?: number;
+  flex?: number;
+};
+
+export interface PostComment {
+  id: number;
+  postId: number;
+  playerId: number;
+  authorName: string;
+  /** @nullable */
+  authorAvatar?: string | null;
+  content: string;
+  isFlagged: boolean;
+  createdAt: string;
+}
+
+export interface FeedPost {
+  id: number;
+  playerId: number;
+  authorName: string;
+  /** @nullable */
+  authorAvatar?: string | null;
+  /** @nullable */
+  creatorBadge?: string | null;
+  content: string;
+  /** @nullable */
+  mediaUrl?: string | null;
+  postType: string;
+  /** @nullable */
+  creatureId?: number | null;
+  /** @nullable */
+  creatureName?: string | null;
+  xpEarned: number;
+  energyEarned: number;
+  isFlagged: boolean;
+  engagementScore: number;
+  createdAt: string;
+  reactionCounts: FeedPostReactionCounts;
+  commentCount: number;
+  /** @nullable */
+  myReaction: string | null;
+  comments?: PostComment[];
+}
+
+export interface FeedPage {
+  posts: FeedPost[];
+  /** @nullable */
+  nextCursor: number | null;
+  total?: number;
+}
+
+export interface PlayerStub {
+  id: number;
+  username: string;
+  /** @nullable */
+  displayName: string | null;
+  /** @nullable */
+  avatarUrl: string | null;
+  /** @nullable */
+  creatorBadge: string | null;
+}
+
+export interface MemoryPost {
+  post: FeedPost;
+  memoryType: string;
+  yearsAgo: number;
+  label: string;
+}
+
+export interface PlayerSocialProfile {
+  player: PlayerStub;
+  posts: FeedPost[];
+  followerCount: number;
+  followingCount: number;
+  isFollowing: boolean;
+  memory: MemoryPost | null;
+}
+
+export interface RepostInput {
+  playerId: number;
+}
+
+export interface RepostResult {
+  reposted: boolean;
+  repostCount: number;
+}
+
+export type ReactionResultReactionCounts = {
+  like?: number;
+  encourage?: number;
+  fire?: number;
+  flex?: number;
+};
+
+export interface ReactionResult {
+  added: boolean;
+  reactionType: string;
+  reactionCounts: ReactionResultReactionCounts;
+}
+
+export interface ModerationError {
+  error: string;
+  flaggedTerms: string[];
+}
+
+export interface CreatePostInput {
+  playerId: number;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  content: string;
+  mediaUrl?: string;
+  postType?: string;
+  creatureId?: number;
+}
+
+export type ReactToPostInputReactionType = typeof ReactToPostInputReactionType[keyof typeof ReactToPostInputReactionType];
+
+
+export const ReactToPostInputReactionType = {
+  like: 'like',
+  encourage: 'encourage',
+  fire: 'fire',
+  flex: 'flex',
+} as const;
+
+export interface ReactToPostInput {
+  playerId: number;
+  reactionType: ReactToPostInputReactionType;
+}
+
+export interface AddCommentInput {
+  playerId: number;
+  /**
+     * @minLength 1
+     * @maxLength 280
+     */
+  content: string;
+}
+
+export interface FollowInput {
+  followerId: number;
+  followeeId: number;
+}
+
 export type ListHatchlingsParams = {
 playerId?: number;
 limit?: number;
@@ -1140,6 +1289,32 @@ playerId: number;
 };
 
 export type ListMyGroupsParams = {
+playerId: number;
+};
+
+export type GetSocialFeedParams = {
+playerId: number;
+cursor?: number;
+limit?: number;
+};
+
+export type GetPostParams = {
+playerId?: number;
+};
+
+export type DeletePostParams = {
+playerId: number;
+};
+
+export type DeletePostCommentParams = {
+playerId: number;
+};
+
+export type GetPlayerSocialProfileParams = {
+viewerId?: number;
+};
+
+export type GetDailyMemoryParams = {
 playerId: number;
 };
 
