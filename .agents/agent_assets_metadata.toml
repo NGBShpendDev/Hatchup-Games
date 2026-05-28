@@ -36,3 +36,9 @@ id = "PBbrSIRt1e5fLg-prDsN9"
 uri = "file://artifacts/hatchup/src/assets/images/cyber-creature.png"
 type = "image"
 title = "Cyber creature"
+
+[[generated]]
+id = "M0S7U81QzifCEGYDBOH4-"
+uri = "file://artifacts/hatchup/public/opengraph.png"
+type = "image"
+title = "hatchup opengraph share card"
