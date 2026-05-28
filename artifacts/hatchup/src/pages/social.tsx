@@ -1159,6 +1159,23 @@ function PlayerDiscoverCard({
   );
 }
 
+type DiscoverReasonFilter = "all" | "similar_goals" | "shared_group" | "top_creator" | "recently_active";
+
+const DISCOVER_REASON_CHIPS: Array<{ value: DiscoverReasonFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "similar_goals", label: "Similar goals" },
+  { value: "shared_group", label: "In my groups" },
+  { value: "top_creator", label: "Top creators" },
+  { value: "recently_active", label: "Recently active" },
+];
+
+const DISCOVER_REASON_EMPTY_COPY: Record<Exclude<DiscoverReasonFilter, "all">, string> = {
+  similar_goals: "No players match your fitness goals yet. Try updating your goal or check back soon.",
+  shared_group: "No suggestions from your groups yet. Join a group to find players here.",
+  top_creator: "No top creators to suggest right now. Check back soon.",
+  recently_active: "No recently active players to suggest. Check back soon.",
+};
+
 function DiscoverPanel({
   playerId,
   onViewProfile,
@@ -1168,6 +1185,7 @@ function DiscoverPanel({
 }) {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [reasonFilter, setReasonFilter] = useState<DiscoverReasonFilter>("all");
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(searchInput.trim()), 250);
@@ -1175,10 +1193,11 @@ function DiscoverPanel({
   }, [searchInput]);
 
   const isSearching = debouncedQuery.length > 0;
+  const reasonParam = reasonFilter === "all" ? undefined : reasonFilter;
 
   const { data: suggestions, isLoading: loadingSuggest } = useDiscoverPlayers(
-    { playerId },
-    { query: { queryKey: getDiscoverPlayersQueryKey({ playerId }), enabled: !isSearching && !!playerId } },
+    { playerId, ...(reasonParam ? { reason: reasonParam } : {}) },
+    { query: { queryKey: getDiscoverPlayersQueryKey({ playerId, ...(reasonParam ? { reason: reasonParam } : {}) }), enabled: !isSearching && !!playerId } },
   );
 
   const { data: searchResults, isLoading: loadingSearch } = useSearchDiscoverablePlayers(
@@ -1212,9 +1231,37 @@ function DiscoverPanel({
       </div>
 
       {!isSearching && (
-        <h2 className="text-xs font-black uppercase tracking-wider text-muted-foreground px-1 flex items-center gap-2">
-          <Compass className="w-3.5 h-3.5" /> Suggested for you
-        </h2>
+        <>
+          <h2 className="text-xs font-black uppercase tracking-wider text-muted-foreground px-1 flex items-center gap-2">
+            <Compass className="w-3.5 h-3.5" /> Suggested for you
+          </h2>
+          <div
+            className="flex flex-wrap gap-1.5"
+            role="tablist"
+            aria-label="Filter suggestions by reason"
+            data-testid="discover-reason-chips"
+          >
+            {DISCOVER_REASON_CHIPS.map((chip) => {
+              const active = reasonFilter === chip.value;
+              return (
+                <button
+                  key={chip.value}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setReasonFilter(chip.value)}
+                  className={`rounded-full px-3 py-1 text-[11px] font-black border transition-colors ${
+                    active
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-card/60 text-muted-foreground border-border hover:text-foreground hover:border-foreground/40"
+                  }`}
+                  data-testid={`discover-reason-chip-${chip.value}`}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {loading ? (
@@ -1230,6 +1277,23 @@ function DiscoverPanel({
               <Search className="w-10 h-10 text-muted-foreground mx-auto mb-2 opacity-40" />
               <p className="text-sm font-bold">No players match "{debouncedQuery}"</p>
               <p className="text-xs text-muted-foreground mt-1">Try a different username or name.</p>
+            </>
+          ) : reasonFilter !== "all" ? (
+            <>
+              <Compass className="w-10 h-10 text-muted-foreground mx-auto mb-2 opacity-40" />
+              <p className="text-sm font-bold">
+                No matches for {DISCOVER_REASON_CHIPS.find(c => c.value === reasonFilter)?.label}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {DISCOVER_REASON_EMPTY_COPY[reasonFilter as Exclude<DiscoverReasonFilter, "all">]}
+              </p>
+              <button
+                onClick={() => setReasonFilter("all")}
+                className="mt-3 text-xs font-black text-primary hover:underline"
+                data-testid="discover-reason-clear"
+              >
+                Show all suggestions
+              </button>
             </>
           ) : (
             <>

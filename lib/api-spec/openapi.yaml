@@ -2260,6 +2260,12 @@ paths:
           in: query
           schema:
             type: integer
+        - name: reason
+          in: query
+          description: Only return candidates with this discovery reason.
+          schema:
+            type: string
+            enum: [similar_goals, shared_group, top_creator, recently_active]
       responses:
         "200":
           description: Discoverable players

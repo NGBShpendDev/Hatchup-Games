@@ -2631,7 +2631,8 @@ export const UnfollowPlayerResponse = zod.object({
  */
 export const DiscoverPlayersQueryParams = zod.object({
   "playerId": zod.coerce.number(),
-  "limit": zod.coerce.number().optional()
+  "limit": zod.coerce.number().optional(),
+  "reason": zod.enum(['similar_goals', 'shared_group', 'top_creator', 'recently_active']).optional().describe('Only return candidates with this discovery reason.')
 })
 
 export const DiscoverPlayersResponseItem = zod.object({

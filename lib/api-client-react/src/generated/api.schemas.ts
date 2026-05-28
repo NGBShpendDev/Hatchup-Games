@@ -3299,7 +3299,21 @@ playerId: number;
 export type DiscoverPlayersParams = {
 playerId: number;
 limit?: number;
+/**
+ * Only return candidates with this discovery reason.
+ */
+reason?: DiscoverPlayersReason;
 };
+
+export type DiscoverPlayersReason = typeof DiscoverPlayersReason[keyof typeof DiscoverPlayersReason];
+
+
+export const DiscoverPlayersReason = {
+  similar_goals: 'similar_goals',
+  shared_group: 'shared_group',
+  top_creator: 'top_creator',
+  recently_active: 'recently_active',
+} as const;
 
 export type SearchDiscoverablePlayersParams = {
 q: string;

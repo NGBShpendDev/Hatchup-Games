@@ -1997,6 +1997,14 @@ async function getMemoryForPlayer(
 router.get("/social/discover", requireAuth, attachPlayer, async (req, res) => {
   const viewerId = req.playerId!;
   const limit = Math.min(Number(req.query.limit) || 20, 50);
+  const ALLOWED_REASONS = new Set([
+    "similar_goals",
+    "shared_group",
+    "top_creator",
+    "recently_active",
+  ]);
+  const rawReason = typeof req.query.reason === "string" ? req.query.reason : "";
+  const reasonFilter = ALLOWED_REASONS.has(rawReason) ? rawReason : null;
 
   // Privacy filter shared with /players/search, /players/nearby,
   // /leaderboards/scoped, and /social/search via buildPeopleDiscoveryFilter
@@ -2087,8 +2095,10 @@ router.get("/social/discover", requireAuth, attachPlayer, async (req, res) => {
   });
   for (const p of recentPosts) consider(p.playerId, "recently_active", "Posted recently", 30);
 
-  // Pick top N candidates by weight
-  const ranked = Array.from(candidates.values()).sort((a, b) => b.weight - a.weight).slice(0, limit);
+  // Pick top N candidates by weight, optionally filtered to a single reason
+  const all = Array.from(candidates.values());
+  const filtered = reasonFilter ? all.filter(c => c.reason === reasonFilter) : all;
+  const ranked = filtered.sort((a, b) => b.weight - a.weight).slice(0, limit);
   if (ranked.length === 0) { res.json([]); return; }
 
   const playerRows = await db.query.playersTable.findMany({
