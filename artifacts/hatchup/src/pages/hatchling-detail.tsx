@@ -19,6 +19,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import { RarityBadge } from "@/components/rarity-badge";
+import { getRarityTokens } from "@/lib/rarityTokens";
 import { motion } from "framer-motion";
 import { ArrowLeft, Zap, Heart, Coffee, Shield, Trash2, ArrowUpCircle, Sword, Star, Share2 } from "lucide-react";
 import { ComposeSheet } from "@/components/compose-sheet";
@@ -327,6 +328,7 @@ export default function HatchlingDetail() {
   const personalityInfo = PERSONALITY_FLAVOR[personality] ?? PERSONALITY_FLAVOR["Calm"];
   const genetics = hatchling.genetics as Genetics | null | undefined;
   const friendshipLevel = hatchling.friendshipLevel ?? 0;
+  const rarityTokens = getRarityTokens(hatchling.rarity);
 
   const getFallbackImage = (cat?: string) => {
     switch (cat?.toLowerCase()) {
@@ -354,8 +356,8 @@ export default function HatchlingDetail() {
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className={`bg-gradient-to-br ${realmConfig.gradient} backdrop-blur border-2 ${realmConfig.border} rounded-3xl p-8 flex flex-col items-center justify-between relative overflow-hidden shadow-2xl`}
-            style={{ boxShadow: `0 0 40px ${realmConfig.color}30` }}
+            className={`bg-gradient-to-br ${realmConfig.gradient} backdrop-blur border-2 ${rarityTokens.border} rounded-3xl p-8 flex flex-col items-center justify-between relative overflow-hidden shadow-2xl ${rarityTokens.aura}`}
+            style={{ boxShadow: `0 0 40px ${rarityTokens.shadowColor}` }}
           >
             {/* Realm header */}
             <div className="w-full flex justify-between items-center mb-4 relative z-10">

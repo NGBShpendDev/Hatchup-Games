@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
 import { Badge } from "@/components/ui/badge";
 import { GlowBadge } from "@/components/ui/glow-badge";
+import { getRarityTokens } from "@/lib/rarityTokens";
 import { NeonButton } from "@/components/ui/neon-button";
 import { Button } from "@/components/ui/button";
 import { SafetyBanner } from "@/components/safety-banner";
@@ -922,15 +923,6 @@ function RankedList({
 }
 
 // ── Artifacts collector leaderboard panel ──────────────────────────────────
-const RARITY_COLORS: Record<string, string> = {
-  Common:    "text-white/60",
-  Rare:      "text-blue-400",
-  Epic:      "text-violet-400",
-  Legendary: "text-orange-400",
-  Mythic:    "text-pink-400",
-  Ancient:   "text-amber-400",
-  Celestial: "text-cyan-300",
-};
 
 function ArtifactsLeaderboardPanel({ myPlayerId: _myPlayerId }: { myPlayerId: number | null }) {
   const { data, isLoading, isError, refetch } = useGetArtifactsLeaderboard({ limit: 50 });
@@ -975,7 +967,7 @@ function ArtifactsLeaderboardPanel({ myPlayerId: _myPlayerId }: { myPlayerId: nu
                   </div>
                   {entry.rarestRarity && (
                     <p className="text-[10px] text-white/40 truncate">
-                      Rarest: <span className={`font-bold ${RARITY_COLORS[entry.rarestRarity] ?? "text-white/70"}`}>{entry.rarestRarity}</span>
+                      Rarest: <span className={`font-bold ${getRarityTokens(entry.rarestRarity).text}`}>{entry.rarestRarity}</span>
                       {entry.rarestName ? ` · ${entry.rarestName}` : ""}
                     </p>
                   )}
@@ -987,9 +979,7 @@ function ArtifactsLeaderboardPanel({ myPlayerId: _myPlayerId }: { myPlayerId: nu
                     <div
                       key={`${a.imageSlug}-${idx}`}
                       title={`${a.name} · ${a.rarity}`}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-base bg-white/5 border ${
-                        idx === 0 ? "border-cyan-400/40" : "border-white/10 hidden sm:flex"
-                      }`}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-base bg-white/5 border hidden sm:flex ${getRarityTokens(a.rarity).border} opacity-80`}
                     >
                       <ArtifactSlugEmoji slug={a.imageSlug} />
                     </div>

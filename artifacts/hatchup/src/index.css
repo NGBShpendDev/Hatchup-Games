@@ -162,3 +162,7 @@
 .pal-aura-mythic    { animation: pal-aura-mythic 1.8s ease-in-out infinite; }
 .pal-aura-ancient   { animation: pal-aura-ancient 1.5s ease-in-out infinite; }
 .pal-aura-celestial { animation: pal-aura-celestial 2.5s linear infinite; }
+.pal-aura-epic      { box-shadow: 0 0 0 2px rgba(168,85,247,0.4), 0 0 14px rgba(168,85,247,0.2); }
+.pal-aura-rare      { box-shadow: 0 0 0 2px rgba(59,130,246,0.35), 0 0 12px rgba(59,130,246,0.15); }
+.pal-aura-uncommon  { box-shadow: 0 0 0 1px rgba(16,185,129,0.3), 0 0 8px rgba(16,185,129,0.12); }
+.pal-aura-common    { box-shadow: 0 0 0 1px rgba(107,114,128,0.2); }
