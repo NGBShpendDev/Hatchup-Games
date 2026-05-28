@@ -4158,7 +4158,16 @@ components:
 
     PlayerSocialProfile:
       type: object
-      required: [player, posts, followerCount, followingCount, isFollowing, memory]
+      required:
+        - player
+        - posts
+        - followerCount
+        - followingCount
+        - isFollowing
+        - memory
+        - mutualFollowers
+        - mutualFollowersTotal
+        - sharedGroups
       properties:
         player:
           $ref: "#/components/schemas/PlayerStub"
@@ -4173,6 +4182,26 @@ components:
           oneOf:
             - $ref: "#/components/schemas/MemoryPost"
             - type: "null"
+        mutualFollowers:
+          type: array
+          description: Up to 3 followers of this player that the viewer also follows.
+          items:
+            $ref: "#/components/schemas/PlayerStub"
+        mutualFollowersTotal:
+          type: integer
+          description: Total number of mutual followers (not limited to the preview list).
+        sharedGroups:
+          type: array
+          description: Groups that both the viewer and this player are members of.
+          items:
+            $ref: "#/components/schemas/SharedGroup"
+
+    SharedGroup:
+      type: object
+      required: [id, name]
+      properties:
+        id:   { type: integer }
+        name: { type: string }
 
     MemoryPost:
       type: object

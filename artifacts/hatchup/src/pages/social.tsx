@@ -385,6 +385,204 @@ export function ComposeSheet({
   );
 }
 
+function ProfileModal({
+  playerId: profileId,
+  viewerId,
+  open,
+  onClose,
+}: {
+  playerId: number;
+  viewerId: number;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { data: profile, isLoading } = useGetPlayerSocialProfile(
+    profileId,
+    { viewerId },
+    { query: { queryKey: getGetPlayerSocialProfileQueryKey(profileId, { viewerId }), enabled: open && !!profileId } }
+  );
+  const followPlayer = useFollowPlayer();
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  async function handleFollow() {
+    await followPlayer.mutateAsync({ data: { followerId: viewerId, followeeId: profileId } });
+    qc.invalidateQueries({ queryKey: getGetPlayerSocialProfileQueryKey(profileId, { viewerId }) });
+    toast({ title: "Following! 🤝" });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto rounded-3xl">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-black">Player Profile</DialogTitle>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-20 w-full rounded-2xl" />
+            <Skeleton className="h-40 w-full rounded-2xl" />
+          </div>
+        ) : profile ? (
+          <div className="space-y-4">
+            {/* Memory banner */}
+            {profile.memory && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-2xl p-3"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Clock className="w-4 h-4 text-purple-400" />
+                  <span className="text-xs font-black text-purple-400 uppercase tracking-wider">Memory</span>
+                </div>
+                <p className="text-sm font-bold">{profile.memory.label}</p>
+                <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{profile.memory.post.content}</p>
+              </motion.div>
+            )}
+
+            {/* Player info */}
+            <div className="flex items-center gap-4">
+              <Avatar className="h-16 w-16 border-2 border-primary">
+                <AvatarImage src={profile.player.avatarUrl ?? undefined} />
+                <AvatarFallback className="font-black text-lg">{(profile.player.username ?? "?").substring(0, 2).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-black text-lg">{profile.player.displayName ?? profile.player.username}</h3>
+                  {profile.player.creatorBadge && (
+                    <Badge className="bg-gradient-to-r from-yellow-500 to-amber-400 text-black text-[10px] font-black">
+                      <Award className="w-2.5 h-2.5 mr-0.5" /> Creator
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">@{profile.player.username}</p>
+                <div className="flex gap-4 mt-1 text-xs font-bold">
+                  <span><span className="text-foreground">{profile.followerCount}</span> <span className="text-muted-foreground">Followers</span></span>
+                  <span><span className="text-foreground">{profile.followingCount}</span> <span className="text-muted-foreground">Following</span></span>
+                </div>
+              </div>
+            </div>
+
+            {profileId !== viewerId && !profile.isFollowing && (
+              <Button onClick={handleFollow} disabled={followPlayer.isPending} className="w-full font-black rounded-xl h-10">
+                <UserPlus className="w-4 h-4 mr-2" />
+                Follow
+              </Button>
+            )}
+            {profile.isFollowing && (
+              <div className="flex items-center justify-center gap-2 text-sm text-primary font-bold py-2">
+                <UserPlus className="w-4 h-4" /> Following
+              </div>
+            )}
+
+            {/* Mutual followers */}
+            {profileId !== viewerId && profile.mutualFollowers && profile.mutualFollowers.length > 0 && (
+              <div className="bg-muted/30 border border-border/40 rounded-2xl p-3" data-testid="section-mutual-followers">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                    Followed by people you follow
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex -space-x-2">
+                    {profile.mutualFollowers.map(m => (
+                      <Avatar key={m.id} className="h-7 w-7 border-2 border-background">
+                        <AvatarImage src={m.avatarUrl ?? undefined} />
+                        <AvatarFallback className="text-[10px] font-bold bg-primary/20">
+                          {(m.username ?? "?").substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    ))}
+                  </div>
+                  <p className="text-xs font-bold flex-1">
+                    {(() => {
+                      const names = profile.mutualFollowers.map(m => m.displayName ?? m.username);
+                      const total = profile.mutualFollowersTotal ?? names.length;
+                      const extra = total - names.length;
+                      const joined = names.length === 1
+                        ? names[0]
+                        : names.length === 2
+                          ? `${names[0]} and ${names[1]}`
+                          : `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+                      if (extra > 0) {
+                        return (
+                          <>
+                            <span>Followed by {names.slice(0, -1).join(", ")}{names.length > 1 ? ", " : ""}{names[names.length - 1]} </span>
+                            <button
+                              className="text-primary hover:underline"
+                              data-testid="link-mutual-followers-more"
+                              onClick={() => toast({ title: `${extra} more mutual follower${extra === 1 ? "" : "s"}`, description: "Tap their profiles from the feed to see more." })}
+                            >
+                              and {extra} {extra === 1 ? "other" : "others"}
+                            </button>
+                          </>
+                        );
+                      }
+                      return <>Followed by {joined}</>;
+                    })()}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Shared groups */}
+            {profileId !== viewerId && profile.sharedGroups && profile.sharedGroups.length > 0 && (
+              <div className="bg-muted/30 border border-border/40 rounded-2xl p-3" data-testid="section-shared-groups">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users2 className="w-3.5 h-3.5 text-purple-400" />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                    Groups you both joined
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.sharedGroups.map(g => (
+                    <Badge
+                      key={g.id}
+                      variant="outline"
+                      className="text-[10px] font-bold border-purple-500/40 text-purple-300 bg-purple-500/10"
+                      data-testid={`badge-shared-group-${g.id}`}
+                    >
+                      {g.name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Timeline posts */}
+            <div>
+              <h4 className="font-black text-sm mb-2 flex items-center gap-2">
+                <Star className="w-3.5 h-3.5 text-primary" /> Transformation Timeline
+              </h4>
+              <div className="space-y-2">
+                {profile.posts.slice(0, 5).map((post) => {
+                  const postTypeInfo = POST_TYPES.find(t => t.value === post.postType);
+                  return (
+                    <div key={post.id} className="border-l-2 border-primary/30 pl-3 py-1">
+                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-0.5">
+                        <span>{postTypeInfo?.icon}</span>
+                        <span>{postTypeInfo?.label}</span>
+                        <span>·</span>
+                        <span>{timeAgo(post.createdAt)}</span>
+                      </div>
+                      <p className="text-xs line-clamp-2">{post.content}</p>
+                    </div>
+                  );
+                })}
+                {profile.posts.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-4">No posts yet</p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function PlayerDiscoverCard({
   player,
   viewerId,

@@ -9,6 +9,7 @@ import {
   playersTable,
   hatchlingsTable,
   groupMembersTable,
+  groupsTable,
 } from "@workspace/db";
 import { eq, and, desc, sql, or, ne, inArray, ilike } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
@@ -578,6 +579,68 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
 
   const memory = await getMemoryForPlayer(id, enrichedPosts);
 
+  // Mutual followers: people the viewer follows who also follow this profile.
+  let mutualFollowers: Array<{
+    id: number;
+    username: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    creatorBadge: string | null;
+  }> = [];
+  let mutualFollowersTotal = 0;
+  if (viewerId !== id) {
+    const viewerFollowsRows = await db.query.playerFollowsTable.findMany({
+      where: eq(playerFollowsTable.followerId, viewerId),
+    });
+    const viewerFollows = new Set(viewerFollowsRows.map(f => f.followeeId));
+    const mutualIds = followers
+      .map(f => f.followerId)
+      .filter(fid => fid !== viewerId && viewerFollows.has(fid));
+    mutualFollowersTotal = mutualIds.length;
+    if (mutualIds.length > 0) {
+      const previewIds = mutualIds.slice(0, 3);
+      const previewRows = await db.query.playersTable.findMany({
+        where: inArray(playersTable.id, previewIds),
+      });
+      const previewMap = new Map(previewRows.map(p => [p.id, p]));
+      mutualFollowers = previewIds.flatMap(pid => {
+        const p = previewMap.get(pid);
+        if (!p) return [];
+        return [{
+          id: p.id,
+          username: p.username,
+          displayName: p.displayName ?? null,
+          avatarUrl: p.avatarUrl ?? null,
+          creatorBadge: p.creatorBadge ?? null,
+        }];
+      });
+    }
+  }
+
+  // Shared groups: groups where both viewer and profile are members.
+  let sharedGroups: Array<{ id: number; name: string }> = [];
+  if (viewerId !== id) {
+    const profileMemberships = await db.query.groupMembersTable.findMany({
+      where: eq(groupMembersTable.playerId, id),
+    });
+    const profileGroupIds = profileMemberships.map(m => m.groupId);
+    if (profileGroupIds.length > 0) {
+      const viewerMemberships = await db.query.groupMembersTable.findMany({
+        where: and(
+          eq(groupMembersTable.playerId, viewerId),
+          inArray(groupMembersTable.groupId, profileGroupIds),
+        ),
+      });
+      const sharedIds = viewerMemberships.map(m => m.groupId);
+      if (sharedIds.length > 0) {
+        const groupRows = await db.query.groupsTable.findMany({
+          where: inArray(groupsTable.id, sharedIds),
+        });
+        sharedGroups = groupRows.map(g => ({ id: g.id, name: g.name }));
+      }
+    }
+  }
+
   res.json({
     player: {
       id: player.id,
@@ -591,6 +654,9 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
     followingCount: following.length,
     isFollowing,
     memory,
+    mutualFollowers,
+    mutualFollowersTotal,
+    sharedGroups,
   });
 });
 

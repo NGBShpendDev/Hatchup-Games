@@ -2445,7 +2445,19 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "memoryType": zod.string(),
   "yearsAgo": zod.number(),
   "label": zod.string()
-}),zod.null()])
+}),zod.null()]),
+  "mutualFollowers": zod.array(zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
+})).describe('Up to 3 followers of this player that the viewer also follows.'),
+  "mutualFollowersTotal": zod.number().describe('Total number of mutual followers (not limited to the preview list).'),
+  "sharedGroups": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string()
+})).describe('Groups that both the viewer and this player are members of.')
 })
 
 

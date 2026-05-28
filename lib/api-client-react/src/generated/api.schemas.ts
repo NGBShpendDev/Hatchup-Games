@@ -1220,6 +1220,11 @@ export interface MemoryPost {
   label: string;
 }
 
+export interface SharedGroup {
+  id: number;
+  name: string;
+}
+
 export interface PlayerSocialProfile {
   player: PlayerStub;
   posts: FeedPost[];
@@ -1227,6 +1232,12 @@ export interface PlayerSocialProfile {
   followingCount: number;
   isFollowing: boolean;
   memory: MemoryPost | null;
+  /** Up to 3 followers of this player that the viewer also follows. */
+  mutualFollowers: PlayerStub[];
+  /** Total number of mutual followers (not limited to the preview list). */
+  mutualFollowersTotal: number;
+  /** Groups that both the viewer and this player are members of. */
+  sharedGroups: SharedGroup[];
 }
 
 export interface RepostInput {
