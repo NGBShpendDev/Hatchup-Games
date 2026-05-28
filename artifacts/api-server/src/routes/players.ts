@@ -314,10 +314,11 @@ router.get("/players/:id", requireAuth, attachPlayer, async (req, res) => {
 });
 
 // GET /players/:id/profile — public profile with artifact showcase (top 3 featured/equipped)
-router.get("/players/:id/profile", requireAuth, async (req, res) => {
+router.get("/players/:id/profile", requireAuth, attachPlayer, async (req, res) => {
   const playerId = Number(req.params.id);
   if (isNaN(playerId)) { res.status(400).json({ error: "Invalid id" }); return; }
 
+  const viewerId = req.playerId;
   const [player, ownedArtifacts] = await Promise.all([
     db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) }),
     db.query.playerArtifactsTable.findMany({
@@ -327,6 +328,18 @@ router.get("/players/:id/profile", requireAuth, async (req, res) => {
   ]);
 
   if (!player) { res.status(404).json({ error: "Player not found" }); return; }
+
+  // Mutual workout partners: third players who have logged a co-workout with
+  // BOTH the viewer and this profile. Mirrors the same trust signal exposed
+  // by /social/players/:id/profile and the invite/search rows. The shared
+  // helper already filters out blocked/hidden/minor partners and caps the
+  // preview list. Skipped when viewing your own profile.
+  let mutualWorkoutPartners: MutualWorkoutPartner[] = [];
+  if (viewerId && viewerId !== playerId) {
+    const hiddenIds = await getHiddenPlayerIds(viewerId);
+    const grouped = await loadMutualWorkoutPartnersForViewer(viewerId, [playerId], hiddenIds);
+    mutualWorkoutPartners = grouped.get(playerId) ?? [];
+  }
 
   // Fetch top 3 featured/equipped artifacts for the public showcase strip
   const showcaseOwned = ownedArtifacts.slice(0, 3);
@@ -358,6 +371,7 @@ router.get("/players/:id/profile", requireAuth, async (req, res) => {
     isSuspended: player.isSuspended,
     artifactShowcase: showcaseArtifacts,
     artifactCount: ownedArtifacts.length,
+    mutualWorkoutPartners,
   });
 });
 

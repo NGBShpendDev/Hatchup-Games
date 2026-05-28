@@ -16,6 +16,7 @@ import { BadgeCheck, Flame, Trophy, Sparkles, ArrowLeft, Settings, GripVertical,
 import { useGetMyPostInsights, getGetMyPostInsightsQueryKey } from "@workspace/api-client-react";
 import type { PostInsight } from "@workspace/api-client-react";
 import { useSubscription } from "@/lib/subscription";
+import { MutualWorkoutPartnersLine, type MutualPartner } from "@/components/mutual-workout-partners";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 const MAX_FEATURED = 3;
@@ -73,6 +74,7 @@ interface PlayerProfile {
   isSuspended?: boolean;
   artifactShowcase: ShowcaseArtifact[];
   artifactCount: number;
+  mutualWorkoutPartners?: MutualPartner[];
 }
 
 export default function PlayerProfilePage() {
@@ -216,7 +218,7 @@ export default function PlayerProfilePage() {
           <ProfileSkeleton />
         ) : (
           <>
-            <ProfileHeader profile={profile} viewerIsAdmin={viewerIsAdmin} />
+            <ProfileHeader profile={profile} viewerIsAdmin={viewerIsAdmin} isOwnProfile={isOwnProfile} />
             {!isOwnProfile && viewerId && (
               <RivalryCard viewerId={viewerId} opponentId={profileId} />
             )}
@@ -240,7 +242,9 @@ export default function PlayerProfilePage() {
   );
 }
 
-function ProfileHeader({ profile, viewerIsAdmin }: { profile: PlayerProfile; viewerIsAdmin: boolean }) {
+function ProfileHeader({ profile, viewerIsAdmin, isOwnProfile }: { profile: PlayerProfile; viewerIsAdmin: boolean; isOwnProfile: boolean }) {
+  const [, navigate] = useLocation();
+  const mutualPartners = profile.mutualWorkoutPartners ?? [];
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -268,6 +272,14 @@ function ProfileHeader({ profile, viewerIsAdmin }: { profile: PlayerProfile; vie
           {profile.isVerified && <BadgeCheck className="w-5 h-5 text-blue-400 fill-blue-400/20" />}
         </div>
         <p className="text-sm text-muted-foreground">@{profile.username}</p>
+        {!isOwnProfile && mutualPartners.length > 0 && (
+          <MutualWorkoutPartnersLine
+            partners={mutualPartners}
+            onViewProfile={(id) => navigate(`/players/${id}`)}
+            testIdPrefix="profile"
+            className="text-[11px] text-emerald-300 font-bold mt-2 flex items-center justify-center gap-1 truncate"
+          />
+        )}
         {viewerIsAdmin && profile.isSuspended && (
           <div
             className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/15 border border-red-500/40 text-red-300 text-[10px] font-black uppercase tracking-wider"
