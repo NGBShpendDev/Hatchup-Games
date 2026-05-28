@@ -15,6 +15,7 @@ interface SuspendedPlayer {
   displayName: string | null;
   avatarUrl: string | null;
   suspendedAt: string | null;
+  suspensionReason: string | null;
 }
 
 export default function AdminSuspended() {
@@ -125,6 +126,15 @@ export default function AdminSuspended() {
                       <p className="text-[10px] text-muted-foreground mt-0.5">
                         Suspended {p.suspendedAt ? new Date(p.suspendedAt).toLocaleDateString() : "—"}
                       </p>
+                      {p.suspensionReason && (
+                        <p
+                          className="text-[11px] text-foreground/80 font-medium mt-1 line-clamp-2"
+                          data-testid={`text-suspended-reason-${p.id}`}
+                        >
+                          <span className="font-black uppercase tracking-wider text-[9px] mr-1 text-red-400">Reason:</span>
+                          {p.suspensionReason}
+                        </p>
+                      )}
                     </div>
 
                     <Button

@@ -728,6 +728,7 @@ router.get("/admin/players/suspended", requireAuth, attachPlayer, async (req, re
       displayName: playersTable.displayName,
       avatarUrl: playersTable.avatarUrl,
       suspendedAt: playersTable.suspendedAt,
+      suspensionReason: playersTable.suspensionReason,
     })
     .from(playersTable)
     .where(eq(playersTable.isSuspended, true))
@@ -763,11 +764,16 @@ router.patch("/admin/players/:id/suspend", requireAuth, attachPlayer, async (req
     return;
   }
 
+  const suspendReason = typeof (req.body as { reason?: unknown })?.reason === "string"
+    ? ((req.body as { reason: string }).reason).trim().slice(0, 500) || null
+    : null;
+
   const [updated] = await db
     .update(playersTable)
     .set({
       isSuspended: body.isSuspended,
       suspendedAt: body.isSuspended ? new Date() : null,
+      suspensionReason: body.isSuspended ? suspendReason : null,
     })
     .where(eq(playersTable.id, targetId))
     .returning({
@@ -775,6 +781,7 @@ router.patch("/admin/players/:id/suspend", requireAuth, attachPlayer, async (req
       username: playersTable.username,
       isSuspended: playersTable.isSuspended,
       suspendedAt: playersTable.suspendedAt,
+      suspensionReason: playersTable.suspensionReason,
     });
   if (!updated) {
     res.status(404).json({ error: "Player not found" });
@@ -785,9 +792,6 @@ router.patch("/admin/players/:id/suspend", requireAuth, attachPlayer, async (req
     { adminId: caller.id, targetId, isSuspended: body.isSuspended },
     "admin toggled account suspension",
   );
-  const suspendReason = typeof (req.body as { reason?: unknown })?.reason === "string"
-    ? ((req.body as { reason: string }).reason).trim().slice(0, 500) || null
-    : null;
   await writeAuditLog({
     actorId: caller.id,
     action: body.isSuspended ? "suspend" : "unsuspend",

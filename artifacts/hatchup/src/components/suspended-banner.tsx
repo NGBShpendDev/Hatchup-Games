@@ -23,6 +23,7 @@ export function SuspendedBanner({ className = "" }: { className?: string }) {
   const { player } = usePlayer();
   if (!player?.isSuspended) return null;
   const since = formatSuspendedSince(player.suspendedAt);
+  const reason = player.suspensionReason?.trim() || null;
   return (
     <div
       role="status"
@@ -43,6 +44,15 @@ export function SuspendedBanner({ className = "" }: { className?: string }) {
         <p className="text-xs font-medium leading-relaxed text-destructive/90">
           {SUSPENDED_COPY.body}
         </p>
+        {reason && (
+          <p
+            className="text-xs font-medium leading-relaxed text-destructive/90 bg-destructive/10 border border-destructive/30 rounded-lg px-2 py-1.5"
+            data-testid="text-suspended-reason"
+          >
+            <span className="font-black uppercase tracking-wider text-[10px] mr-1 text-destructive">Reason:</span>
+            {reason}
+          </p>
+        )}
         <a
           href={SUSPENDED_COPY.supportHref}
           className="inline-block text-xs font-black text-destructive underline underline-offset-2 hover:opacity-80"
