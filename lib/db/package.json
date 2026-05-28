@@ -8,8 +8,9 @@
     "./schema": "./src/schema/index.ts"
   },
   "scripts": {
-    "push": "drizzle-kit push --config ./drizzle.config.ts",
-    "push-force": "drizzle-kit push --force --config ./drizzle.config.ts",
+    "push": "tsx ./src/push.ts",
+    "push-force": "tsx ./src/push.ts --force",
+    "push-interactive": "drizzle-kit push --config ./drizzle.config.ts",
     "seed:realms": "tsx ./src/seeds/realm-evolutions.ts",
     "seed:artifacts": "tsx ./src/seeds/artifacts.ts"
   },

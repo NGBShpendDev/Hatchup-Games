@@ -9,7 +9,7 @@ A creature-hatching game universe where players hatch and evolve creatures calle
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only, non-interactive). Add `--force` (or use `push-force`) to allow data-loss statements like dropping columns or truncating tables. Use `push-interactive` if you actually want drizzle-kit's interactive prompts (TTY shells only).
 - Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
@@ -167,7 +167,7 @@ Across 6 metrics — xp, steps, workouts, battle_wins, streaks, artifacts — if
 - Vite `strictPort: true` was removed — it caused the workflow restart tool to fail with DIDNT_OPEN_A_PORT even though the server was running
 - `@replit/vite-plugin-dev-banner` was removed from hatchup Vite config (same reason)
 - Always run `pnpm --filter @workspace/api-spec run codegen` after editing `lib/api-spec/openapi.yaml`
-- Always run `pnpm --filter @workspace/db run push` after editing `lib/db/src/schema/index.ts`
+- Always run `pnpm --filter @workspace/db run push` after editing `lib/db/src/schema/index.ts`. The script wraps `drizzle-kit`'s programmatic `pushSchema` so it works in non-TTY shells; pass `--force` (or use `push-force`) when you need to allow data-loss statements (drop column, truncate, etc.).
 
 ## Pointers
 
