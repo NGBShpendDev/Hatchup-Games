@@ -52,10 +52,28 @@ async function advanceEliminationRound(challengeId: number): Promise<boolean> {
 
   if (plan.kind === "noop") return false;
 
+  const participantPlayer = new Map(active.map(p => [p.id, p.playerId]));
+  const link = `/challenges/${challengeId}`;
+  const title = challenge.title;
+
   if (plan.eliminatedIds.length > 0) {
     await db.update(challengeParticipantsTable)
       .set({ eliminated: true, eliminatedRound: plan.eliminatedRound })
       .where(inArray(challengeParticipantsTable.id, plan.eliminatedIds));
+
+    const eliminatedRound = plan.eliminatedRound;
+    const rows = plan.eliminatedIds
+      .map(pid => participantPlayer.get(pid))
+      .filter((id): id is number => typeof id === "number")
+      .map(playerId => ({
+        playerId,
+        type: "tournament_eliminated",
+        title: `Eliminated in round ${eliminatedRound}`,
+        body: `You were eliminated from "${title}" in round ${eliminatedRound}. Better luck next time!`,
+        link,
+        sourceId: challengeId,
+      }));
+    if (rows.length > 0) await db.insert(notificationsTable).values(rows);
   }
 
   // If only one survivor remains, the bracket is resolved — let the caller
@@ -72,6 +90,20 @@ async function advanceEliminationRound(challengeId: number): Promise<boolean> {
   await db.update(challengesTable)
     .set({ currentRound: plan.nextRound, endAt: plan.nextEndAt })
     .where(eq(challengesTable.id, challengeId));
+
+  // Notify survivors that they advanced to the next round.
+  const advancedRows = plan.survivorIds
+    .map(pid => participantPlayer.get(pid))
+    .filter((id): id is number => typeof id === "number")
+    .map(playerId => ({
+      playerId,
+      type: "tournament_advanced",
+      title: `Advanced to round ${plan.nextRound}`,
+      body: `You advanced to round ${plan.nextRound} of "${title}". Keep going!`,
+      link,
+      sourceId: challengeId,
+    }));
+  if (advancedRows.length > 0) await db.insert(notificationsTable).values(advancedRows);
 
   return true;
 }
