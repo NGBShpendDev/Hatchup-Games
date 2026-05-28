@@ -29,7 +29,7 @@ export const POST_TYPES = [
   { value: "hatch_moment", label: "Hatch Moment", icon: "🥚" },
 ];
 
-const REACTION_ICONS: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
+export const REACTION_ICONS: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
   like: { icon: <Heart className="w-4 h-4" />, label: "Like", color: "text-pink-500" },
   encourage: { icon: <Zap className="w-4 h-4" />, label: "Encourage", color: "text-yellow-500" },
   fire: { icon: <Flame className="w-4 h-4" />, label: "Fire", color: "text-orange-500" },
