@@ -99,6 +99,14 @@ export const playersTable = pgTable("players", {
   notifySocialPush: boolean("notify_social_push").notNull().default(true),
   notifyEndingSoonPush: boolean("notify_ending_soon_push").notNull().default(true),
   notifyCompletedPush: boolean("notify_completed_push").notNull().default(true),
+  // Per-type social opt-outs. Gate BOTH the in-app inbox row and the push
+  // delivery so silencing a type fully removes it. When false, the matching
+  // notification is suppressed end-to-end. Defaults to true so existing
+  // behavior is unchanged for current users.
+  notifySocialReactions: boolean("notify_social_reactions").notNull().default(true),
+  notifySocialReplies: boolean("notify_social_replies").notNull().default(true),
+  notifySocialMentions: boolean("notify_social_mentions").notNull().default(true),
+  notifySocialFollowers: boolean("notify_social_followers").notNull().default(true),
   // Weekly nutrition recap delivery preferences
   weeklyRecapEnabled: boolean("weekly_recap_enabled").notNull().default(true),
   weeklyRecapDayOfWeek: integer("weekly_recap_day_of_week").notNull().default(0),

@@ -82,14 +82,23 @@ router.get("/push/preferences", requireAuth, attachPlayer, async (req, res) => {
     social: player.notifySocialPush,
     endingSoon: player.notifyEndingSoonPush,
     completed: player.notifyCompletedPush,
+    socialReactions: player.notifySocialReactions,
+    socialReplies: player.notifySocialReplies,
+    socialMentions: player.notifySocialMentions,
+    socialFollowers: player.notifySocialFollowers,
     subscriptionCount: subs.length,
   });
 });
 
 // ── Update per-category push preferences ───────────────────────────────────
 router.patch("/push/preferences", requireAuth, attachPlayer, async (req, res) => {
-  const { invites, social, endingSoon, completed } = req.body as {
+  const {
+    invites, social, endingSoon, completed,
+    socialReactions, socialReplies, socialMentions, socialFollowers,
+  } = req.body as {
     invites?: boolean; social?: boolean; endingSoon?: boolean; completed?: boolean;
+    socialReactions?: boolean; socialReplies?: boolean;
+    socialMentions?: boolean; socialFollowers?: boolean;
   };
 
   const patch: Record<string, boolean> = {};
@@ -97,6 +106,10 @@ router.patch("/push/preferences", requireAuth, attachPlayer, async (req, res) =>
   if (typeof social === "boolean") patch.notifySocialPush = social;
   if (typeof endingSoon === "boolean") patch.notifyEndingSoonPush = endingSoon;
   if (typeof completed === "boolean") patch.notifyCompletedPush = completed;
+  if (typeof socialReactions === "boolean") patch.notifySocialReactions = socialReactions;
+  if (typeof socialReplies === "boolean") patch.notifySocialReplies = socialReplies;
+  if (typeof socialMentions === "boolean") patch.notifySocialMentions = socialMentions;
+  if (typeof socialFollowers === "boolean") patch.notifySocialFollowers = socialFollowers;
 
   if (Object.keys(patch).length > 0) {
     await db.update(playersTable).set(patch).where(eq(playersTable.id, req.playerId!));
@@ -108,6 +121,10 @@ router.patch("/push/preferences", requireAuth, attachPlayer, async (req, res) =>
     social: player!.notifySocialPush,
     endingSoon: player!.notifyEndingSoonPush,
     completed: player!.notifyCompletedPush,
+    socialReactions: player!.notifySocialReactions,
+    socialReplies: player!.notifySocialReplies,
+    socialMentions: player!.notifySocialMentions,
+    socialFollowers: player!.notifySocialFollowers,
   });
 });
 

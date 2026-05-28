@@ -155,7 +155,16 @@ export default function SettingsPrivacy() {
 
   // Web push state ──
   const push = usePushSubscription();
-  const [pushPrefs, setPushPrefs] = useState({ invites: true, social: true, endingSoon: true, completed: true });
+  const [pushPrefs, setPushPrefs] = useState({
+    invites: true,
+    social: true,
+    endingSoon: true,
+    completed: true,
+    socialReactions: true,
+    socialReplies: true,
+    socialMentions: true,
+    socialFollowers: true,
+  });
   const [pushPrefsLoaded, setPushPrefsLoaded] = useState(false);
 
   useEffect(() => {
@@ -168,13 +177,20 @@ export default function SettingsPrivacy() {
           social: data.social !== false,
           endingSoon: !!data.endingSoon,
           completed: !!data.completed,
+          socialReactions: data.socialReactions !== false,
+          socialReplies: data.socialReplies !== false,
+          socialMentions: data.socialMentions !== false,
+          socialFollowers: data.socialFollowers !== false,
         });
         setPushPrefsLoaded(true);
       })
       .catch(() => setPushPrefsLoaded(true));
   }, [playerId, pushPrefsLoaded]);
 
-  const updatePushPref = async (key: "invites" | "social" | "endingSoon" | "completed", value: boolean) => {
+  type PushPrefKey =
+    | "invites" | "social" | "endingSoon" | "completed"
+    | "socialReactions" | "socialReplies" | "socialMentions" | "socialFollowers";
+  const updatePushPref = async (key: PushPrefKey, value: boolean) => {
     setPushPrefs(prev => ({ ...prev, [key]: value }));
     try {
       await fetch("/api/push/preferences", {
@@ -707,7 +723,6 @@ export default function SettingsPrivacy() {
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Categories</p>
               {[
                 { key: "invites" as const, label: "Challenge invites", desc: "Someone invites you to a challenge" },
-                { key: "social" as const, label: "Likes, replies & mentions", desc: "Someone reacts, comments, mentions, or follows you" },
                 { key: "endingSoon" as const, label: "Ending soon", desc: "A joined challenge has under 24 hours left" },
                 { key: "completed" as const, label: "Challenge complete", desc: "A challenge you joined wrapped up" },
               ].map(({ key, label, desc }) => (
@@ -723,6 +738,42 @@ export default function SettingsPrivacy() {
                   />
                 </div>
               ))}
+            </div>
+
+            <div className="border-t border-cyan-500/10 pt-3 space-y-3">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Social</p>
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="font-bold text-sm">All social notifications (push)</p>
+                  <p className="text-xs text-muted-foreground font-medium">Master switch for the push side of likes, replies, mentions and follows.</p>
+                </div>
+                <Switch
+                  checked={pushPrefs.social}
+                  disabled={!pushPrefsLoaded}
+                  onCheckedChange={(v) => updatePushPref("social", v)}
+                />
+              </div>
+              {[
+                { key: "socialReactions" as const, label: "Reactions on my posts", desc: "Someone likes, cheers, fire-reacts or flexes your posts and comments." },
+                { key: "socialReplies" as const, label: "Replies to my posts", desc: "Someone comments on a post you wrote." },
+                { key: "socialMentions" as const, label: "@mentions", desc: "Someone mentions you in a post, comment or club chat." },
+                { key: "socialFollowers" as const, label: "New followers", desc: "Someone starts following you." },
+              ].map(({ key, label, desc }) => (
+                <div key={key} className="flex items-center justify-between gap-4 pl-3 border-l-2 border-cyan-500/20">
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm">{label}</p>
+                    <p className="text-xs text-muted-foreground font-medium">{desc}</p>
+                  </div>
+                  <Switch
+                    checked={pushPrefs[key]}
+                    disabled={!pushPrefsLoaded}
+                    onCheckedChange={(v) => updatePushPref(key, v)}
+                  />
+                </div>
+              ))}
+              <p className="text-[11px] text-muted-foreground/80 font-medium">
+                Turning a social type off silences both the in-app inbox row and the push.
+              </p>
             </div>
           </div>
         </GlassCard>

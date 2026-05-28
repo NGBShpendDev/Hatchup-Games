@@ -38,6 +38,7 @@ import {
 } from "./sharedGroups.ts";
 import { sendPushToPlayer } from "../services/pushNotifications.ts";
 import { pushForNotification } from "../services/notificationFanout.ts";
+import { isSocialNotificationAllowed } from "../services/socialNotifyPrefs.ts";
 import { notificationsTable } from "@workspace/db";
 import { resolveMentionedPlayers } from "../services/mentions.ts";
 import { createHmac } from "node:crypto";
@@ -689,6 +690,7 @@ router.post("/social/posts", requireAuth, attachPlayer, socialWriteLimiter, bloc
       : post.content;
     const link = `/post/${post.id}`;
     for (const m of mentioned) {
+      if (!(await isSocialNotificationAllowed(m.id, "post_mention"))) continue;
       const title = "You were mentioned";
       const body = `${posterName} mentioned you in a post: "${snippet}"`;
       await db.insert(notificationsTable).values({
@@ -1081,7 +1083,12 @@ router.post("/social/posts/:id/react", requireAuth, attachPlayer, socialWriteLim
   // Notify the post author when someone else reacts. Dedupe per (author,
   // post, reactor) so flipping between reaction types or quickly toggling
   // doesn't spam the bell.
-  if (added && targetPost.playerId !== playerId && !(await isPostMutedFor(targetPost.playerId, postId))) {
+  if (
+    added &&
+    targetPost.playerId !== playerId &&
+    !(await isPostMutedFor(targetPost.playerId, postId)) &&
+    (await isSocialNotificationAllowed(targetPost.playerId, "post_reaction"))
+  ) {
     const link = `/post/${postId}?reactFrom=${playerId}`;
     const duplicate = await db.query.notificationsTable.findFirst({
       where: and(
@@ -1295,7 +1302,11 @@ router.post("/social/posts/:id/comments", requireAuth, attachPlayer, socialWrite
     ? `${comment.content.slice(0, 77)}…`
     : comment.content;
   const commenterName = author?.displayName ?? author?.username ?? "Someone";
-  if (parentPost.playerId !== playerId && !(await isPostMutedFor(parentPost.playerId, postId))) {
+  if (
+    parentPost.playerId !== playerId &&
+    !(await isPostMutedFor(parentPost.playerId, postId)) &&
+    (await isSocialNotificationAllowed(parentPost.playerId, "post_comment"))
+  ) {
     const replyTitle = "New reply on your post";
     const replyBody = `${commenterName}: "${snippet}"`;
     await db.insert(notificationsTable).values({
@@ -1321,6 +1332,7 @@ router.post("/social/posts/:id/comments", requireAuth, attachPlayer, socialWrite
   for (const m of mentioned) {
     if (m.id === parentPost.playerId) continue;
     if (await isPostMutedFor(m.id, postId)) continue;
+    if (!(await isSocialNotificationAllowed(m.id, "comment_mention"))) continue;
     const mTitle = "You were mentioned";
     const mBody = `${commenterName} mentioned you in a comment: "${snippet}"`;
     await db.insert(notificationsTable).values({
@@ -1488,7 +1500,12 @@ router.post(
     // Notify the comment author when someone else likes their comment.
     // Skip self-likes and dedupe per (author, comment, liker) so rapid toggling
     // doesn't spam the notifications feed.
-    if (liked && comment.playerId !== playerId && !(await isPostMutedFor(comment.playerId, comment.postId))) {
+    if (
+      liked &&
+      comment.playerId !== playerId &&
+      !(await isPostMutedFor(comment.playerId, comment.postId)) &&
+      (await isSocialNotificationAllowed(comment.playerId, "comment_like"))
+    ) {
       const link = `/post/${comment.postId}?commentLikeFrom=${playerId}`;
       const duplicate = await db.query.notificationsTable.findFirst({
         where: and(
@@ -1645,7 +1662,7 @@ router.post("/social/follow", requireAuth, attachPlayer, socialWriteLimiter, blo
       eq(notificationsTable.sourceId, followerId),
     ),
   });
-  if (!duplicate) {
+  if (!duplicate && (await isSocialNotificationAllowed(followeeId, "new_follower"))) {
     const follower = await db.query.playersTable.findFirst({
       where: eq(playersTable.id, followerId),
     });

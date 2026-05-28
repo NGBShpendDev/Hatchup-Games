@@ -3,6 +3,7 @@ import { db, notificationsTable } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { pushForNotification } from "../services/notificationFanout.ts";
+import { isSocialNotificationAllowed } from "../services/socialNotifyPrefs.ts";
 
 const router = Router();
 
@@ -82,6 +83,13 @@ router.post("/notifications", requireAuth, attachPlayer, async (req, res) => {
   }
   if (!title) {
     res.status(400).json({ error: "title_required" });
+    return;
+  }
+
+  // Respect per-type social opt-outs end-to-end: silenced types neither
+  // land in the inbox nor get pushed.
+  if (!(await isSocialNotificationAllowed(req.playerId!, type))) {
+    res.status(202).json({ suppressed: true });
     return;
   }
 
