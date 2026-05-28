@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -71,3 +71,20 @@ export const bouncedEmailsTable = pgTable("bounced_emails", {
 export const insertBouncedEmailSchema = createInsertSchema(bouncedEmailsTable).omit({ id: true, createdAt: true });
 export type InsertBouncedEmail = z.infer<typeof insertBouncedEmailSchema>;
 export type BouncedEmail = typeof bouncedEmailsTable.$inferSelect;
+
+// Persistent backing store for the per-player email-resend budget. We log one
+// row per consumed send keyed by the same string the in-process limiter used
+// (`player:<id>` or `ip:<addr>`) so the cap survives API restarts and is
+// shared across horizontally-scaled instances. Rows older than the window are
+// GC'd opportunistically inside `consumeEmailResendBudget`.
+export const emailResendAttemptsTable = pgTable(
+  "email_resend_attempts",
+  {
+    id: serial("id").primaryKey(),
+    key: text("key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("email_resend_attempts_key_created_at_idx").on(t.key, t.createdAt)],
+);
+
+export type EmailResendAttempt = typeof emailResendAttemptsTable.$inferSelect;

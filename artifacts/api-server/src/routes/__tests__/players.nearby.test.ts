@@ -90,6 +90,7 @@ mock.module("../safety.ts", {
 
 mock.module("drizzle-orm", {
   namedExports: {
+    lt: () => ({}),
     eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
     and: (...args: unknown[]) => ({ op: "and", args }),
     or: (...args: unknown[]) => ({ op: "or", args }),
@@ -169,6 +170,7 @@ const fakeDb = {
 
 mock.module("@workspace/db", {
   namedExports: {
+    emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
     db: fakeDb,
     playersTable: { id: {}, clerkId: {}, username: {} },
     playerLocationTable: { playerId: {}, city: {}, state: {} },

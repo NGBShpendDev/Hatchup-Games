@@ -84,6 +84,7 @@ mock.module("drizzle-orm", {
     and: (...parts: Record<string, unknown>[]) => Object.assign({}, ...parts),
     or: (...parts: Record<string, unknown>[]) => ({ __or: parts }),
     desc: () => ({}),
+    lt: () => ({}),
     notInArray: () => ({}),
   },
 });
@@ -217,6 +218,7 @@ mock.module("@workspace/db", {
     blockedUsersTable: { blockerId: {}, blockedId: {}, createdAt: {} },
     moderationAuditLogTable: { id: {}, actorId: {}, action: {}, targetPlayerId: {}, targetReportId: {}, reason: {}, metadata: {}, createdAt: {} },
     bouncedEmailsTable: { id: {}, email: {} },
+    emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
   },
 });
 

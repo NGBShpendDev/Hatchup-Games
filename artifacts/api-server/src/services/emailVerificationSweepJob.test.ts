@@ -49,6 +49,7 @@ const fakeDb = {
 
 mock.module("@workspace/db", {
   namedExports: {
+    emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
     db: fakeDb,
     playersTable,
   },

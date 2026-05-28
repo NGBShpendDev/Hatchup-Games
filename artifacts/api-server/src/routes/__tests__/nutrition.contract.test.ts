@@ -180,6 +180,7 @@ mock.module("@workspace/integrations-openai-ai-server", {
 // db never inspects them.
 mock.module("drizzle-orm", {
   namedExports: {
+    lt: () => ({}),
     eq: () => ({}),
     and: () => ({}),
     or: () => ({}),
@@ -272,6 +273,7 @@ const fakeDb = {
 
 mock.module("@workspace/db", {
   namedExports: {
+    emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
     db: fakeDb,
     mealPostsTable: {},
     mealLikesTable: {},

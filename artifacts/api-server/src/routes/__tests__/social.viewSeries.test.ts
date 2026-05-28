@@ -100,6 +100,7 @@ const col = (name: string) => ({ __col: name });
 
 mock.module("drizzle-orm", {
   namedExports: {
+    lt: () => ({}),
     eq: (c: { __col?: string }, v: unknown) => ({ __op: "eq", col: c, val: v }),
     and: (...args: Pred[]) => ({ __op: "and", args }),
     or: () => ({}),
@@ -197,6 +198,7 @@ const fakeDb = {
 
 mock.module("@workspace/db", {
   namedExports: {
+    emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
     db: fakeDb,
     postsTable,
     postViewsTable,

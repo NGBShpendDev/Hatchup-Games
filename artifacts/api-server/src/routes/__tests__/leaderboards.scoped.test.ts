@@ -123,6 +123,7 @@ mock.module("../../services/subscriptionGuards.ts", {
 // drizzle helpers — opaque markers so we can introspect predicates.
 mock.module("drizzle-orm", {
   namedExports: {
+    lt: () => ({}),
     eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
     and: (...args: unknown[]) => ({ op: "and", args }),
     or: (...args: unknown[]) => ({ op: "or", args }),
@@ -171,6 +172,7 @@ const fakeDb = {
 
 mock.module("@workspace/db", {
   namedExports: {
+    emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
     db: fakeDb,
     playersTable: { id: colMarker("id"), rankScore: colMarker("rankScore"), totalWins: colMarker("totalWins"), battleElo: colMarker("battleElo") },
     playerLocationTable: {

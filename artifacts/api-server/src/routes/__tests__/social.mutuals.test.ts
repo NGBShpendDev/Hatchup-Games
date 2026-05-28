@@ -386,6 +386,7 @@ const fakeDb: any = {
 // Re-export schema as opaque markers — only ever read as table identifiers.
 mock.module("@workspace/db", {
   namedExports: {
+    emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
     db: fakeDb,
     playersTable: makeTable("playersTable"),
     playerFollowsTable: makeTable("playerFollowsTable"),

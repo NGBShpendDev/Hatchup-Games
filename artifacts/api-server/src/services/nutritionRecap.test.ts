@@ -114,6 +114,7 @@ const fakeDb = {
 
 mock.module("@workspace/db", {
   namedExports: {
+    emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
     db: fakeDb,
     mealPostsTable,
     playersTable,
@@ -123,6 +124,7 @@ mock.module("@workspace/db", {
 
 mock.module("drizzle-orm", {
   namedExports: {
+    lt: () => ({}),
     and: (...parts: Predicate[]) => mergePredicates(parts),
     desc: (c: unknown) => ({ __desc: c }),
     eq: (c: { __col: string }, val: unknown): Predicate => ({ [c.__col]: val }),

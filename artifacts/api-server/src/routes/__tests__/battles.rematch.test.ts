@@ -120,6 +120,7 @@ mock.module("../../services/matchmakingQueue.ts", {
 // the predicates beyond identity.
 mock.module("drizzle-orm", {
   namedExports: {
+    lt: () => ({}),
     eq: (_c: unknown, v: unknown) => ({ __op: "eq", val: v }),
     desc: () => ({}),
     or: () => ({}),
@@ -154,6 +155,7 @@ const fakeDb = {
 
 mock.module("@workspace/db", {
   namedExports: {
+    emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
     db: fakeDb,
     battlesTable: {},
     hatchlingsTable: {},

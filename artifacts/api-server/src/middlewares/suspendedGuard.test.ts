@@ -14,12 +14,14 @@ function resetState() {
 
 mock.module("drizzle-orm", {
   namedExports: {
+    lt: () => ({}),
     eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
   },
 });
 
 mock.module("@workspace/db", {
   namedExports: {
+    emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
     db: {
       query: {
         playersTable: {

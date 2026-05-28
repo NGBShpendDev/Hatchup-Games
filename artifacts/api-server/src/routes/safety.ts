@@ -631,7 +631,7 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     // rest of the privacy update still commits if the implicit send is over
     // the limit — the new address is saved and the user can hit the explicit
     // Resend button later once the window resets.
-    if (!consumeEmailResendBudget({ playerId: req.playerId, ip: req.ip })) {
+    if (!(await consumeEmailResendBudget({ playerId: req.playerId, ip: req.ip }))) {
       verificationRateLimited = true;
     } else {
       try {
