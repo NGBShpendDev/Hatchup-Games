@@ -131,6 +131,8 @@ mock.module("drizzle-orm", {
     gte: () => ({}),
     desc: () => ({ op: "desc" }),
     notInArray: () => ({}),
+    inArray: () => ({}),
+    sql: Object.assign(() => ({}), { join: () => ({}) }),
   },
 });
 
@@ -356,5 +358,185 @@ describe("GET /leaderboards/scoped — privacy rules", () => {
     const { body } = await getScoped("city", "xp");
     const ids = body.entries.map((e: any) => e.playerId).filter((id: number) => id !== 1);
     assert.deepEqual(ids, [2], "only the non-blocked, non-hidden, non-minor candidate should remain");
+  });
+});
+
+describe("GET /leaderboards/scoped — premium scope gating", () => {
+  it("returns 402 when a free-tier player requests a local scope", async () => {
+    seedViewer({ locationVisibility: "exact" });
+    // Free tier: only world and country allowed
+    state.allowedScopes = ["world", "country"];
+
+    for (const scope of ["state", "county", "city", "nearby"]) {
+      const { status, body } = await getScoped(scope, "xp");
+      assert.equal(status, 402, `scope=${scope} must be gated`);
+      assert.equal(body.error, "premium_required_scope");
+      assert.ok(Array.isArray(body.allowedScopes), "allowedScopes returned in 402 body");
+    }
+  });
+
+  it("allows a free-tier player to access world and country scopes", async () => {
+    seedViewer({ locationVisibility: "exact" });
+    state.players.push(makePlayer({ id: 2, clerkId: "u_a", username: "alpha", locationVisibility: "exact", xp: 500 }));
+    state.locations.push(makeLoc({ playerId: 2 }));
+    state.allowedScopes = ["world", "country"];
+
+    for (const scope of ["world", "country"]) {
+      const { status } = await getScoped(scope, "xp");
+      assert.equal(status, 200, `scope=${scope} must succeed for free-tier`);
+    }
+  });
+
+  it("returns 400 for an unrecognised scope value", async () => {
+    seedViewer();
+    const { status, body } = await getScoped("galaxy", "xp");
+    assert.equal(status, 400);
+    assert.equal(body.error, "Invalid scope or metric");
+  });
+
+  it("returns 400 for an unrecognised metric value", async () => {
+    seedViewer();
+    const res = await fetch(`${baseUrl}/leaderboards/scoped?scope=world&metric=magic`);
+    const body = await res.json();
+    assert.equal(res.status, 400);
+    assert.equal(body.error, "Invalid scope or metric");
+  });
+});
+
+describe("GET /leaderboards/scoped — location-required short-circuit", () => {
+  it("returns locationRequired:true with empty entries when the viewer has no location and scope is non-world", async () => {
+    // Viewer exists but has no location row
+    state.players.push(makePlayer({ id: 1, clerkId: "u_viewer", username: "viewer", locationVisibility: "exact" }));
+    state.players.push(makePlayer({ id: 2, clerkId: "u_other", username: "other", locationVisibility: "exact" }));
+    state.locations.push(makeLoc({ playerId: 2 }));
+    // No location for viewer (id 1)
+
+    for (const scope of ["country", "state", "county", "city", "nearby"]) {
+      const { status, body } = await getScoped(scope, "xp");
+      assert.equal(status, 200, `scope=${scope} should return 200 with locationRequired flag`);
+      assert.equal(body.locationRequired, true, `scope=${scope} must signal locationRequired`);
+      assert.deepEqual(body.entries, [], `scope=${scope} must return empty entries`);
+    }
+  });
+
+  it("does NOT require location for world scope", async () => {
+    state.players.push(makePlayer({ id: 1, clerkId: "u_viewer", username: "viewer", locationVisibility: "exact" }));
+    state.players.push(makePlayer({ id: 2, clerkId: "u_other", username: "other", locationVisibility: "exact", xp: 2000 }));
+    // No locations for anyone
+
+    const { status, body } = await getScoped("world", "xp");
+    assert.equal(status, 200);
+    assert.ok(!body.locationRequired, "world scope must not set locationRequired");
+    assert.ok(body.entries.length > 0, "world scope must return results without a location");
+  });
+});
+
+describe("GET /leaderboards/scoped — per-metric sort ordering", () => {
+  function seedThreePlayers(stats: Array<{ id: number; clerkId: string; username: string } & Partial<PlayerRow>>) {
+    for (const s of stats) {
+      state.players.push(makePlayer(s as any));
+      state.locations.push(makeLoc({ playerId: s.id }));
+    }
+  }
+
+  it("sorts by xp descending", async () => {
+    seedViewer({ xp: 100 });
+    seedThreePlayers([
+      { id: 2, clerkId: "u_b", username: "b", xp: 300 },
+      { id: 3, clerkId: "u_c", username: "c", xp: 200 },
+      { id: 4, clerkId: "u_d", username: "d", xp: 50 },
+    ]);
+
+    const { body } = await getScoped("city", "xp");
+    const ordered = body.entries.map((e: any) => e.playerId);
+    assert.deepEqual(ordered, [2, 3, 1, 4], "entries must be sorted by xp descending");
+  });
+
+  it("sorts by steps descending", async () => {
+    seedViewer({ totalSteps: 1000 });
+    seedThreePlayers([
+      { id: 2, clerkId: "u_b", username: "b", totalSteps: 5000 },
+      { id: 3, clerkId: "u_c", username: "c", totalSteps: 3000 },
+    ]);
+
+    const { body } = await getScoped("city", "steps");
+    const ordered = body.entries.map((e: any) => e.playerId);
+    assert.deepEqual(ordered, [2, 3, 1]);
+  });
+
+  it("sorts by workouts descending", async () => {
+    seedViewer({ totalWorkouts: 5 });
+    seedThreePlayers([
+      { id: 2, clerkId: "u_b", username: "b", totalWorkouts: 20 },
+      { id: 3, clerkId: "u_c", username: "c", totalWorkouts: 10 },
+    ]);
+
+    const { body } = await getScoped("city", "workouts");
+    const ordered = body.entries.map((e: any) => e.playerId);
+    assert.deepEqual(ordered, [2, 3, 1]);
+  });
+
+  it("sorts by battle_wins descending", async () => {
+    seedViewer({ totalBattleWins: 1 });
+    seedThreePlayers([
+      { id: 2, clerkId: "u_b", username: "b", totalBattleWins: 50 },
+      { id: 3, clerkId: "u_c", username: "c", totalBattleWins: 25 },
+    ]);
+
+    const { body } = await getScoped("city", "battle_wins");
+    const ordered = body.entries.map((e: any) => e.playerId);
+    assert.deepEqual(ordered, [2, 3, 1]);
+  });
+
+  it("sorts by streaks (currentStreak) descending", async () => {
+    seedViewer({ currentStreak: 3 });
+    seedThreePlayers([
+      { id: 2, clerkId: "u_b", username: "b", currentStreak: 30 },
+      { id: 3, clerkId: "u_c", username: "c", currentStreak: 15 },
+    ]);
+
+    const { body } = await getScoped("city", "streaks");
+    const ordered = body.entries.map((e: any) => e.playerId);
+    assert.deepEqual(ordered, [2, 3, 1]);
+  });
+
+  it("metricValue in response matches the requested metric", async () => {
+    seedViewer({ xp: 500, totalSteps: 9999, totalWorkouts: 7, totalBattleWins: 3, currentStreak: 10 });
+
+    const cases: Array<{ metric: string; expected: number }> = [
+      { metric: "xp",          expected: 500 },
+      { metric: "steps",       expected: 9999 },
+      { metric: "workouts",    expected: 7 },
+      { metric: "battle_wins", expected: 3 },
+      { metric: "streaks",     expected: 10 },
+    ];
+
+    for (const { metric, expected } of cases) {
+      const { body } = await getScoped("world", metric);
+      const myEntry = body.entries.find((e: any) => e.playerId === 1);
+      assert.equal(
+        myEntry?.metricValue,
+        expected,
+        `metric=${metric}: metricValue should be ${expected}, got ${myEntry?.metricValue}`,
+      );
+    }
+  });
+
+  it("myEntry is pinned when the viewer is outside the top page", async () => {
+    // Seed viewer with low xp so they end up outside page 1 (limit 1)
+    seedViewer({ xp: 1 });
+    state.players.push(makePlayer({ id: 2, clerkId: "u_top", username: "top", xp: 9999 }));
+    state.locations.push(makeLoc({ playerId: 2 }));
+
+    const res = await fetch(`${baseUrl}/leaderboards/scoped?scope=city&metric=xp&limit=1&page=1`);
+    const body = await res.json();
+    assert.equal(res.status, 200);
+    // Viewer not in entries (page 1 only shows the top player)
+    const entryIds = body.entries.map((e: any) => e.playerId);
+    assert.ok(!entryIds.includes(1), "viewer must not be in page-1 entries");
+    // But myEntry should still be present
+    assert.ok(body.myEntry !== null, "myEntry must be pinned even off the first page");
+    assert.equal(body.myEntry.playerId, 1);
+    assert.equal(body.myEntry.position, 2, "viewer sits at position 2 (rank #2 overall)");
   });
 });
