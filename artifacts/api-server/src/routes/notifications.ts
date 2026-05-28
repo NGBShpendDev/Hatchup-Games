@@ -1,9 +1,18 @@
 import { Router } from "express";
 import { db, notificationsTable } from "@workspace/db";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
 
 const router = Router();
+
+const ALLOWED_TYPES = new Set([
+  "challenge_invite",
+  "challenge_ending",
+  "challenge_complete",
+  "club_mention",
+  "artifact_unlock",
+  "generic",
+]);
 
 // ── List notifications ─────────────────────────────────────────────────────
 router.get("/notifications", requireAuth, attachPlayer, async (req, res) => {
@@ -42,6 +51,57 @@ router.post("/notifications/:id/read", requireAuth, attachPlayer, async (req, re
     .where(and(eq(notificationsTable.id, id), eq(notificationsTable.playerId, req.playerId!)));
 
   res.json({ success: true });
+});
+
+// ── Upsert a notification (idempotent on player+type+sourceId) ─────────────
+// Used by client-side detectors (e.g. challenge ending soon / completed) so
+// transient toasts also land in the persistent inbox.
+router.post("/notifications", requireAuth, attachPlayer, async (req, res) => {
+  const body = req.body as {
+    type?: string;
+    title?: string;
+    body?: string;
+    link?: string;
+    sourceId?: number | null;
+  };
+
+  const type = String(body.type ?? "").trim();
+  const title = String(body.title ?? "").trim();
+  if (!type || !ALLOWED_TYPES.has(type)) {
+    res.status(400).json({ error: "invalid_type" });
+    return;
+  }
+  if (!title) {
+    res.status(400).json({ error: "title_required" });
+    return;
+  }
+
+  const sourceId = typeof body.sourceId === "number" ? body.sourceId : null;
+
+  if (sourceId !== null) {
+    const existing = await db.query.notificationsTable.findFirst({
+      where: and(
+        eq(notificationsTable.playerId, req.playerId!),
+        eq(notificationsTable.type, type),
+        eq(notificationsTable.sourceId, sourceId),
+      ),
+    });
+    if (existing) {
+      res.json({ ...existing, createdAt: existing.createdAt.toISOString(), deduped: true });
+      return;
+    }
+  }
+
+  const [row] = await db.insert(notificationsTable).values({
+    playerId: req.playerId!,
+    type,
+    title,
+    body: String(body.body ?? ""),
+    link: String(body.link ?? ""),
+    sourceId,
+  }).returning();
+
+  res.status(201).json({ ...row!, createdAt: row!.createdAt.toISOString() });
 });
 
 // ── Mark all as read ───────────────────────────────────────────────────────

@@ -36,6 +36,7 @@ import Onboarding from "@/pages/onboarding";
 import FamilyPage from "@/pages/family";
 import SubscriptionPage from "@/pages/subscription";
 import PlayerProfile from "@/pages/player-profile";
+import NotificationsPage from "@/pages/notifications";
 import { PageTransition } from "@/components/page-transition";
 
 const queryClient = new QueryClient();
@@ -251,6 +252,7 @@ function AppRoutes() {
         <Route path="/challenges" component={Challenges} />
         <Route path="/family" component={FamilyPage} />
         <Route path="/subscription" component={SubscriptionPage} />
+        <Route path="/notifications" component={NotificationsPage} />
         <Route component={NotFound} />
       </Switch>
       </PageTransition>

@@ -160,6 +160,7 @@ import type {
   TodayGoalProgress,
   UploadUrlRequest,
   UploadUrlResponse,
+  UpsertNotificationBody,
   UseItemInput,
   WorkoutGroupDetail,
   WorkoutGroupSummary,
@@ -8219,6 +8220,77 @@ export function useListNotifications<TData = Awaited<ReturnType<typeof listNotif
 
 
 
+
+export const getUpsertNotificationUrl = () => {
+
+
+
+
+  return `/api/notifications`
+}
+
+/**
+ * @summary Create an in-app notification for the current player (idempotent on type+sourceId)
+ */
+export const upsertNotification = async (upsertNotificationBody: UpsertNotificationBody, options?: RequestInit): Promise<Notification> => {
+
+  return customFetch<Notification>(getUpsertNotificationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      upsertNotificationBody,)
+  }
+);}
+
+
+
+
+export const getUpsertNotificationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertNotification>>, TError,{data: BodyType<UpsertNotificationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertNotification>>, TError,{data: BodyType<UpsertNotificationBody>}, TContext> => {
+
+const mutationKey = ['upsertNotification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertNotification>>, {data: BodyType<UpsertNotificationBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  upsertNotification(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpsertNotificationMutationResult = NonNullable<Awaited<ReturnType<typeof upsertNotification>>>
+    export type UpsertNotificationMutationBody = BodyType<UpsertNotificationBody>
+    export type UpsertNotificationMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create an in-app notification for the current player (idempotent on type+sourceId)
+ */
+export const useUpsertNotification = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertNotification>>, TError,{data: BodyType<UpsertNotificationBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof upsertNotification>>,
+        TError,
+        {data: BodyType<UpsertNotificationBody>},
+        TContext
+      > => {
+      return useMutation(getUpsertNotificationMutationOptions(options));
+    }
 
 export const getGetUnreadNotificationCountUrl = () => {
 

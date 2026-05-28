@@ -2747,6 +2747,30 @@ export const ListNotificationsResponse = zod.array(ListNotificationsResponseItem
 
 
 /**
+ * @summary Create an in-app notification for the current player (idempotent on type+sourceId)
+ */
+export const UpsertNotificationBody = zod.object({
+  "type": zod.string(),
+  "title": zod.string(),
+  "body": zod.string().optional(),
+  "link": zod.string().optional(),
+  "sourceId": zod.number().nullish()
+})
+
+export const UpsertNotificationResponse = zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "type": zod.string(),
+  "title": zod.string(),
+  "body": zod.string(),
+  "link": zod.string(),
+  "sourceId": zod.number().nullish(),
+  "read": zod.boolean(),
+  "createdAt": zod.string()
+})
+
+
+/**
  * @summary Get unread notification count for the current player
  */
 export const GetUnreadNotificationCountResponse = zod.object({

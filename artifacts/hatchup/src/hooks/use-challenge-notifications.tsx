@@ -5,9 +5,13 @@ import {
   getGetMyChallengeInvitesQueryKey,
   useListChallenges,
   getListChallengesQueryKey,
+  useUpsertNotification,
+  getListNotificationsQueryKey,
+  getGetUnreadNotificationCountQueryKey,
   type ChallengeListItem,
   type ChallengeInvite,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "./use-toast";
 import { ToastAction } from "@/components/ui/toast";
 
@@ -54,6 +58,27 @@ export function usePendingInviteCount(): number {
 export function useChallengeNotifications() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const qc = useQueryClient();
+  const upsertNotification = useUpsertNotification();
+
+  const writeInbox = (params: {
+    type: "challenge_invite" | "challenge_ending" | "challenge_complete";
+    title: string;
+    body: string;
+    link: string;
+    sourceId: number;
+  }) => {
+    upsertNotification.mutate(
+      { data: params },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: getGetUnreadNotificationCountQueryKey() });
+          qc.invalidateQueries({ queryKey: getListNotificationsQueryKey({ limit: 20 }) });
+          qc.invalidateQueries({ queryKey: getListNotificationsQueryKey({ limit: 50 }) });
+        },
+      },
+    );
+  };
 
   const { data: invites } = useGetMyChallengeInvites({
     query: {
@@ -94,6 +119,11 @@ export function useChallengeNotifications() {
       (latest.challenge as { title?: string } | undefined)?.title ?? "a challenge";
     const more = fresh.length > 1 ? ` (+${fresh.length - 1} more)` : "";
 
+    // Also invalidate the inbox — the server inserts a `challenge_invite`
+    // notification when the invite is created, so the bell should refresh.
+    qc.invalidateQueries({ queryKey: getGetUnreadNotificationCountQueryKey() });
+    qc.invalidateQueries({ queryKey: getListNotificationsQueryKey({ limit: 20 }) });
+
     toast({
       title: "New challenge invite",
       description: `You were invited to ${challengeTitle}${more}.`,
@@ -125,6 +155,13 @@ export function useChallengeNotifications() {
       if (c.status === "completed" || (Number.isFinite(end) && end <= now && c.status !== "active")) {
         if (completedSeen.has(c.id)) continue;
         completedSeen.add(c.id);
+        writeInbox({
+          type: "challenge_complete",
+          title: "Challenge complete!",
+          body: `"${c.title}" wrapped up — tap to see your final rank.`,
+          link: `/challenges/${c.id}`,
+          sourceId: c.id,
+        });
         if (!isFirst) {
           toast({
             title: "Challenge complete!",
@@ -144,8 +181,15 @@ export function useChallengeNotifications() {
         if (msLeft > 0 && msLeft <= ENDING_WINDOW_MS) {
           if (endingSeen.has(c.id)) continue;
           endingSeen.add(c.id);
+          const hoursLeft = Math.max(1, Math.round(msLeft / 3_600_000));
+          writeInbox({
+            type: "challenge_ending",
+            title: "Challenge ending soon",
+            body: `"${c.title}" ends in ~${hoursLeft}h. Push for the podium!`,
+            link: `/challenges/${c.id}`,
+            sourceId: c.id,
+          });
           if (!isFirst) {
-            const hoursLeft = Math.max(1, Math.round(msLeft / 3_600_000));
             toast({
               title: "Challenge ending soon",
               description: `"${c.title}" ends in ~${hoursLeft}h. Push for the podium!`,

@@ -1697,6 +1697,15 @@ unread?: boolean;
 limit?: number;
 };
 
+export type UpsertNotificationBody = {
+  type: string;
+  title: string;
+  body?: string;
+  link?: string;
+  /** @nullable */
+  sourceId?: number | null;
+};
+
 export type GetUnreadNotificationCount200 = {
   count: number;
 };

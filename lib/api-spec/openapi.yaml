@@ -2298,6 +2298,37 @@ paths:
                 items:
                   $ref: "#/components/schemas/Notification"
 
+    post:
+      operationId: upsertNotification
+      tags: [notifications]
+      summary: Create an in-app notification for the current player (idempotent on type+sourceId)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, title]
+              properties:
+                type:     { type: string }
+                title:    { type: string }
+                body:     { type: string }
+                link:     { type: string }
+                sourceId: { type: ["integer", "null"] }
+      responses:
+        "200":
+          description: Already existed (deduped)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
   /notifications/unread-count:
     get:
       operationId: getUnreadNotificationCount

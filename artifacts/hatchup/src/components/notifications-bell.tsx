@@ -1,5 +1,5 @@
-import { useLocation } from "wouter";
-import { Bell, CheckCheck } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { Bell, CheckCheck, ChevronRight } from "lucide-react";
 import {
   useGetUnreadNotificationCount,
   getGetUnreadNotificationCountQueryKey,
@@ -95,7 +95,7 @@ export function NotificationsBell() {
             </button>
           )}
         </div>
-        <div className="max-h-[60vh] overflow-y-auto">
+        <div className="max-h-[55vh] overflow-y-auto">
           {items.length === 0 ? (
             <div className="px-4 py-8 text-center text-xs text-muted-foreground">
               You're all caught up.
@@ -129,6 +129,16 @@ export function NotificationsBell() {
               </button>
             ))
           )}
+        </div>
+        <div className="border-t border-border/40">
+          <Link href="/notifications">
+            <button
+              className="w-full px-3 py-2 text-[11px] uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-card/80 transition-colors inline-flex items-center justify-center gap-1"
+              data-testid="link-view-all-notifications"
+            >
+              View all <ChevronRight className="w-3 h-3" />
+            </button>
+          </Link>
         </div>
       </PopoverContent>
     </Popover>
