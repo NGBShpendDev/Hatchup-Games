@@ -348,7 +348,14 @@ export default function ChallengeDetail() {
         data: {
           playerId: player.id,
           content: victoryShareText,
-          postType: "streak_milestone",
+          postType: "tournament_win",
+          metadata: {
+            challengeId: Number(challengeId),
+            challengeTitle: challenge.title,
+            bracketSize,
+            boostedXp,
+            boostedCoins,
+          },
         },
       });
     } catch {

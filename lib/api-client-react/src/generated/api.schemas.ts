@@ -1168,6 +1168,16 @@ export interface RespondToInviteBody {
   status: RespondToInviteBodyStatus;
 }
 
+/**
+ * Structured payload that depends on `postType`. For
+`tournament_win`, expect `challengeId` (integer),
+`challengeTitle` (string), `bracketSize` (integer),
+`boostedXp` (integer), and `boostedCoins` (integer). May be
+null for post types that don't carry extra data.
+
+ */
+export type FeedPostMetadata = { [key: string]: unknown } | null;
+
 export type FeedPostReactionCounts = {
   like?: number;
   encourage?: number;
@@ -1211,6 +1221,13 @@ export interface FeedPost {
   engagementScore: number;
   viewCount: number;
   createdAt: string;
+  /** Structured payload that depends on `postType`. For
+  `tournament_win`, expect `challengeId` (integer),
+  `challengeTitle` (string), `bracketSize` (integer),
+  `boostedXp` (integer), and `boostedCoins` (integer). May be
+  null for post types that don't carry extra data.
+   */
+  metadata?: FeedPostMetadata;
   reactionCounts: FeedPostReactionCounts;
   commentCount: number;
   /** @nullable */
@@ -1425,6 +1442,14 @@ export interface ModerationError {
   flaggedTerms: string[];
 }
 
+/**
+ * Structured payload that depends on `postType`. See `FeedPost.metadata`
+for the per-type shape (e.g. `tournament_win` carries `challengeId`,
+`challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`).
+
+ */
+export type CreatePostInputMetadata = { [key: string]: unknown } | null;
+
 export interface CreatePostInput {
   playerId: number;
   /**
@@ -1435,6 +1460,11 @@ export interface CreatePostInput {
   mediaUrl?: string;
   postType?: string;
   creatureId?: number;
+  /** Structured payload that depends on `postType`. See `FeedPost.metadata`
+  for the per-type shape (e.g. `tournament_win` carries `challengeId`,
+  `challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`).
+   */
+  metadata?: CreatePostInputMetadata;
 }
 
 export type ReactToPostInputReactionType = typeof ReactToPostInputReactionType[keyof typeof ReactToPostInputReactionType];

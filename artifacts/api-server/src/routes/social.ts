@@ -58,6 +58,7 @@ const POST_REWARDS: Record<string, { xp: number; energy: number }> = {
   transformation: { xp: 30, energy: 20 },
   workout_stat: { xp: 15, energy: 8 },
   hatch_moment: { xp: 20, energy: 12 },
+  tournament_win: { xp: 40, energy: 25 },
 };
 
 // ── Creator badge threshold ─────────────────────────────────────────────────
@@ -170,6 +171,7 @@ async function enrichPost(
     engagementScore: post.engagementScore,
     viewCount: post.viewCount,
     createdAt: post.createdAt.toISOString(),
+    metadata: (post.metadata as Record<string, unknown> | null) ?? null,
     reactionCounts,
     commentCount,
     repostCount,
@@ -309,7 +311,7 @@ router.post("/social/posts", socialWriteLimiter, requireAuth, attachPlayer, bloc
   const body = CreatePostBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
-  const { content, mediaUrl, postType = "general", creatureId } = body.data;
+  const { content, mediaUrl, postType = "general", creatureId, metadata } = body.data;
 
   // Validate the creature belongs to this player if provided
   if (creatureId) {
@@ -339,6 +341,7 @@ router.post("/social/posts", socialWriteLimiter, requireAuth, attachPlayer, bloc
     creatureId: creatureId ?? undefined,
     xpEarned: rewards.xp,
     energyEarned: rewards.energy,
+    metadata: metadata ?? undefined,
   }).returning();
 
   // Award XP to player

@@ -4800,6 +4800,16 @@ components:
         engagementScore: { type: integer }
         viewCount:       { type: integer }
         createdAt:       { type: string }
+        metadata:
+          description: |
+            Structured payload that depends on `postType`. For
+            `tournament_win`, expect `challengeId` (integer),
+            `challengeTitle` (string), `bracketSize` (integer),
+            `boostedXp` (integer), and `boostedCoins` (integer). May be
+            null for post types that don't carry extra data.
+          nullable: true
+          type: object
+          additionalProperties: true
         reactionCounts:
           type: object
           properties:
@@ -5105,6 +5115,14 @@ components:
         mediaUrl:   { type: string }
         postType:   { type: string }
         creatureId: { type: integer }
+        metadata:
+          description: |
+            Structured payload that depends on `postType`. See `FeedPost.metadata`
+            for the per-type shape (e.g. `tournament_win` carries `challengeId`,
+            `challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`).
+          nullable: true
+          type: object
+          additionalProperties: true
 
     ReactToPostInput:
       type: object

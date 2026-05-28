@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp, unique, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, unique, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -14,6 +14,7 @@ export const postsTable = pgTable("posts", {
   isFlagged: boolean("is_flagged").notNull().default(false),
   engagementScore: integer("engagement_score").notNull().default(0),
   viewCount: integer("view_count").notNull().default(0),
+  metadata: jsonb("metadata"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -2175,6 +2175,7 @@ export const GetSocialFeedResponse = zod.object({
   "engagementScore": zod.number(),
   "viewCount": zod.number(),
   "createdAt": zod.string(),
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). May be\nnull for post types that don\'t carry extra data.\n'),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),
   "encourage": zod.number().optional(),
@@ -2273,7 +2274,8 @@ export const CreatePostBody = zod.object({
   "content": zod.string().min(1).max(createPostBodyContentMax),
   "mediaUrl": zod.string().optional(),
   "postType": zod.string().optional(),
-  "creatureId": zod.number().optional()
+  "creatureId": zod.number().optional(),
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. See `FeedPost.metadata`\nfor the per-type shape (e.g. `tournament_win` carries `challengeId`,\n`challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`).\n')
 })
 
 
@@ -2305,6 +2307,7 @@ export const GetPostResponse = zod.object({
   "engagementScore": zod.number(),
   "viewCount": zod.number(),
   "createdAt": zod.string(),
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). May be\nnull for post types that don\'t carry extra data.\n'),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),
   "encourage": zod.number().optional(),
@@ -2614,6 +2617,7 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "engagementScore": zod.number(),
   "viewCount": zod.number(),
   "createdAt": zod.string(),
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). May be\nnull for post types that don\'t carry extra data.\n'),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),
   "encourage": zod.number().optional(),
@@ -2656,6 +2660,7 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "engagementScore": zod.number(),
   "viewCount": zod.number(),
   "createdAt": zod.string(),
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). May be\nnull for post types that don\'t carry extra data.\n'),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),
   "encourage": zod.number().optional(),
@@ -2879,6 +2884,7 @@ export const GetDailyMemoryResponse = zod.union([zod.object({
   "engagementScore": zod.number(),
   "viewCount": zod.number(),
   "createdAt": zod.string(),
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). May be\nnull for post types that don\'t carry extra data.\n'),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),
   "encourage": zod.number().optional(),
