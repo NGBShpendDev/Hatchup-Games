@@ -20,9 +20,49 @@ import { motion } from "framer-motion";
 import { ReportBlockMenu } from "@/components/report-block-menu";
 import { SafetyBanner } from "@/components/safety-banner";
 
+const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+
+const RARITY_GLOW: Record<string, string> = {
+  Common:    "",
+  Rare:      "shadow-[0_0_6px_rgba(59,130,246,0.7)]",
+  Epic:      "shadow-[0_0_6px_rgba(147,51,234,0.8)]",
+  Legendary: "shadow-[0_0_8px_rgba(234,179,8,0.9)]",
+  Mythic:    "shadow-[0_0_8px_rgba(236,72,153,0.9)]",
+  Ancient:   "shadow-[0_0_8px_rgba(249,115,22,0.9)]",
+  Celestial: "shadow-[0_0_10px_rgba(34,211,238,0.95)]",
+};
+
+const ARTIFACT_EMOJIS: Record<string, string> = {
+  ember_spark:"🔥",bronze_strider:"🥾",iron_pact:"⚙️",flame_keeper:"🕯️",crystal_horizon:"💎",
+  iron_fist:"✊",steel_resolve:"🛡️",thunderstride:"⚡",iron_devotee:"💪",steel_form:"🗿",
+  leg_day_legend:"🦵",centurion_flame:"👑",marathon_spirit:"🏃",million_paces:"🌍",phoenix_core:"🦅",
+  obsidian_sovereign:"⚫",stellar_epoch:"⭐",void_whisper:"🌑",agile_phantom:"🐆",eternal_vigil:"🌙",
+};
+
+interface OwnedArtifact {
+  id: number;
+  name: string;
+  rarity: string;
+  imageSlug: string;
+  isEquipped: boolean;
+  isFeatured: boolean;
+}
+
 export default function Social() {
   const { playerId } = usePlayer();
   const pid = playerId ?? 0;
+
+  const { data: myArtifacts } = useQuery<OwnedArtifact[]>({
+    queryKey: ["my-artifacts", pid],
+    queryFn: () => fetch(`${BASE}/api/players/me/artifacts`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!playerId,
+  });
+
+  // Top 3: featured first, then equipped, then most recently earned
+  const showcaseArtifacts = (myArtifacts ?? [])
+    .sort((a, b) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0) || (b.isEquipped ? 1 : 0) - (a.isEquipped ? 1 : 0))
+    .slice(0, 3);
+
   const { data: leaderboard, isLoading: isLoadingLeaderboard } = useQuery({
     queryKey: ["leaderboard", "global"],
     queryFn: async () => {
@@ -56,6 +96,26 @@ export default function Social() {
             Compete, collaborate, and connect with players around the globe.
           </p>
         </div>
+
+        {/* My Artifact Showcase Strip */}
+        {showcaseArtifacts.length > 0 && (
+          <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-4">
+            <span className="text-xs font-black text-muted-foreground uppercase tracking-wider shrink-0">My Relics</span>
+            <div className="flex gap-2 flex-1">
+              {showcaseArtifacts.map(artifact => (
+                <motion.div
+                  key={artifact.id}
+                  whileHover={{ scale: 1.1 }}
+                  className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl border border-border/60 bg-muted/30 ${RARITY_GLOW[artifact.rarity] ?? ""}`}
+                  title={artifact.name}
+                >
+                  {ARTIFACT_EMOJIS[artifact.imageSlug] ?? "🏺"}
+                </motion.div>
+              ))}
+            </div>
+            <span className="text-xs text-muted-foreground shrink-0 font-bold">{myArtifacts?.length ?? 0} earned</span>
+          </div>
+        )}
 
         <Tabs defaultValue="leaderboard" className="w-full">
           <TabsList className="w-full grid grid-cols-4 bg-muted/50 p-1 rounded-2xl mb-8">

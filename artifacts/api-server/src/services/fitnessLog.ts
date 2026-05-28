@@ -9,6 +9,7 @@ import {
 import { eq, and, gte } from "drizzle-orm";
 import { checkAndAwardBadges, type BadgeDefinition } from "./badgeService";
 import { awardFitnessBarXp, checkAndAwardArtifacts } from "./artifactService";
+import { logger } from "../lib/logger";
 
 export const STRENGTH_TYPES = new Set(["pushups", "burpees", "squats", "pullups", "planks", "situps"]);
 
@@ -328,8 +329,13 @@ export async function logFitnessActivity(
   });
 
   // Award fitness bar XP and check artifact milestones
-  await awardFitnessBarXp(playerId, type, value).catch(() => {});
-  const newArtifacts = await checkAndAwardArtifacts(playerId, updatedPlayer.username).catch(() => []);
+  await awardFitnessBarXp(playerId, type, value).catch(err => {
+    logger.error({ err, playerId, type, value }, "awardFitnessBarXp failed");
+  });
+  const newArtifacts = await checkAndAwardArtifacts(playerId, updatedPlayer.username).catch(err => {
+    logger.error({ err, playerId }, "checkAndAwardArtifacts failed");
+    return [];
+  });
 
   return {
     fitnessXpEarned,

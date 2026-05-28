@@ -19,6 +19,21 @@ import { LevelUpOverlay } from "@/components/level-up-overlay";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
+const BAR_MINI_ICONS: Record<string, string> = {
+  strength: "💪", speed: "⚡", cardio: "🫀", recovery: "🌿",
+  consistency: "🔥", endurance: "🏔️", agility: "🐆", discipline: "🧘",
+};
+const BAR_MINI_COLORS: Record<string, string> = {
+  strength:    "from-red-500 to-orange-500",
+  speed:       "from-yellow-400 to-amber-500",
+  cardio:      "from-pink-500 to-rose-500",
+  recovery:    "from-green-400 to-emerald-500",
+  consistency: "from-orange-500 to-yellow-500",
+  endurance:   "from-blue-500 to-indigo-500",
+  agility:     "from-purple-500 to-violet-500",
+  discipline:  "from-teal-400 to-cyan-500",
+};
+
 const RARITY_NOTIF_STYLES: Record<string, string> = {
   Mythic:    "bg-pink-950/60 border-pink-500/60 text-pink-300",
   Ancient:   "bg-orange-950/60 border-orange-500/60 text-orange-300",
@@ -59,6 +74,12 @@ export default function Home() {
     queryKey: ["artifact-world-notifications"],
     queryFn: () => fetch(`${BASE}/api/artifacts/world-notifications?limit=5`, { credentials: "include" }).then(r => r.json()),
     refetchInterval: 60_000,
+    enabled: !!playerId,
+  });
+
+  const { data: fitnessBars } = useQuery<Array<{ barType: string; level: number; xp: number; nextLevelXp: number; xpInCurrentLevel: number; progressPct: number }>>({
+    queryKey: ["fitness-bars", pid],
+    queryFn: () => fetch(`${BASE}/api/players/me/fitness-bars`, { credentials: "include" }).then(r => r.json()),
     enabled: !!playerId,
   });
 
@@ -294,6 +315,33 @@ export default function Home() {
               <ChevronRight className="w-4 h-4 text-yellow-500" />
             </motion.div>
           </Link>
+        )}
+
+        {/* Fitness Bars Mini-Dashboard */}
+        {fitnessBars && fitnessBars.length > 0 && (
+          <section>
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground">Fitness Bars</h2>
+              <Link href="/artifacts" className="text-xs font-bold text-primary hover:underline">Museum →</Link>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5">
+              {fitnessBars.map(bar => (
+                <div key={bar.barType} className="bg-muted/40 rounded-xl p-2 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs">{BAR_MINI_ICONS[bar.barType] ?? "💪"}</span>
+                    <span className="text-[10px] font-black text-white">{bar.level}</span>
+                  </div>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full bg-gradient-to-r ${BAR_MINI_COLORS[bar.barType] ?? "from-primary to-primary"}`}
+                      style={{ width: `${bar.progressPct}%` }}
+                    />
+                  </div>
+                  <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wide truncate">{bar.barType}</p>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         {/* Quick Actions */}

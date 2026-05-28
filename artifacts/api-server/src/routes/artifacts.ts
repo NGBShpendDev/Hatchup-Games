@@ -24,17 +24,22 @@ router.get("/artifacts", requireAuth, attachPlayer, async (req, res) => {
   const result = allArtifacts.map(a => {
     const playerOwned = ownedMap.get(a.id);
     const discovered = !!playerOwned;
-    const isHiddenUndiscovered = a.isHidden && !discovered;
+    // ALL undiscovered artifacts appear as silhouettes — not just hidden ones
+    const mask = !discovered;
 
     return {
       id: a.id,
-      name: isHiddenUndiscovered ? "???" : a.name,
-      lore: isHiddenUndiscovered ? "Unlock this hidden artifact to reveal its lore." : a.lore,
+      name: mask ? "???" : a.name,
+      lore: mask
+        ? (a.isHidden
+          ? "A secret artifact. Keep training to reveal it."
+          : "You haven't earned this artifact yet. Keep pushing your limits.")
+        : a.lore,
       rarity: a.rarity,
       type: a.type,
-      imageSlug: isHiddenUndiscovered ? "mystery" : a.imageSlug,
+      imageSlug: mask ? "mystery" : a.imageSlug,
       isHidden: a.isHidden,
-      abilities: isHiddenUndiscovered ? [] : (a.abilities as unknown[]),
+      abilities: mask ? [] : (a.abilities as unknown[]),
       discovered,
       isEquipped: playerOwned?.isEquipped ?? false,
       isFeatured: playerOwned?.isFeatured ?? false,
