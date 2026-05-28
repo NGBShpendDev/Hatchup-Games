@@ -11,6 +11,10 @@ import {
   useReactToPost,
   useDeletePost,
   useFollowPlayer,
+  useGetPlayerSocialProfile,
+  getGetPlayerSocialProfileQueryKey,
+  useListMutualFollowers,
+  getListMutualFollowersQueryKey,
   useDiscoverPlayers,
   getDiscoverPlayersQueryKey,
   useSearchDiscoverablePlayers,
@@ -81,6 +85,14 @@ function ProfileModal({
   const followPlayer = useFollowPlayer();
   const qc = useQueryClient();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const [mutualSheetOpen, setMutualSheetOpen] = useState(false);
+
+  function handleViewMutualProfile(targetId: number) {
+    setMutualSheetOpen(false);
+    onClose();
+    setLocation(`/players/${targetId}`);
+  }
 
   async function handleFollow() {
     await followPlayer.mutateAsync({ data: { followerId: viewerId, followeeId: profileId } });
@@ -89,6 +101,7 @@ function ProfileModal({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto rounded-3xl">
         <DialogHeader>
@@ -190,7 +203,7 @@ function ProfileModal({
                             <button
                               className="text-primary hover:underline"
                               data-testid="link-mutual-followers-more"
-                              onClick={() => toast({ title: `${extra} more mutual follower${extra === 1 ? "" : "s"}`, description: "Tap their profiles from the feed to see more." })}
+                              onClick={() => setMutualSheetOpen(true)}
                             >
                               and {extra} {extra === 1 ? "other" : "others"}
                             </button>
@@ -257,6 +270,152 @@ function ProfileModal({
         ) : null}
       </DialogContent>
     </Dialog>
+    <MutualFollowersSheet
+      profileId={profileId}
+      viewerId={viewerId}
+      open={mutualSheetOpen}
+      onClose={() => setMutualSheetOpen(false)}
+      onViewProfile={handleViewMutualProfile}
+    />
+    </>
+  );
+}
+
+function MutualFollowersSheet({
+  profileId,
+  viewerId,
+  open,
+  onClose,
+  onViewProfile,
+}: {
+  profileId: number;
+  viewerId: number;
+  open: boolean;
+  onClose: () => void;
+  onViewProfile: (pid: number) => void;
+}) {
+  const [cursor, setCursor] = useState(0);
+  const [accumulated, setAccumulated] = useState<Array<{
+    id: number;
+    username: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    creatorBadge: string | null;
+  }>>([]);
+
+  useEffect(() => {
+    if (open) {
+      setCursor(0);
+      setAccumulated([]);
+    }
+  }, [open, profileId, viewerId]);
+
+  const { data, isLoading, isFetching } = useListMutualFollowers(
+    profileId,
+    { viewerId, cursor, limit: 20 },
+    {
+      query: {
+        queryKey: getListMutualFollowersQueryKey(profileId, { viewerId, cursor, limit: 20 }),
+        enabled: open && !!profileId && !!viewerId && profileId !== viewerId,
+      },
+    },
+  );
+
+  useEffect(() => {
+    if (!data) return;
+    setAccumulated(prev => {
+      const seen = new Set(prev.map(p => p.id));
+      const next = [...prev];
+      for (const p of data.players) {
+        if (!seen.has(p.id)) {
+          next.push(p);
+          seen.add(p.id);
+        }
+      }
+      return next;
+    });
+  }, [data]);
+
+  const total = data?.total ?? accumulated.length;
+  const hasMore = data?.nextCursor != null;
+
+  return (
+    <Sheet open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-3xl" data-testid="sheet-mutual-followers">
+        <SheetHeader>
+          <SheetTitle className="text-lg font-black flex items-center gap-2">
+            <Users className="w-4 h-4 text-primary" />
+            Mutual followers
+            {total > 0 && (
+              <span className="text-xs font-bold text-muted-foreground">({total})</span>
+            )}
+          </SheetTitle>
+        </SheetHeader>
+
+        <div className="mt-4 space-y-2">
+          {isLoading && accumulated.length === 0 ? (
+            <>
+              <Skeleton className="h-14 w-full rounded-2xl" />
+              <Skeleton className="h-14 w-full rounded-2xl" />
+              <Skeleton className="h-14 w-full rounded-2xl" />
+            </>
+          ) : accumulated.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No mutual followers found.
+            </p>
+          ) : (
+            accumulated.map(m => (
+              <div
+                key={m.id}
+                className="flex items-center gap-3 bg-muted/30 border border-border/40 rounded-2xl p-3"
+                data-testid={`row-mutual-follower-${m.id}`}
+              >
+                <Avatar className="h-10 w-10 border border-primary/40">
+                  <AvatarImage src={m.avatarUrl ?? undefined} />
+                  <AvatarFallback className="font-black text-xs">
+                    {(m.username ?? "?").substring(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-black text-sm truncate">{m.displayName ?? m.username}</p>
+                    {m.creatorBadge && (
+                      <Badge className="bg-gradient-to-r from-yellow-500 to-amber-400 text-black text-[9px] font-black px-1 py-0">
+                        <Award className="w-2 h-2 mr-0.5" /> Creator
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground truncate">@{m.username}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-xl font-bold text-xs h-8"
+                  data-testid={`button-view-mutual-follower-${m.id}`}
+                  onClick={() => onViewProfile(m.id)}
+                >
+                  View profile
+                </Button>
+              </div>
+            ))
+          )}
+
+          {hasMore && (
+            <Button
+              variant="ghost"
+              className="w-full rounded-xl font-bold mt-2"
+              data-testid="button-load-more-mutual-followers"
+              disabled={isFetching}
+              onClick={() => {
+                if (data?.nextCursor != null) setCursor(data.nextCursor);
+              }}
+            >
+              {isFetching ? "Loading..." : "Load more"}
+            </Button>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 

@@ -711,6 +711,67 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
   });
 });
 
+// ── GET /social/players/:id/mutual-followers ───────────────────────────────
+
+router.get("/social/players/:id/mutual-followers", requireAuth, attachPlayer, async (req, res) => {
+  const id = Number(req.params.id);
+  const viewerId = Number(req.query.viewerId);
+  const cursor = Math.max(0, Number(req.query.cursor) || 0);
+  const limit = Math.min(Math.max(1, Number(req.query.limit) || 20), 100);
+
+  if (!Number.isFinite(id) || !Number.isFinite(viewerId)) {
+    res.status(400).json({ error: "id and viewerId are required" });
+    return;
+  }
+
+  if (viewerId === id) {
+    res.json({ players: [], total: 0, nextCursor: null });
+    return;
+  }
+
+  const [profileFollowers, viewerFollowsRows] = await Promise.all([
+    db.query.playerFollowsTable.findMany({ where: eq(playerFollowsTable.followeeId, id) }),
+    db.query.playerFollowsTable.findMany({ where: eq(playerFollowsTable.followerId, viewerId) }),
+  ]);
+
+  const viewerFollows = new Set(viewerFollowsRows.map(f => f.followeeId));
+  const mutualIds = profileFollowers
+    .map(f => f.followerId)
+    .filter(fid => fid !== viewerId && viewerFollows.has(fid));
+
+  const total = mutualIds.length;
+  const pageIds = mutualIds.slice(cursor, cursor + limit);
+  const nextOffset = cursor + pageIds.length;
+  const nextCursor = nextOffset < total ? nextOffset : null;
+
+  let players: Array<{
+    id: number;
+    username: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    creatorBadge: string | null;
+  }> = [];
+  if (pageIds.length > 0) {
+    const rows = await db.query.playersTable.findMany({
+      where: inArray(playersTable.id, pageIds),
+    });
+    const map = new Map(rows.map(p => [p.id, p]));
+    players = pageIds.flatMap(pid => {
+      const p = map.get(pid);
+      if (!p) return [];
+      return [{
+        id: p.id,
+        username: p.username,
+        displayName: p.displayName ?? null,
+        avatarUrl: p.avatarUrl ?? null,
+        creatorBadge: p.creatorBadge ?? null,
+      }];
+    });
+  }
+
+  res.json({ players, total, nextCursor });
+});
+
 // ── GET /social/players/:id/followers ──────────────────────────────────────
 
 router.get("/social/players/:id/followers", requireAuth, attachPlayer, async (req, res) => {

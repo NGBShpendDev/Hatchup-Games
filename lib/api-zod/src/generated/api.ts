@@ -2524,6 +2524,35 @@ export const ListFollowersResponse = zod.array(ListFollowersResponseItem)
 
 
 /**
+ * @summary List all mutual followers (followers of this player that the viewer also follows)
+ */
+export const ListMutualFollowersParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const listMutualFollowersQueryCursorDefault = 0;
+export const listMutualFollowersQueryLimitDefault = 20;
+
+export const ListMutualFollowersQueryParams = zod.object({
+  "viewerId": zod.coerce.number(),
+  "cursor": zod.coerce.number().default(listMutualFollowersQueryCursorDefault).describe('Offset (number of items to skip).'),
+  "limit": zod.coerce.number().default(listMutualFollowersQueryLimitDefault)
+})
+
+export const ListMutualFollowersResponse = zod.object({
+  "players": zod.array(zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
+})),
+  "total": zod.number(),
+  "nextCursor": zod.number().nullable()
+})
+
+
+/**
  * @summary List players a player is following
  */
 export const ListFollowingParams = zod.object({

@@ -2080,6 +2080,41 @@ paths:
                 items:
                   $ref: "#/components/schemas/PlayerStub"
 
+  /social/players/{id}/mutual-followers:
+    get:
+      operationId: listMutualFollowers
+      tags: [social]
+      summary: List all mutual followers (followers of this player that the viewer also follows)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: viewerId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          description: Offset (number of items to skip).
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Paginated mutual followers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MutualFollowersPage"
+
   /social/players/{id}/following:
     get:
       operationId: listFollowing
@@ -4265,6 +4300,17 @@ components:
           description: Groups that both the viewer and this player are members of.
           items:
             $ref: "#/components/schemas/SharedGroup"
+
+    MutualFollowersPage:
+      type: object
+      required: [players, total, nextCursor]
+      properties:
+        players:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlayerStub"
+        total:      { type: integer }
+        nextCursor: { type: ["integer", "null"] }
 
     SharedGroup:
       type: object

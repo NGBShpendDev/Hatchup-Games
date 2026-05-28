@@ -114,6 +114,7 @@ import type {
   ListHatchlingsParams,
   ListIdentityPaths200,
   ListItemsParams,
+  ListMutualFollowersParams,
   ListMyGroupsParams,
   ListNotificationsParams,
   ListRealmsParams,
@@ -128,6 +129,7 @@ import type {
   MealPlan,
   MemoryPost,
   ModerationError,
+  MutualFollowersPage,
   Notification,
   NutritionWeeklySummary,
   OnboardingInput,
@@ -7388,6 +7390,95 @@ export function useListFollowers<TData = Awaited<ReturnType<typeof listFollowers
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListFollowersQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListMutualFollowersUrl = (id: number,
+    params: ListMutualFollowersParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/social/players/${id}/mutual-followers?${stringifiedParams}` : `/api/social/players/${id}/mutual-followers`
+}
+
+/**
+ * @summary List all mutual followers (followers of this player that the viewer also follows)
+ */
+export const listMutualFollowers = async (id: number,
+    params: ListMutualFollowersParams, options?: RequestInit): Promise<MutualFollowersPage> => {
+
+  return customFetch<MutualFollowersPage>(getListMutualFollowersUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMutualFollowersQueryKey = (id: number,
+    params?: ListMutualFollowersParams,) => {
+    return [
+    `/api/social/players/${id}/mutual-followers`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMutualFollowersQueryOptions = <TData = Awaited<ReturnType<typeof listMutualFollowers>>, TError = ErrorType<unknown>>(id: number,
+    params: ListMutualFollowersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMutualFollowers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMutualFollowersQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMutualFollowers>>> = ({ signal }) => listMutualFollowers(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMutualFollowers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMutualFollowersQueryResult = NonNullable<Awaited<ReturnType<typeof listMutualFollowers>>>
+export type ListMutualFollowersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all mutual followers (followers of this player that the viewer also follows)
+ */
+
+export function useListMutualFollowers<TData = Awaited<ReturnType<typeof listMutualFollowers>>, TError = ErrorType<unknown>>(
+ id: number,
+    params: ListMutualFollowersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMutualFollowers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMutualFollowersQueryOptions(id,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

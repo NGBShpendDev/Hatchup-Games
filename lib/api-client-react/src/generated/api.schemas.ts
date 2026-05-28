@@ -1271,6 +1271,13 @@ export interface PlayerSocialProfile {
   sharedGroups: SharedGroup[];
 }
 
+export interface MutualFollowersPage {
+  players: PlayerStub[];
+  total: number;
+  /** @nullable */
+  nextCursor: number | null;
+}
+
 export interface ViewResult {
   viewCount: number;
   counted: boolean;
@@ -1820,6 +1827,15 @@ limit?: number;
 
 export type GetPlayerSocialProfileParams = {
 viewerId?: number;
+};
+
+export type ListMutualFollowersParams = {
+viewerId: number;
+/**
+ * Offset (number of items to skip).
+ */
+cursor?: number;
+limit?: number;
 };
 
 export type GetDailyMemoryParams = {
