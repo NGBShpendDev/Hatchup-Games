@@ -4289,7 +4289,10 @@ export const ListBattleRivalsResponseItem = zod.object({
   "losses": zod.number(),
   "draws": zod.number(),
   "lastBattleAt": zod.coerce.date(),
-  "lastBattleId": zod.number()
+  "lastBattleId": zod.number(),
+  "lastEloChange": zod.number().describe('ELO swing from the viewer\'s most recent battle vs this rival.'),
+  "streakType": zod.enum(['W', 'L', 'D']).describe('Outcome type of the current head-to-head streak.'),
+  "streakCount": zod.number().describe('Length of the current head-to-head streak.')
 })
 export const ListBattleRivalsResponse = zod.array(ListBattleRivalsResponseItem)
 

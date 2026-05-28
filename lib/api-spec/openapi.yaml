@@ -6527,6 +6527,9 @@ components:
         - draws
         - lastBattleAt
         - lastBattleId
+        - lastEloChange
+        - streakType
+        - streakCount
       properties:
         opponentId:          { type: integer }
         opponentUsername:    { type: ["string", "null"] }
@@ -6537,6 +6540,9 @@ components:
         draws:               { type: integer }
         lastBattleAt:        { type: string, format: date-time }
         lastBattleId:        { type: integer }
+        lastEloChange:       { type: integer, description: "ELO swing from the viewer's most recent battle vs this rival." }
+        streakType:          { type: string, enum: [W, L, D], description: "Outcome type of the current head-to-head streak." }
+        streakCount:         { type: integer, description: "Length of the current head-to-head streak." }
 
     BattleRematchCreateBody:
       type: object

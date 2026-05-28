@@ -32,6 +32,7 @@ import Records from "@/pages/records";
 import Nutrition from "@/pages/nutrition";
 import Battle from "@/pages/battle";
 import RivalsDetail from "@/pages/rivals-detail";
+import RivalsPage from "@/pages/rivals";
 import ArtifactsPage from "@/pages/artifacts";
 import Challenges from "@/pages/challenges";
 import ChallengeDetail from "@/pages/challenge-detail";
@@ -250,6 +251,7 @@ function AppRoutes() {
         <Route path="/compete/battle" component={Battle} />
         <Route path="/compete/race" component={Race} />
         <Route path="/compete/rivals/:opponentId" component={RivalsDetail} />
+        <Route path="/compete/rivals" component={RivalsPage} />
         <Route path="/rewards" component={Rewards} />
         <Route path="/settings/privacy" component={SettingsPrivacy} />
         <Route path="/admin/reports" component={AdminReports} />

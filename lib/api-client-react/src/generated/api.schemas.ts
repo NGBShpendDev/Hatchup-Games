@@ -2292,6 +2292,18 @@ export interface BattleDetail {
   createdAt: string;
 }
 
+/**
+ * Outcome type of the current head-to-head streak.
+ */
+export type BattleRivalStreakType = typeof BattleRivalStreakType[keyof typeof BattleRivalStreakType];
+
+
+export const BattleRivalStreakType = {
+  W: 'W',
+  L: 'L',
+  D: 'D',
+} as const;
+
 export interface BattleRival {
   opponentId: number;
   /** @nullable */
@@ -2304,6 +2316,12 @@ export interface BattleRival {
   draws: number;
   lastBattleAt: string;
   lastBattleId: number;
+  /** ELO swing from the viewer's most recent battle vs this rival. */
+  lastEloChange: number;
+  /** Outcome type of the current head-to-head streak. */
+  streakType: BattleRivalStreakType;
+  /** Length of the current head-to-head streak. */
+  streakCount: number;
 }
 
 export interface BattleRematchCreateBody {

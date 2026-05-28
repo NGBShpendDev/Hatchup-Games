@@ -5,12 +5,15 @@ import {
   getGetMyChallengeInvitesQueryKey,
   useListChallenges,
   getListChallengesQueryKey,
+  useListPendingBattleRematches,
+  getListPendingBattleRematchesQueryKey,
   useUpsertNotification,
   getListNotificationsQueryKey,
   getGetUnreadNotificationCountQueryKey,
   type ChallengeListItem,
   type ChallengeInvite,
 } from "@workspace/api-client-react";
+import { usePlayer } from "@/lib/playerContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "./use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -53,6 +56,22 @@ export function usePendingInviteCount(): number {
     },
   });
   return data?.length ?? 0;
+}
+
+export function usePendingRematchInviteCount(): number {
+  const { playerId } = usePlayer();
+  const pid = playerId ?? 0;
+  const { data } = useListPendingBattleRematches({
+    query: {
+      queryKey: getListPendingBattleRematchesQueryKey(),
+      enabled: !!pid,
+      refetchInterval: INVITE_POLL_MS,
+      refetchOnWindowFocus: true,
+      staleTime: 10_000,
+    },
+  });
+  if (!data || !pid) return 0;
+  return data.filter((inv) => inv.toPlayerId === pid).length;
 }
 
 export function useChallengeNotifications() {

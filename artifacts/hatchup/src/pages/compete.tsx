@@ -12,7 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { Swords, Trophy, Zap, Crown, Salad, Dumbbell, Bot, Flame } from "lucide-react";
+import { Swords, Trophy, Zap, Crown, Salad, Dumbbell, Bot, Flame, Inbox } from "lucide-react";
+import { usePendingRematchInviteCount } from "@/hooks/use-challenge-notifications";
 import { ForYouStrip } from "@/components/for-you-strip";
 import { ErrorCard } from "@/components/error-card";
 import { useState } from "react";
@@ -73,6 +74,7 @@ export default function Compete() {
   const [, navigate] = useLocation();
   const [rematchTarget, setRematchTarget] = useState<RivalItem | null>(null);
   const [sendingRematch, setSendingRematch] = useState(false);
+  const pendingRematchCount = usePendingRematchInviteCount();
 
   const { data: modes, isLoading, isError, refetch } = useListGameModes({
     query: { queryKey: getListGameModesQueryKey() }
@@ -193,6 +195,37 @@ export default function Compete() {
           </div>
         </motion.div>
 
+        {/* ── Pending rematch banner ── */}
+        {pendingRematchCount > 0 && (
+          <Link href="/compete/rivals">
+            <button
+              type="button"
+              className="w-full text-left rounded-2xl border border-primary/40 bg-primary/10 hover:bg-primary/15 transition px-4 py-3 flex items-center gap-3"
+              data-testid="banner-pending-rematches"
+            >
+              <div className="relative">
+                <Inbox className="w-5 h-5 text-primary" />
+                <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-black flex items-center justify-center">
+                  {pendingRematchCount > 9 ? "9+" : pendingRematchCount}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-black text-sm">
+                  {pendingRematchCount === 1
+                    ? "1 rival wants a rematch"
+                    : `${pendingRematchCount} rivals want a rematch`}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Tap to accept, decline, or send your own challenge.
+                </p>
+              </div>
+              <span className="text-primary font-black text-xs uppercase tracking-wider">
+                Open
+              </span>
+            </button>
+          </Link>
+        )}
+
         {/* ── Recent battle history strip ── */}
         {battleHistory.length > 0 && (
           <div className="space-y-2">
@@ -219,9 +252,21 @@ export default function Compete() {
         {/* ── Rivalries ── */}
         {rivals.length > 0 && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Flame className="w-4 h-4 text-orange-400" />
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Your Rivalries</p>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Flame className="w-4 h-4 text-orange-400" />
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Your Rivalries</p>
+              </div>
+              <Link href="/compete/rivals">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="font-bold text-xs"
+                  data-testid="link-view-all-rivals"
+                >
+                  View all rivals
+                </Button>
+              </Link>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {rivals.map(r => {

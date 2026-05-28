@@ -1,14 +1,19 @@
 import { Link, useLocation } from "wouter";
 import { Home, Sparkles, Swords, MessageSquare, User } from "lucide-react";
 import { usePlayer } from "@/lib/playerContext";
-import { usePendingInviteCount } from "@/hooks/use-challenge-notifications";
+import {
+  usePendingInviteCount,
+  usePendingRematchInviteCount,
+} from "@/hooks/use-challenge-notifications";
 
 export function BottomNav() {
   const [location] = useLocation();
   const { player } = usePlayer();
   const hasPassiveXp = (player?.passiveXpSinceLastVisit ?? 0) > 0;
   const isChildMode = player?.accessibilityMode === "child";
-  const pendingInvites = usePendingInviteCount();
+  const pendingChallengeInvites = usePendingInviteCount();
+  const pendingRematchInvites = usePendingRematchInviteCount();
+  const pendingInvites = pendingChallengeInvites + pendingRematchInvites;
 
   // Unified 5-tile beginner nav per task spec:
   // Home, Hatchlings, Compete, Social, Profile.
