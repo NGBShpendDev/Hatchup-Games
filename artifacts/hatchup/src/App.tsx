@@ -8,6 +8,7 @@ import { handleAccountSuspendedError } from "@/lib/suspendedError";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PlayerProvider, usePlayer } from "@/lib/playerContext";
+import { useTimezoneSync } from "@/hooks/use-timezone-sync";
 import { SuspendedScreen } from "@/components/suspended-screen";
 
 import Landing from "@/pages/landing";
@@ -219,6 +220,7 @@ function PassiveXpBanner() {
 
 function AppRoutes() {
   const { player, isLoading, needsProfile, needsOnboarding, completeOnboarding } = usePlayer();
+  useTimezoneSync();
 
   if (isLoading) {
     return (
