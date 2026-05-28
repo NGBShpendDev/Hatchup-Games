@@ -91,7 +91,7 @@ const POST_TYPES = [
   { value: "hatch_moment", label: "Hatch Moment", icon: "🥚" },
 ];
 
-const REACTION_ICONS: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
+export const REACTION_ICONS: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
   like: { icon: <Heart className="w-4 h-4" />, label: "Like", color: "text-pink-500" },
   encourage: { icon: <Zap className="w-4 h-4" />, label: "Encourage", color: "text-yellow-500" },
   fire: { icon: <Flame className="w-4 h-4" />, label: "Fire", color: "text-orange-500" },
@@ -347,7 +347,7 @@ function PostCard({
   );
 }
 
-function ComposeSheet({
+export function ComposeSheet({
   open,
   onClose,
   playerId,
@@ -407,7 +407,10 @@ function ComposeSheet({
       setPostType("general");
       setCreatureId("none");
       setArDataUrl(null);
-      qc.invalidateQueries({ queryKey: getGetSocialFeedQueryKey({ playerId }) });
+      // Invalidate every variant of the feed query (home highlights uses
+      // limit:3, the main /social feed uses no params, etc.) by matching
+      // the shared URL prefix.
+      qc.invalidateQueries({ queryKey: ["/api/social/feed"] });
       onClose();
     } catch (err: any) {
       if (err?.response?.status === 422) {

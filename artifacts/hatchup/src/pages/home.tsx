@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { useGetPlayerDashboard, getGetPlayerDashboardQueryKey, useLogActivity, useGetSocialFeed, getGetSocialFeedQueryKey, useReactToPost } from "@workspace/api-client-react";
+import { ComposeSheet, REACTION_ICONS } from "@/pages/social";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -95,17 +96,20 @@ export default function Home() {
     { query: { queryKey: getGetSocialFeedQueryKey({ playerId: pid, limit: 3 }), enabled: !!playerId } }
   );
   const reactToPost = useReactToPost();
-  const handleHighlightReact = (postId: number) => {
+  const handleHighlightReact = (postId: number, reactionType: string) => {
     if (!playerId) return;
     reactToPost.mutate(
-      { id: postId, data: { playerId: pid, reactionType: "fire" as any } },
+      { id: postId, data: { playerId: pid, reactionType: reactionType as any } },
       {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetSocialFeedQueryKey({ playerId: pid, limit: 3 }) });
+          // Invalidate every social feed variant (home limit:3 AND main /social feed)
+          // so reactions update everywhere at once.
+          queryClient.invalidateQueries({ queryKey: ["/api/social/feed"] });
         },
       }
     );
   };
+  const [composeOpen, setComposeOpen] = useState(false);
 
   const HIGHLIGHT_POST_TYPE_ICONS: Record<string, string> = {
     general: "💬",
@@ -688,21 +692,44 @@ export default function Home() {
         </div>
 
         {/* Community Highlights */}
-        {socialFeed && socialFeed.posts && socialFeed.posts.length > 0 && (
-          <section>
-            <div className="flex justify-between items-end mb-3">
-              <h2 className="text-lg font-black flex items-center gap-2">
-                <Users className="w-4 h-4 text-primary" /> Community Highlights
-              </h2>
+        <section>
+          <div className="flex justify-between items-end mb-3">
+            <h2 className="text-lg font-black flex items-center gap-2">
+              <Users className="w-4 h-4 text-primary" /> Community Highlights
+            </h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setComposeOpen(true)}
+                className="text-xs font-bold text-primary flex items-center gap-1 hover:underline"
+                data-testid="button-home-compose"
+                aria-label="Share an update"
+              >
+                <PlusCircle className="w-3 h-3" /> Share
+              </button>
               <Link href="/social" className="text-xs font-bold text-primary flex items-center hover:underline">
                 See all <ChevronRight className="w-3 h-3" />
               </Link>
             </div>
+          </div>
+
+          {/* Inline compose entry */}
+          <button
+            onClick={() => setComposeOpen(true)}
+            className="w-full text-left mb-2 flex items-center gap-3 bg-card/60 hover:bg-card border border-border hover:border-primary/40 rounded-2xl p-3 transition-colors"
+            data-testid="button-home-compose-inline"
+          >
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/20 border border-primary/40 flex items-center justify-center font-black text-sm text-primary shrink-0">
+              {(dashboard.player.displayName || dashboard.player.username || "?")[0]?.toUpperCase()}
+            </div>
+            <span className="text-sm text-muted-foreground font-medium flex-1">
+              Share an update with the community...
+            </span>
+            <PlusCircle className="w-4 h-4 text-primary shrink-0" />
+          </button>
+
+          {socialFeed && socialFeed.posts && socialFeed.posts.length > 0 && (
             <div className="space-y-2">
               {socialFeed.posts.slice(0, 3).map((post: any) => {
-                const totalReactions = Object.values(post.reactionCounts ?? {}).reduce(
-                  (a: number, b: any) => a + (b as number), 0
-                ) as number;
                 const myReaction = post.myReaction as string | null;
                 const typeIcon = HIGHLIGHT_POST_TYPE_ICONS[post.postType] ?? "💬";
                 return (
@@ -710,50 +737,71 @@ export default function Home() {
                     key={post.id}
                     className="bg-card border-2 hover:border-primary/40 transition-colors overflow-hidden"
                   >
-                    <CardContent className="p-3 flex items-start gap-3">
-                      <Link href="/social" className="shrink-0">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/20 border border-primary/40 flex items-center justify-center font-black text-sm text-primary">
-                          {post.authorAvatar ? (
-                            <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full object-cover" />
-                          ) : (
-                            (post.authorName?.[0] ?? "?").toUpperCase()
-                          )}
-                        </div>
-                      </Link>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-0.5">
-                          <span className="font-black text-sm truncate">{post.authorName}</span>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1 shrink-0">
-                            <span>{typeIcon}</span>
-                            {(post.postType ?? "general").replace(/_/g, " ")}
-                          </span>
-                        </div>
-                        <Link href="/social">
-                          <p className="text-xs text-foreground/90 line-clamp-2 leading-snug cursor-pointer">
-                            {post.content}
-                          </p>
+                    <CardContent className="p-3 space-y-2">
+                      <div className="flex items-start gap-3">
+                        <Link href="/social" className="shrink-0">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/20 border border-primary/40 flex items-center justify-center font-black text-sm text-primary">
+                            {post.authorAvatar ? (
+                              <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full object-cover" />
+                            ) : (
+                              (post.authorName?.[0] ?? "?").toUpperCase()
+                            )}
+                          </div>
                         </Link>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className="font-black text-sm truncate">{post.authorName}</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1 shrink-0">
+                              <span>{typeIcon}</span>
+                              {(post.postType ?? "general").replace(/_/g, " ")}
+                            </span>
+                          </div>
+                          <Link href="/social">
+                            <p className="text-xs text-foreground/90 line-clamp-2 leading-snug cursor-pointer">
+                              {post.content}
+                            </p>
+                          </Link>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => handleHighlightReact(post.id)}
-                        disabled={reactToPost.isPending}
-                        className={`shrink-0 flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 border transition-colors ${
-                          myReaction === "fire"
-                            ? "bg-orange-500/20 border-orange-500/60 text-orange-400"
-                            : "bg-muted/40 border-border text-muted-foreground hover:border-orange-500/40 hover:text-orange-400"
-                        }`}
-                        aria-label="React with fire"
-                      >
-                        <Flame className="w-4 h-4" />
-                        <span className="text-[10px] font-black leading-none">{totalReactions}</span>
-                      </button>
+
+                      {/* Full reaction picker — matches /social PostCard */}
+                      <div className="flex items-center gap-1 pt-1 border-t border-border/30">
+                        {Object.entries(REACTION_ICONS).map(([type, cfg]) => {
+                          const count = (post.reactionCounts as Record<string, number>)?.[type] ?? 0;
+                          const isActive = myReaction === type;
+                          return (
+                            <button
+                              key={type}
+                              onClick={() => handleHighlightReact(post.id, type)}
+                              disabled={reactToPost.isPending}
+                              className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold transition-all ${
+                                isActive
+                                  ? `bg-primary/20 ${cfg.color} scale-105`
+                                  : "text-muted-foreground hover:bg-muted/50 hover:scale-105"
+                              }`}
+                              aria-label={`React with ${cfg.label}`}
+                              data-testid={`button-home-react-${type}-${post.id}`}
+                            >
+                              <span className={isActive ? cfg.color : ""}>{cfg.icon}</span>
+                              {count > 0 && <span>{count}</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </CardContent>
                   </Card>
                 );
               })}
             </div>
-          </section>
-        )}
+          )}
+        </section>
+
+        {/* Compose sheet — same modal used on /social */}
+        <ComposeSheet
+          open={composeOpen}
+          onClose={() => setComposeOpen(false)}
+          playerId={pid}
+        />
 
         {/* Badge Showcase */}
         {recentBadges.length > 0 && (
