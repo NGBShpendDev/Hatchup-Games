@@ -50,6 +50,7 @@ import SubscriptionPage from "@/pages/subscription";
 import PlayerProfile from "@/pages/player-profile";
 import FindPlayers from "@/pages/find-players";
 import ClubDetail from "@/pages/club-detail";
+import Events from "@/pages/events";
 import NotificationsPage from "@/pages/notifications";
 import PostDetail from "@/pages/post-detail";
 import { PageTransition } from "@/components/page-transition";
@@ -291,6 +292,7 @@ function AppRoutes() {
         <Route path="/challenges" component={Challenges} />
         <Route path="/family" component={FamilyPage} />
         <Route path="/subscription" component={SubscriptionPage} />
+        <Route path="/events" component={Events} />
         <Route path="/notifications" component={NotificationsPage} />
         <Route component={NotFound} />
       </Switch>
