@@ -244,13 +244,29 @@ router.get("/social/feed", requireAuth, attachPlayer, async (req, res) => {
   // enrichPost uses for comments.
   const hiddenIds = await getHiddenPlayerIds(playerId);
 
-  const allPosts = await db.query.postsTable.findMany({
+  const allPostsRaw = await db.query.postsTable.findMany({
     where: hiddenIds.length
       ? and(isNull(postsTable.deletedAt), notInArray(postsTable.playerId, hiddenIds))
       : isNull(postsTable.deletedAt),
     orderBy: [desc(postsTable.createdAt)],
     limit: 200,
   });
+
+  // Additional safety filter: drop posts authored by minor accounts. This is
+  // the read-side equivalent of `blockMinorSocialWrite` — minors aren't
+  // supposed to be writing public social posts, so any legacy/bypass content
+  // they may have produced should not surface in the main feed either.
+  const feedAuthorIds = [...new Set(allPostsRaw.map(p => p.playerId))];
+  const feedAuthorRows = feedAuthorIds.length
+    ? await db.query.playersTable.findMany({
+        where: inArray(playersTable.id, feedAuthorIds),
+        columns: { id: true, isMinor: true },
+      })
+    : [];
+  const feedMinorAuthorSet = new Set(
+    feedAuthorRows.filter(a => a.isMinor).map(a => a.id),
+  );
+  const allPosts = allPostsRaw.filter(p => !feedMinorAuthorSet.has(p.playerId));
 
   const nowMs = Date.now();
   const scored = allPosts.map(p => ({
