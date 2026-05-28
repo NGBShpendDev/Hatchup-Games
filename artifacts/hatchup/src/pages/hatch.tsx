@@ -252,8 +252,13 @@ export default function Hatch() {
           toast({ title: "🥚 New egg found!" });
           queryClient.invalidateQueries({ queryKey: getListEggsQueryKey({ playerId: pid, hatched: false }) });
         },
-        onError: () => {
-          toast({ title: "Couldn't find a new egg", description: "Try again in a moment.", variant: "destructive" });
+        onError: (err: unknown) => {
+          const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+          if (msg === "incubator_full") {
+            toast({ title: "Incubator full", description: "You can only hold 3 eggs at a time. Hatch one first!", variant: "destructive" });
+          } else {
+            toast({ title: "Couldn't find a new egg", description: "Try again in a moment.", variant: "destructive" });
+          }
         }
       }
     );

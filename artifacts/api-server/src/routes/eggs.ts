@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { eggsTable, hatchlingsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
 import {
   ListEggsQueryParams,
   GetEggParams,
@@ -249,6 +249,16 @@ router.post("/eggs/:id/hatch", requireAuth, attachPlayer, requirePlayerOwnership
 router.post("/eggs/incubate", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const body = AddEggBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
+
+  const INCUBATOR_CAP = 3;
+  const [{ value: activeEggCount }] = await db
+    .select({ value: count() })
+    .from(eggsTable)
+    .where(and(eq(eggsTable.playerId, body.data.playerId), eq(eggsTable.isHatched, false)));
+  if (activeEggCount >= INCUBATOR_CAP) {
+    res.status(400).json({ error: "incubator_full", message: "Your incubator is full. Hatch an egg to make room." });
+    return;
+  }
 
   const eggType = body.data.eggType ?? "balanced";
   const config = EGG_TYPE_CONFIG[eggType] ?? EGG_TYPE_CONFIG["balanced"];
