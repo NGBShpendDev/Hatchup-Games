@@ -15,7 +15,7 @@ import {
   groupsTable,
   userReportsTable,
 } from "@workspace/db";
-import { eq, and, desc, sql, or, ne, inArray, ilike, gte, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, desc, sql, or, ne, inArray, ilike, gte, isNull, isNotNull, notInArray } from "drizzle-orm";
 import { hardDeletePosts, RETENTION_DAYS } from "../services/postPurgeJob.ts";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
@@ -235,8 +235,15 @@ router.get("/social/feed", requireAuth, attachPlayer, async (req, res) => {
   });
   const followedIds = new Set(follows.map(f => f.followeeId));
 
+  // Hide posts (and reposts surfaced via engagement) authored by anyone the
+  // viewer has blocked, or who has blocked the viewer — same per-viewer model
+  // enrichPost uses for comments.
+  const hiddenIds = await getHiddenPlayerIds(playerId);
+
   const allPosts = await db.query.postsTable.findMany({
-    where: isNull(postsTable.deletedAt),
+    where: hiddenIds.length
+      ? and(isNull(postsTable.deletedAt), notInArray(postsTable.playerId, hiddenIds))
+      : isNull(postsTable.deletedAt),
     orderBy: [desc(postsTable.createdAt)],
     limit: 200,
   });
@@ -305,22 +312,25 @@ router.get("/social/trending", requireAuth, attachPlayer, async (req, res) => {
   }
 
   const postIds = recentViewRows.map(r => r.postId);
+  // Same per-viewer hiding as the feed: blocked-author posts should not show
+  // up in trending or count toward the surfaced engagement totals. Done at
+  // the DB layer so we don't pay for rows we'd just drop in memory.
+  const trendingHiddenIds = await getHiddenPlayerIds(playerId);
   const postsForWindowRaw = await db.query.postsTable.findMany({
     where: and(
       inArray(postsTable.id, postIds),
       eq(postsTable.isFlagged, false),
       isNull(postsTable.deletedAt),
+      ...(trendingHiddenIds.length
+        ? [notInArray(postsTable.playerId, trendingHiddenIds)]
+        : []),
     ),
   });
 
-  // Safety filters: exclude posts from players the viewer has blocked (or who
-  // have blocked the viewer) and posts authored by minor accounts. The latter
-  // is the read-side equivalent of `blockMinorSocialWrite` — minors aren't
+  // Additional safety filter: drop posts authored by minor accounts. This is
+  // the read-side equivalent of `blockMinorSocialWrite` — minors aren't
   // supposed to be writing public social posts, so any legacy/bypass content
   // they may have produced should not be amplified by the trending surface.
-  const hiddenIds = await getHiddenPlayerIds(playerId);
-  const hiddenSet = new Set(hiddenIds);
-
   const authorIds = [...new Set(postsForWindowRaw.map(p => p.playerId))];
   const authorRows = authorIds.length
     ? await db.query.playersTable.findMany({
@@ -333,7 +343,7 @@ router.get("/social/trending", requireAuth, attachPlayer, async (req, res) => {
   );
 
   const postsForWindow = postsForWindowRaw.filter(
-    p => !hiddenSet.has(p.playerId) && !minorAuthorSet.has(p.playerId),
+    p => !minorAuthorSet.has(p.playerId),
   );
 
   const viewsById = new Map(recentViewRows.map(r => [r.postId, r.recentViews]));
