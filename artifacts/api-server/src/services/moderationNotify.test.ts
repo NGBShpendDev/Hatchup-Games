@@ -114,7 +114,9 @@ describe("notifyModerationAction", () => {
     assert.equal(n.type, "account_suspended");
     assert.match(n.title, /suspended/i);
     assert.match(n.body, /Spamming chat/);
-    assert.equal(n.link, "/safety/guidelines");
+    // Suspend notifications deep-link to "/", which lands the user on the
+    // SuspendedScreen overlay where they can file an appeal.
+    assert.equal(n.link, "/");
   });
 
   it("uses fallback body copy when no reason is provided", async () => {
@@ -124,6 +126,8 @@ describe("notifyModerationAction", () => {
     assert.equal(n.type, "account_restored");
     assert.match(n.body, /reinstated/i);
     assert.doesNotMatch(n.body, /Reason:/);
+    // Unsuspend notifications send the player back to the app home.
+    assert.equal(n.link, "/");
   });
 
   it("uses the verify copy with link to /safety/guidelines", async () => {
@@ -143,7 +147,7 @@ describe("notifyModerationAction", () => {
     assert.equal(e.to, "a@b.test");
     assert.match(e.subject, /suspended/i);
     assert.match(e.html, /Spamming chat/);
-    assert.match(e.html, /\/safety\/guidelines/);
+    assert.match(e.html, /file an appeal/i);
   });
 
   it("skips email when email provider is not configured", async () => {

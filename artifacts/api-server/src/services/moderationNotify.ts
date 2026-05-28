@@ -7,6 +7,15 @@ import { pushForNotification } from "./notificationFanout.ts";
 
 export type ModerationAction = "suspend" | "unsuspend" | "verify";
 
+// The suspended screen is rendered as a full-screen overlay any time
+// `player.isSuspended` is true, so linking to `/` is the most reliable
+// way to land a suspended user on the appeal UI (no dedicated route
+// exists, and any in-app route gets covered by the overlay). For
+// unsuspend we send them home so they immediately see access restored.
+// For verify we keep them on the safety/guidelines page since there is
+// no account-status screen to surface.
+const SUSPENDED_LINK = "/";
+const RESTORED_LINK = "/";
 const SAFETY_LINK = "/safety/guidelines";
 
 interface Copy {
@@ -15,6 +24,8 @@ interface Copy {
   body: (reason: string | null) => string;
   emailSubject: string;
   emailIntro: string;
+  link: string;
+  emailCtaLabel: string;
 }
 
 const COPY: Record<ModerationAction, Copy> = {
@@ -23,10 +34,12 @@ const COPY: Record<ModerationAction, Copy> = {
     title: "Your HATCHUP account has been suspended",
     body: (reason) =>
       reason
-        ? `A moderator suspended your account. Reason: ${reason}`
-        : "A moderator suspended your account. Review our community guidelines for details.",
+        ? `A moderator suspended your account. Reason: ${reason}. Tap to view details and file an appeal.`
+        : "A moderator suspended your account. Tap to view details and file an appeal.",
     emailSubject: "Your HATCHUP account has been suspended",
     emailIntro: "A HATCHUP moderator has suspended your account.",
+    link: SUSPENDED_LINK,
+    emailCtaLabel: "Review your account & file an appeal",
   },
   unsuspend: {
     type: "account_restored",
@@ -37,6 +50,8 @@ const COPY: Record<ModerationAction, Copy> = {
         : "Welcome back! Your account has been reinstated and you can sign in again.",
     emailSubject: "Your HATCHUP account has been restored",
     emailIntro: "Good news — a HATCHUP moderator has reinstated your account.",
+    link: RESTORED_LINK,
+    emailCtaLabel: "Open HATCHUP",
   },
   verify: {
     type: "account_verified",
@@ -47,6 +62,8 @@ const COPY: Record<ModerationAction, Copy> = {
         : "A moderator approved your verification request. The blue checkmark now shows on your profile.",
     emailSubject: "Your HATCHUP profile is verified",
     emailIntro: "A HATCHUP moderator has approved your profile verification.",
+    link: SAFETY_LINK,
+    emailCtaLabel: "Review the community guidelines",
   },
 };
 
@@ -86,7 +103,7 @@ export async function notifyModerationAction(
       type: copy.type,
       title: copy.title,
       body: copy.body(cleanReason),
-      link: SAFETY_LINK,
+      link: copy.link,
     });
     // Fan out to web push so players hear about account-status changes even
     // when the app is closed. Best-effort: respects the per-category push
@@ -133,7 +150,7 @@ export async function notifyModerationAction(
         <p style="font-size:16px;line-height:1.5;margin:0 0 12px;">Hi ${safeName},</p>
         <p style="font-size:16px;line-height:1.5;margin:0 0 12px;">${escapeHtml(copy.emailIntro)}</p>
         ${reasonBlock}
-        <p style="margin:24px 0;"><a href="${SAFETY_LINK}" style="background:#ec4899;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Review the community guidelines</a></p>
+        <p style="margin:24px 0;"><a href="${copy.link}" style="background:#ec4899;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">${escapeHtml(copy.emailCtaLabel)}</a></p>
         <p style="font-size:12px;color:#666;">You're receiving this because you have HATCHUP account emails enabled. You can change this in Settings → Privacy.</p>
       </div>
     `;
@@ -141,7 +158,7 @@ export async function notifyModerationAction(
     const textParts = [
       copy.emailIntro,
       cleanReason ? `Reason from moderation: ${cleanReason}` : null,
-      `Review the community guidelines: ${SAFETY_LINK}`,
+      `${copy.emailCtaLabel}: ${copy.link}`,
     ].filter(Boolean);
 
     await sendTransactionalEmail({
