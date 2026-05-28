@@ -179,6 +179,13 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     isMinor?: unknown;
   };
 
+  // Read current player so we know if this is (or will become) a minor account.
+  const current = await db.query.playersTable.findFirst({ where: eq(playersTable.id, urlId) });
+  if (!current) {
+    res.status(404).json({ error: "Player not found" });
+    return;
+  }
+
   const updates: Partial<typeof playersTable.$inferInsert> = {};
 
   if (body.locationVisibility !== undefined) {
@@ -199,12 +206,21 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     updates.emergencyContactPhone = body.emergencyContactPhone as string | null;
   }
   if (typeof body.isMinor === "boolean") {
-    // When enabling minor mode, force safer defaults (city visibility, require approval).
     updates.isMinor = body.isMinor;
-    if (body.isMinor) {
+  }
+
+  // ── Minor-account safety enforcement ────────────────────────────────────────
+  // If the account is (or will be) flagged as a minor, force safer defaults on
+  // EVERY privacy update — regardless of payload order. This prevents loosening
+  // a minor's settings by sending only `locationVisibility=exact` in a later request.
+  const willBeMinor = typeof body.isMinor === "boolean" ? body.isMinor : current.isMinor;
+  if (willBeMinor) {
+    const UNSAFE_VISIBILITY = new Set(["exact", "neighborhood"]);
+    const requestedVis = updates.locationVisibility ?? current.locationVisibility;
+    if (UNSAFE_VISIBILITY.has(requestedVis as string)) {
       updates.locationVisibility = "city";
-      updates.requireWorkoutApproval = true;
     }
+    updates.requireWorkoutApproval = true;
   }
 
   const [updated] = await db

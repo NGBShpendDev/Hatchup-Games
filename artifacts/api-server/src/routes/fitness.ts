@@ -10,7 +10,7 @@ import {
   CompleteQuestParams,
   ListRealmsQueryParams,
 } from "@workspace/api-zod";
-import { logFitnessActivity } from "../services/fitnessLog";
+import { logFitnessActivity, ACTIVITY_CONFIG } from "../services/fitnessLog";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth";
 import { fitnessLogLimiter } from "../middlewares/rateLimiters";
 
@@ -183,8 +183,14 @@ router.post("/fitness/log", fitnessLogLimiter, requireAuth, attachPlayer, requir
   }
 
   // ── Anti-cheat: reject impossible pace and unrealistic durations ───────────
+  // `value` is polymorphic across activity types (minutes / steps / reps / cups / hours / kcal),
+  // so duration/pace checks only apply to duration-based cardio activities where the unit is
+  // minutes (running, walking, cycling, etc.). Distance-based activities additionally get a pace check.
+  const cfg = ACTIVITY_CONFIG[body.data.type];
+  const isDurationMinutes = cfg?.unit === "minutes";
+
   // World-record marathon pace is ~4:30/mile. Anything sub-3:00/mile is clearly spoofed.
-  if (body.data.distanceMiles != null && body.data.value > 0) {
+  if (isDurationMinutes && body.data.distanceMiles != null && body.data.value > 0) {
     const minutesPerMile = body.data.value / body.data.distanceMiles;
     if (minutesPerMile < 3) {
       req.log?.warn?.({ playerId: body.data.playerId, minutesPerMile, distanceMiles: body.data.distanceMiles, value: body.data.value }, "Fitness log rejected: impossible pace");
@@ -192,8 +198,9 @@ router.post("/fitness/log", fitnessLogLimiter, requireAuth, attachPlayer, requir
       return;
     }
   }
-  // 24h+ single activity is implausible — likely a stuck timer or spoof.
-  if (body.data.value > 1440) {
+  // 24h+ single duration log is implausible — likely a stuck timer or spoof.
+  // Only applied to minute-unit activities, not step/rep/cup/kcal logs.
+  if (isDurationMinutes && body.data.value > 1440) {
     res.status(400).json({ error: "fitness_anti_cheat_reject", reason: "duration_too_long" });
     return;
   }
