@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { useGetDailyStreak, useClaimDailyReward, getGetDailyStreakQueryKey, useB
 import type { DailyRewardDay, DailyClaimResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetPlayerDashboardQueryKey } from "@workspace/api-client-react";
-import { CheckCircle2, Lock, Gift, Flame, ShieldCheck, ShoppingCart } from "lucide-react";
+import { CheckCircle2, Lock, Gift, Flame, ShieldCheck, ShoppingCart, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const KIND_BG: Record<string, string> = {
@@ -32,6 +32,20 @@ interface Props {
 export function StreakCalendarModal({ open, onClose, playerId, onClaimed }: Props) {
   const queryClient = useQueryClient();
   const gridRef = useRef<HTMLDivElement>(null);
+  const [shieldCelebrating, setShieldCelebrating] = useState(false);
+  const shieldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerShieldCelebration = useCallback(() => {
+    if (shieldTimerRef.current) clearTimeout(shieldTimerRef.current);
+    setShieldCelebrating(true);
+    shieldTimerRef.current = setTimeout(() => setShieldCelebrating(false), 2500);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (shieldTimerRef.current) clearTimeout(shieldTimerRef.current);
+    };
+  }, []);
 
   const { data: streak, isLoading } = useGetDailyStreak({
     query: {
@@ -45,6 +59,9 @@ export function StreakCalendarModal({ open, onClose, playerId, onClaimed }: Prop
       onSuccess: (result) => {
         queryClient.invalidateQueries({ queryKey: getGetDailyStreakQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetPlayerDashboardQueryKey(playerId) });
+        if (result.streakShieldGranted) {
+          triggerShieldCelebration();
+        }
         onClaimed?.(result);
       },
     },
@@ -104,14 +121,59 @@ export function StreakCalendarModal({ open, onClose, playerId, onClaimed }: Prop
               </p>
             </div>
             {/* Shield count badge */}
-            {shieldCount > 0 && (
-              <div className="flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-2 py-1 flex-shrink-0">
-                <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-                <span className="text-xs font-bold text-cyan-400">{shieldCount}</span>
-              </div>
-            )}
+            <AnimatePresence mode="wait">
+              {(shieldCount > 0 || shieldCelebrating) && (
+                <motion.div
+                  key={shieldCount}
+                  initial={shieldCelebrating ? { scale: 1.4, backgroundColor: "rgba(6,182,212,0.3)" } : { scale: 1 }}
+                  animate={{ scale: 1, backgroundColor: "rgba(6,182,212,0.1)" }}
+                  transition={{ type: "spring", stiffness: 500, damping: 18 }}
+                  className="flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-2 py-1 flex-shrink-0"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="text-xs font-bold text-cyan-400">{shieldCount}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </DialogHeader>
+
+        {/* Shield earned celebration banner */}
+        <AnimatePresence>
+          {shieldCelebrating && (
+            <motion.div
+              key="shield-celebration"
+              initial={{ opacity: 0, scale: 0.85, y: -8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: -8 }}
+              transition={{ type: "spring", stiffness: 400, damping: 22 }}
+              className="mx-5 mb-2 flex-shrink-0 relative overflow-hidden rounded-2xl border-2 border-cyan-400/60 bg-gradient-to-br from-cyan-950/80 via-cyan-900/60 to-slate-900/80 px-4 py-4 flex flex-col items-center gap-2 text-center shadow-[0_0_24px_rgba(6,182,212,0.35)]"
+            >
+              {/* Animated glow ring */}
+              <motion.div
+                className="absolute inset-0 rounded-2xl border-2 border-cyan-400/30 pointer-events-none"
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+              />
+              <motion.div
+                initial={{ scale: 0.5, rotate: -15 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: "spring", stiffness: 500, damping: 18, delay: 0.05 }}
+                className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-400/30 to-cyan-600/20 border border-cyan-400/50 flex items-center justify-center"
+              >
+                <ShieldCheck className="w-7 h-7 text-cyan-300" />
+              </motion.div>
+              <div>
+                <p className="text-base font-black text-cyan-200 leading-tight">Streak Shield Earned!</p>
+                <p className="text-xs text-cyan-400/80 mt-0.5">Your streak is protected for one missed day.</p>
+              </div>
+              <div className="flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-3 py-1">
+                <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
+                <span className="text-xs font-bold text-cyan-300">Shield added to your collection</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Shield used notice */}
         <AnimatePresence>
