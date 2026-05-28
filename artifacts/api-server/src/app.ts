@@ -11,6 +11,7 @@ import {
   getClerkProxyHost,
 } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
+import ogRouter from "./routes/og";
 import { logger } from "./lib/logger";
 import { startPassiveSyncJob } from "./services/passiveSyncJob";
 import { WebhookHandlers } from "./webhookHandlers";
@@ -131,6 +132,7 @@ app.use("/api", (req, res, next) => {
 });
 
 app.use("/api", router);
+app.use(ogRouter);
 
 startPassiveSyncJob();
 

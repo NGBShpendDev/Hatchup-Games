@@ -143,7 +143,7 @@ function PostCard({
   const postTypeInfo = POST_TYPES.find(t => t.value === post.postType);
 
   async function handleNativeShare() {
-    const url = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : "";
+    const url = typeof window !== "undefined" ? `${window.location.origin}/post/${post.id}` : "";
     const tag = postTypeInfo ? `${postTypeInfo.icon} ${postTypeInfo.label}\n` : "";
     const text = `${tag}${post.authorName} on HatchUp: ${post.content}`;
     const canNativeShare =
