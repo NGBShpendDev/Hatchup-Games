@@ -77,6 +77,7 @@ export default function SettingsPrivacy() {
   const [resendingVerification, setResendingVerification] = useState(false);
   const [notifyRecapEmail, setNotifyRecapEmail] = useState(true);
   const [notifyChampionEmail, setNotifyChampionEmail] = useState(true);
+  const [notifyModerationEmail, setNotifyModerationEmail] = useState(true);
   const [notifyRecapPush, setNotifyRecapPush] = useState(true);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -193,6 +194,7 @@ export default function SettingsPrivacy() {
         setEmailVerifiedAt(typeof data.emailVerifiedAt === "string" ? data.emailVerifiedAt : null);
         if (typeof data.notifyRecapEmail === "boolean") setNotifyRecapEmail(data.notifyRecapEmail);
         if (typeof data.notifyChampionEmail === "boolean") setNotifyChampionEmail(data.notifyChampionEmail);
+        if (typeof data.notifyModerationEmail === "boolean") setNotifyModerationEmail(data.notifyModerationEmail);
         if (typeof data.notifyRecapPush === "boolean") setNotifyRecapPush(data.notifyRecapPush);
         setWeeklyRecapLastSentAt(typeof data.weeklyRecapLastSentAt === "string" ? data.weeklyRecapLastSentAt : null);
         setLoaded(true);
@@ -359,6 +361,7 @@ export default function SettingsPrivacy() {
           email: recapEmail.trim() === "" ? null : recapEmail.trim(),
           notifyRecapEmail,
           notifyChampionEmail,
+          notifyModerationEmail,
           notifyRecapPush,
         }),
       });
@@ -919,6 +922,19 @@ export default function SettingsPrivacy() {
               <Switch
                 checked={notifyChampionEmail}
                 onCheckedChange={setNotifyChampionEmail}
+                disabled={recapEmail.trim() === ""}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4 border-t border-emerald-500/10 pt-3">
+              <div className="min-w-0">
+                <p className="font-bold text-sm">Account &amp; safety emails</p>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Account status notices like suspensions, reinstatements, and verification approvals. Recommended.
+                </p>
+              </div>
+              <Switch
+                checked={notifyModerationEmail}
+                onCheckedChange={setNotifyModerationEmail}
                 disabled={recapEmail.trim() === ""}
               />
             </div>

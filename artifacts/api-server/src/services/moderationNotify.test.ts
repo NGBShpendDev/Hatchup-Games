@@ -4,7 +4,7 @@
 //   - inserts an in-app notification with the right type/title/body/link
 //   - includes the admin reason in the body when provided
 //   - only sends email when a provider is configured AND the player has an
-//     address on file AND has opted in via notifyRecapEmail
+//     address on file AND has opted in via notifyModerationEmail
 //   - never throws — failures are swallowed and logged
 //
 // DB and email-provider are mocked via `node:test` module mocks.
@@ -33,7 +33,7 @@ const state = {
   insertShouldThrow: false,
   player: null as null | {
     email: string | null;
-    notifyRecapEmail: boolean;
+    notifyModerationEmail: boolean;
     displayName: string | null;
     username: string;
   },
@@ -100,7 +100,7 @@ beforeEach(reset);
 
 describe("notifyModerationAction", () => {
   it("inserts an in-app notification on suspend with reason in the body", async () => {
-    state.player = { email: null, notifyRecapEmail: true, displayName: null, username: "alice" };
+    state.player = { email: null, notifyModerationEmail: true, displayName: null, username: "alice" };
     await notifyModerationAction(42, "suspend", "Spamming chat");
     assert.equal(state.inserts.length, 1);
     const n = state.inserts[0]!;
@@ -112,7 +112,7 @@ describe("notifyModerationAction", () => {
   });
 
   it("uses fallback body copy when no reason is provided", async () => {
-    state.player = { email: null, notifyRecapEmail: true, displayName: null, username: "alice" };
+    state.player = { email: null, notifyModerationEmail: true, displayName: null, username: "alice" };
     await notifyModerationAction(42, "unsuspend", null);
     const n = state.inserts[0]!;
     assert.equal(n.type, "account_restored");
@@ -121,7 +121,7 @@ describe("notifyModerationAction", () => {
   });
 
   it("uses the verify copy with link to /safety/guidelines", async () => {
-    state.player = { email: null, notifyRecapEmail: true, displayName: null, username: "alice" };
+    state.player = { email: null, notifyModerationEmail: true, displayName: null, username: "alice" };
     await notifyModerationAction(42, "verify", "Looks good");
     const n = state.inserts[0]!;
     assert.equal(n.type, "account_verified");
@@ -129,8 +129,8 @@ describe("notifyModerationAction", () => {
     assert.equal(n.link, "/safety/guidelines");
   });
 
-  it("sends email when configured, email on file, and notifyRecapEmail=true", async () => {
-    state.player = { email: "a@b.test", notifyRecapEmail: true, displayName: "Alice", username: "alice" };
+  it("sends email when configured, email on file, and notifyModerationEmail=true", async () => {
+    state.player = { email: "a@b.test", notifyModerationEmail: true, displayName: "Alice", username: "alice" };
     await notifyModerationAction(42, "suspend", "Spamming chat");
     assert.equal(state.emails.length, 1);
     const e = state.emails[0]!;
@@ -142,20 +142,20 @@ describe("notifyModerationAction", () => {
 
   it("skips email when email provider is not configured", async () => {
     state.emailConfigured = false;
-    state.player = { email: "a@b.test", notifyRecapEmail: true, displayName: "Alice", username: "alice" };
+    state.player = { email: "a@b.test", notifyModerationEmail: true, displayName: "Alice", username: "alice" };
     await notifyModerationAction(42, "suspend", null);
     assert.equal(state.inserts.length, 1);
     assert.equal(state.emails.length, 0);
   });
 
   it("skips email when player has no address on file", async () => {
-    state.player = { email: null, notifyRecapEmail: true, displayName: null, username: "alice" };
+    state.player = { email: null, notifyModerationEmail: true, displayName: null, username: "alice" };
     await notifyModerationAction(42, "suspend", null);
     assert.equal(state.emails.length, 0);
   });
 
-  it("skips email when player has opted out via notifyRecapEmail=false", async () => {
-    state.player = { email: "a@b.test", notifyRecapEmail: false, displayName: "Alice", username: "alice" };
+  it("skips email when player has opted out via notifyModerationEmail=false", async () => {
+    state.player = { email: "a@b.test", notifyModerationEmail: false, displayName: "Alice", username: "alice" };
     await notifyModerationAction(42, "verify", null);
     assert.equal(state.inserts.length, 1);
     assert.equal(state.emails.length, 0);
@@ -163,7 +163,7 @@ describe("notifyModerationAction", () => {
 
   it("never throws when the notifications insert fails", async () => {
     state.insertShouldThrow = true;
-    state.player = { email: "a@b.test", notifyRecapEmail: true, displayName: "Alice", username: "alice" };
+    state.player = { email: "a@b.test", notifyModerationEmail: true, displayName: "Alice", username: "alice" };
     await assert.doesNotReject(() => notifyModerationAction(42, "suspend", null));
     // The email path should still attempt to fire.
     assert.equal(state.emails.length, 1);
@@ -171,13 +171,13 @@ describe("notifyModerationAction", () => {
 
   it("never throws when the email send fails", async () => {
     state.emailSendShouldThrow = true;
-    state.player = { email: "a@b.test", notifyRecapEmail: true, displayName: "Alice", username: "alice" };
+    state.player = { email: "a@b.test", notifyModerationEmail: true, displayName: "Alice", username: "alice" };
     await assert.doesNotReject(() => notifyModerationAction(42, "suspend", null));
     assert.equal(state.inserts.length, 1);
   });
 
   it("HTML-escapes the moderator reason in the email body", async () => {
-    state.player = { email: "a@b.test", notifyRecapEmail: true, displayName: "Alice", username: "alice" };
+    state.player = { email: "a@b.test", notifyModerationEmail: true, displayName: "Alice", username: "alice" };
     await notifyModerationAction(42, "suspend", "<script>alert(1)</script>");
     const e = state.emails[0]!;
     assert.doesNotMatch(e.html, /<script>alert/);

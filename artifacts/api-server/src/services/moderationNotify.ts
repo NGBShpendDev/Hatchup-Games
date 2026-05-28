@@ -66,8 +66,10 @@ function escapeHtml(s: string): string {
  * Always inserts an in-app notification. Additionally sends an email when:
  *   - an email provider is configured (`isEmailConfigured()`), AND
  *   - the player has an `email` on file, AND
- *   - the player has opted in via `notifyRecapEmail` (the shared transactional
- *     opt-in used for other account-level emails).
+ *   - the player has opted in via `notifyModerationEmail` (the dedicated
+ *     account-status email opt-in, default true). This is intentionally
+ *     separate from `notifyRecapEmail` so silencing weekly recaps doesn't
+ *     also silence suspend/unsuspend/verify notices.
  */
 export async function notifyModerationAction(
   playerId: number,
@@ -96,13 +98,13 @@ export async function notifyModerationAction(
       where: eq(playersTable.id, playerId),
       columns: {
         email: true,
-        notifyRecapEmail: true,
+        notifyModerationEmail: true,
         displayName: true,
         username: true,
       },
     });
     if (!player || !player.email) return;
-    if (!player.notifyRecapEmail) return;
+    if (!player.notifyModerationEmail) return;
 
     const name = player.displayName ?? player.username;
     const safeName = escapeHtml(name);
