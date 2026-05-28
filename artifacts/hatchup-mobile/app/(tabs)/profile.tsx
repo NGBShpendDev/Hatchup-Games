@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useGetPlayer, useGetFitnessStats, useGetPlayerSocialProfile, useGetDailyStreak, useBuyStreakShield, getGetDailyStreakQueryKey } from "@workspace/api-client-react";
+import { useGetPlayer, useGetFitnessStats, useGetPlayerSocialProfile, useGetDailyStreak, useBuyStreakShield, getGetDailyStreakQueryKey, getGetPlayerQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -47,18 +47,20 @@ const MENU_ITEMS = [
   { label: "Privacy & Settings", icon: "shield", color: "#9ca3af", route: "/settings" },
 ];
 
-function StreakProtectionCard() {
+function StreakProtectionCard({ coins }: { coins: number }) {
   const colors = useColors();
   const queryClient = useQueryClient();
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
   const { data: streakData } = useGetDailyStreak();
   const shieldCount = streakData?.streakShields ?? 0;
+  const canAfford = coins >= SHIELD_COST;
 
   const buyShield = useBuyStreakShield({
     mutation: {
       onSuccess: (data) => {
         queryClient.invalidateQueries({ queryKey: getGetDailyStreakQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetPlayerQueryKey(PLAYER_ID) });
         setMessage({ text: `Shield purchased! You now have ${data.streakShields} shield${data.streakShields !== 1 ? "s" : ""}.`, ok: true });
         setTimeout(() => setMessage(null), 3000);
       },
@@ -99,6 +101,20 @@ function StreakProtectionCard() {
         </View>
       </View>
 
+      {/* Coin balance row */}
+      <View style={[shieldStyles.balanceRow, { backgroundColor: canAfford ? "#f59e0b14" : "#ef444414", borderColor: canAfford ? "#f59e0b33" : "#ef444433" }]}>
+        <Feather name="dollar-sign" size={13} color={canAfford ? "#f59e0b" : "#ef4444"} />
+        <Text style={[shieldStyles.balanceLabel, { color: colors.mutedForeground }]}>Your balance:</Text>
+        <Text style={[shieldStyles.balanceValue, { color: canAfford ? "#f59e0b" : "#ef4444" }]}>
+          {coins.toLocaleString()} coins
+        </Text>
+        {!canAfford && (
+          <Text style={[shieldStyles.balanceHint, { color: "#ef4444" }]}>
+            · need {(SHIELD_COST - coins).toLocaleString()} more
+          </Text>
+        )}
+      </View>
+
       {message && (
         <View style={[shieldStyles.message, { backgroundColor: message.ok ? "#22d3ee18" : "#ef444418", borderColor: message.ok ? "#22d3ee44" : "#ef444444" }]}>
           <Text style={[shieldStyles.messageText, { color: message.ok ? "#22d3ee" : "#ef4444" }]}>{message.text}</Text>
@@ -107,8 +123,8 @@ function StreakProtectionCard() {
 
       <Pressable
         onPress={handleBuy}
-        disabled={buyShield.isPending}
-        style={[shieldStyles.buyBtn, { opacity: buyShield.isPending ? 0.6 : 1 }]}
+        disabled={buyShield.isPending || !canAfford}
+        style={[shieldStyles.buyBtn, { opacity: (buyShield.isPending || !canAfford) ? 0.5 : 1 }]}
         testID="button-buy-shield"
       >
         {buyShield.isPending ? (
@@ -243,7 +259,7 @@ export default function ProfileScreen() {
 
       {/* Streak Protection */}
       <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-        <StreakProtectionCard />
+        <StreakProtectionCard coins={player?.coins ?? 0} />
       </View>
 
       {/* Menu */}
@@ -302,6 +318,10 @@ const shieldStyles = StyleSheet.create({
   countBadge: { alignItems: "center", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
   countText: { fontSize: 20, fontWeight: "900", color: "#22d3ee" },
   countLabel: { fontSize: 10, color: "#22d3ee", fontWeight: "600" },
+  balanceRow: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
+  balanceLabel: { fontSize: 12 },
+  balanceValue: { fontSize: 12, fontWeight: "700" },
+  balanceHint: { fontSize: 12, fontWeight: "600" },
   message: { borderRadius: 8, borderWidth: 1, padding: 10 },
   messageText: { fontSize: 13, fontWeight: "600" },
   buyBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#22d3ee", borderRadius: 12, paddingVertical: 11 },
