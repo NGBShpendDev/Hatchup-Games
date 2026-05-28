@@ -1152,6 +1152,25 @@ paths:
         "409":
           description: Event not currently active
 
+  /players/me/events:
+    get:
+      operationId: getMyEventHistory
+      tags: [events]
+      summary: Get the authenticated player's event participation history
+      description: |
+        Returns every event the authenticated player has ever joined, ordered by
+        join date descending (most recent first). Includes the event name, reward
+        XP, and the timestamp when the player joined.
+      responses:
+        "200":
+          description: Event history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlayerEventHistoryItem"
+
   # ── Clubs ─────────────────────────────────────────────────────────────────
   /clubs:
     get:
@@ -5054,6 +5073,20 @@ components:
         isFeatured:  { type: boolean }
         color:       { type: ["string", "null"] }
         hasJoined:   { type: boolean }
+
+    PlayerEventHistoryItem:
+      type: object
+      required: [eventId, eventName, joinedAt]
+      properties:
+        eventId:    { type: integer }
+        eventName:  { type: string }
+        eventType:  { type: string }
+        status:     { type: string }
+        joinedAt:   { type: string, format: date-time }
+        xpEarned:   { type: ["integer", "null"] }
+        startTime:  { type: string, format: date-time }
+        endTime:    { type: string, format: date-time }
+        imageUrl:   { type: ["string", "null"] }
 
     # ── Club ─────────────────────────────────────────────────────────────────
     Club:

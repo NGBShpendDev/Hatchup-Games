@@ -1419,6 +1419,27 @@ export const JoinLiveEventResponse = zod.object({
 
 
 /**
+ * Returns every event the authenticated player has ever joined, ordered by
+join date descending (most recent first). Includes the event name, reward
+XP, and the timestamp when the player joined.
+
+ * @summary Get the authenticated player's event participation history
+ */
+export const GetMyEventHistoryResponseItem = zod.object({
+  "eventId": zod.number(),
+  "eventName": zod.string(),
+  "eventType": zod.string().optional(),
+  "status": zod.string().optional(),
+  "joinedAt": zod.coerce.date(),
+  "xpEarned": zod.number().nullish(),
+  "startTime": zod.coerce.date().optional(),
+  "endTime": zod.coerce.date().optional(),
+  "imageUrl": zod.string().nullish()
+})
+export const GetMyEventHistoryResponse = zod.array(GetMyEventHistoryResponseItem)
+
+
+/**
  * @summary List clubs/guilds
  */
 export const listClubsQueryLimitDefault = 20;

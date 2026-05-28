@@ -6,6 +6,8 @@ import {
   useListHatchlings,
   getListHatchlingsQueryKey,
   useJoinLiveEvent,
+  useGetMyEventHistory,
+  getGetMyEventHistoryQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -15,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
 import { GlowBadge } from "@/components/ui/glow-badge";
-import { Calendar, Clock, Gift, Users, Phone, CheckCircle2 } from "lucide-react";
+import { Calendar, Clock, Gift, Users, Phone, CheckCircle2, History } from "lucide-react";
 import { motion } from "framer-motion";
 import { SafetyBanner } from "@/components/safety-banner";
 import { ErrorCard } from "@/components/error-card";
@@ -32,6 +34,9 @@ export default function Events() {
   const { data: playerHatchlings } = useListHatchlings(
     { playerId: pid },
     { query: { enabled: !!playerId, queryKey: getListHatchlingsQueryKey({ playerId: pid }) } },
+  );
+  const { data: eventHistory, isLoading: historyLoading } = useGetMyEventHistory(
+    { query: { enabled: !!playerId, queryKey: getGetMyEventHistoryQueryKey() } }
   );
   const joinEventMutation = useJoinLiveEvent();
 
@@ -60,8 +65,10 @@ export default function Events() {
               ? `${target.name} is ready to earn ${eventName} rewards.`
               : `You're in for ${eventName}. Hatch a Pal to earn evolution rewards.`,
           });
-          // Refresh the events list so participant counts update immediately.
+          // Refresh the events list so participant counts update immediately,
+          // and the history section so the new entry appears right away.
           queryClient.invalidateQueries({ queryKey: getListEventsQueryKey({}) });
+          queryClient.invalidateQueries({ queryKey: getGetMyEventHistoryQueryKey() });
           if (pid) {
             queryClient.invalidateQueries({
               queryKey: getListHatchlingsQueryKey({ playerId: pid }),
@@ -235,6 +242,78 @@ export default function Events() {
               </motion.div>
             ))}
           </div>
+        )}
+
+        {/* My Events — participation history */}
+        {playerId && (
+          <section className="space-y-4" data-testid="my-events-history">
+            <h2 className="text-2xl font-black tracking-tight flex items-center gap-2">
+              <History className="w-6 h-6 text-primary" /> My Events
+            </h2>
+
+            {historyLoading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full rounded-2xl" />
+                ))}
+              </div>
+            ) : !eventHistory || eventHistory.length === 0 ? (
+              <GlassCard className="text-center py-10">
+                <p className="text-muted-foreground font-medium">No events joined yet.</p>
+                <p className="text-sm text-muted-foreground/60 mt-1">
+                  Join an active event above to start building your history.
+                </p>
+              </GlassCard>
+            ) : (
+              <div className="space-y-3">
+                {eventHistory.map((item, i) => (
+                  <motion.div
+                    key={`${item.eventId}-${item.joinedAt}`}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                  >
+                    <GlassCard className="flex items-center gap-4 px-5 py-4">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.eventName}
+                          className="w-12 h-12 rounded-xl object-cover shrink-0"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                          <Calendar className="w-5 h-5 text-primary" />
+                        </div>
+                      )}
+
+                      <div className="flex-1 min-w-0">
+                        <p className="font-black truncate">{item.eventName}</p>
+                        <p className="text-xs text-muted-foreground font-medium">
+                          {item.eventType && <span className="text-primary mr-2">{item.eventType}</span>}
+                          Joined {new Date(item.joinedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        {item.xpEarned != null && item.xpEarned > 0 && (
+                          <div className="flex items-center gap-1 text-sm font-bold text-yellow-400">
+                            <Gift className="w-4 h-4" />
+                            <span>+{item.xpEarned} XP</span>
+                          </div>
+                        )}
+                        <Badge
+                          variant={item.status === "active" ? "default" : "secondary"}
+                          className="text-xs font-bold capitalize"
+                        >
+                          {item.status}
+                        </Badge>
+                      </div>
+                    </GlassCard>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </section>
         )}
       </div>
     </Layout>

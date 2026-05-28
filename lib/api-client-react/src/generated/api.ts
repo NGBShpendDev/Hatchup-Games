@@ -210,6 +210,7 @@ import type {
   PhysiqueGoalResult,
   Player,
   PlayerDashboard,
+  PlayerEventHistoryItem,
   PlayerInput,
   PlayerLocationRecord,
   PlayerSocialProfile,
@@ -4225,6 +4226,87 @@ export const useJoinLiveEvent = <TError = ErrorType<void>,
       > => {
       return useMutation(getJoinLiveEventMutationOptions(options));
     }
+
+export const getGetMyEventHistoryUrl = () => {
+
+
+
+
+  return `/api/players/me/events`
+}
+
+/**
+ * Returns every event the authenticated player has ever joined, ordered by
+join date descending (most recent first). Includes the event name, reward
+XP, and the timestamp when the player joined.
+
+ * @summary Get the authenticated player's event participation history
+ */
+export const getMyEventHistory = async ( options?: RequestInit): Promise<PlayerEventHistoryItem[]> => {
+
+  return customFetch<PlayerEventHistoryItem[]>(getGetMyEventHistoryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyEventHistoryQueryKey = () => {
+    return [
+    `/api/players/me/events`
+    ] as const;
+    }
+
+
+export const getGetMyEventHistoryQueryOptions = <TData = Awaited<ReturnType<typeof getMyEventHistory>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyEventHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyEventHistoryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyEventHistory>>> = ({ signal }) => getMyEventHistory({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyEventHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyEventHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof getMyEventHistory>>>
+export type GetMyEventHistoryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the authenticated player's event participation history
+ */
+
+export function useGetMyEventHistory<TData = Awaited<ReturnType<typeof getMyEventHistory>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyEventHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyEventHistoryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListClubsUrl = (params?: ListClubsParams,) => {
   const normalizedParams = new URLSearchParams();

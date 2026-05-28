@@ -359,6 +359,20 @@ export interface UseItemInput {
   hatchlingId: number;
 }
 
+export interface PlayerEventHistoryItem {
+  eventId: number;
+  eventName: string;
+  eventType?: string;
+  status?: string;
+  joinedAt: string;
+  /** @nullable */
+  xpEarned?: number | null;
+  startTime?: string;
+  endTime?: string;
+  /** @nullable */
+  imageUrl?: string | null;
+}
+
 export interface Club {
   id: number;
   name: string;

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import { liveEventsTable, hatchlingsTable, playersTable, eventParticipantsTable } from "@workspace/db";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql, desc } from "drizzle-orm";
 import { ListEventsQueryParams, GetLiveEventParams } from "@workspace/api-zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 
@@ -54,6 +54,40 @@ function toApiEvent(
     hasJoined,
   };
 }
+
+// Returns the full participation history for the authenticated player,
+// ordered most-recent-first. Each row joins event_participants with
+// live_events so the client gets name/type/status/reward in one shot.
+router.get("/players/me/events", requireAuth, attachPlayer, async (req, res) => {
+  const rows = await db
+    .select({
+      eventId:   eventParticipantsTable.eventId,
+      joinedAt:  eventParticipantsTable.joinedAt,
+      eventName: liveEventsTable.name,
+      eventType: liveEventsTable.type,
+      status:    liveEventsTable.status,
+      xpEarned:  liveEventsTable.reward,
+      startTime: liveEventsTable.startsAt,
+      endTime:   liveEventsTable.endsAt,
+      imageUrl:  liveEventsTable.imageUrl,
+    })
+    .from(eventParticipantsTable)
+    .innerJoin(liveEventsTable, eq(eventParticipantsTable.eventId, liveEventsTable.id))
+    .where(eq(eventParticipantsTable.playerId, req.playerId!))
+    .orderBy(desc(eventParticipantsTable.joinedAt));
+
+  res.json(rows.map(r => ({
+    eventId:   r.eventId,
+    eventName: r.eventName,
+    eventType: r.eventType,
+    status:    r.status,
+    joinedAt:  r.joinedAt.toISOString(),
+    xpEarned:  r.xpEarned != null ? (parseInt(r.xpEarned, 10) || null) : null,
+    startTime: r.startTime.toISOString(),
+    endTime:   r.endTime.toISOString(),
+    imageUrl:  r.imageUrl ?? null,
+  })));
+});
 
 router.get("/events", async (req, res) => {
   const query = ListEventsQueryParams.safeParse({ status: req.query.status as string | undefined });
