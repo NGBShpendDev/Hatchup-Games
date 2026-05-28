@@ -576,6 +576,27 @@ paths:
                 items:
                   $ref: "#/components/schemas/RankDistribution"
 
+  /leaderboards/artifacts:
+    get:
+      operationId: getArtifactsLeaderboard
+      tags: [leaderboards]
+      summary: Top artifact collectors ranked by weighted rarity score
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Top artifact collectors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ArtifactCollectorEntry"
+
   # ── Artifacts ─────────────────────────────────────────────────────────────
   /artifacts:
     get:
@@ -3810,6 +3831,22 @@ components:
         city:        { type: ["string", "null"] }
         visibility:  { type: string, enum: [exact, neighborhood, city, hidden] }
         updatedAt:   { type: string }
+
+    ArtifactCollectorEntry:
+      type: object
+      required: [position, playerId, username, rank, artifactCount, rarityScore, isMe]
+      properties:
+        position:      { type: integer }
+        playerId:      { type: integer }
+        username:      { type: string }
+        displayName:   { type: ["string", "null"] }
+        avatarUrl:     { type: ["string", "null"] }
+        rank:          { type: string }
+        artifactCount: { type: integer }
+        rarityScore:   { type: integer }
+        rarestRarity:  { type: ["string", "null"] }
+        rarestName:    { type: ["string", "null"] }
+        isMe:          { type: boolean }
 
     ScopedLeaderboardEntry:
       type: object

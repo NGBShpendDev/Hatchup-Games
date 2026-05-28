@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import {
   playersTable, hatchlingsTable, fitnessActivitiesTable,
   personalRecordsTable, playerLocationTable, playerArtifactsTable,
+  artifactsTable,
 } from "@workspace/db";
 import { desc, eq, notInArray, gte, and } from "drizzle-orm";
 import { GetGlobalLeaderboardQueryParams, GetModeLeaderboardQueryParams } from "@workspace/api-zod";
@@ -270,6 +271,73 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, attachEntitlement,
       hasPrev:     safePage > 1,
     },
   });
+});
+
+// ── GET /leaderboards/artifacts ───────────────────────────────────────────────
+// Top artifact collectors, ranked by weighted rarity score then by count.
+// Rarity weights: Celestial=7, Ancient=6, Mythic=5, Legendary=4, Epic=3, Rare=2, Common=1.
+const RARITY_WEIGHTS: Record<string, number> = {
+  Common: 1, Rare: 2, Epic: 3, Legendary: 4, Mythic: 5, Ancient: 6, Celestial: 7,
+};
+
+router.get("/leaderboards/artifacts", requireAuth, attachPlayer, async (req, res) => {
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
+  const hiddenIds = req.playerId ? await getHiddenPlayerIds(req.playerId) : [];
+  const hiddenSet = new Set(hiddenIds);
+
+  const [ownedRows, catalog, players] = await Promise.all([
+    db.query.playerArtifactsTable.findMany(),
+    db.query.artifactsTable.findMany(),
+    db.query.playersTable.findMany(),
+  ]);
+
+  const catalogMap = new Map<number, typeof artifactsTable.$inferSelect>();
+  for (const a of catalog) catalogMap.set(a.id, a);
+
+  type Agg = { playerId: number; count: number; score: number; rarestWeight: number; rarestRarity: string | null; rarestName: string | null; };
+  const aggMap = new Map<number, Agg>();
+
+  for (const pa of ownedRows) {
+    if (hiddenSet.has(pa.playerId)) continue;
+    const art = catalogMap.get(pa.artifactId);
+    if (!art) continue;
+    const w = RARITY_WEIGHTS[art.rarity] ?? 0;
+    let agg = aggMap.get(pa.playerId);
+    if (!agg) {
+      agg = { playerId: pa.playerId, count: 0, score: 0, rarestWeight: 0, rarestRarity: null, rarestName: null };
+      aggMap.set(pa.playerId, agg);
+    }
+    agg.count += 1;
+    agg.score += w;
+    if (w > agg.rarestWeight) {
+      agg.rarestWeight = w;
+      agg.rarestRarity = art.rarity;
+      agg.rarestName = art.name;
+    }
+  }
+
+  const playerMap = new Map(players.map(p => [p.id, p]));
+  const ranked = [...aggMap.values()]
+    .filter(a => playerMap.has(a.playerId))
+    .sort((a, b) => b.score - a.score || b.count - a.count || a.playerId - b.playerId)
+    .slice(0, limit);
+
+  res.json(ranked.map((a, i) => {
+    const p = playerMap.get(a.playerId)!;
+    return {
+      position:      i + 1,
+      playerId:      p.id,
+      username:      p.username,
+      displayName:   p.displayName,
+      avatarUrl:     p.avatarUrl,
+      rank:          p.rank,
+      artifactCount: a.count,
+      rarityScore:   a.score,
+      rarestRarity:  a.rarestRarity,
+      rarestName:    a.rarestName,
+      isMe:          p.id === req.playerId,
+    };
+  }));
 });
 
 // ── GET /leaderboards/by-mode ─────────────────────────────────────────────────

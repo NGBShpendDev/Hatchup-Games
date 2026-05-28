@@ -25,6 +25,7 @@ import type {
   AddCommentInput,
   AddEggInput,
   ArtifactBattleXpEntry,
+  ArtifactCollectorEntry,
   ArtifactLoadout,
   ArtifactMuseumEntry,
   ArtifactWorldNotification,
@@ -63,6 +64,7 @@ import type {
   GenerateMealPlanInput,
   GeneratePlanInput,
   GetArtifactWorldNotificationsParams,
+  GetArtifactsLeaderboardParams,
   GetDailyMemoryParams,
   GetGlobalLeaderboardParams,
   GetMealPlanParams,
@@ -2148,6 +2150,90 @@ export function useGetRankDistribution<TData = Awaited<ReturnType<typeof getRank
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetRankDistributionQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetArtifactsLeaderboardUrl = (params?: GetArtifactsLeaderboardParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/leaderboards/artifacts?${stringifiedParams}` : `/api/leaderboards/artifacts`
+}
+
+/**
+ * @summary Top artifact collectors ranked by weighted rarity score
+ */
+export const getArtifactsLeaderboard = async (params?: GetArtifactsLeaderboardParams, options?: RequestInit): Promise<ArtifactCollectorEntry[]> => {
+
+  return customFetch<ArtifactCollectorEntry[]>(getGetArtifactsLeaderboardUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetArtifactsLeaderboardQueryKey = (params?: GetArtifactsLeaderboardParams,) => {
+    return [
+    `/api/leaderboards/artifacts`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetArtifactsLeaderboardQueryOptions = <TData = Awaited<ReturnType<typeof getArtifactsLeaderboard>>, TError = ErrorType<unknown>>(params?: GetArtifactsLeaderboardParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getArtifactsLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetArtifactsLeaderboardQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getArtifactsLeaderboard>>> = ({ signal }) => getArtifactsLeaderboard(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getArtifactsLeaderboard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetArtifactsLeaderboardQueryResult = NonNullable<Awaited<ReturnType<typeof getArtifactsLeaderboard>>>
+export type GetArtifactsLeaderboardQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Top artifact collectors ranked by weighted rarity score
+ */
+
+export function useGetArtifactsLeaderboard<TData = Awaited<ReturnType<typeof getArtifactsLeaderboard>>, TError = ErrorType<unknown>>(
+ params?: GetArtifactsLeaderboardParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getArtifactsLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetArtifactsLeaderboardQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

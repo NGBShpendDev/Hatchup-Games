@@ -790,6 +790,31 @@ export const GetRankDistributionResponse = zod.array(GetRankDistributionResponse
 
 
 /**
+ * @summary Top artifact collectors ranked by weighted rarity score
+ */
+export const getArtifactsLeaderboardQueryLimitDefault = 50;
+
+export const GetArtifactsLeaderboardQueryParams = zod.object({
+  "limit": zod.coerce.number().default(getArtifactsLeaderboardQueryLimitDefault)
+})
+
+export const GetArtifactsLeaderboardResponseItem = zod.object({
+  "position": zod.number(),
+  "playerId": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "rank": zod.string(),
+  "artifactCount": zod.number(),
+  "rarityScore": zod.number(),
+  "rarestRarity": zod.string().nullish(),
+  "rarestName": zod.string().nullish(),
+  "isMe": zod.boolean()
+})
+export const GetArtifactsLeaderboardResponse = zod.array(GetArtifactsLeaderboardResponseItem)
+
+
+/**
  * @summary Get artifact museum — all artifacts with per-player discovery state
  */
 export const ListArtifactsResponseItem = zod.object({

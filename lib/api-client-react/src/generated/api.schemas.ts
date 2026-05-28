@@ -1344,6 +1344,24 @@ export interface PlayerLocationRecord {
   updatedAt: string;
 }
 
+export interface ArtifactCollectorEntry {
+  position: number;
+  playerId: number;
+  username: string;
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  avatarUrl?: string | null;
+  rank: string;
+  artifactCount: number;
+  rarityScore: number;
+  /** @nullable */
+  rarestRarity?: string | null;
+  /** @nullable */
+  rarestName?: string | null;
+  isMe: boolean;
+}
+
 export interface ScopedLeaderboardEntry {
   position: number;
   playerId: number;
@@ -1490,6 +1508,10 @@ export const GetSpeedLeaderboardMode = {
   steps: 'steps',
   pace: 'pace',
 } as const;
+
+export type GetArtifactsLeaderboardParams = {
+limit?: number;
+};
 
 export type GetArtifactWorldNotificationsParams = {
 limit?: number;

@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import {
   useGetGlobalLeaderboard, getGetGlobalLeaderboardQueryKey,
+  useGetArtifactsLeaderboard,
 } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -21,7 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
-type TabKey    = "rankings" | "fitness" | "battle" | "local";
+type TabKey    = "rankings" | "fitness" | "battle" | "artifacts" | "local";
 type ScopeKey  = "world" | "country" | "state" | "county" | "city" | "nearby";
 type MetricKey = "xp" | "steps" | "workouts" | "battle_wins" | "streaks" | "artifacts";
 
@@ -264,8 +265,9 @@ export default function Leaderboard() {
   const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
     { key: "rankings", label: "Rankings", icon: <Trophy className="w-4 h-4" /> },
     { key: "fitness",  label: "Fitness",  icon: <Zap className="w-4 h-4" /> },
-    { key: "battle",   label: "Battle",   icon: <Swords className="w-4 h-4" /> },
-    { key: "local",    label: "Local",    icon: <MapPin className="w-4 h-4" /> },
+    { key: "battle",    label: "Battle",    icon: <Swords className="w-4 h-4" /> },
+    { key: "artifacts", label: "Artifacts", icon: <Gift className="w-4 h-4" /> },
+    { key: "local",     label: "Local",     icon: <MapPin className="w-4 h-4" /> },
   ];
 
   const selectedMetric = METRICS.find(m => m.key === metric)!;
@@ -567,6 +569,11 @@ export default function Leaderboard() {
             </motion.div>
           )}
 
+          {/* ── Artifacts Tab ──────────────────────────────────────────────── */}
+          {activeTab === "artifacts" && (
+            <ArtifactsLeaderboardPanel myPlayerId={playerId ?? null} />
+          )}
+
           {/* ── Local Competitions Tab ────────────────────────────────────── */}
           {activeTab === "local" && (
             <motion.div key="local" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
@@ -855,5 +862,81 @@ function RankedList({
         </div>
       )}
     </div>
+  );
+}
+
+// ── Artifacts collector leaderboard panel ──────────────────────────────────
+const RARITY_COLORS: Record<string, string> = {
+  Common:    "text-white/60",
+  Rare:      "text-blue-400",
+  Epic:      "text-violet-400",
+  Legendary: "text-orange-400",
+  Mythic:    "text-pink-400",
+  Ancient:   "text-amber-400",
+  Celestial: "text-cyan-300",
+};
+
+function ArtifactsLeaderboardPanel({ myPlayerId: _myPlayerId }: { myPlayerId: number | null }) {
+  const { data, isLoading } = useGetArtifactsLeaderboard({ limit: 50 });
+
+  return (
+    <motion.div key="artifacts" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
+      <p className="text-xs text-white/40 flex items-center gap-1">
+        <Gift className="w-3.5 h-3.5 text-cyan-300" />
+        Top collectors ranked by weighted rarity score. Celestial=7, Ancient=6, Mythic=5, Legendary=4, Epic=3, Rare=2, Common=1.
+      </p>
+
+      {isLoading ? (
+        <div className="space-y-2">{[...Array(8)].map((_, i) => <Skeleton key={i} className="h-16 rounded-2xl bg-white/5" />)}</div>
+      ) : (
+        <div className="bg-white/5 rounded-3xl border border-white/10 overflow-hidden divide-y divide-white/5">
+          {(data ?? []).map((entry, i) => (
+            <motion.div
+              key={entry.playerId}
+              initial={{ opacity: 0, x: -16 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.03 }}
+              className={`flex items-center gap-3 p-3 ${
+                entry.isMe ? "bg-cyan-500/10 border-l-2 border-cyan-400" : i < 3 ? "bg-yellow-500/5" : "hover:bg-white/5"
+              }`}
+            >
+              <span className="w-8 text-center font-black text-sm text-white/40 flex-shrink-0">
+                {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${entry.position}`}
+              </span>
+              <Avatar className="h-9 w-9 border border-white/10 flex-shrink-0">
+                <AvatarImage src={entry.avatarUrl ?? undefined} />
+                <AvatarFallback className="text-xs font-bold bg-gradient-to-br from-cyan-600 to-violet-700">
+                  {entry.username.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="font-bold text-sm truncate">{entry.displayName ?? entry.username}</p>
+                  {entry.isMe && <Badge className="text-[10px] px-1 py-0 bg-cyan-600 text-white flex-shrink-0">You</Badge>}
+                </div>
+                {entry.rarestRarity && (
+                  <p className="text-[10px] text-white/40 truncate">
+                    Rarest: <span className={`font-bold ${RARITY_COLORS[entry.rarestRarity] ?? "text-white/70"}`}>{entry.rarestRarity}</span>
+                    {entry.rarestName ? ` · ${entry.rarestName}` : ""}
+                  </p>
+                )}
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="font-black text-sm text-cyan-300 flex items-center justify-end gap-1">
+                  <Medal className="w-3.5 h-3.5" />{entry.rarityScore}
+                </p>
+                <p className="text-[10px] text-white/40">{entry.artifactCount} artifact{entry.artifactCount === 1 ? "" : "s"}</p>
+              </div>
+            </motion.div>
+          ))}
+          {(data?.length ?? 0) === 0 && (
+            <div className="py-10 text-center text-white/30">
+              <Gift className="w-8 h-8 mx-auto mb-2" />
+              <p className="text-sm font-bold">No artifact collectors yet</p>
+            </div>
+          )}
+        </div>
+      )}
+    </motion.div>
   );
 }
