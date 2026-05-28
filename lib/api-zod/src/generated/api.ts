@@ -2201,7 +2201,8 @@ export const GetSocialFeedQueryParams = zod.object({
   "playerId": zod.coerce.number(),
   "cursor": zod.coerce.number().optional(),
   "limit": zod.coerce.number().default(getSocialFeedQueryLimitDefault),
-  "shuffle": zod.coerce.boolean().default(getSocialFeedQueryShuffleDefault).describe('When true, randomly samples `limit` posts from the top-scoring candidates so repeat visits see fresh highlights. Cursor is ignored when shuffling.')
+  "shuffle": zod.coerce.boolean().default(getSocialFeedQueryShuffleDefault).describe('When true, randomly samples `limit` posts from the top-scoring candidates so repeat visits see fresh highlights. Cursor is ignored when shuffling.'),
+  "excludeIds": zod.coerce.string().optional().describe('Comma-separated post ids the viewer has recently seen. Only honored in\nshuffle mode — the server drops these from the candidate pool before\nsampling so highlights don\'t repeat across visits, and falls back to\nthe full pool if too few candidates remain after filtering.\n')
 })
 
 export const GetSocialFeedResponse = zod.object({

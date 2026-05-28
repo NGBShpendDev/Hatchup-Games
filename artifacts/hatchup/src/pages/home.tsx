@@ -139,11 +139,43 @@ export default function Home() {
     enabled: !!playerId,
   });
 
+  // Track the last ~10 highlight ids the viewer has been shown so the server
+  // can drop them from the shuffle pool. Persisted to localStorage so it
+  // survives reloads and tab switches.
+  const HIGHLIGHTS_SEEN_KEY = "hatchup:home:seenHighlights";
+  const HIGHLIGHTS_SEEN_MAX = 10;
+  const seenHighlightIdsRef = useRef<number[]>([]);
+  if (seenHighlightIdsRef.current.length === 0 && typeof window !== "undefined") {
+    try {
+      const raw = window.localStorage.getItem(HIGHLIGHTS_SEEN_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          seenHighlightIdsRef.current = parsed
+            .map((n: unknown) => Number(n))
+            .filter((n) => Number.isFinite(n) && n > 0)
+            .slice(0, HIGHLIGHTS_SEEN_MAX);
+        }
+      }
+    } catch {
+      // Ignore corrupt storage — we'll just rebuild the list as the user browses.
+    }
+  }
+  const excludeIdsParam = seenHighlightIdsRef.current.length > 0
+    ? seenHighlightIdsRef.current.join(",")
+    : undefined;
+
+  const socialFeedParams = {
+    playerId: pid,
+    limit: 3,
+    shuffle: true,
+    ...(excludeIdsParam ? { excludeIds: excludeIdsParam } : {}),
+  } as const;
   const { data: socialFeed } = useGetSocialFeed(
-    { playerId: pid, limit: 3, shuffle: true },
+    socialFeedParams,
     {
       query: {
-        queryKey: getGetSocialFeedQueryKey({ playerId: pid, limit: 3, shuffle: true }),
+        queryKey: getGetSocialFeedQueryKey(socialFeedParams),
         enabled: !!playerId,
         // Always refetch on mount so each home visit gets a fresh random sample
         // of community highlights instead of the same cached cards.
@@ -152,6 +184,28 @@ export default function Home() {
       },
     }
   );
+
+  // Record ids we just rendered so the next visit (or next refetch) can ask
+  // the server to skip them. Keep the most recent HIGHLIGHTS_SEEN_MAX.
+  useEffect(() => {
+    const posts = (socialFeed as any)?.posts as Array<{ id: number }> | undefined;
+    if (!posts || posts.length === 0) return;
+    const newIds = posts.map(p => p.id).filter(n => Number.isFinite(n));
+    if (newIds.length === 0) return;
+    const merged = [
+      ...newIds,
+      ...seenHighlightIdsRef.current.filter(id => !newIds.includes(id)),
+    ].slice(0, HIGHLIGHTS_SEEN_MAX);
+    seenHighlightIdsRef.current = merged;
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(HIGHLIGHTS_SEEN_KEY, JSON.stringify(merged));
+      } catch {
+        // Storage may be unavailable (private mode, quota); the in-memory ref
+        // still helps within the session.
+      }
+    }
+  }, [socialFeed]);
   const reactToPost = useReactToPost();
   const handleHighlightReact = (postId: number, reactionType: string) => {
     if (!playerId) return;

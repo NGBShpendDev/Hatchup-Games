@@ -3179,6 +3179,14 @@ limit?: number;
  * When true, randomly samples `limit` posts from the top-scoring candidates so repeat visits see fresh highlights. Cursor is ignored when shuffling.
  */
 shuffle?: boolean;
+/**
+ * Comma-separated post ids the viewer has recently seen. Only honored in
+shuffle mode — the server drops these from the candidate pool before
+sampling so highlights don't repeat across visits, and falls back to
+the full pool if too few candidates remain after filtering.
+
+ */
+excludeIds?: string;
 };
 
 export type GetTrendingPostsParams = {

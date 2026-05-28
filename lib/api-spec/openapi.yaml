@@ -1809,6 +1809,15 @@ paths:
           schema:
             type: boolean
             default: false
+        - name: excludeIds
+          in: query
+          description: |
+            Comma-separated post ids the viewer has recently seen. Only honored in
+            shuffle mode — the server drops these from the candidate pool before
+            sampling so highlights don't repeat across visits, and falls back to
+            the full pool if too few candidates remain after filtering.
+          schema:
+            type: string
       responses:
         "200":
           description: Feed posts

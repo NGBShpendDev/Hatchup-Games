@@ -257,6 +257,14 @@ router.get("/social/feed", requireAuth, attachPlayer, async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 20, 50);
   const cursor = req.query.cursor ? Number(req.query.cursor) : null;
   const shuffle = req.query.shuffle === "true" || req.query.shuffle === "1";
+  const excludeIds = typeof req.query.excludeIds === "string" && req.query.excludeIds.length > 0
+    ? new Set(
+        req.query.excludeIds
+          .split(",")
+          .map(s => Number(s.trim()))
+          .filter(n => Number.isFinite(n) && n > 0),
+      )
+    : new Set<number>();
 
   const follows = await db.query.playerFollowsTable.findMany({
     where: eq(playerFollowsTable.followerId, playerId),
@@ -307,7 +315,14 @@ router.get("/social/feed", requireAuth, attachPlayer, async (req, res) => {
     // returning players see fresh picks each visit while still favoring
     // high-engagement, recent posts.
     const poolSize = Math.max(limit * 5, 20);
-    const pool = scored.slice(0, poolSize);
+    const basePool = scored.slice(0, poolSize);
+    // Drop recently-seen posts from the candidate pool so highlights don't
+    // repeat across visits. Fall back to the full pool if filtering would
+    // leave us with too few candidates to fill the page.
+    const filtered = excludeIds.size > 0
+      ? basePool.filter(s => !excludeIds.has(s.post.id))
+      : basePool;
+    const pool = filtered.length >= limit ? filtered : basePool;
     // Fisher–Yates partial shuffle
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
