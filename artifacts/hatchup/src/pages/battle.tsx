@@ -15,64 +15,20 @@ import {
   Share2, Bookmark, Trash2, Star, Plus, X,
 } from "lucide-react";
 import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
+import type {
+  BattleState,
+  BattleTurnResult as TurnResult,
+  EquippedArtifactSlot,
+  FighterState,
+} from "@workspace/api-client-react";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
 // ── Type defs ─────────────────────────────────────────────────────────────────
-interface EquippedArtifactSlot {
-  id: number;
-  name: string;
-  rarity: string;
-  imageSlug: string;
-  slot: "major" | "minor";
-  isPowered: boolean;
-  evolutionStage: number;
-}
-
-interface FighterState {
-  playerId: number;
-  playerUsername: string | null;
-  playerDisplayName: string | null;
-  hatchlingId: number;
-  hatchlingName: string;
-  hatchlingLevel: number;
-  realm: string;
-  maxHp: number;
-  currentHp: number;
-  maxEnergy: number;
-  energy: number;
-  speed: number;
-  defenseBonus: number;
-  specialCooldown: number;
-  itemUsed: boolean;
-  isBot: boolean;
-  equippedArtifacts: EquippedArtifactSlot[];
-  artifactPowerScore: number;
-}
-
-interface TurnResult {
-  turnNumber: number;
-  actingSlot: 1 | 2;
-  move: string;
-  damage: number;
-  healing: number;
-  isCrit: boolean;
-  isSuper: boolean;
-  p1HpAfter: number;
-  p2HpAfter: number;
-}
-
-interface BattleState {
-  battleId: number;
-  mode: "casual" | "ranked";
-  fighter1: FighterState;
-  fighter2: FighterState;
-  currentSlot: 1 | 2;
-  turnNumber: number;
-  phase: "lobby" | "active" | "ended";
-  winner: 0 | 1 | 2 | null;
-  turns: TurnResult[];
-}
+// Battle / fighter / turn shapes are sourced from the OpenAPI-generated types
+// (see `lib/api-spec/openapi.yaml`). The local re-exports above keep call sites
+// stable while the contract evolves.
+export type { BattleState, EquippedArtifactSlot, FighterState, TurnResult };
 
 interface Hatchling {
   id: number;

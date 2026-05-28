@@ -2087,6 +2087,140 @@ export interface PhysiqueGoalResult {
   physiqueGoal: string;
 }
 
+export type EquippedArtifactSlotSlot = typeof EquippedArtifactSlotSlot[keyof typeof EquippedArtifactSlotSlot];
+
+
+export const EquippedArtifactSlotSlot = {
+  major: 'major',
+  minor: 'minor',
+} as const;
+
+export interface EquippedArtifactSlot {
+  id: number;
+  name: string;
+  rarity: string;
+  imageSlug: string;
+  slot: EquippedArtifactSlotSlot;
+  isPowered: boolean;
+  evolutionStage: number;
+}
+
+export interface FighterState {
+  /** Player id of the fighter's owner. `0` indicates a bot opponent with no real player. */
+  playerId: number;
+  /**
+     * Username of the fighter's owner, used to display opponent identity. `null` for bots.
+     * @nullable
+     */
+  playerUsername: string | null;
+  /**
+     * Display name of the fighter's owner. Falls back to `playerUsername` in the UI when null. `null` for bots.
+     * @nullable
+     */
+  playerDisplayName: string | null;
+  hatchlingId: number;
+  hatchlingName: string;
+  hatchlingLevel: number;
+  realm: string;
+  maxHp: number;
+  currentHp: number;
+  maxEnergy: number;
+  energy: number;
+  speed: number;
+  defenseBonus: number;
+  specialCooldown: number;
+  itemUsed: boolean;
+  isBot: boolean;
+  equippedArtifacts: EquippedArtifactSlot[];
+  artifactPowerScore: number;
+}
+
+export type BattleTurnResultActingSlot = typeof BattleTurnResultActingSlot[keyof typeof BattleTurnResultActingSlot];
+
+
+export const BattleTurnResultActingSlot = {
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+} as const;
+
+export type BattleTurnResultMove = typeof BattleTurnResultMove[keyof typeof BattleTurnResultMove];
+
+
+export const BattleTurnResultMove = {
+  basic_attack: 'basic_attack',
+  special_move: 'special_move',
+  defend: 'defend',
+  use_item: 'use_item',
+} as const;
+
+export interface BattleTurnResult {
+  turnNumber: number;
+  actingSlot: BattleTurnResultActingSlot;
+  move: BattleTurnResultMove;
+  damage: number;
+  healing: number;
+  isCrit: boolean;
+  isSuper: boolean;
+  p1HpAfter: number;
+  p2HpAfter: number;
+  p1EnergyAfter: number;
+  p2EnergyAfter: number;
+}
+
+export type BattleStateMode = typeof BattleStateMode[keyof typeof BattleStateMode];
+
+
+export const BattleStateMode = {
+  casual: 'casual',
+  ranked: 'ranked',
+} as const;
+
+export type BattleStateCurrentSlot = typeof BattleStateCurrentSlot[keyof typeof BattleStateCurrentSlot];
+
+
+export const BattleStateCurrentSlot = {
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+} as const;
+
+export type BattleStatePhase = typeof BattleStatePhase[keyof typeof BattleStatePhase];
+
+
+export const BattleStatePhase = {
+  lobby: 'lobby',
+  active: 'active',
+  ended: 'ended',
+} as const;
+
+/**
+ * Winning slot (1 or 2), `0` for a draw, `null` while the battle is still ongoing.
+ * @nullable
+ */
+export type BattleStateWinner = typeof BattleStateWinner[keyof typeof BattleStateWinner] | null;
+
+
+export const BattleStateWinner = {
+  NUMBER_0: 0,
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+} as const;
+
+export interface BattleState {
+  battleId: number;
+  mode: BattleStateMode;
+  fighter1: FighterState;
+  fighter2: FighterState;
+  currentSlot: BattleStateCurrentSlot;
+  turnNumber: number;
+  phase: BattleStatePhase;
+  /**
+     * Winning slot (1 or 2), `0` for a draw, `null` while the battle is still ongoing.
+     * @nullable
+     */
+  winner: BattleStateWinner;
+  turns: BattleTurnResult[];
+}
+
 export type SearchPlayersParams = {
 /**
  * @minLength 1

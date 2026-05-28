@@ -5760,3 +5760,123 @@ components:
       required: [physiqueGoal]
       properties:
         physiqueGoal: { type: string }
+
+    # ── Battle (live WebSocket payload schemas) ─────────────────────────────
+    # These schemas mirror the fighter / battle state structures pushed over
+    # the live battle WebSocket (`/api/ws/battle`). They are documented here so
+    # generated TS types and Zod schemas stay in sync with the server.
+    EquippedArtifactSlot:
+      type: object
+      required: [id, name, rarity, imageSlug, slot, isPowered, evolutionStage]
+      properties:
+        id:             { type: integer }
+        name:           { type: string }
+        rarity:         { type: string }
+        imageSlug:      { type: string }
+        slot:           { type: string, enum: [major, minor] }
+        isPowered:      { type: boolean }
+        evolutionStage: { type: integer }
+
+    FighterState:
+      type: object
+      required:
+        - playerId
+        - playerUsername
+        - playerDisplayName
+        - hatchlingId
+        - hatchlingName
+        - hatchlingLevel
+        - realm
+        - maxHp
+        - currentHp
+        - maxEnergy
+        - energy
+        - speed
+        - defenseBonus
+        - specialCooldown
+        - itemUsed
+        - isBot
+        - equippedArtifacts
+        - artifactPowerScore
+      properties:
+        playerId:
+          type: integer
+          description: Player id of the fighter's owner. `0` indicates a bot opponent with no real player.
+        playerUsername:
+          type: ["string", "null"]
+          description: Username of the fighter's owner, used to display opponent identity. `null` for bots.
+        playerDisplayName:
+          type: ["string", "null"]
+          description: Display name of the fighter's owner. Falls back to `playerUsername` in the UI when null. `null` for bots.
+        hatchlingId:        { type: integer }
+        hatchlingName:      { type: string }
+        hatchlingLevel:     { type: integer }
+        realm:              { type: string }
+        maxHp:              { type: integer }
+        currentHp:          { type: integer }
+        maxEnergy:          { type: integer }
+        energy:             { type: integer }
+        speed:              { type: integer }
+        defenseBonus:       { type: integer }
+        specialCooldown:    { type: integer }
+        itemUsed:           { type: boolean }
+        isBot:              { type: boolean }
+        equippedArtifacts:
+          type: array
+          items: { $ref: "#/components/schemas/EquippedArtifactSlot" }
+        artifactPowerScore: { type: integer }
+
+    BattleTurnResult:
+      type: object
+      required:
+        - turnNumber
+        - actingSlot
+        - move
+        - damage
+        - healing
+        - isCrit
+        - isSuper
+        - p1HpAfter
+        - p2HpAfter
+        - p1EnergyAfter
+        - p2EnergyAfter
+      properties:
+        turnNumber:    { type: integer }
+        actingSlot:    { type: integer, enum: [1, 2] }
+        move:          { type: string, enum: [basic_attack, special_move, defend, use_item] }
+        damage:        { type: integer }
+        healing:       { type: integer }
+        isCrit:        { type: boolean }
+        isSuper:       { type: boolean }
+        p1HpAfter:     { type: integer }
+        p2HpAfter:     { type: integer }
+        p1EnergyAfter: { type: integer }
+        p2EnergyAfter: { type: integer }
+
+    BattleState:
+      type: object
+      required:
+        - battleId
+        - mode
+        - fighter1
+        - fighter2
+        - currentSlot
+        - turnNumber
+        - phase
+        - winner
+        - turns
+      properties:
+        battleId:    { type: integer }
+        mode:        { type: string, enum: [casual, ranked] }
+        fighter1:    { $ref: "#/components/schemas/FighterState" }
+        fighter2:    { $ref: "#/components/schemas/FighterState" }
+        currentSlot: { type: integer, enum: [1, 2] }
+        turnNumber:  { type: integer }
+        phase:       { type: string, enum: [lobby, active, ended] }
+        winner:
+          type: ["integer", "null"]
+          enum: [0, 1, 2, null]
+          description: Winning slot (1 or 2), `0` for a draw, `null` while the battle is still ongoing.
+        turns:
+          type: array
+          items: { $ref: "#/components/schemas/BattleTurnResult" }
