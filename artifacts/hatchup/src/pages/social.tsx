@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -48,14 +49,36 @@ interface OwnedArtifact {
   isFeatured: boolean;
 }
 
+interface PublicProfile {
+  id: number;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  rank: string;
+  level: number;
+  currentStreak: number;
+  totalWorkouts: number;
+  isVerified: boolean;
+  artifactShowcase: Array<{ id: number; name: string; rarity: string; imageSlug: string; isFeatured: boolean; isEquipped: boolean }>;
+  artifactCount: number;
+}
+
 export default function Social() {
   const { playerId } = usePlayer();
   const pid = playerId ?? 0;
+
+  const [expandedPlayerId, setExpandedPlayerId] = useState<number | null>(null);
 
   const { data: myArtifacts } = useQuery<OwnedArtifact[]>({
     queryKey: ["my-artifacts", pid],
     queryFn: () => fetch(`${BASE}/api/players/me/artifacts`, { credentials: "include" }).then(r => r.json()),
     enabled: !!playerId,
+  });
+
+  const { data: expandedProfile } = useQuery<PublicProfile>({
+    queryKey: ["player-profile", expandedPlayerId],
+    queryFn: () => fetch(`${BASE}/api/players/${expandedPlayerId}/profile`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!expandedPlayerId,
   });
 
   // Top 3: featured first, then equipped, then most recently earned
@@ -135,8 +158,15 @@ export default function Social() {
                 </div>
               ) : (
                 <div className="divide-y divide-border">
-                  {leaderboard?.map((entry, index) => (
-                    <div key={entry.playerId} className="flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors">
+                  {leaderboard?.map((entry) => {
+                    const isExpanded = expandedPlayerId === entry.playerId;
+                    const profile = isExpanded ? expandedProfile : undefined;
+                    return (
+                    <div key={entry.playerId}>
+                      <button
+                        className="w-full flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors text-left"
+                        onClick={() => setExpandedPlayerId(isExpanded ? null : entry.playerId)}
+                      >
                       <div className="w-8 text-center font-black text-xl text-muted-foreground">
                         {entry.position === 1 ? "🥇" : entry.position === 2 ? "🥈" : entry.position === 3 ? "🥉" : `#${entry.position}`}
                       </div>
@@ -148,24 +178,69 @@ export default function Social() {
                         <p className="font-bold text-lg leading-tight">{entry.displayName || entry.username}</p>
                         <p className="text-xs font-bold text-muted-foreground uppercase">{entry.rank}</p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right mr-1">
                         <div className="font-black text-xl">{entry.score}</div>
                         <div className="text-xs text-green-500 font-bold">{entry.wins} Wins</div>
                       </div>
                       {entry.playerId !== pid && (
-                        <ReportBlockMenu
-                          trigger={
-                            <button className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
-                              <MoreVertical className="w-4 h-4" />
-                            </button>
-                          }
-                          targetPlayerId={entry.playerId}
-                          targetName={entry.displayName ?? entry.username}
-                          contentType="profile"
-                        />
+                        <div onClick={e => e.stopPropagation()}>
+                          <ReportBlockMenu
+                            trigger={
+                              <button className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
+                            }
+                            targetPlayerId={entry.playerId}
+                            targetName={entry.displayName ?? entry.username}
+                            contentType="profile"
+                          />
+                        </div>
+                      )}
+                      </button>
+
+                      {/* Artifact Showcase — expanded on tap */}
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="px-4 pb-3 border-t border-border/50 bg-muted/20"
+                        >
+                          {profile ? (
+                            profile.artifactShowcase.length > 0 ? (
+                              <div className="pt-3 space-y-2">
+                                <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                                  Featured Relics · {profile.artifactCount} earned
+                                </p>
+                                <div className="flex gap-2">
+                                  {profile.artifactShowcase.map(artifact => (
+                                    <div
+                                      key={artifact.id}
+                                      className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl border border-border/60 bg-muted/30 ${RARITY_GLOW[artifact.rarity] ?? ""}`}
+                                      title={artifact.name}
+                                    >
+                                      {ARTIFACT_EMOJIS[artifact.imageSlug] ?? "🏺"}
+                                    </div>
+                                  ))}
+                                  <div className="flex-1 flex items-center">
+                                    <span className="text-xs text-muted-foreground font-bold">Lv.{profile.level} · {profile.currentStreak}d streak</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="pt-3 text-xs text-muted-foreground font-bold">No artifacts earned yet.</p>
+                            )
+                          ) : (
+                            <div className="pt-3 flex gap-2">
+                              {[...Array(3)].map((_, i) => <Skeleton key={i} className="w-10 h-10 rounded-xl" />)}
+                            </div>
+                          )}
+                        </motion.div>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

@@ -241,6 +241,8 @@ router.post("/fitness/log", requireAuth, attachPlayer, requirePlayerOwnership, a
     groupBonusXp: groupBonusXp > 0 ? groupBonusXp : undefined,
     groupXpBonusPct: groupXpBonusPct > 0 ? groupXpBonusPct : undefined,
     prResult: result.prResult ?? null,
+    newArtifacts: result.newArtifacts ?? [],
+    newBadges: result.newBadges ?? [],
   });
 });
 

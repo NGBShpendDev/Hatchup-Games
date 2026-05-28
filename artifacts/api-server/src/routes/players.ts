@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable, eggsTable, fitnessActivitiesTable, playerBadgesTable } from "@workspace/db";
+import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable, eggsTable, fitnessActivitiesTable, playerBadgesTable, playerArtifactsTable, artifactsTable } from "@workspace/db";
 import { eq, desc, and, gte } from "drizzle-orm";
 import {
   CreatePlayerBody,
@@ -77,6 +77,53 @@ router.get("/players/:id", requireAuth, attachPlayer, async (req, res) => {
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, params.data.id) });
   if (!player) { res.status(404).json({ error: "Player not found" }); return; }
   res.json(player);
+});
+
+// GET /players/:id/profile — public profile with artifact showcase (top 3 featured/equipped)
+router.get("/players/:id/profile", requireAuth, async (req, res) => {
+  const playerId = Number(req.params.id);
+  if (isNaN(playerId)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const [player, ownedArtifacts] = await Promise.all([
+    db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) }),
+    db.query.playerArtifactsTable.findMany({
+      where: eq(playerArtifactsTable.playerId, playerId),
+      orderBy: (t, { desc: d }) => [d(t.isFeatured), d(t.isEquipped), d(t.earnedAt)],
+    }),
+  ]);
+
+  if (!player) { res.status(404).json({ error: "Player not found" }); return; }
+
+  // Fetch top 3 featured/equipped artifacts for the public showcase strip
+  const showcaseOwned = ownedArtifacts.slice(0, 3);
+  let showcaseArtifacts: Array<{ id: number; name: string; rarity: string; imageSlug: string; isFeatured: boolean; isEquipped: boolean }> = [];
+
+  if (showcaseOwned.length > 0) {
+    const artifactIds = showcaseOwned.map(o => o.artifactId);
+    const artifacts = await db.query.artifactsTable.findMany({
+      where: (t, { inArray }) => inArray(t.id, artifactIds),
+    });
+    const artifactMap = new Map(artifacts.map(a => [a.id, a]));
+    showcaseArtifacts = showcaseOwned.map(o => {
+      const a = artifactMap.get(o.artifactId);
+      if (!a) return null;
+      return { id: a.id, name: a.name, rarity: a.rarity, imageSlug: a.imageSlug, isFeatured: o.isFeatured, isEquipped: o.isEquipped };
+    }).filter((x): x is NonNullable<typeof x> => x !== null);
+  }
+
+  res.json({
+    id: player.id,
+    username: player.username,
+    displayName: player.displayName,
+    avatarUrl: player.avatarUrl,
+    rank: player.rank,
+    level: player.level,
+    currentStreak: player.currentStreak,
+    totalWorkouts: player.totalWorkouts,
+    isVerified: player.isVerified,
+    artifactShowcase: showcaseArtifacts,
+    artifactCount: ownedArtifacts.length,
+  });
 });
 
 router.patch("/players/:id", requireAuth, attachPlayer, async (req, res) => {
