@@ -117,6 +117,23 @@ mock.module("../../middlewares/auth.ts", {
   },
 });
 
+// We mock the admin panel gate so the test doesn't need to wire up Clerk +
+// admin allowlist + admin session cookies. The gate is exercised in its own
+// dedicated middleware tests; here we just need a simple `isAdmin` toggle.
+mock.module("../../middlewares/adminPanel.ts", {
+  namedExports: {
+    requireAdminPanel: (req: Request, res: Response, next: NextFunction) => {
+      const player = state.players.find((p) => p.id === req.playerId);
+      if (!player?.isAdmin) {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+      (req as Request & { adminPlayer?: PlayerRow }).adminPlayer = player;
+      next();
+    },
+  },
+});
+
 mock.module("../../services/emailVerification.ts", {
   namedExports: {
     issueEmailVerification: async () => ({ sent: false }),
@@ -136,11 +153,21 @@ mock.module("drizzle-orm", {
     ne: () => ({}),
     gt: () => ({}),
     lt: () => ({}),
+    isNull: () => ({}),
     and: (...args: unknown[]) => ({ op: "and", args: args.filter(Boolean) }),
     or: (...args: unknown[]) => ({ op: "or", args }),
     desc: (col: unknown) => ({ op: "desc", col }),
     notInArray: () => ({ op: "notIn" }),
     inArray: () => ({}),
+    // Stubs drizzle-zod pulls in at module load time. We don't exercise it,
+    // we just need the named exports to exist so the import resolves.
+    Column: class {},
+    SQL: class {},
+    isView: () => false,
+    isTable: () => false,
+    getTableColumns: () => ({}),
+    getViewSelectedFields: () => ({}),
+    is: () => false,
   },
 });
 
@@ -353,6 +380,8 @@ mock.module("@workspace/db", {
     bouncedEmailsTable: { id: {}, email: {}, bounceType: {}, reason: {}, source: {}, bouncedAt: {}, createdAt: {} },
     accountAppealsTable: { id: {}, playerId: {}, status: {}, reason: {}, createdAt: {}, resolvedAt: {} },
     emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
+    pushSubscriptionsTable: { id: {}, playerId: {}, endpoint: {}, p256dh: {}, auth: {}, createdAt: {} },
+    pushVapidKeysTable: { id: {}, publicKey: {}, privateKey: {}, createdAt: {} },
   },
 });
 
@@ -614,5 +643,172 @@ describe("GET /admin/audit", () => {
     assert.equal(body[0].actorId, 2);
     assert.equal(body[0].action, "suspend");
     assert.equal(body[0].targetPlayerId, 10);
+  });
+
+  it("resolves actor and target usernames in the response", async () => {
+    seedAdmin();
+    seedTarget({ id: 10, clerkId: "u_t10", username: "target_ten" });
+    seedTarget({ id: 11, clerkId: "u_t11", username: "target_eleven" });
+    state.audits.push(
+      {
+        id: 1,
+        actorId: 1,
+        action: "suspend",
+        targetPlayerId: 10,
+        targetReportId: null,
+        reason: null,
+        metadata: null,
+        createdAt: new Date(),
+      },
+      {
+        id: 2,
+        actorId: 1,
+        action: "verify",
+        targetPlayerId: 11,
+        targetReportId: null,
+        reason: null,
+        metadata: null,
+        createdAt: new Date(),
+      },
+    );
+    state.nextAuditId = 3;
+    const { status, body } = await req("GET", "/admin/audit");
+    assert.equal(status, 200);
+    assert.equal(body.length, 2);
+    for (const row of body) {
+      assert.equal(row.actorUsername, "admin");
+      assert.ok("actorDisplayName" in row);
+    }
+    const byId = new Map(body.map((r: { id: number }) => [r.id, r]));
+    assert.equal(byId.get(1).targetUsername, "target_ten");
+    assert.equal(byId.get(2).targetUsername, "target_eleven");
+  });
+
+  it("returns null target username when the audit row has no targetPlayerId", async () => {
+    seedAdmin();
+    state.audits.push({
+      id: 1,
+      actorId: 1,
+      action: "resolve_report",
+      targetPlayerId: null,
+      targetReportId: 99,
+      reason: null,
+      metadata: null,
+      createdAt: new Date(),
+    });
+    state.nextAuditId = 2;
+    const { status, body } = await req("GET", "/admin/audit");
+    assert.equal(status, 200);
+    assert.equal(body.length, 1);
+    assert.equal(body[0].actorUsername, "admin");
+    assert.equal(body[0].targetUsername, null);
+  });
+});
+
+describe("GET /admin/audit — isUndoable state", () => {
+  it("isUndoable is true for a fresh undoable action and isUndone is false", async () => {
+    seedAdmin();
+    seedTarget({ id: 2, clerkId: "u_target", username: "target" });
+    state.audits.push({
+      id: 1,
+      actorId: 1,
+      action: "suspend",
+      targetPlayerId: 2,
+      targetReportId: null,
+      reason: null,
+      metadata: null,
+      createdAt: new Date(),
+    });
+    state.nextAuditId = 2;
+    const { status, body } = await req("GET", "/admin/audit");
+    assert.equal(status, 200);
+    assert.equal(body.length, 1);
+    assert.equal(body[0].isUndoable, true);
+    assert.equal(body[0].isUndone, false);
+    assert.equal(body[0].isUndoEntry, false);
+  });
+
+  it("isUndoable flips to false after a later entry with metadata.undoOf is written", async () => {
+    seedAdmin();
+    seedTarget({ id: 2, clerkId: "u_target", username: "target" });
+    state.audits.push(
+      {
+        id: 1,
+        actorId: 1,
+        action: "suspend",
+        targetPlayerId: 2,
+        targetReportId: null,
+        reason: null,
+        metadata: null,
+        createdAt: new Date(Date.now() - 5000),
+      },
+      {
+        id: 2,
+        actorId: 1,
+        action: "unsuspend",
+        targetPlayerId: 2,
+        targetReportId: null,
+        reason: null,
+        metadata: JSON.stringify({ undoOf: 1, originalAction: "suspend" }),
+        createdAt: new Date(),
+      },
+    );
+    state.nextAuditId = 3;
+    const { status, body } = await req("GET", "/admin/audit");
+    assert.equal(status, 200);
+    const byId = new Map(body.map((r: { id: number }) => [r.id, r]));
+    const original = byId.get(1);
+    const undoEntry = byId.get(2);
+    assert.equal(original.isUndoable, false);
+    assert.equal(original.isUndone, true);
+    assert.equal(original.undoneByEntryId, 2);
+    assert.equal(undoEntry.isUndoEntry, true);
+    assert.equal(undoEntry.undoOfId, 1);
+    // The undo entry itself should never advertise itself as undoable.
+    assert.equal(undoEntry.isUndoable, false);
+  });
+
+  it("isUndoable flips to false once the entry is older than UNDO_WINDOW_MS", async () => {
+    seedAdmin();
+    seedTarget({ id: 2, clerkId: "u_target", username: "target" });
+    // Default window is 7 days. Backdate the audit row to 8 days ago.
+    const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+    state.audits.push({
+      id: 1,
+      actorId: 1,
+      action: "suspend",
+      targetPlayerId: 2,
+      targetReportId: null,
+      reason: null,
+      metadata: null,
+      createdAt: eightDaysAgo,
+    });
+    state.nextAuditId = 2;
+    const { status, body } = await req("GET", "/admin/audit");
+    assert.equal(status, 200);
+    assert.equal(body.length, 1);
+    assert.equal(body[0].isUndoable, false);
+    // It has not been undone — it just timed out.
+    assert.equal(body[0].isUndone, false);
+  });
+
+  it("isUndoable is false for actions that are not in UNDOABLE_ACTIONS", async () => {
+    seedAdmin();
+    seedTarget({ id: 2, clerkId: "u_target", username: "target" });
+    state.audits.push({
+      id: 1,
+      actorId: 1,
+      action: "unsuspend",
+      targetPlayerId: 2,
+      targetReportId: null,
+      reason: null,
+      metadata: null,
+      createdAt: new Date(),
+    });
+    state.nextAuditId = 2;
+    const { status, body } = await req("GET", "/admin/audit");
+    assert.equal(status, 200);
+    assert.equal(body.length, 1);
+    assert.equal(body[0].isUndoable, false);
   });
 });
