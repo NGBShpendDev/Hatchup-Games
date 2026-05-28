@@ -15,7 +15,10 @@ import {
   groupMembersTable,
   groupsTable,
   userReportsTable,
+  challengesTable,
+  challengeParticipantsTable,
 } from "@workspace/db";
+import { z } from "zod/v4";
 import { eq, and, desc, sql, or, ne, inArray, ilike, gte, isNull, isNotNull, notInArray } from "drizzle-orm";
 import { hardDeletePosts, RETENTION_DAYS } from "../services/postPurgeJob.ts";
 import { detectViewAbuse } from "../services/viewAbuseDetection.ts";
@@ -97,6 +100,39 @@ const POST_REWARDS: Record<string, { xp: number; energy: number }> = {
   hatch_moment: { xp: 20, energy: 12 },
   tournament_win: { xp: 40, energy: 25 },
   artifact_unlock: { xp: 15, energy: 10 },
+};
+
+// ── Per-postType metadata validators ────────────────────────────────────────
+//
+// `posts.metadata` is intentionally a flexible JSON blob (OpenAPI marks it
+// `additionalProperties: true`), but PostCard renders specific shapes for a
+// few post types — a misbehaving client could ship malformed payloads (wrong
+// types, missing required keys) that the card then renders awkwardly. We
+// validate metadata at write time against the schema for the given postType.
+//
+// Post types not in the registry accept any object (back-compat for general/
+// gym_selfie/etc. that don't currently carry structured data). Unknown extra
+// keys are passed through (`.passthrough()`) so adding new fields client-side
+// stays a non-breaking change.
+
+const ArtifactUnlockMetadata = z.object({
+  artifactId: z.number().int().positive(),
+  artifactName: z.string().min(1).max(120),
+  artifactRarity: z.string().min(1).max(40),
+  artifactLore: z.string().max(500).nullish(),
+}).passthrough();
+
+const TournamentWinMetadata = z.object({
+  challengeId: z.number().int().positive(),
+  challengeTitle: z.string().min(1).max(200),
+  bracketSize: z.number().int().nonnegative(),
+  boostedXp: z.number().int().nonnegative(),
+  boostedCoins: z.number().int().nonnegative(),
+}).passthrough();
+
+const POST_METADATA_SCHEMAS: Record<string, z.ZodType<Record<string, unknown>>> = {
+  artifact_unlock: ArtifactUnlockMetadata,
+  tournament_win: TournamentWinMetadata,
 };
 
 // ── Creator badge threshold ─────────────────────────────────────────────────
@@ -494,6 +530,63 @@ router.post("/social/posts", requireAuth, attachPlayer, socialWriteLimiter, bloc
     }
   }
 
+  // Per-postType metadata validation. Reject payloads whose metadata doesn't
+  // match the registered shape so PostCard never has to render bad data.
+  let validatedMetadata: Record<string, unknown> | undefined = metadata ?? undefined;
+  const metaSchema = POST_METADATA_SCHEMAS[postType];
+  if (metaSchema) {
+    if (metadata == null) {
+      res.status(400).json({
+        error: `Posts of type "${postType}" require a metadata object`,
+        field: "metadata",
+      });
+      return;
+    }
+    const parsed = metaSchema.safeParse(metadata);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: `Invalid metadata for post type "${postType}"`,
+        field: "metadata",
+        issues: parsed.error.issues.map(i => ({
+          path: i.path.join("."),
+          message: i.message,
+        })),
+      });
+      return;
+    }
+    validatedMetadata = parsed.data;
+  }
+
+  // tournament_win: verify the player actually placed first in the referenced
+  // challenge before letting them broadcast a champion card.
+  if (postType === "tournament_win" && validatedMetadata) {
+    const challengeId = validatedMetadata.challengeId as number;
+    const [challenge] = await db
+      .select({ id: challengesTable.id, status: challengesTable.status })
+      .from(challengesTable)
+      .where(eq(challengesTable.id, challengeId))
+      .limit(1);
+    if (!challenge) {
+      res.status(400).json({ error: "Referenced challenge does not exist", field: "metadata.challengeId" });
+      return;
+    }
+    const [participant] = await db
+      .select({ rank: challengeParticipantsTable.rank })
+      .from(challengeParticipantsTable)
+      .where(and(
+        eq(challengeParticipantsTable.challengeId, challengeId),
+        eq(challengeParticipantsTable.playerId, playerId),
+      ))
+      .limit(1);
+    if (!participant || participant.rank !== 1) {
+      res.status(403).json({
+        error: "Only the first-place finisher can post a tournament_win card",
+        field: "metadata.challengeId",
+      });
+      return;
+    }
+  }
+
   const mod = moderateContent(content);
   if (mod.flagged) {
     res.status(422).json({
@@ -513,7 +606,7 @@ router.post("/social/posts", requireAuth, attachPlayer, socialWriteLimiter, bloc
     creatureId: creatureId ?? undefined,
     xpEarned: rewards.xp,
     energyEarned: rewards.energy,
-    metadata: metadata ?? undefined,
+    metadata: validatedMetadata,
   }).returning();
 
   // Award XP to player

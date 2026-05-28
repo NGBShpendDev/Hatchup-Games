@@ -1675,7 +1675,11 @@ export interface ModerationError {
 for the per-type shape (e.g. `tournament_win` carries `challengeId`,
 `challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`;
 `artifact_unlock` carries `artifactId`, `artifactName`,
-`artifactRarity`, `artifactLore`).
+`artifactRarity`, `artifactLore`). The server validates this object
+against a per-postType Zod schema at write time — payloads with
+missing required keys or wrong types are rejected with `400`. For
+`tournament_win`, the server also verifies the authenticated player
+actually placed first (rank=1) in the referenced challenge.
 
  */
 export type CreatePostInputMetadata = { [key: string]: unknown } | null;
@@ -1694,7 +1698,11 @@ export interface CreatePostInput {
   for the per-type shape (e.g. `tournament_win` carries `challengeId`,
   `challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`;
   `artifact_unlock` carries `artifactId`, `artifactName`,
-  `artifactRarity`, `artifactLore`).
+  `artifactRarity`, `artifactLore`). The server validates this object
+  against a per-postType Zod schema at write time — payloads with
+  missing required keys or wrong types are rejected with `400`. For
+  `tournament_win`, the server also verifies the authenticated player
+  actually placed first (rank=1) in the referenced challenge.
    */
   metadata?: CreatePostInputMetadata;
 }

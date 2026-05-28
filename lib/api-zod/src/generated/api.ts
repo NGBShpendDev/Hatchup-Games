@@ -2370,7 +2370,7 @@ export const CreatePostBody = zod.object({
   "mediaUrl": zod.string().optional(),
   "postType": zod.string().optional(),
   "creatureId": zod.number().optional(),
-  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. See `FeedPost.metadata`\nfor the per-type shape (e.g. `tournament_win` carries `challengeId`,\n`challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`;\n`artifact_unlock` carries `artifactId`, `artifactName`,\n`artifactRarity`, `artifactLore`).\n')
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. See `FeedPost.metadata`\nfor the per-type shape (e.g. `tournament_win` carries `challengeId`,\n`challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`;\n`artifact_unlock` carries `artifactId`, `artifactName`,\n`artifactRarity`, `artifactLore`). The server validates this object\nagainst a per-postType Zod schema at write time — payloads with\nmissing required keys or wrong types are rejected with `400`. For\n`tournament_win`, the server also verifies the authenticated player\nactually placed first (rank=1) in the referenced challenge.\n')
 })
 
 
