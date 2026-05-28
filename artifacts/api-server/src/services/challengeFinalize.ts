@@ -441,7 +441,7 @@ async function notifyTournamentChampion(
         columns: { username: true },
       }),
       db.query.artifactsTable.findFirst({
-        where: eq(artifactsTable.imageSlug, CHAMPION_ARTIFACT_SLUG),
+        where: eq(artifactsTable.imageSlug, `${CHAMPION_ARTIFACT_SLUG_PREFIX}__c${challengeId}`),
       }),
     ]);
     if (player && artifact) {
