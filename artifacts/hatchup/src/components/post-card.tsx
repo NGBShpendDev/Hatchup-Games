@@ -18,6 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 // Note: useEditPostComment / useDeletePostComment are consumed by CommentRow below.
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { isAccountSuspendedError } from "@/lib/suspendedError";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Badge } from "@/components/ui/badge";
@@ -181,8 +182,9 @@ export function CommentRow({
       });
       setOptimistic({ liked: result.liked, count: result.likeCount });
       invalidateFeed();
-    } catch {
+    } catch (err) {
       setOptimistic(null);
+      if (isAccountSuspendedError(err)) return;
       toast({ title: "Could not like comment", variant: "destructive" });
     }
   }
@@ -209,6 +211,7 @@ export function CommentRow({
       setIsEditing(false);
       toast({ title: "Comment updated ✏️" });
     } catch (err: any) {
+      if (isAccountSuspendedError(err)) return;
       if (err?.response?.status === 422) {
         toast({ title: "Keep it positive! 🌟", description: "That content doesn't meet our community guidelines.", variant: "destructive" });
       } else {
@@ -228,7 +231,8 @@ export function CommentRow({
       });
       invalidateFeed();
       toast({ title: "Comment deleted" });
-    } catch {
+    } catch (err) {
+      if (isAccountSuspendedError(err)) return;
       toast({ title: "Could not delete comment", variant: "destructive" });
     }
   }
@@ -546,7 +550,8 @@ export function PostCard({
       const result = await repost.mutateAsync({ id: post.id, data: { playerId: playerId! } });
       qc.invalidateQueries({ queryKey: getGetSocialFeedQueryKey({ playerId: playerId! }) });
       toast({ title: result.reposted ? "Reposted! 🔁" : "Repost removed" });
-    } catch {
+    } catch (err) {
+      if (isAccountSuspendedError(err)) return;
       toast({ title: "Could not repost", variant: "destructive" });
     }
   }
@@ -589,6 +594,7 @@ export function PostCard({
       qc.invalidateQueries({ queryKey: getGetSocialFeedQueryKey({ playerId: playerId! }) });
       toast({ title: "Comment added! 💬" });
     } catch (err: any) {
+      if (isAccountSuspendedError(err)) return;
       if (err?.response?.status === 422) {
         toast({ title: "Keep it positive! 🌟", description: "That content doesn't meet our community guidelines.", variant: "destructive" });
       } else {

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useUser } from "@clerk/react";
+import { ACCOUNT_SUSPENDED_EVENT } from "@/lib/suspendedError";
 
 export type PlayerProfile = {
   id: number;
@@ -85,6 +86,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       fetchPlayer();
     }
   }, [isLoaded, user?.id]);
+
+  useEffect(() => {
+    const handler = () => {
+      fetchPlayer();
+    };
+    window.addEventListener(ACCOUNT_SUSPENDED_EVENT, handler);
+    return () => window.removeEventListener(ACCOUNT_SUSPENDED_EVENT, handler);
+  }, [user?.id]);
 
   const createProfile = async (username: string, displayName: string) => {
     const res = await fetch("/api/players/me", {

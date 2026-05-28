@@ -36,6 +36,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { isAccountSuspendedError } from "@/lib/suspendedError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -131,9 +132,14 @@ function ProfileModal({
       });
       return;
     }
-    await followPlayer.mutateAsync({ data: { followerId: viewerId, followeeId: profileId } });
-    qc.invalidateQueries({ queryKey: getGetPlayerSocialProfileQueryKey(profileId, { viewerId }) });
-    toast({ title: "Following! 🤝" });
+    try {
+      await followPlayer.mutateAsync({ data: { followerId: viewerId, followeeId: profileId } });
+      qc.invalidateQueries({ queryKey: getGetPlayerSocialProfileQueryKey(profileId, { viewerId }) });
+      toast({ title: "Following! 🤝" });
+    } catch (err) {
+      if (isAccountSuspendedError(err)) return;
+      toast({ title: "Could not follow", variant: "destructive" });
+    }
   }
 
   return (
@@ -1076,8 +1082,9 @@ function PlayerDiscoverCard({
       qc.invalidateQueries({ queryKey: getGetSocialFeedQueryKey({ playerId: viewerId }) });
       qc.invalidateQueries({ queryKey: getDiscoverPlayersQueryKey({ playerId: viewerId }) });
       toast({ title: `Following ${player.displayName ?? player.username}! 🤝` });
-    } catch {
+    } catch (err) {
       setOptimisticFollow(false);
+      if (isAccountSuspendedError(err)) return;
       toast({ title: "Could not follow", variant: "destructive" });
     }
   }
@@ -1556,7 +1563,8 @@ export default function Social() {
     try {
       await reactToPost.mutateAsync({ id: postId, data: { playerId: pid, reactionType: reactionType as any } });
       qc.invalidateQueries({ queryKey: getGetSocialFeedQueryKey({ playerId: pid }) });
-    } catch {
+    } catch (err) {
+      if (isAccountSuspendedError(err)) return;
       toast({ title: "Could not react", variant: "destructive" });
     }
   }, [pid, reactToPost, qc, toast]);
@@ -1566,7 +1574,8 @@ export default function Social() {
       await deletePost.mutateAsync({ id: postId, params: { playerId: pid } });
       qc.invalidateQueries({ queryKey: getGetSocialFeedQueryKey({ playerId: pid }) });
       toast({ title: "Post deleted" });
-    } catch {
+    } catch (err) {
+      if (isAccountSuspendedError(err)) return;
       toast({ title: "Could not delete post", variant: "destructive" });
     }
   }, [pid, deletePost, qc, toast]);

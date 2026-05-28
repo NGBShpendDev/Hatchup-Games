@@ -6,6 +6,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { isAccountSuspendedError } from "@/lib/suspendedError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -121,6 +122,7 @@ export function ComposeSheet({
       qc.invalidateQueries({ queryKey: ["/api/social/feed"] });
       onClose();
     } catch (err: any) {
+      if (isAccountSuspendedError(err)) return;
       if (err?.response?.status === 422) {
         toast({ title: "Keep it positive! 🌟", description: "Your post was flagged by our community guidelines. Focus on encouragement!", variant: "destructive" });
       } else {

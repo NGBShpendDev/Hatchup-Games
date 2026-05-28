@@ -3,7 +3,8 @@ import { ClerkProvider, SignIn, SignUp, Show, useClerk } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from "wouter";
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryCache, MutationCache, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { handleAccountSuspendedError } from "@/lib/suspendedError";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PlayerProvider, usePlayer } from "@/lib/playerContext";
@@ -44,7 +45,10 @@ import NotificationsPage from "@/pages/notifications";
 import PostDetail from "@/pages/post-detail";
 import { PageTransition } from "@/components/page-transition";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: handleAccountSuspendedError }),
+  mutationCache: new MutationCache({ onError: handleAccountSuspendedError }),
+});
 
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
