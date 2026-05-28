@@ -66,6 +66,19 @@ export const playersTable = pgTable("players", {
   streakAtRisk: boolean("streak_at_risk").notNull().default(false),
   recoveryMessage: text("recovery_message"),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
+  // Subscription / monetization
+  subscriptionTier: text("subscription_tier").notNull().default("premium"),
+  subscriptionSource: text("subscription_source").notNull().default("trial"),
+  trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+  paidUntil: timestamp("paid_until", { withTimezone: true }),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  top10LastCheckedAt: timestamp("top10_last_checked_at", { withTimezone: true }),
+  top10ContextLabel: text("top10_context_label"),
+  dailyCoachUsedCount: integer("daily_coach_used_count").notNull().default(0),
+  dailyCoachResetDate: date("daily_coach_reset_date"),
+  dailyBattleUsedCount: integer("daily_battle_used_count").notNull().default(0),
+  dailyBattleResetDate: date("daily_battle_reset_date"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

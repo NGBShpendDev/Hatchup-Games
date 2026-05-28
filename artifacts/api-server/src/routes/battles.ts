@@ -4,12 +4,13 @@ import { battlesTable, hatchlingsTable, playersTable } from "@workspace/db";
 import { eq, desc, or } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { attachEntitlement, enforceBattleDailyCap } from "../services/subscriptionGuards";
 import { issueWsToken } from "../services/matchmakingQueue";
 
 const router = Router();
 
 // ── POST /battles/queue/join (REST fallback — primary join is via WS) ─────────
-router.post("/battles/queue/join", requireAuth, attachPlayer, async (req, res) => {
+router.post("/battles/queue/join", requireAuth, attachPlayer, attachEntitlement, enforceBattleDailyCap, async (req, res) => {
   const body = z.object({ hatchlingId: z.number(), mode: z.enum(["casual", "ranked"]).default("casual") }).safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 

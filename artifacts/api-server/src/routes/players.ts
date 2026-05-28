@@ -47,11 +47,15 @@ router.post("/players/me", requireAuth, async (req, res) => {
     return;
   }
 
+  const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const player = await db.insert(playersTable).values({
     clerkId,
     username,
     displayName: displayName ?? username,
     avatarUrl: avatarUrl ?? null,
+    subscriptionTier: "premium",
+    subscriptionSource: "trial",
+    trialEndsAt: trialEnd,
   }).returning();
 
   res.status(201).json(player[0]);
@@ -63,9 +67,18 @@ router.post("/players", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Invalid input" });
     return;
   }
+  const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const player = await db
     .insert(playersTable)
-    .values({ username: body.data.username, displayName: body.data.displayName, avatarUrl: body.data.avatarUrl, clerkId: req.clerkUserId! })
+    .values({
+      username: body.data.username,
+      displayName: body.data.displayName,
+      avatarUrl: body.data.avatarUrl,
+      clerkId: req.clerkUserId!,
+      subscriptionTier: "premium",
+      subscriptionSource: "trial",
+      trialEndsAt: trialEnd,
+    })
     .returning();
   res.status(201).json(player[0]);
 });

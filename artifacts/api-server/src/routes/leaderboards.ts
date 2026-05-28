@@ -8,6 +8,7 @@ import { desc, eq, notInArray, gte, and } from "drizzle-orm";
 import { GetGlobalLeaderboardQueryParams, GetModeLeaderboardQueryParams } from "@workspace/api-zod";
 import { getHiddenPlayerIds } from "./safety";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { attachEntitlement } from "../services/subscriptionGuards";
 import { canAppearInScope } from "./locations";
 
 const router = Router();
@@ -97,7 +98,7 @@ router.get("/leaderboards/global", requireAuth, attachPlayer, async (req, res) =
 // ── GET /leaderboards/scoped ──────────────────────────────────────────────────
 // Privacy source of truth: players.locationVisibility (updated by /settings/privacy).
 // "nearby" scope is equivalent to city — players within the same city as the requester.
-router.get("/leaderboards/scoped", requireAuth, attachPlayer, async (req, res) => {
+router.get("/leaderboards/scoped", requireAuth, attachPlayer, attachEntitlement, async (req, res) => {
   const scope  = ((req.query.scope  as string) ?? "world") as ScopeKey;
   const metric = ((req.query.metric as string) ?? "xp")    as MetricKey;
   const limit  = Math.min(50, Number(req.query.limit ?? 20));
@@ -108,6 +109,17 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, async (req, res) =
 
   if (!validScopes.includes(scope) || !validMetrics.includes(metric)) {
     res.status(400).json({ error: "Invalid scope or metric" });
+    return;
+  }
+
+  // Free tier can only see world/country leaderboards (no nearby/county/state/city)
+  const allowedScopes = req.entitlement?.features.allowedScopes ?? ["world", "country", "state", "county", "city", "nearby"];
+  if (!allowedScopes.includes(scope)) {
+    res.status(402).json({
+      error: "premium_required_scope",
+      message: "Local leaderboards (nearby, city, county, state) are a Premium feature. Upgrade to compete locally.",
+      allowedScopes,
+    });
     return;
   }
 

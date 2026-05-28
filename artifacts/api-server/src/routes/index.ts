@@ -25,6 +25,7 @@ import challengesRouter from "./challenges";
 import socialRouter from "./social";
 import accessibilityRouter from "./accessibility";
 import locationsRouter from "./locations";
+import subscriptionRouter from "./subscription";
 
 const router: IRouter = Router();
 
@@ -54,5 +55,6 @@ router.use(challengesRouter);
 router.use(socialRouter);
 router.use(accessibilityRouter);
 router.use(locationsRouter);
+router.use(subscriptionRouter);
 
 export default router;

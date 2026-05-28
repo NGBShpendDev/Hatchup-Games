@@ -13,6 +13,7 @@ import {
   EvolveHatchlingBody,
 } from "@workspace/api-zod";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth";
+import { attachEntitlement, enforceHatchlingCap } from "../services/subscriptionGuards";
 
 const router = Router();
 
@@ -43,7 +44,7 @@ router.get("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, asy
   })));
 });
 
-router.post("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
+router.post("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, attachEntitlement, enforceHatchlingCap, async (req, res) => {
   const body = CreateHatchlingBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 

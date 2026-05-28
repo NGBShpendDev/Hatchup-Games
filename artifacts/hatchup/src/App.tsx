@@ -34,6 +34,7 @@ import ChallengeDetail from "@/pages/challenge-detail";
 import ChallengeCreate from "@/pages/challenge-create";
 import Onboarding from "@/pages/onboarding";
 import FamilyPage from "@/pages/family";
+import SubscriptionPage from "@/pages/subscription";
 
 const queryClient = new QueryClient();
 
@@ -245,6 +246,7 @@ function AppRoutes() {
         <Route path="/challenges/:id" component={ChallengeDetail} />
         <Route path="/challenges" component={Challenges} />
         <Route path="/family" component={FamilyPage} />
+        <Route path="/subscription" component={SubscriptionPage} />
         <Route component={NotFound} />
       </Switch>
     </>

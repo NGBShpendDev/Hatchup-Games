@@ -15,6 +15,7 @@ import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkle
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { XpBar } from "@/components/xp-bar";
+import { SubscriptionChip } from "@/components/subscription-chip";
 import { LevelUpOverlay } from "@/components/level-up-overlay";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
@@ -244,6 +245,7 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-2">
+            <SubscriptionChip />
             {streakFreezes > 0 && (
               <div className="flex items-center gap-1 bg-blue-500/20 border border-blue-500/40 px-2 py-1 rounded-full">
                 <span className="text-sm">❄️</span>
