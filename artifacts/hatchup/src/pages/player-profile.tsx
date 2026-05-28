@@ -369,6 +369,7 @@ function RivalryCard({ viewerId, opponentId }: { viewerId: number; opponentId: n
   const [, navigate] = useLocation();
   const [rematchOpen, setRematchOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const [hotPicksOnly, setHotPicksOnly] = useState(false);
 
   const { data } = useQuery<RivalrySummary>({
     queryKey: ["rival-summary", viewerId, opponentId],
@@ -463,7 +464,7 @@ function RivalryCard({ viewerId, opponentId }: { viewerId: number; opponentId: n
         )}
       </motion.div>
 
-      <Dialog open={rematchOpen} onOpenChange={(open) => { if (!open) setRematchOpen(false); }}>
+      <Dialog open={rematchOpen} onOpenChange={(open) => { if (!open) { setRematchOpen(false); setHotPicksOnly(false); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Rematch {opponentName}?</DialogTitle>
@@ -472,79 +473,112 @@ function RivalryCard({ viewerId, opponentId }: { viewerId: number; opponentId: n
               Pick a Hatchling to send into the arena.
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-72 overflow-y-auto space-y-2">
-            {myHatchlings.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">
-                You need a Hatchling first.
-              </p>
-            ) : (
-              rankHatchlingsForRematch(myHatchlings, data?.battles ?? []).map(r => {
-                const h = r.hatchling;
-                const record = formatRecord(r);
-                const streakLabel = formatStreak(r.currentStreak);
-                const streakTooltip = r.currentStreak && r.currentStreak.count >= 2
-                  ? `${r.currentStreak.count}-${r.currentStreak.type} streak vs this rival`
-                  : undefined;
-                const subLabel = r.reason === "best-win-rate" && record
-                  ? `${record} vs this rival`
-                  : r.reason === "last-used"
-                    ? record
-                      ? `Last used · ${record} vs this rival`
-                      : "Last used vs this rival"
-                    : record
-                      ? `${record} vs this rival`
-                      : `Lv. ${h.level}`;
-                return (
-                  <button
-                    key={h.id}
-                    disabled={sending}
-                    onClick={() => sendRematch(h.id)}
-                    className={`w-full flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition disabled:opacity-50 ${
-                      r.isRecommended
-                        ? "border-primary/60 bg-primary/10 hover:bg-primary/15"
-                        : "border-border bg-card/40 hover:border-primary/50 hover:bg-primary/5"
-                    }`}
-                    data-testid={`button-pick-hatchling-rematch-${h.id}`}
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="font-bold truncate">{h.name}</p>
-                        {r.isRecommended && (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-primary"
-                            data-testid={`badge-recommended-rematch-${h.id}`}
-                          >
-                            <Star className="w-2.5 h-2.5" /> Recommended
-                          </span>
-                        )}
-                        {streakLabel && (
-                          <span
-                            title={streakTooltip}
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-black tabular-nums ${
-                              r.currentStreak?.type === "win"
-                                ? "bg-orange-500/20 text-orange-300"
-                                : r.currentStreak?.type === "loss"
-                                  ? "bg-red-500/20 text-red-400"
-                                  : "bg-yellow-500/20 text-yellow-300"
-                            }`}
-                            data-testid={`badge-streak-rematch-${h.id}`}
-                          >
-                            {streakLabel}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        Lv. {h.level} · {subLabel}
-                      </p>
-                    </div>
-                    <Swords className="w-4 h-4 text-primary shrink-0" />
-                  </button>
-                );
-              })
-            )}
-          </div>
+          {(() => {
+            const ranked = rankHatchlingsForRematch(myHatchlings, data?.battles ?? []);
+            const hasHotPicks = ranked.some(
+              r => r.currentStreak?.type === "win" && r.currentStreak.count >= 2,
+            );
+            const displayed = hotPicksOnly
+              ? ranked.filter(r => r.currentStreak?.type === "win" && r.currentStreak.count >= 2)
+              : ranked;
+            return (
+              <>
+                {hasHotPicks && (
+                  <div className="flex items-center gap-2 px-1">
+                    <button
+                      onClick={() => setHotPicksOnly(v => !v)}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border transition ${
+                        hotPicksOnly
+                          ? "bg-orange-500/20 border-orange-500/50 text-orange-300"
+                          : "bg-card/40 border-border text-muted-foreground hover:border-orange-500/40 hover:text-orange-300"
+                      }`}
+                      data-testid="toggle-hot-picks-profile"
+                    >
+                      <Flame className="w-3.5 h-3.5" />
+                      Hot picks only
+                    </button>
+                  </div>
+                )}
+                <div className="max-h-72 overflow-y-auto space-y-2">
+                  {myHatchlings.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      You need a Hatchling first.
+                    </p>
+                  ) : displayed.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">
+                      No hatchlings on a hot streak vs this rival.
+                    </p>
+                  ) : (
+                    displayed.map(r => {
+                      const h = r.hatchling;
+                      const record = formatRecord(r);
+                      const streakLabel = formatStreak(r.currentStreak);
+                      const streakTooltip = r.currentStreak && r.currentStreak.count >= 2
+                        ? `${r.currentStreak.count}-${r.currentStreak.type} streak vs this rival`
+                        : undefined;
+                      const subLabel = r.reason === "best-win-rate" && record
+                        ? `${record} vs this rival`
+                        : r.reason === "last-used"
+                          ? record
+                            ? `Last used · ${record} vs this rival`
+                            : "Last used vs this rival"
+                          : record
+                            ? `${record} vs this rival`
+                            : `Lv. ${h.level}`;
+                      return (
+                        <button
+                          key={h.id}
+                          disabled={sending}
+                          onClick={() => sendRematch(h.id)}
+                          className={`w-full flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition disabled:opacity-50 ${
+                            r.isRecommended
+                              ? "border-primary/60 bg-primary/10 hover:bg-primary/15"
+                              : "border-border bg-card/40 hover:border-primary/50 hover:bg-primary/5"
+                          }`}
+                          data-testid={`button-pick-hatchling-rematch-${h.id}`}
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="font-bold truncate">{h.name}</p>
+                              {r.isRecommended && (
+                                <span
+                                  className="inline-flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-primary"
+                                  data-testid={`badge-recommended-rematch-${h.id}`}
+                                >
+                                  <Star className="w-2.5 h-2.5" /> Recommended
+                                </span>
+                              )}
+                              {streakLabel && (
+                                <span
+                                  title={streakTooltip}
+                                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-black tabular-nums ${
+                                    r.currentStreak?.type === "win"
+                                      ? "bg-orange-500/20 text-orange-300"
+                                      : r.currentStreak?.type === "loss"
+                                        ? "bg-red-500/20 text-red-400"
+                                        : "bg-yellow-500/20 text-yellow-300"
+                                  }`}
+                                  data-testid={`badge-streak-rematch-${h.id}`}
+                                >
+                                  {streakLabel}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              Lv. {h.level} · {subLabel}
+                            </p>
+                          </div>
+                          <Swords className="w-4 h-4 text-primary shrink-0" />
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            );
+          })()}
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setRematchOpen(false)} disabled={sending}>
+            <Button variant="ghost" onClick={() => { setRematchOpen(false); setHotPicksOnly(false); }} disabled={sending}>
               Cancel
             </Button>
           </DialogFooter>
