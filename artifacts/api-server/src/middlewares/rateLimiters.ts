@@ -69,9 +69,19 @@ function dbLimiter(opts: DbLimiterOptions): RequestHandler {
   return async (req, res, next) => {
     try {
       const key = keyFor(req);
-      const ok = await consumeRateLimitBudget(opts.scope, key, opts.windowMs, opts.max);
-      if (!ok) {
-        res.status(429).json(opts.message);
+      const result = await consumeRateLimitBudget(opts.scope, key, opts.windowMs, opts.max);
+      if (!result.allowed) {
+        // Surface the precise wait time so frontends can render a real
+        // "Try again in 42s" countdown instead of a generic message.
+        // The body shape is additive — `retryAfterSeconds` is appended
+        // alongside the original `message` fields so existing clients
+        // that only read `error`/`message` keep working unchanged.
+        if (result.retryAfterSeconds != null) {
+          res.setHeader("Retry-After", String(result.retryAfterSeconds));
+          res.status(429).json({ ...opts.message, retryAfterSeconds: result.retryAfterSeconds });
+        } else {
+          res.status(429).json(opts.message);
+        }
         return;
       }
       next();
@@ -182,12 +192,13 @@ const emailResendKey = (req: { playerId?: number; ip?: string }) =>
 export async function consumeEmailResendBudget(
   req: { playerId?: number; ip?: string },
 ): Promise<boolean> {
-  return consumeRateLimitBudget(
+  const result = await consumeRateLimitBudget(
     "email_resend",
     emailResendKey(req),
     EMAIL_RESEND_WINDOW_MS,
     EMAIL_RESEND_MAX,
   );
+  return result.allowed;
 }
 
 export async function emailResendLimiter(
@@ -195,12 +206,25 @@ export async function emailResendLimiter(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  const ok = await consumeEmailResendBudget({ playerId: req.playerId, ip: req.ip });
-  if (!ok) {
-    res.status(429).json({
+  // Call the underlying budget directly so we can surface `retryAfterSeconds`
+  // to the client. `consumeEmailResendBudget` stays boolean for backward
+  // compatibility with the programmatic caller in `routes/safety.ts`.
+  const result = await consumeRateLimitBudget(
+    "email_resend",
+    emailResendKey({ playerId: req.playerId, ip: req.ip }),
+    EMAIL_RESEND_WINDOW_MS,
+    EMAIL_RESEND_MAX,
+  );
+  if (!result.allowed) {
+    const body: Record<string, unknown> = {
       error: "too_many_email_resends",
       message: "You can only send 3 confirmation emails per hour. Please try again later.",
-    });
+    };
+    if (result.retryAfterSeconds != null) {
+      res.setHeader("Retry-After", String(result.retryAfterSeconds));
+      body.retryAfterSeconds = result.retryAfterSeconds;
+    }
+    res.status(429).json(body);
     return;
   }
   next();

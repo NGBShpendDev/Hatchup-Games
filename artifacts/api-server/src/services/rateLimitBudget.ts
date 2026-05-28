@@ -22,14 +22,33 @@ import { and, desc, eq, lt } from "drizzle-orm";
  * GC is bounded per `(scope, key)` — at most `max` rows live in any window
  * for a given key, and the opportunistic delete touches only that key's
  * rows, so the table never accumulates more than `max * activeKeys` rows.
+ *
+ * Returns `{ allowed }` plus, when the call is denied, `retryAfterSeconds`
+ * — the wall-clock seconds until the oldest in-window attempt rolls off
+ * and a slot frees up. Callers (the `dbLimiter` middleware) surface this
+ * to clients via the standard `Retry-After` header and an additive
+ * `retryAfterSeconds` field on the 429 JSON body so frontends can render
+ * a precise "Try again in 42s" countdown instead of a generic message.
  */
+export interface RateLimitBudgetResult {
+  allowed: boolean;
+  /**
+   * Seconds (rounded up, minimum 1) until the next slot frees for this
+   * `(scope, key)` bucket. Only set when `allowed === false`. Omitted if
+   * we cannot determine it (e.g. the row's `createdAt` is missing in a
+   * test stub) so callers can fall back to a generic message.
+   */
+  retryAfterSeconds?: number;
+}
+
 export async function consumeRateLimitBudget(
   scope: string,
   key: string,
   windowMs: number,
   max: number,
-): Promise<boolean> {
-  const cutoff = new Date(Date.now() - windowMs);
+): Promise<RateLimitBudgetResult> {
+  const now = Date.now();
+  const cutoff = new Date(now - windowMs);
   // Opportunistic GC scoped to this key only — keeps the per-call delete
   // bounded regardless of how many other keys are active in the table.
   await db
@@ -42,7 +61,10 @@ export async function consumeRateLimitBudget(
       ),
     );
   const recent = await db
-    .select({ id: rateLimitAttemptsTable.id })
+    .select({
+      id: rateLimitAttemptsTable.id,
+      createdAt: rateLimitAttemptsTable.createdAt,
+    })
     .from(rateLimitAttemptsTable)
     .where(
       and(
@@ -51,7 +73,22 @@ export async function consumeRateLimitBudget(
       ),
     )
     .orderBy(desc(rateLimitAttemptsTable.createdAt));
-  if (recent.length >= max) return false;
+  if (recent.length >= max) {
+    // `recent` is desc, so the `max`-th newest row (index max-1) is the
+    // oldest attempt that still occupies a slot. The next slot frees when
+    // that row rolls off the window: createdAt + windowMs.
+    const blocker = recent[max - 1];
+    const blockerTs = blocker?.createdAt instanceof Date
+      ? blocker.createdAt.getTime()
+      : typeof blocker?.createdAt === "string"
+        ? Date.parse(blocker.createdAt)
+        : NaN;
+    if (Number.isFinite(blockerTs)) {
+      const msUntilFree = Math.max(0, blockerTs + windowMs - now);
+      return { allowed: false, retryAfterSeconds: Math.max(1, Math.ceil(msUntilFree / 1000)) };
+    }
+    return { allowed: false };
+  }
   await db.insert(rateLimitAttemptsTable).values({ scope, key });
-  return true;
+  return { allowed: true };
 }

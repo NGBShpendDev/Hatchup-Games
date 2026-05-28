@@ -40,6 +40,24 @@ import {
 } from "lucide-react";
 import { usePushSubscription } from "@/hooks/use-push-subscription";
 
+/**
+ * Render a `retryAfterSeconds` value from a 429 response as friendly toast
+ * copy ("Try again in 42s" / "Try again in 3m 12s"). Returns `null` for
+ * non-finite / missing inputs so callers can fall back to their existing
+ * static "try later" message.
+ */
+function formatRetryAfter(seconds: number | undefined | null): string | null {
+  if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return null;
+  const total = Math.ceil(seconds);
+  if (total < 60) return `Try again in ${total}s.`;
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  if (mins < 60) return secs === 0 ? `Try again in ${mins}m.` : `Try again in ${mins}m ${secs}s.`;
+  const hrs = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  return remMins === 0 ? `Try again in ${hrs}h.` : `Try again in ${hrs}h ${remMins}m.`;
+}
+
 // Mirror of the server's `isoWeekKey` (artifacts/api-server/src/services/nutritionRecap.ts).
 // Used to decide whether a real delivery timestamp falls inside the current ISO
 // week, matching the same dedupe key the scheduler uses.
@@ -319,9 +337,16 @@ export default function SettingsPrivacy() {
         credentials: "include",
       });
       if (res.status === 429) {
+        // The dbLimiter now ships a precise `retryAfterSeconds` alongside the
+        // legacy message, so we can swap the vague "try later" copy for a
+        // concrete countdown ("Try again in 42m 13s") whenever the server
+        // tells us exactly when the slot frees.
+        const body = await res.json().catch(() => null) as { retryAfterSeconds?: number } | null;
+        const description = formatRetryAfter(body?.retryAfterSeconds)
+          ?? "You can only send one recap preview per hour. Try again later.";
         toast({
           title: "Slow down",
-          description: "You can only send one recap preview per hour. Try again later.",
+          description,
           variant: "destructive",
         });
         return;
