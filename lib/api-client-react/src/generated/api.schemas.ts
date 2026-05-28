@@ -1195,6 +1195,8 @@ export interface PostComment {
   content: string;
   isFlagged: boolean;
   createdAt: string;
+  /** @nullable */
+  updatedAt?: string | null;
   likeCount: number;
   myLiked: boolean;
 }

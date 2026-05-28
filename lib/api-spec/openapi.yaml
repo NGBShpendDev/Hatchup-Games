@@ -4869,6 +4869,7 @@ components:
         content:    { type: string }
         isFlagged:  { type: boolean }
         createdAt:  { type: string }
+        updatedAt:  { type: ["string", "null"] }
         likeCount:  { type: integer }
         myLiked:    { type: boolean }
 

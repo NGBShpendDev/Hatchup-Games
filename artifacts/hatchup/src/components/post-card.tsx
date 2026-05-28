@@ -169,6 +169,15 @@ export function CommentRow({
       <div className="bg-muted/50 rounded-xl px-2.5 py-1.5 flex-1 min-w-0">
         <div className="flex items-start gap-2">
           <span className="font-bold text-[11px]">{comment.authorName}</span>
+          {comment.updatedAt && (
+            <span
+              className="text-[10px] text-muted-foreground italic"
+              title={`Edited ${new Date(comment.updatedAt).toLocaleString()}`}
+              data-testid={`text-${testIdPrefix}-edited-${comment.id}`}
+            >
+              (edited)
+            </span>
+          )}
           {isOwn && !isEditing && (
             <div className="ml-auto flex items-center gap-1">
               <button

@@ -135,6 +135,7 @@ async function enrichPost(
       authorName: commentAuthor?.displayName ?? commentAuthor?.username ?? "Trainer",
       authorAvatar: commentAuthor?.avatarUrl ?? null,
       createdAt: c.createdAt.toISOString(),
+      updatedAt: c.updatedAt ? c.updatedAt.toISOString() : null,
       likeCount: likeCountByComment.get(c.id) ?? 0,
       myLiked: myLikedByComment.get(c.id) ?? false,
     };
@@ -618,6 +619,7 @@ router.get("/social/posts/:id/comments", requireAuth, attachPlayer, async (req, 
       authorName: author?.displayName ?? author?.username ?? "Trainer",
       authorAvatar: author?.avatarUrl ?? null,
       createdAt: c.createdAt.toISOString(),
+      updatedAt: c.updatedAt ? c.updatedAt.toISOString() : null,
       likeCount: likeCountByComment.get(c.id) ?? 0,
       myLiked: myLikedByComment.get(c.id) ?? false,
     };
@@ -674,6 +676,7 @@ router.post("/social/posts/:id/comments", socialWriteLimiter, requireAuth, attac
     authorName: author?.displayName ?? author?.username ?? "Trainer",
     authorAvatar: author?.avatarUrl ?? null,
     createdAt: comment.createdAt.toISOString(),
+    updatedAt: null,
     likeCount: 0,
     myLiked: false,
   });
@@ -703,7 +706,7 @@ router.patch("/social/posts/:id/comments/:commentId", socialWriteLimiter, requir
   }
 
   const [updated] = await db.update(postCommentsTable)
-    .set({ content: content.trim().slice(0, 280) })
+    .set({ content: content.trim().slice(0, 280), updatedAt: new Date() })
     .where(eq(postCommentsTable.id, commentId))
     .returning();
 
@@ -725,6 +728,7 @@ router.patch("/social/posts/:id/comments/:commentId", socialWriteLimiter, requir
     authorName: author?.displayName ?? author?.username ?? "Trainer",
     authorAvatar: author?.avatarUrl ?? null,
     createdAt: updated.createdAt.toISOString(),
+    updatedAt: updated.updatedAt ? updated.updatedAt.toISOString() : null,
     likeCount,
     myLiked: !!myLike,
   });

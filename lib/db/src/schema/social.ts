@@ -42,6 +42,7 @@ export const postCommentsTable = pgTable("post_comments", {
   content: text("content").notNull(),
   isFlagged: boolean("is_flagged").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }),
 });
 
 export const postCommentReactionsTable = pgTable("post_comment_reactions", {

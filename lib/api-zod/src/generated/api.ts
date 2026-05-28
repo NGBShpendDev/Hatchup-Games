@@ -2193,6 +2193,7 @@ export const GetSocialFeedResponse = zod.object({
   "content": zod.string(),
   "isFlagged": zod.boolean(),
   "createdAt": zod.string(),
+  "updatedAt": zod.string().nullish(),
   "likeCount": zod.number(),
   "myLiked": zod.boolean()
 })).optional()
@@ -2253,6 +2254,7 @@ export const GetTrendingPostsResponse = zod.object({
   "content": zod.string(),
   "isFlagged": zod.boolean(),
   "createdAt": zod.string(),
+  "updatedAt": zod.string().nullish(),
   "likeCount": zod.number(),
   "myLiked": zod.boolean()
 })).optional()
@@ -2326,6 +2328,7 @@ export const GetPostResponse = zod.object({
   "content": zod.string(),
   "isFlagged": zod.boolean(),
   "createdAt": zod.string(),
+  "updatedAt": zod.string().nullish(),
   "likeCount": zod.number(),
   "myLiked": zod.boolean()
 })).optional()
@@ -2397,6 +2400,7 @@ export const ListPostCommentsResponseItem = zod.object({
   "content": zod.string(),
   "isFlagged": zod.boolean(),
   "createdAt": zod.string(),
+  "updatedAt": zod.string().nullish(),
   "likeCount": zod.number(),
   "myLiked": zod.boolean()
 })
@@ -2446,6 +2450,7 @@ export const EditPostCommentResponse = zod.object({
   "content": zod.string(),
   "isFlagged": zod.boolean(),
   "createdAt": zod.string(),
+  "updatedAt": zod.string().nullish(),
   "likeCount": zod.number(),
   "myLiked": zod.boolean()
 })
@@ -2636,6 +2641,7 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "content": zod.string(),
   "isFlagged": zod.boolean(),
   "createdAt": zod.string(),
+  "updatedAt": zod.string().nullish(),
   "likeCount": zod.number(),
   "myLiked": zod.boolean()
 })).optional()
@@ -2679,6 +2685,7 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "content": zod.string(),
   "isFlagged": zod.boolean(),
   "createdAt": zod.string(),
+  "updatedAt": zod.string().nullish(),
   "likeCount": zod.number(),
   "myLiked": zod.boolean()
 })).optional()
@@ -2903,6 +2910,7 @@ export const GetDailyMemoryResponse = zod.union([zod.object({
   "content": zod.string(),
   "isFlagged": zod.boolean(),
   "createdAt": zod.string(),
+  "updatedAt": zod.string().nullish(),
   "likeCount": zod.number(),
   "myLiked": zod.boolean()
 })).optional()
