@@ -16,6 +16,7 @@ import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middleware
 import { attachEntitlement, enforceHatchlingCap } from "../services/subscriptionGuards.ts";
 import { buildHatchShareSvg } from "./og-render.ts";
 import { renderSvgToPng } from "./og-router.ts";
+import { applyHatchlingXp } from "../services/hatchlingXp.ts";
 
 // ── Realm → emoji mapping (mirrors client-side REALM_EGG_STYLES) ──────────────
 const REALM_EMOJI: Record<string, string> = {
@@ -392,7 +393,7 @@ router.post("/hatchlings/:id/evolve", requireAuth, attachPlayer, async (req, res
 
   const newStage = Math.min(3, hatchling.evolutionStage + 1);
 
-  const updated = await db.update(hatchlingsTable).set({
+  await db.update(hatchlingsTable).set({
     evolutionStage: newStage,
     evolutionType: evolutionType.name,
     category: evolutionType.category,
@@ -402,21 +403,24 @@ router.post("/hatchlings/:id/evolve", requireAuth, attachPlayer, async (req, res
     abilityDesc: evolutionType.abilityDesc,
     imageUrl: evolutionType.imageUrl,
     color: evolutionType.color,
-    level: hatchling.level + 2,
-    xp: hatchling.xp + 500,
     moodState: "celebrating",
     lastWorkoutAt: new Date(),
-  }).where(eq(hatchlingsTable.id, params.data.id)).returning();
+  }).where(eq(hatchlingsTable.id, params.data.id));
+
+  await applyHatchlingXp(params.data.id, 500);
 
   await db.update(evolutionTypesTable).set({ unlockedCount: evolutionType.unlockedCount + 1 }).where(eq(evolutionTypesTable.id, evolutionType.id));
 
+  const evolved = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, params.data.id) });
+  if (!evolved) { res.status(404).json({ error: "Hatchling not found after evolve" }); return; }
+
   res.json({
-    ...updated[0],
+    ...evolved,
     moodState: "celebrating",
-    powerScore: computePowerScore(updated[0].level, updated[0].rarity, updated[0].battleWins),
-    stepsToEvolution: computeStepsToEvolution(updated[0].xp, updated[0].evolutionStage),
-    createdAt: updated[0].createdAt.toISOString(),
-    lastWorkoutAt: updated[0].lastWorkoutAt?.toISOString() ?? null,
+    powerScore: computePowerScore(evolved.level, evolved.rarity, evolved.battleWins),
+    stepsToEvolution: computeStepsToEvolution(evolved.xp, evolved.evolutionStage),
+    createdAt: evolved.createdAt.toISOString(),
+    lastWorkoutAt: evolved.lastWorkoutAt?.toISOString() ?? null,
   });
 });
 

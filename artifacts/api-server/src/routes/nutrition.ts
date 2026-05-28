@@ -27,6 +27,7 @@ import {
 } from "../services/dailyMacroReward.ts";
 import { notificationsTable } from "@workspace/db";
 import { recapPreviewLimiter } from "../middlewares/rateLimiters.ts";
+import { applyHatchlingXp } from "../services/hatchlingXp.ts";
 import { resolveActivePartner } from "../services/activePartner.ts";
 
 const objectStorageService = new ObjectStorageService();
@@ -284,9 +285,9 @@ async function checkAndRewardDailyMacroTarget(playerId: number, player: typeof p
     await db.update(hatchlingsTable)
       .set({
         friendshipLevel: sql`friendship_level + ${STREAK_HATCHLING_BOND}`,
-        xp: sql`xp + ${STREAK_HATCHLING_XP}`,
       })
       .where(eq(hatchlingsTable.id, active.id));
+    await applyHatchlingXp(active.id, STREAK_HATCHLING_XP);
     hatchlingReward = {
       hatchlingId: active.id,
       hatchlingName: active.name,

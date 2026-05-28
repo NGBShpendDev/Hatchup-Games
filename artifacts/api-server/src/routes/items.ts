@@ -4,6 +4,7 @@ import { itemsTable, hatchlingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { ListItemsQueryParams, UseItemBody, UseItemParams } from "@workspace/api-zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { applyHatchlingXp } from "../services/hatchlingXp.ts";
 
 const router = Router();
 
@@ -28,11 +29,17 @@ router.post("/items/:id/use", requireAuth, attachPlayer, async (req, res) => {
   if (!hatchling) { res.status(404).json({ error: "Hatchling not found" }); return; }
   if (hatchling.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
 
+  if (item.effectType === "xp") {
+    await applyHatchlingXp(body.data.hatchlingId, item.effectValue);
+    const updated = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, body.data.hatchlingId) });
+    res.json(updated);
+    return;
+  }
+
   const updates: Partial<typeof hatchling> = {};
   if (item.effectType === "happiness") updates.happiness = Math.min(100, hatchling.happiness + item.effectValue);
   if (item.effectType === "hunger") updates.hunger = Math.min(100, hatchling.hunger + item.effectValue);
   if (item.effectType === "energy") updates.energy = Math.min(100, hatchling.energy + item.effectValue);
-  if (item.effectType === "xp") updates.xp = hatchling.xp + item.effectValue;
 
   const updated = await db.update(hatchlingsTable).set(updates).where(eq(hatchlingsTable.id, body.data.hatchlingId)).returning();
   res.json(updated[0]);
