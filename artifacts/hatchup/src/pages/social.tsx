@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Layout } from "@/components/layout";
 import { ForYouStrip } from "@/components/for-you-strip";
 import { usePlayer } from "@/lib/playerContext";
@@ -11,8 +12,6 @@ import {
   useAddPostComment,
   useDeletePost,
   useFollowPlayer,
-  useGetPlayerSocialProfile,
-  getGetPlayerSocialProfileQueryKey,
   useDiscoverPlayers,
   getDiscoverPlayersQueryKey,
   useSearchDiscoverablePlayers,
@@ -646,129 +645,6 @@ export function ComposeSheet({
   );
 }
 
-function ProfileModal({
-  playerId: profileId,
-  viewerId,
-  open,
-  onClose,
-}: {
-  playerId: number;
-  viewerId: number;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const { data: profile, isLoading } = useGetPlayerSocialProfile(
-    profileId,
-    { viewerId },
-    { query: { queryKey: getGetPlayerSocialProfileQueryKey(profileId, { viewerId }), enabled: open && !!profileId } }
-  );
-  const followPlayer = useFollowPlayer();
-  const qc = useQueryClient();
-  const { toast } = useToast();
-
-  async function handleFollow() {
-    await followPlayer.mutateAsync({ data: { followerId: viewerId, followeeId: profileId } });
-    qc.invalidateQueries({ queryKey: getGetPlayerSocialProfileQueryKey(profileId, { viewerId }) });
-    toast({ title: "Following! 🤝" });
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto rounded-3xl">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-black">Player Profile</DialogTitle>
-        </DialogHeader>
-
-        {isLoading ? (
-          <div className="space-y-3">
-            <Skeleton className="h-20 w-full rounded-2xl" />
-            <Skeleton className="h-40 w-full rounded-2xl" />
-          </div>
-        ) : profile ? (
-          <div className="space-y-4">
-            {/* Memory banner */}
-            {profile.memory && (
-              <motion.div
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-2xl p-3"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Clock className="w-4 h-4 text-purple-400" />
-                  <span className="text-xs font-black text-purple-400 uppercase tracking-wider">Memory</span>
-                </div>
-                <p className="text-sm font-bold">{profile.memory.label}</p>
-                <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{profile.memory.post.content}</p>
-              </motion.div>
-            )}
-
-            {/* Player info */}
-            <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16 border-2 border-primary">
-                <AvatarImage src={profile.player.avatarUrl ?? undefined} />
-                <AvatarFallback className="font-black text-lg">{(profile.player.username ?? "?").substring(0, 2).toUpperCase()}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-black text-lg">{profile.player.displayName ?? profile.player.username}</h3>
-                  {profile.player.creatorBadge && (
-                    <Badge className="bg-gradient-to-r from-yellow-500 to-amber-400 text-black text-[10px] font-black">
-                      <Award className="w-2.5 h-2.5 mr-0.5" /> Creator
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">@{profile.player.username}</p>
-                <div className="flex gap-4 mt-1 text-xs font-bold">
-                  <span><span className="text-foreground">{profile.followerCount}</span> <span className="text-muted-foreground">Followers</span></span>
-                  <span><span className="text-foreground">{profile.followingCount}</span> <span className="text-muted-foreground">Following</span></span>
-                </div>
-              </div>
-            </div>
-
-            {profileId !== viewerId && !profile.isFollowing && (
-              <Button onClick={handleFollow} disabled={followPlayer.isPending} className="w-full font-black rounded-xl h-10">
-                <UserPlus className="w-4 h-4 mr-2" />
-                Follow
-              </Button>
-            )}
-            {profile.isFollowing && (
-              <div className="flex items-center justify-center gap-2 text-sm text-primary font-bold py-2">
-                <UserPlus className="w-4 h-4" /> Following
-              </div>
-            )}
-
-            {/* Timeline posts */}
-            <div>
-              <h4 className="font-black text-sm mb-2 flex items-center gap-2">
-                <Star className="w-3.5 h-3.5 text-primary" /> Transformation Timeline
-              </h4>
-              <div className="space-y-2">
-                {profile.posts.slice(0, 5).map((post) => {
-                  const postTypeInfo = POST_TYPES.find(t => t.value === post.postType);
-                  return (
-                    <div key={post.id} className="border-l-2 border-primary/30 pl-3 py-1">
-                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-0.5">
-                        <span>{postTypeInfo?.icon}</span>
-                        <span>{postTypeInfo?.label}</span>
-                        <span>·</span>
-                        <span>{timeAgo(post.createdAt)}</span>
-                      </div>
-                      <p className="text-xs line-clamp-2">{post.content}</p>
-                    </div>
-                  );
-                })}
-                {profile.posts.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-4">No posts yet</p>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function PlayerDiscoverCard({
   player,
   viewerId,
@@ -969,8 +845,9 @@ export default function Social() {
   const { playerId } = usePlayer();
   const pid = playerId ?? 1;
   const [composeOpen, setComposeOpen] = useState(false);
-  const [profilePlayerId, setProfilePlayerId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState("feed");
+  const [, setLocation] = useLocation();
+  const goToProfile = useCallback((targetId: number) => setLocation(`/players/${targetId}`), [setLocation]);
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -1074,7 +951,7 @@ export default function Social() {
                       playerId={pid}
                       onReact={handleReact}
                       onDelete={handleDelete}
-                      onViewProfile={setProfilePlayerId}
+                      onViewProfile={goToProfile}
                     />
                   ))}
                 </div>
@@ -1083,7 +960,7 @@ export default function Social() {
           </TabsContent>
 
           <TabsContent value="discover" className="mt-4">
-            <DiscoverPanel playerId={pid} onViewProfile={setProfilePlayerId} />
+            <DiscoverPanel playerId={pid} onViewProfile={goToProfile} />
           </TabsContent>
         </Tabs>
 
@@ -1094,15 +971,6 @@ export default function Social() {
           playerId={pid}
         />
 
-        {/* Profile modal */}
-        {profilePlayerId !== null && (
-          <ProfileModal
-            playerId={profilePlayerId}
-            viewerId={pid}
-            open={profilePlayerId !== null}
-            onClose={() => setProfilePlayerId(null)}
-          />
-        )}
       </div>
     </Layout>
   );

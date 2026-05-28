@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type ReactElement } from "react";
+import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import {
@@ -369,20 +370,22 @@ function GroupDetail({ groupId, onBack }: { groupId: number; onBack: () => void 
           {group.members.map((member) => (
             <Card key={member.id} className="border">
               <CardContent className="p-3 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
-                  <span className="font-black text-primary text-sm">
-                    {(member.displayName ?? member.username).charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm truncate">{member.displayName ?? member.username}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px] text-muted-foreground font-medium">{member.coWorkoutCount} co-workouts</span>
-                    {member.playerId === group.creatorPlayerId && (
-                      <Badge variant="secondary" className="text-[9px] font-black uppercase h-4 px-1">Leader</Badge>
-                    )}
+                <Link href={`/players/${member.playerId}`} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity" data-testid={`link-profile-${member.playerId}`}>
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+                    <span className="font-black text-primary text-sm">
+                      {(member.displayName ?? member.username).charAt(0).toUpperCase()}
+                    </span>
                   </div>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm truncate">{member.displayName ?? member.username}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] text-muted-foreground font-medium">{member.coWorkoutCount} co-workouts</span>
+                      {member.playerId === group.creatorPlayerId && (
+                        <Badge variant="secondary" className="text-[9px] font-black uppercase h-4 px-1">Leader</Badge>
+                      )}
+                    </div>
+                  </div>
+                </Link>
                 <div className="flex items-center gap-1 shrink-0">
                   {Array.from({ length: Math.min(member.friendshipLevel, 5) }).map((_, i) => (
                     <Heart key={i} className="w-3 h-3 fill-pink-500 text-pink-500" />
@@ -452,7 +455,7 @@ function GroupDetail({ groupId, onBack }: { groupId: number; onBack: () => void 
                       : "bg-muted text-foreground rounded-tl-sm"
                   }`}>
                     {msg.playerId !== pid && (
-                      <span className="text-[10px] font-black text-muted-foreground block">{msg.playerName}</span>
+                      <Link href={`/players/${msg.playerId}`} className="text-[10px] font-black text-muted-foreground block hover:text-primary transition-colors" data-testid={`link-profile-${msg.playerId}`}>{msg.playerName}</Link>
                     )}
                     {msg.content}
                   </div>

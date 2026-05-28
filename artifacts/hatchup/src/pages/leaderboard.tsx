@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import {
   useGetGlobalLeaderboard, getGetGlobalLeaderboardQueryKey,
@@ -495,14 +496,16 @@ export default function Leaderboard() {
                       <span className="w-8 text-center font-black text-base text-white/40 flex-shrink-0">
                         {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
                       </span>
-                      <Avatar className="h-9 w-9 border border-white/10 flex-shrink-0">
-                        <AvatarImage src={entry.avatarUrl ?? undefined} />
-                        <AvatarFallback className="text-xs font-bold">{entry.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-sm truncate">{entry.displayName ?? entry.username}</p>
-                        <p className="text-[10px] text-white/40 uppercase font-bold">{entry.rank}</p>
-                      </div>
+                      <Link href={`/players/${entry.playerId}`} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity" data-testid={`link-profile-${entry.playerId}`}>
+                        <Avatar className="h-9 w-9 border border-white/10 flex-shrink-0">
+                          <AvatarImage src={entry.avatarUrl ?? undefined} />
+                          <AvatarFallback className="text-xs font-bold">{entry.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-sm truncate">{entry.displayName ?? entry.username}</p>
+                          <p className="text-[10px] text-white/40 uppercase font-bold">{entry.rank}</p>
+                        </div>
+                      </Link>
                       <div className="text-right flex-shrink-0">
                         <p className="font-black text-sm text-blue-400">{entry.metricLabel}</p>
                         <p className="text-[10px] text-orange-400">{entry.currentStreak}🔥</p>
@@ -541,17 +544,19 @@ export default function Leaderboard() {
                       <span className="w-8 text-center font-black text-base text-white/40 flex-shrink-0">
                         {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${entry.rank}`}
                       </span>
-                      <Avatar className="h-9 w-9 border border-white/10 flex-shrink-0">
-                        <AvatarImage src={entry.avatarUrl ?? undefined} />
-                        <AvatarFallback className="text-xs font-bold">{entry.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1">
-                          <p className="font-bold text-sm truncate">{entry.displayName ?? entry.username}</p>
-                          {entry.isMe && <Badge className="text-[10px] px-1 py-0 bg-pink-600 text-white flex-shrink-0">You</Badge>}
+                      <Link href={`/players/${entry.playerId}`} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity" data-testid={`link-profile-${entry.playerId}`}>
+                        <Avatar className="h-9 w-9 border border-white/10 flex-shrink-0">
+                          <AvatarImage src={entry.avatarUrl ?? undefined} />
+                          <AvatarFallback className="text-xs font-bold">{entry.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1">
+                            <p className="font-bold text-sm truncate">{entry.displayName ?? entry.username}</p>
+                            {entry.isMe && <Badge className="text-[10px] px-1 py-0 bg-pink-600 text-white flex-shrink-0">You</Badge>}
+                          </div>
+                          <p className="text-[10px] text-white/40">Lv.{entry.level}</p>
                         </div>
-                        <p className="text-[10px] text-white/40">Lv.{entry.level}</p>
-                      </div>
+                      </Link>
                       <div className="text-right flex-shrink-0">
                         <p className="font-black text-sm text-yellow-400">{entry.battleElo}</p>
                         <p className="text-[10px] text-green-400">{entry.totalBattleWins}W</p>
@@ -714,7 +719,7 @@ export default function Leaderboard() {
                                               }`}
                                             >
                                               <div className="text-xl">{medal}</div>
-                                              <div className="font-bold text-[11px] truncate">{w.displayName ?? w.username}</div>
+                                              <Link href={`/players/${w.playerId}`} className="font-bold text-[11px] truncate hover:text-pink-300 transition-colors block" data-testid={`link-profile-${w.playerId}`}>{w.displayName ?? w.username}</Link>
                                               {w.rewardEarned && (
                                                 <div className="text-[9px] space-y-0.5 pt-1 border-t border-white/10">
                                                   <div className="text-yellow-400 font-bold">⚡ {w.rewardEarned.xp}</div>
@@ -747,12 +752,12 @@ export default function Leaderboard() {
                                         <span className="w-6 text-center font-black text-xs text-white/40">
                                           {ei === 0 ? "🥇" : ei === 1 ? "🥈" : ei === 2 ? "🥉" : `#${e.rank}`}
                                         </span>
-                                        <div className="flex-1 min-w-0">
+                                        <Link href={`/players/${e.playerId}`} className="flex-1 min-w-0 hover:opacity-80 transition-opacity" data-testid={`link-profile-${e.playerId}`}>
                                           <div className="flex items-center gap-1">
                                             <span className="font-bold text-xs truncate">{e.displayName ?? e.username}</span>
                                             {e.isMe && <Badge className="text-[9px] px-1 py-0 bg-pink-600 text-white">You</Badge>}
                                           </div>
-                                        </div>
+                                        </Link>
                                         <span className="font-black text-xs text-pink-400">{e.currentValue.toLocaleString()}</span>
                                       </div>
                                     ))
@@ -824,22 +829,24 @@ function RankedList({
             <span className="w-8 text-center font-black text-sm text-white/40 flex-shrink-0">
               {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${entry.position}`}
             </span>
-            <Avatar className="h-9 w-9 border border-white/10 flex-shrink-0">
-              <AvatarImage src={entry.avatarUrl ?? undefined} />
-              <AvatarFallback className="text-xs font-bold bg-gradient-to-br from-violet-600 to-pink-600">
-                {entry.username.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <p className="font-bold text-sm truncate">{entry.displayName ?? entry.username}</p>
-                {entry.isMe && <Badge className="text-[10px] px-1 py-0 bg-pink-600 text-white flex-shrink-0">You</Badge>}
+            <Link href={`/players/${entry.playerId}`} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity" data-testid={`link-profile-${entry.playerId}`}>
+              <Avatar className="h-9 w-9 border border-white/10 flex-shrink-0">
+                <AvatarImage src={entry.avatarUrl ?? undefined} />
+                <AvatarFallback className="text-xs font-bold bg-gradient-to-br from-violet-600 to-pink-600">
+                  {entry.username.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="font-bold text-sm truncate">{entry.displayName ?? entry.username}</p>
+                  {entry.isMe && <Badge className="text-[10px] px-1 py-0 bg-pink-600 text-white flex-shrink-0">You</Badge>}
+                </div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <RankBadge rank={entry.rank} size="sm" />
+                  <span className="text-[10px] text-white/40 uppercase font-bold">{entry.rank}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <RankBadge rank={entry.rank} size="sm" />
-                <span className="text-[10px] text-white/40 uppercase font-bold">{entry.rank}</span>
-              </div>
-            </div>
+            </Link>
             <div className="text-right flex-shrink-0">
               <p className="font-black text-sm text-pink-400">{entry.metricLabel}</p>
               {(metric === "steps" || metric === "streaks") && (
@@ -903,24 +910,26 @@ function ArtifactsLeaderboardPanel({ myPlayerId: _myPlayerId }: { myPlayerId: nu
               <span className="w-8 text-center font-black text-sm text-white/40 flex-shrink-0">
                 {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${entry.position}`}
               </span>
-              <Avatar className="h-9 w-9 border border-white/10 flex-shrink-0">
-                <AvatarImage src={entry.avatarUrl ?? undefined} />
-                <AvatarFallback className="text-xs font-bold bg-gradient-to-br from-cyan-600 to-violet-700">
-                  {entry.username.slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <p className="font-bold text-sm truncate">{entry.displayName ?? entry.username}</p>
-                  {entry.isMe && <Badge className="text-[10px] px-1 py-0 bg-cyan-600 text-white flex-shrink-0">You</Badge>}
+              <Link href={`/players/${entry.playerId}`} className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity" data-testid={`link-profile-${entry.playerId}`}>
+                <Avatar className="h-9 w-9 border border-white/10 flex-shrink-0">
+                  <AvatarImage src={entry.avatarUrl ?? undefined} />
+                  <AvatarFallback className="text-xs font-bold bg-gradient-to-br from-cyan-600 to-violet-700">
+                    {entry.username.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-bold text-sm truncate">{entry.displayName ?? entry.username}</p>
+                    {entry.isMe && <Badge className="text-[10px] px-1 py-0 bg-cyan-600 text-white flex-shrink-0">You</Badge>}
+                  </div>
+                  {entry.rarestRarity && (
+                    <p className="text-[10px] text-white/40 truncate">
+                      Rarest: <span className={`font-bold ${RARITY_COLORS[entry.rarestRarity] ?? "text-white/70"}`}>{entry.rarestRarity}</span>
+                      {entry.rarestName ? ` · ${entry.rarestName}` : ""}
+                    </p>
+                  )}
                 </div>
-                {entry.rarestRarity && (
-                  <p className="text-[10px] text-white/40 truncate">
-                    Rarest: <span className={`font-bold ${RARITY_COLORS[entry.rarestRarity] ?? "text-white/70"}`}>{entry.rarestRarity}</span>
-                    {entry.rarestName ? ` · ${entry.rarestName}` : ""}
-                  </p>
-                )}
-              </div>
+              </Link>
               <div className="text-right flex-shrink-0">
                 <p className="font-black text-sm text-cyan-300 flex items-center justify-end gap-1">
                   <Medal className="w-3.5 h-3.5" />{entry.rarityScore}
