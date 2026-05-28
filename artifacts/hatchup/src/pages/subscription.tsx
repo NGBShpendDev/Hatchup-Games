@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { Crown, Check, Sparkles, Trophy, X, ExternalLink, ArrowLeft, Loader2, Palette, Egg, Bot, Swords, MapPin, ShieldCheck, ShoppingCart, RefreshCw } from "lucide-react";
 import { useSubscription, useStartCheckout, useOpenPortal } from "@/lib/subscription";
-import { useGetDailyStreak, getGetDailyStreakQueryKey, useBuyStreakShield, useUpdateShieldAutoReplenish } from "@workspace/api-client-react";
+import { useGetDailyStreak, getGetDailyStreakQueryKey, useBuyStreakShield, useUpdateShieldAutoReplenish, useGetCurrentPlayer, getGetCurrentPlayerQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
@@ -96,10 +96,18 @@ export default function SubscriptionPage() {
     query: { queryKey: getGetDailyStreakQueryKey() },
   });
 
+  const { data: playerData } = useGetCurrentPlayer({
+    query: { queryKey: getGetCurrentPlayerQueryKey() },
+  });
+
+  const coins = playerData?.coins ?? 0;
+  const canAffordShield = coins >= SHIELD_COST;
+
   const buyShield = useBuyStreakShield({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetDailyStreakQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetCurrentPlayerQueryKey() });
         toast({ title: "Shield purchased!", description: "Your streak is now protected for one missed day." });
       },
       onError: (e: unknown) => {
@@ -329,12 +337,21 @@ export default function SubscriptionPage() {
             <div>
               <p className="text-sm font-black">Buy a Streak Shield</p>
               <p className="text-xs text-white/50 mt-0.5">{SHIELD_COST} coins per shield</p>
+              <p className="text-xs mt-1" data-testid="coin-balance">
+                <span className="text-white/40">Balance: </span>
+                <span className={canAffordShield ? "text-cyan-300 font-bold" : "text-amber-400 font-bold"}>{coins} coins</span>
+              </p>
+              {!canAffordShield && (
+                <p className="text-xs text-amber-400 font-bold mt-0.5" data-testid="not-enough-coins">
+                  Not enough coins
+                </p>
+              )}
             </div>
             <button
               onClick={() => buyShield.mutate()}
-              disabled={buyShield.isPending}
+              disabled={buyShield.isPending || !canAffordShield}
               data-testid="button-buy-shield"
-              className="flex items-center gap-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 font-bold text-sm px-4 py-2 rounded-xl transition disabled:opacity-50"
+              className="flex items-center gap-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 font-bold text-sm px-4 py-2 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {buyShield.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
