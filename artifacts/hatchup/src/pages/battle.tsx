@@ -23,6 +23,7 @@ import {
   acceptBattleRematch,
   declineBattleRematch,
   useListBattleHistory,
+  useListBattleRivals,
 } from "@workspace/api-client-react";
 import type {
   BattleState,
@@ -31,6 +32,7 @@ import type {
   FighterState,
   BattleHistoryEntry,
   BattleRematchInvite,
+  BattleRival,
 } from "@workspace/api-client-react";
 import { BattleWsServerMessageSchema } from "@workspace/api-zod";
 
@@ -402,6 +404,11 @@ export default function BattlePage() {
   const { data: history = [] } = useListBattleHistory<BattleHistoryEntry[]>(
     undefined,
     { query: { enabled: !!pid, queryKey: ["battle-history", pid] } },
+  );
+
+  const { data: rivals = [] } = useListBattleRivals<BattleRival[]>(
+    { limit: 5 },
+    { query: { enabled: !!pid, queryKey: ["battle-rivals", pid] } },
   );
 
   const { data: ownedArtifacts = [] } = useQuery<OwnedArtifact[]>({
@@ -992,6 +999,44 @@ export default function BattlePage() {
                     <Swords className="w-5 h-5 mr-2" /> Equip Artifacts & Find Battle
                   </Button>
                 </motion.div>
+              )}
+
+              {rivals.length > 0 && (
+                <div className="space-y-2" data-testid="rivals-section">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Rivals</p>
+                  {rivals.map(r => {
+                    const name = r.opponentDisplayName ?? r.opponentUsername ?? `Player #${r.opponentId}`;
+                    const dominating = r.wins > r.losses;
+                    const losing = r.losses > r.wins;
+                    return (
+                      <Link
+                        key={r.opponentId}
+                        href={`/players/${r.opponentId}`}
+                        className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/5 hover:border-primary/50 hover:bg-white/10 transition-all"
+                        data-testid={`link-rival-${r.opponentId}`}
+                      >
+                        <span className="text-lg">{dominating ? "👑" : losing ? "😤" : "⚔️"}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-sm truncate">{name}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {r.totalBattles} {r.totalBattles === 1 ? "battle" : "battles"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs font-black tabular-nums">
+                          <span className="text-green-400" data-testid={`rival-wins-${r.opponentId}`}>{r.wins}W</span>
+                          <span className="text-muted-foreground">/</span>
+                          <span className="text-red-400" data-testid={`rival-losses-${r.opponentId}`}>{r.losses}L</span>
+                          {r.draws > 0 && (
+                            <>
+                              <span className="text-muted-foreground">/</span>
+                              <span className="text-yellow-400" data-testid={`rival-draws-${r.opponentId}`}>{r.draws}D</span>
+                            </>
+                          )}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
               )}
 
               {history.length > 0 && (
