@@ -703,7 +703,9 @@ export const EvolveHatchlingResponse = zod.object({
   "stepsToEvolution": zod.number().optional(),
   "streakCount": zod.number().nullish(),
   "createdAt": zod.string()
-})
+}).and(zod.object({
+  "evolutionSharePrompt": zod.boolean().describe('When true, the client should surface a share sheet so the player can brag about the evolution.')
+}))
 
 
 /**

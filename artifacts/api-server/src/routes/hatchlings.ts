@@ -536,6 +536,7 @@ router.post("/hatchlings/:id/evolve", requireAuth, attachPlayer, async (req, res
     streakCount: evolveStreak >= 2 ? evolveStreak : null,
     createdAt: evolved.createdAt.toISOString(),
     lastWorkoutAt: evolved.lastWorkoutAt?.toISOString() ?? null,
+    evolutionSharePrompt: true,
   });
 });
 

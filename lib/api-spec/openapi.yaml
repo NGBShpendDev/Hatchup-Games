@@ -523,7 +523,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Hatchling"
+                $ref: "#/components/schemas/EvolveHatchlingResponse"
 
   /hatchlings/showcase:
     get:
@@ -5082,6 +5082,16 @@ components:
       required: [triggerId]
       properties:
         triggerId: { type: integer }
+
+    EvolveHatchlingResponse:
+      allOf:
+        - $ref: "#/components/schemas/Hatchling"
+        - type: object
+          required: [evolutionSharePrompt]
+          properties:
+            evolutionSharePrompt:
+              type: boolean
+              description: When true, the client should surface a share sheet so the player can brag about the evolution.
 
     # ── Evolution ────────────────────────────────────────────────────────────
     EvolutionType:

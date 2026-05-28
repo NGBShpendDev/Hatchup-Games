@@ -1,12 +1,14 @@
 import { Feather } from "@expo/vector-icons";
-import { useGetHatchling } from "@workspace/api-client-react";
+import { useGetHatchling, useEvolveHatchling } from "@workspace/api-client-react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React from "react";
+import React, { useCallback } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -14,6 +16,16 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { getRarityColor, capitalize } from "@/constants/rarity";
+
+// Stage thresholds mirror the web app and server logic:
+// Stage 1 → 2 at level 5, Stage 2 → 3 at level 15.
+const EVOLVE_LEVEL_FOR_STAGE: Record<number, number> = { 1: 5, 2: 15 };
+
+const STAGE_NAMES: Record<number, string> = {
+  1: "Cute",
+  2: "Athletic",
+  3: "Legendary",
+};
 
 function StatBar({ label, value, color }: { label: string; value: number; color: string }) {
   const colors = useColors();
@@ -35,13 +47,51 @@ export default function HatchlingDetailScreen() {
   const router = useRouter();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
-  const { data: pal, isLoading } = useGetHatchling(Number(id));
+  const { data: pal, isLoading, refetch } = useGetHatchling(Number(id));
+  const evolveMutation = useEvolveHatchling();
 
   const rarityColor = getRarityColor(pal?.rarity);
   const level = pal?.level ?? 1;
+  const stage = pal?.evolutionStage ?? 1;
   const xpPerLevel = 100;
   const xp = pal?.xp ?? 0;
   const xpProgress = (xp % xpPerLevel) / xpPerLevel;
+
+  const evolveThreshold = EVOLVE_LEVEL_FOR_STAGE[stage];
+  const canEvolve = stage < 3 && evolveThreshold != null && level >= evolveThreshold;
+  const nextStageName = STAGE_NAMES[stage + 1] ?? `Stage ${stage + 1}`;
+
+  const handleEvolve = useCallback(() => {
+    if (!pal) return;
+    evolveMutation.mutate(
+      { id: pal.id, data: { triggerId: 1 } },
+      {
+        onSuccess: async (result) => {
+          await refetch();
+          if (result.evolutionSharePrompt) {
+            const palName = result.name ?? pal.name;
+            const toStage = result.evolutionStage ?? stage + 1;
+            const evolutionType = result.evolutionType;
+            const headline = evolutionType
+              ? `✨ ${palName} evolved into ${evolutionType}!`
+              : `✨ ${palName} just evolved!`;
+            const stageLine = STAGE_NAMES[toStage]
+              ? `Stage ${stage} → Stage ${toStage} (${STAGE_NAMES[toStage]})`
+              : `Stage ${stage} → Stage ${toStage}`;
+            const message = `${headline}\n${stageLine}\n\nPlay HatchUp and evolve your own Pal!`;
+            try {
+              await Share.share({ message });
+            } catch {
+              // Share API unavailable or dismissed — silently continue
+            }
+          }
+        },
+        onError: () => {
+          Alert.alert("Evolution failed", "Could not evolve your Pal right now. Try again later.");
+        },
+      },
+    );
+  }, [pal, evolveMutation, refetch, stage]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -89,6 +139,28 @@ export default function HatchlingDetailScreen() {
             <Text style={[styles.xpLabel, { color: colors.mutedForeground }]}>
               {xp % xpPerLevel} / {xpPerLevel} XP to Lv {level + 1}
             </Text>
+
+            {/* Evolve CTA */}
+            {canEvolve && (
+              <Pressable
+                onPress={handleEvolve}
+                disabled={evolveMutation.isPending}
+                style={[
+                  styles.evolveBtn,
+                  { backgroundColor: rarityColor + "22", borderColor: rarityColor + "66" },
+                  evolveMutation.isPending && styles.evolveBtnDisabled,
+                ]}
+              >
+                {evolveMutation.isPending ? (
+                  <ActivityIndicator size="small" color={rarityColor} />
+                ) : (
+                  <Feather name="trending-up" size={16} color={rarityColor} />
+                )}
+                <Text style={[styles.evolveBtnText, { color: rarityColor }]}>
+                  {evolveMutation.isPending ? "Evolving…" : `Evolve to ${nextStageName}!`}
+                </Text>
+              </Pressable>
+            )}
           </View>
 
           {/* Power Score */}
@@ -167,6 +239,9 @@ const styles = StyleSheet.create({
   xpTrack: { height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 4 },
   xpFill: { height: 8, borderRadius: 4 },
   xpLabel: { fontSize: 12 },
+  evolveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 10, borderWidth: 1.5, paddingVertical: 10, marginTop: 6 },
+  evolveBtnDisabled: { opacity: 0.6 },
+  evolveBtnText: { fontSize: 13, fontWeight: "700" },
   powerCard: { borderRadius: 14, borderWidth: 1, padding: 14, flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
   powerValue: { fontSize: 24, fontWeight: "800" },
   powerLabel: { fontSize: 12 },

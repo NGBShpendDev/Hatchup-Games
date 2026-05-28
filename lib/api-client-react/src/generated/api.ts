@@ -88,6 +88,7 @@ import type {
   Egg,
   EvolutionCategory,
   EvolutionType,
+  EvolveHatchlingResponse,
   EvolveInput,
   FamilyGroup,
   FeedPage,
@@ -1718,9 +1719,9 @@ export const getEvolveHatchlingUrl = (id: number,) => {
  * @summary Trigger evolution for a hatchling
  */
 export const evolveHatchling = async (id: number,
-    evolveInput: EvolveInput, options?: RequestInit): Promise<Hatchling> => {
+    evolveInput: EvolveInput, options?: RequestInit): Promise<EvolveHatchlingResponse> => {
 
-  return customFetch<Hatchling>(getEvolveHatchlingUrl(id),
+  return customFetch<EvolveHatchlingResponse>(getEvolveHatchlingUrl(id),
   {
     ...options,
     method: 'POST',

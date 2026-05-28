@@ -285,6 +285,11 @@ export interface EvolveInput {
   triggerId: number;
 }
 
+export type EvolveHatchlingResponse = Hatchling & {
+  /** When true, the client should surface a share sheet so the player can brag about the evolution. */
+  evolutionSharePrompt: boolean;
+};
+
 export interface EvolutionType {
   id: number;
   name: string;
