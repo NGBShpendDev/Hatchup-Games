@@ -7,6 +7,7 @@ import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { emailResendLimiter, consumeEmailResendBudget } from "../middlewares/rateLimiters.ts";
 import { issueEmailVerification } from "../services/emailVerification.ts";
 import { isEmailBouncing, recordEmailBounce, clearEmailBounce } from "../services/bouncedEmails.ts";
+import { notifyModerationAction } from "../services/moderationNotify.ts";
 
 const router = Router();
 
@@ -917,6 +918,7 @@ router.patch("/admin/players/:id/suspend", requireAuth, attachPlayer, async (req
     targetPlayerId: targetId,
     reason: suspendReason,
   });
+  void notifyModerationAction(targetId, body.isSuspended ? "suspend" : "unsuspend", suspendReason);
   res.json({ success: true, player: updated });
 });
 
@@ -932,6 +934,9 @@ router.post("/admin/players/:id/verify", requireAuth, attachPlayer, async (req, 
   }
   const targetId = Number(req.params.id);
   if (isNaN(targetId)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const verifyReason = typeof (req.body as { reason?: unknown })?.reason === "string"
+    ? ((req.body as { reason: string }).reason).trim().slice(0, 500) || null
+    : null;
 
   const [updated] = await db
     .update(playersTable)
@@ -955,8 +960,10 @@ router.post("/admin/players/:id/verify", requireAuth, attachPlayer, async (req, 
     actorId: caller.id,
     action: "verify",
     targetPlayerId: targetId,
+    reason: verifyReason,
     metadata: autoResolved.length ? { autoResolvedReportIds: autoResolved.map(r => r.id) } : null,
   });
+  void notifyModerationAction(targetId, "verify", verifyReason);
 
   res.json({ success: true, player: updated });
 });
