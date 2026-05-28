@@ -454,6 +454,97 @@ describe("rematch invites — expiry & cleanup", () => {
   });
 });
 
+describe("rematch invites — accept/queue-join extend expiry (Task #355)", () => {
+  it("accept extends a near-expiry invite so it survives the grace window", async () => {
+    const p1 = await seedPlayer("j1");
+    const p2 = await seedPlayer("j2");
+    const h1 = await seedHatchling(p1, "Sparky");
+    const h2 = await seedHatchling(p2, "Blaze");
+    const battleId = await seedBattle(p1, p2, h1, h2);
+
+    // Insert an invite expiring in 2 seconds — simulates a recipient who
+    // accepts right at the tail end of the 5 minute TTL.
+    const inviteId = `${TAG}_nearexpiry_${Math.random().toString(36).slice(2)}`;
+    const nearExpiry = new Date(Date.now() + 2_000);
+    await db.insert(rematchInvitesTable).values({
+      id: inviteId,
+      fromPlayerId: p1,
+      toPlayerId: p2,
+      mode: "casual",
+      fromHatchlingId: h1,
+      fromHatchlingName: "Sparky",
+      fromBattleId: battleId,
+      status: "pending",
+      createdAt: new Date(Date.now() - 4 * 60 * 1000),
+      expiresAt: nearExpiry,
+    });
+    createdInviteIds.push(inviteId);
+
+    const beforeAccept = Date.now();
+    const ok = await asPlayer(p2, "POST", `/battles/rematch/${inviteId}/accept`);
+    assert.equal(ok.status, 200);
+
+    const row = await db.query.rematchInvitesTable.findFirst({
+      where: eq(rematchInvitesTable.id, inviteId),
+    });
+    assert.ok(row);
+    assert.equal(row!.status, "accepted");
+    const extendedMs = row!.expiresAt.getTime() - beforeAccept;
+    assert.ok(
+      extendedMs > 60_000,
+      `expected expiresAt to be pushed >60s into the future on accept, got ${extendedMs}ms`,
+    );
+
+    // Wait past the original near-expiry to prove the invite isn't gone —
+    // both the lazy flip in GET /:id and the periodic hard-delete purge
+    // would have killed it under the old fixed-TTL behaviour.
+    await new Promise((r) => setTimeout(r, 2_500));
+    const stillThere = await asPlayer(p1, "GET", `/battles/rematch/${inviteId}`);
+    assert.equal(stillThere.status, 200);
+    assert.equal(stillThere.body.status, "accepted");
+  });
+
+  it("queue-join refresh extends an accepted invite past its original expiry", async () => {
+    const fresh = await import(`../../services/matchmakingQueue.ts?fresh=${Date.now()}_qjoin`);
+    const p1 = await seedPlayer("k1");
+    const p2 = await seedPlayer("k2");
+    const h1 = await seedHatchling(p1, "Sparky");
+    const h2 = await seedHatchling(p2, "Blaze");
+    const battleId = await seedBattle(p1, p2, h1, h2);
+
+    // Accepted invite about to expire — simulates the "recipient accepted,
+    // now both parties race to the WS queue" scenario where the inviter
+    // shows up last.
+    const inviteId = `${TAG}_qjoin_${Math.random().toString(36).slice(2)}`;
+    const nearExpiry = new Date(Date.now() + 1_500);
+    await db.insert(rematchInvitesTable).values({
+      id: inviteId,
+      fromPlayerId: p1,
+      toPlayerId: p2,
+      mode: "casual",
+      fromHatchlingId: h1,
+      fromHatchlingName: "Sparky",
+      fromBattleId: battleId,
+      status: "accepted",
+      createdAt: new Date(Date.now() - 4 * 60 * 1000),
+      expiresAt: nearExpiry,
+    });
+    createdInviteIds.push(inviteId);
+
+    const refreshed = await fresh.extendRematchInviteExpiry(inviteId, 2 * 60 * 1000);
+    assert.ok(refreshed, "extendRematchInviteExpiry returned the updated row");
+    assert.equal(refreshed.status, "accepted");
+    assert.ok(refreshed.expiresAt > Date.now() + 60_000);
+
+    // Wait past the original near-expiry. The accepted invite must still
+    // be resolvable so a slow second join_queue would succeed.
+    await new Promise((r) => setTimeout(r, 1_800));
+    const still = await fresh.getRematchInvite(inviteId);
+    assert.ok(still, "accepted invite still exists past original near-expiry");
+    assert.equal(still.status, "accepted");
+  });
+});
+
 describe("rematch invites — survive a fresh matchmakingQueue import (restart proxy)", () => {
   it("a pending invite created before the re-import is still readable after it", async () => {
     const p1 = await seedPlayer("i1");

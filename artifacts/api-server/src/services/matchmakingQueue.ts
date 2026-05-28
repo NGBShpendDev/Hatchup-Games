@@ -62,6 +62,13 @@ export interface RematchInvite {
 const REMATCH_TTL_MS = 5 * 60 * 1000;
 // Drop terminal/expired rows from the table this long after they expire.
 const REMATCH_CLEANUP_GRACE_MS = 60_000;
+// When a recipient accepts, push expiresAt out by this much so the pair has
+// time to actually meet in the matchmaking queue without the row being
+// hard-deleted by `purgeExpiredRematches` mid-handshake. (Task #355)
+export const REMATCH_ACCEPT_EXTENSION_MS = 5 * 60 * 1000;
+// Additional refresh when either party joins the WS queue with an accepted
+// invite — gives the partner a fresh window to also join.
+export const REMATCH_QUEUE_JOIN_EXTENSION_MS = 2 * 60 * 1000;
 
 function rowToInvite(row: typeof rematchInvitesTable.$inferSelect): RematchInvite {
   return {
@@ -151,9 +158,33 @@ export async function listPendingRematchInvitesFor(playerId: number): Promise<Re
   return rows.map(rowToInvite);
 }
 
-export async function setRematchInviteStatus(id: string, status: RematchInvite["status"]): Promise<RematchInvite | null> {
+export async function setRematchInviteStatus(
+  id: string,
+  status: RematchInvite["status"],
+  options?: { extendExpiresByMs?: number },
+): Promise<RematchInvite | null> {
+  const updates: Partial<typeof rematchInvitesTable.$inferInsert> = { status };
+  if (options?.extendExpiresByMs && options.extendExpiresByMs > 0) {
+    updates.expiresAt = new Date(Date.now() + options.extendExpiresByMs);
+  }
   const [row] = await db.update(rematchInvitesTable)
-    .set({ status })
+    .set(updates)
+    .where(eq(rematchInvitesTable.id, id))
+    .returning();
+  return row ? rowToInvite(row) : null;
+}
+
+// Push out an invite's expiresAt without touching its status. Used by the
+// WS join_queue path so an accepted invite isn't hard-deleted while the
+// pair is still trying to meet in the matchmaking queue. (Task #355)
+export async function extendRematchInviteExpiry(
+  id: string,
+  extensionMs: number,
+): Promise<RematchInvite | null> {
+  if (!id || extensionMs <= 0) return null;
+  const newExpiresAt = new Date(Date.now() + extensionMs);
+  const [row] = await db.update(rematchInvitesTable)
+    .set({ expiresAt: newExpiresAt })
     .where(eq(rematchInvitesTable.id, id))
     .returning();
   return row ? rowToInvite(row) : null;
@@ -580,6 +611,12 @@ async function handleMessage(ws: WebSocket, playerId: number, raw: string) {
         send(ws, { type: "error", message: "Rematch invite is no longer active" });
         return;
       }
+      // Refresh expiry so the partner still has time to also join the
+      // queue. Without this, an invite accepted just before its TTL
+      // elapsed could be hard-deleted between the two parties joining,
+      // leaving the second one with "not found or expired". (Task #355)
+      const refreshed = await extendRematchInviteExpiry(invite.id, REMATCH_QUEUE_JOIN_EXTENSION_MS);
+      if (refreshed) invite = refreshed;
     }
     const mode = (invite?.mode ?? rawMode) as "casual" | "ranked";
 

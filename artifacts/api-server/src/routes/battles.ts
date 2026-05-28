@@ -11,6 +11,7 @@ import {
   getRematchInvite,
   listPendingRematchInvitesFor,
   setRematchInviteStatus,
+  REMATCH_ACCEPT_EXTENSION_MS,
   type RematchInvite,
 } from "../services/matchmakingQueue.ts";
 import { pushForNotification } from "../services/notificationFanout.ts";
@@ -405,7 +406,13 @@ router.post("/battles/rematch/:id/accept", requireAuth, attachPlayer, async (req
   if (inv.toPlayerId !== me) { res.status(403).json({ error: "Only the recipient can accept" }); return; }
   if (inv.status !== "pending") { res.status(409).json({ error: `Invite is ${inv.status}` }); return; }
 
-  await setRematchInviteStatus(inv.id, "accepted");
+  // Extend expiry on accept so the pair has a full window to actually meet
+  // in the matchmaking queue. Without this, a recipient who accepts at
+  // ~4:59 into the 5-minute TTL would see the row hard-deleted before the
+  // inviter could finish joining the WS queue. (Task #355)
+  await setRematchInviteStatus(inv.id, "accepted", {
+    extendExpiresByMs: REMATCH_ACCEPT_EXTENSION_MS,
+  });
 
   // Notify the inviter so they can hop into the queue.
   const me_ = await db.query.playersTable.findFirst({ where: eq(playersTable.id, me) });
