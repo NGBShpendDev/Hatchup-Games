@@ -11,6 +11,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useEvolutionShare } from "@/components/evolution-share-provider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ export default function Events() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const pid = playerId ?? 0;
+  const { promptLevelMilestoneShare } = useEvolutionShare();
   const { data: events, isLoading, isError, refetch } = useListEvents(
     {},
     { query: { queryKey: getListEventsQueryKey({}) } }
@@ -51,7 +53,7 @@ export default function Events() {
     joinEventMutation.mutate(
       { id: eventId },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
           const activeId = player?.activeHatchlingId ?? null;
           const target =
             (playerHatchlings && playerHatchlings.length > 0)
@@ -65,6 +67,15 @@ export default function Events() {
               ? `${target.name} is ready to earn ${eventName} rewards.`
               : `You're in for ${eventName}. Hatch a Pal to earn evolution rewards.`,
           });
+          if (data?.palXpResult?.evolutionSharePrompt) {
+            const palXpResult = data.palXpResult;
+            const palName = target?.name ?? "Your Pal";
+            promptLevelMilestoneShare({
+              hatchlingId: palXpResult.hatchlingId,
+              hatchlingName: palName,
+              newLevel: palXpResult.newLevel,
+            });
+          }
           // Refresh the events list so participant counts update immediately,
           // and the history section so the new entry appears right away.
           queryClient.invalidateQueries({ queryKey: getListEventsQueryKey({}) });

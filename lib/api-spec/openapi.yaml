@@ -1246,6 +1246,18 @@ paths:
                     type: integer
                   coinsEarned:
                     type: integer
+                  palXpResult:
+                    nullable: true
+                    type: object
+                    description: "XP awarded to the active Pal from joining this event, if applicable."
+                    required: [hatchlingId, xpDelta, prevLevel, newLevel, newXp]
+                    properties:
+                      hatchlingId: { type: integer }
+                      xpDelta:     { type: integer }
+                      prevLevel:   { type: integer }
+                      newLevel:    { type: integer }
+                      newXp:       { type: integer }
+                      evolutionSharePrompt: { type: boolean, description: "True when the Pal crossed an evolution milestone (level 5 or 15)." }
         "404":
           description: Event not found
         "409":
@@ -5204,6 +5216,7 @@ components:
         hatchlingPrevLevel: { type: ["integer", "null"], description: "Pal level before the XP was applied." }
         hatchlingNewLevel:  { type: ["integer", "null"], description: "Pal level after XP was applied." }
         hatchlingNewXp:     { type: ["integer", "null"], description: "Pal total XP after the reward." }
+        hatchlingEvolutionSharePrompt: { type: ["boolean", "null"], description: "True when the Pal crossed an evolution milestone (level 5 or 15) in this result." }
 
     CompetitionInput:
       type: object
@@ -5509,6 +5522,7 @@ components:
             prevLevel:   { type: integer, description: "Pal level before XP was applied." }
             newLevel:    { type: integer, description: "Pal level after XP was applied." }
             newXp:       { type: integer, description: "Pal total XP after the reward." }
+            evolutionSharePrompt: { type: boolean, description: "True when the Pal crossed an evolution milestone (level 5 or 15)." }
 
     BadgeDefinition:
       type: object
@@ -5640,6 +5654,7 @@ components:
             prevLevel:   { type: integer, description: "Pal level before XP was applied." }
             newLevel:    { type: integer, description: "Pal level after XP was applied." }
             newXp:       { type: integer, description: "Pal total XP after the reward." }
+            evolutionSharePrompt: { type: boolean, description: "True when the Pal crossed an evolution milestone (level 5 or 15)." }
 
     MealItem:
       type: object

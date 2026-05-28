@@ -20,6 +20,7 @@ import { HatchlingCard } from "@/components/hatchling-card";
 import { ErrorCard } from "@/components/error-card";
 import { HatchlingReaction, type HatchlingReactionData } from "@/components/hatchling-reaction";
 import { Zap, TrendingUp } from "lucide-react";
+import { useEvolutionShare } from "@/components/evolution-share-provider";
 
 const XP_PER_LEVEL = 100;
 
@@ -39,11 +40,13 @@ export default function Race() {
     hatchlingPrevLevel: number | null;
     hatchlingNewLevel: number | null;
     hatchlingNewXp: number | null;
+    hatchlingEvolutionSharePrompt: boolean | null;
   } | null>(null);
   const [reaction, setReaction] = useState<HatchlingReactionData | null>(null);
 
   const { playerId } = usePlayer();
   const pid = playerId ?? 0;
+  const { promptLevelMilestoneShare } = useEvolutionShare();
   const { data: hatchlings, isError: isHatchlingsError, refetch: refetchHatchlings } = useListHatchlings(
     { playerId: pid },
     { query: { enabled: !!playerId, queryKey: getListHatchlingsQueryKey({ playerId: pid }) } }
@@ -78,7 +81,18 @@ export default function Race() {
                     hatchlingPrevLevel: finalComp.hatchlingPrevLevel ?? null,
                     hatchlingNewLevel: finalComp.hatchlingNewLevel ?? null,
                     hatchlingNewXp: finalComp.hatchlingNewXp ?? null,
+                    hatchlingEvolutionSharePrompt: finalComp.hatchlingEvolutionSharePrompt ?? null,
                   });
+                  if (finalComp.hatchlingEvolutionSharePrompt && finalComp.hatchlingNewLevel != null) {
+                    const racer = hatchlings?.find((h) => h.id === comp.hatchlingId);
+                    if (racer) {
+                      promptLevelMilestoneShare({
+                        hatchlingId: comp.hatchlingId,
+                        hatchlingName: racer.name,
+                        newLevel: finalComp.hatchlingNewLevel,
+                      });
+                    }
+                  }
                   setGameState('result');
                   const racer = hatchlings?.find((h) => h.id === selectedHatchlingId);
                   if (racer) {
@@ -108,6 +122,7 @@ export default function Race() {
                     hatchlingPrevLevel: null,
                     hatchlingNewLevel: null,
                     hatchlingNewXp: null,
+                    hatchlingEvolutionSharePrompt: null,
                   });
                   setGameState('result');
                   toast({ title: "Note", description: "Could not record result, XP may be delayed." });

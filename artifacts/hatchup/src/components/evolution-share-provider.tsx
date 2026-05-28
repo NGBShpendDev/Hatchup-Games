@@ -87,6 +87,15 @@ type EvolutionShareContextValue = {
     level?: number | null;
     triggerId?: number;
   }) => void;
+  // Surface a share prompt specifically for a level-5 or level-15 XP
+  // milestone (detected server-side via shouldTriggerSharePrompt). Distinct
+  // from a stage-evolution share — this fires from any XP-awarding flow that
+  // returns evolutionSharePrompt: true, before the auto-evolve mutation runs.
+  promptLevelMilestoneShare: (input: {
+    hatchlingId: number;
+    hatchlingName: string;
+    newLevel: number;
+  }) => void;
 };
 
 const EvolutionShareContext = createContext<EvolutionShareContextValue | null>(null);
@@ -169,6 +178,36 @@ export function EvolutionShareProvider({ children }: { children: ReactNode }) {
     { playerId: pid },
     { query: { enabled: !!playerId, queryKey: getListHatchlingsQueryKey({ playerId: pid }) } },
   );
+
+  const promptLevelMilestoneShare = useCallback<
+    EvolutionShareContextValue["promptLevelMilestoneShare"]
+  >(({ hatchlingId, hatchlingName, newLevel }) => {
+    if (player?.isSuspended) return;
+    const content = `🎉 ${hatchlingName} just reached level ${newLevel} — an evolution milestone! #HatchUp`;
+    const built: ShareState = {
+      hatchlingId,
+      hatchlingName,
+      content,
+      metadata: { hatchlingId, hatchlingName, newLevel, milestone: true },
+    };
+    setShare(built);
+    toast({
+      title: `${hatchlingName} hit level ${newLevel}!`,
+      description: `Evolution milestone reached. Share this moment with friends!`,
+      action: (
+        <ToastAction
+          altText="Share this milestone"
+          onClick={() => {
+            setShare(built);
+            setOpen(true);
+          }}
+          data-testid="toast-action-share-milestone"
+        >
+          Share milestone!
+        </ToastAction>
+      ),
+    });
+  }, [toast, player?.isSuspended]);
 
   const promptShare = useCallback<EvolutionShareContextValue["promptShare"]>(({ prev, result }) => {
     if (player?.isSuspended) return;
@@ -281,7 +320,7 @@ export function EvolutionShareProvider({ children }: { children: ReactNode }) {
   }, [qc, promptShare]);
 
   return (
-    <EvolutionShareContext.Provider value={{ promptShare, triggerEvolutionIfEligible }}>
+    <EvolutionShareContext.Provider value={{ promptShare, triggerEvolutionIfEligible, promptLevelMilestoneShare }}>
       {children}
       {player && share && (
         <ComposeSheet

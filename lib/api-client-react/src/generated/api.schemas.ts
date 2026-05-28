@@ -156,6 +156,11 @@ export interface Competition {
      * @nullable
      */
   hatchlingNewXp?: number | null;
+  /**
+     * True when the Pal crossed an evolution milestone (level 5 or 15) in this result.
+     * @nullable
+     */
+  hatchlingEvolutionSharePrompt?: boolean | null;
 }
 
 export interface LiveEvent {
@@ -570,6 +575,8 @@ export type ActivityLogResultPalXpResult = {
   newLevel: number;
   /** Pal total XP after the reward. */
   newXp: number;
+  /** True when the Pal crossed an evolution milestone (level 5 or 15). */
+  evolutionSharePrompt?: boolean;
 } | null;
 
 export type BadgeDefinitionTier = typeof BadgeDefinitionTier[keyof typeof BadgeDefinitionTier];
@@ -711,6 +718,8 @@ export type WorkoutSessionPalXpResult = {
   newLevel: number;
   /** Pal total XP after the reward. */
   newXp: number;
+  /** True when the Pal crossed an evolution milestone (level 5 or 15). */
+  evolutionSharePrompt?: boolean;
 } | null;
 
 export interface WorkoutSession {
@@ -3684,11 +3693,26 @@ export const ListEventsStatus = {
   past: 'past',
 } as const;
 
+/**
+ * XP awarded to the active Pal from joining this event, if applicable.
+ */
+export type JoinLiveEvent200PalXpResult = {
+  hatchlingId: number;
+  xpDelta: number;
+  prevLevel: number;
+  newLevel: number;
+  newXp: number;
+  /** True when the Pal crossed an evolution milestone (level 5 or 15). */
+  evolutionSharePrompt?: boolean;
+} | null;
+
 export type JoinLiveEvent200 = {
   eventId: number;
   joinedAt: string;
   xpEarned?: number;
   coinsEarned?: number;
+  /** XP awarded to the active Pal from joining this event, if applicable. */
+  palXpResult?: JoinLiveEvent200PalXpResult;
 };
 
 export type ListClubsParams = {

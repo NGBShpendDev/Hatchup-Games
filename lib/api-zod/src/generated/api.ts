@@ -341,7 +341,8 @@ export const GetPlayerDashboardResponse = zod.object({
   "hatchlingXpDelta": zod.number().nullish().describe('XP awarded to the Pal this race\/competition.'),
   "hatchlingPrevLevel": zod.number().nullish().describe('Pal level before the XP was applied.'),
   "hatchlingNewLevel": zod.number().nullish().describe('Pal level after XP was applied.'),
-  "hatchlingNewXp": zod.number().nullish().describe('Pal total XP after the reward.')
+  "hatchlingNewXp": zod.number().nullish().describe('Pal total XP after the reward.'),
+  "hatchlingEvolutionSharePrompt": zod.boolean().nullish().describe('True when the Pal crossed an evolution milestone (level 5 or 15) in this result.')
 })),
   "activeEvents": zod.array(zod.object({
   "id": zod.number(),
@@ -866,7 +867,8 @@ export const ListCompetitionsResponseItem = zod.object({
   "hatchlingXpDelta": zod.number().nullish().describe('XP awarded to the Pal this race\/competition.'),
   "hatchlingPrevLevel": zod.number().nullish().describe('Pal level before the XP was applied.'),
   "hatchlingNewLevel": zod.number().nullish().describe('Pal level after XP was applied.'),
-  "hatchlingNewXp": zod.number().nullish().describe('Pal total XP after the reward.')
+  "hatchlingNewXp": zod.number().nullish().describe('Pal total XP after the reward.'),
+  "hatchlingEvolutionSharePrompt": zod.boolean().nullish().describe('True when the Pal crossed an evolution milestone (level 5 or 15) in this result.')
 })
 export const ListCompetitionsResponse = zod.array(ListCompetitionsResponseItem)
 
@@ -905,7 +907,8 @@ export const GetCompetitionResponse = zod.object({
   "hatchlingXpDelta": zod.number().nullish().describe('XP awarded to the Pal this race\/competition.'),
   "hatchlingPrevLevel": zod.number().nullish().describe('Pal level before the XP was applied.'),
   "hatchlingNewLevel": zod.number().nullish().describe('Pal level after XP was applied.'),
-  "hatchlingNewXp": zod.number().nullish().describe('Pal total XP after the reward.')
+  "hatchlingNewXp": zod.number().nullish().describe('Pal total XP after the reward.'),
+  "hatchlingEvolutionSharePrompt": zod.boolean().nullish().describe('True when the Pal crossed an evolution milestone (level 5 or 15) in this result.')
 })
 
 
@@ -940,7 +943,8 @@ export const SubmitCompetitionResultResponse = zod.object({
   "hatchlingXpDelta": zod.number().nullish().describe('XP awarded to the Pal this race\/competition.'),
   "hatchlingPrevLevel": zod.number().nullish().describe('Pal level before the XP was applied.'),
   "hatchlingNewLevel": zod.number().nullish().describe('Pal level after XP was applied.'),
-  "hatchlingNewXp": zod.number().nullish().describe('Pal total XP after the reward.')
+  "hatchlingNewXp": zod.number().nullish().describe('Pal total XP after the reward.'),
+  "hatchlingEvolutionSharePrompt": zod.boolean().nullish().describe('True when the Pal crossed an evolution milestone (level 5 or 15) in this result.')
 })
 
 
@@ -1572,7 +1576,15 @@ export const JoinLiveEventResponse = zod.object({
   "eventId": zod.number(),
   "joinedAt": zod.coerce.date(),
   "xpEarned": zod.number().optional(),
-  "coinsEarned": zod.number().optional()
+  "coinsEarned": zod.number().optional(),
+  "palXpResult": zod.object({
+  "hatchlingId": zod.number(),
+  "xpDelta": zod.number(),
+  "prevLevel": zod.number(),
+  "newLevel": zod.number(),
+  "newXp": zod.number(),
+  "evolutionSharePrompt": zod.boolean().optional().describe('True when the Pal crossed an evolution milestone (level 5 or 15).')
+}).nullish().describe('XP awarded to the active Pal from joining this event, if applicable.')
 })
 
 
@@ -2156,7 +2168,8 @@ export const ListWorkoutSessionsResponseItem = zod.object({
   "xpDelta": zod.number().describe('XP awarded to the Pal.'),
   "prevLevel": zod.number().describe('Pal level before XP was applied.'),
   "newLevel": zod.number().describe('Pal level after XP was applied.'),
-  "newXp": zod.number().describe('Pal total XP after the reward.')
+  "newXp": zod.number().describe('Pal total XP after the reward.'),
+  "evolutionSharePrompt": zod.boolean().optional().describe('True when the Pal crossed an evolution milestone (level 5 or 15).')
 }).nullish().describe('XP awarded to the active Pal from this training session, if applicable.')
 })
 export const ListWorkoutSessionsResponse = zod.array(ListWorkoutSessionsResponseItem)

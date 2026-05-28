@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useEvolutionShare } from "@/components/evolution-share-provider";
 
 const XP_PER_LEVEL = 100;
 
@@ -41,6 +42,7 @@ export default function Training() {
   const { toast } = useToast();
   const { playerId, player } = usePlayer();
   const pid = playerId ?? 0;
+  const { promptLevelMilestoneShare } = useEvolutionShare();
   const [reaction, setReaction] = useState<HatchlingReactionData | null>(null);
   const [palXp, setPalXp] = useState<PalXpResult | null>(null);
   const [lastSessionXp, setLastSessionXp] = useState<number | null>(null);
@@ -102,7 +104,21 @@ export default function Training() {
           queryClient.invalidateQueries({ queryKey: getListWorkoutSessionsQueryKey({ playerId: pid, limit: 10 }) });
           setLastSessionXp(data.xpEarned);
           if (data.palXpResult) {
-            setPalXp(data.palXpResult as PalXpResult);
+            const palXpResult = data.palXpResult as PalXpResult & { evolutionSharePrompt?: boolean };
+            setPalXp(palXpResult);
+            if (palXpResult.evolutionSharePrompt) {
+              const activeId = player?.activeHatchlingId;
+              const partner =
+                (activeId && ownedHatchlings?.find((h) => h.id === activeId)) ||
+                ownedHatchlings?.[0];
+              if (partner) {
+                promptLevelMilestoneShare({
+                  hatchlingId: palXpResult.hatchlingId,
+                  hatchlingName: partner.name,
+                  newLevel: palXpResult.newLevel,
+                });
+              }
+            }
           }
           const activeId = player?.activeHatchlingId;
           const partner =

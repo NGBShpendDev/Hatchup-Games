@@ -10,7 +10,7 @@ import {
   SubmitCompetitionResultBody,
 } from "@workspace/api-zod";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth.ts";
-import { applyHatchlingXp } from "../services/hatchlingXp.ts";
+import { applyHatchlingXp, shouldTriggerSharePrompt } from "../services/hatchlingXp.ts";
 import { resolveActivePartner } from "../services/activePartner.ts";
 
 /**
@@ -143,6 +143,7 @@ router.post("/competitions/:id/result", requireAuth, attachPlayer, async (req, r
     hatchlingPrevLevel: palXpResult?.prevLevel ?? null,
     hatchlingNewLevel: palXpResult?.newLevel ?? null,
     hatchlingNewXp: palXpResult?.newXp ?? null,
+    hatchlingEvolutionSharePrompt: palXpResult ? shouldTriggerSharePrompt(palXpResult) : null,
   });
 });
 

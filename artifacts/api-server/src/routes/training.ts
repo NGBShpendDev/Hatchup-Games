@@ -11,7 +11,7 @@ import {
   GetMealPlanQueryParams,
 } from "@workspace/api-zod";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth.ts";
-import { applyHatchlingXp, getActivePalId } from "../services/hatchlingXp.ts";
+import { applyHatchlingXp, getActivePalId, shouldTriggerSharePrompt } from "../services/hatchlingXp.ts";
 
 const router = Router();
 
@@ -295,7 +295,9 @@ router.post("/training/log-session", requireAuth, attachPlayer, requirePlayerOwn
   res.status(201).json({
     ...session[0],
     createdAt: session[0].createdAt.toISOString(),
-    palXpResult: palXpResult ?? null,
+    palXpResult: palXpResult
+      ? { ...palXpResult, evolutionSharePrompt: shouldTriggerSharePrompt(palXpResult) }
+      : null,
   });
 });
 

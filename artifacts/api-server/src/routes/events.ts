@@ -5,7 +5,7 @@ import { liveEventsTable, playersTable, eventParticipantsTable } from "@workspac
 import { and, eq, inArray, sql, desc } from "drizzle-orm";
 import { ListEventsQueryParams, GetLiveEventParams } from "@workspace/api-zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
-import { applyHatchlingXp, getActivePalId } from "../services/hatchlingXp.ts";
+import { applyHatchlingXp, getActivePalId, shouldTriggerSharePrompt } from "../services/hatchlingXp.ts";
 
 // Live event entry-reward XP grant. Kept small and flat so it can't replace
 // real progression — it exists so a level-up that crosses an evolution
@@ -211,6 +211,9 @@ router.post("/events/:id/join", requireAuth, attachPlayer, async (req, res) => {
     joinedAt: inserted[0].joinedAt.toISOString(),
     xpEarned: xpResult ? xpResult.xpDelta : 0,
     coinsEarned: 0,
+    palXpResult: xpResult
+      ? { ...xpResult, evolutionSharePrompt: shouldTriggerSharePrompt(xpResult) }
+      : null,
   });
 });
 
