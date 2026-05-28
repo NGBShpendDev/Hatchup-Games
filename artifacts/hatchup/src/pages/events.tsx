@@ -2,9 +2,11 @@ import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { GlassCard } from "@/components/ui/glass-card";
+import { NeonButton } from "@/components/ui/neon-button";
+import { GlowBadge } from "@/components/ui/glow-badge";
 import { Calendar, Clock, Gift, Users, Phone } from "lucide-react";
 import { motion } from "framer-motion";
 import { SafetyBanner } from "@/components/safety-banner";
@@ -88,14 +90,17 @@ export default function Events() {
           <div className="space-y-6">
             {events?.map(event => (
               <motion.div key={event.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                <Card className={`overflow-hidden border-2 transition-all ${event.status === "active" ? "border-red-500 shadow-xl shadow-red-500/10" : "border-border opacity-75"}`}>
-                  <div className="flex flex-col md:flex-row">
+                <GlassCard
+                  glow={event.status === "active" ? "primary" : "none"}
+                  className={`overflow-hidden ${event.status === "active" ? "" : "opacity-75"}`}
+                >
+                  <div className="relative z-10 flex flex-col md:flex-row">
                     <div className="w-full md:w-1/3 h-48 md:h-auto bg-muted relative">
                       {event.imageUrl && <img src={event.imageUrl} alt={event.name} className="w-full h-full object-cover" />}
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent to-background/90 md:bg-gradient-to-l" />
                       {event.status === "active" && (
-                        <div className="absolute top-4 left-4 bg-red-500 text-white text-xs font-black uppercase px-3 py-1.5 rounded-full animate-pulse shadow-lg">
-                          Live Now
+                        <div className="absolute top-4 left-4 animate-pulse">
+                          <GlowBadge tone="primary">Live Now</GlowBadge>
                         </div>
                       )}
                     </div>
@@ -130,18 +135,24 @@ export default function Events() {
                             </div>
                           )}
                         </div>
-                        <Button
-                          size="lg"
-                          variant={event.status === "active" ? "default" : "secondary"}
-                          className="font-bold w-full md:w-auto active-elevate"
-                          disabled={event.status !== "active"}
-                        >
-                          {event.status === "active" ? "Join Event" : "Starts Soon"}
-                        </Button>
+                        {event.status === "active" ? (
+                          <NeonButton size="lg" className="w-full md:w-auto">
+                            Join Event
+                          </NeonButton>
+                        ) : (
+                          <Button
+                            size="lg"
+                            variant="secondary"
+                            className="font-bold w-full md:w-auto active-elevate"
+                            disabled
+                          >
+                            Starts Soon
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
-                </Card>
+                </GlassCard>
               </motion.div>
             ))}
           </div>

@@ -15,6 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
+import { GlassCard } from "@/components/ui/glass-card";
+import { NeonButton } from "@/components/ui/neon-button";
+import { GlowBadge } from "@/components/ui/glow-badge";
 import { motion } from "framer-motion";
 import { ArrowLeft, Zap, Heart, Coffee, Shield, Trash2, ArrowUpCircle, Sword, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -386,9 +389,9 @@ export default function HatchlingDetail() {
             <div>
               <h1 className="text-4xl font-black tracking-tight text-foreground mb-2">{hatchling.name}</h1>
               <div className="flex gap-2 items-center flex-wrap">
-                <Badge variant="outline" className="text-sm font-bold px-3 py-1 uppercase">{hatchling.species}</Badge>
-                <Badge className="text-sm font-bold px-3 py-1 bg-primary/20 text-primary border-0">Level {hatchling.level}</Badge>
-                <Badge variant="outline" className="text-sm font-bold">{hatchling.rarity ?? "Common"}</Badge>
+                <GlowBadge tone="violet">{hatchling.species}</GlowBadge>
+                <GlowBadge tone="primary">Level {hatchling.level}</GlowBadge>
+                <GlowBadge tone="cyan">{hatchling.rarity ?? "Common"}</GlowBadge>
                 {isActivePartner && (
                   <Badge className="text-sm font-black px-3 py-1 bg-yellow-400 text-black border-0 flex items-center gap-1">
                     <Star className="w-3 h-3 fill-black" /> Active Partner
@@ -398,8 +401,8 @@ export default function HatchlingDetail() {
             </div>
 
             {/* Active partner action */}
-            <Card className={`${isActivePartner ? "bg-yellow-400/10 border-yellow-400/40" : "bg-card/80 border-border"}`}>
-              <CardContent className="p-4 flex items-center justify-between gap-3">
+            <GlassCard glow={isActivePartner ? "yellow" : "none"} className="p-4">
+              <div className="relative z-10 flex items-center justify-between gap-3">
                 <div>
                   <p className="font-black text-sm flex items-center gap-1.5">
                     <Star className={`w-4 h-4 ${isActivePartner ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
@@ -411,52 +414,50 @@ export default function HatchlingDetail() {
                       : "Set as your bonded partner so nutrition buffs go here."}
                   </p>
                 </div>
-                <Button
+                <NeonButton
                   size="sm"
-                  variant={isActivePartner ? "secondary" : "default"}
-                  className="font-bold whitespace-nowrap"
+                  variant={isActivePartner ? "secondary" : "primary"}
+                  className="whitespace-nowrap"
                   onClick={handleSetActive}
                   disabled={isActivePartner || updatePlayerMutation.isPending}
                   data-testid="button-set-active-partner"
                 >
                   {isActivePartner ? "Active" : updatePlayerMutation.isPending ? "Setting…" : "Set Active"}
-                </Button>
-              </CardContent>
-            </Card>
+                </NeonButton>
+              </div>
+            </GlassCard>
 
             {/* Realm description */}
-            <Card className={`border ${realmConfig.border} bg-gradient-to-br ${realmConfig.gradient}`}>
-              <CardContent className="p-4">
+            <GlassCard glow="primary" className={`p-4 bg-gradient-to-br ${realmConfig.gradient}`}>
+              <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xl">{realmConfig.emoji}</span>
                   <p className="font-black text-sm" style={{ color: realmConfig.color }}>{realmConfig.label}</p>
                 </div>
                 <p className="text-xs text-muted-foreground">{realmConfig.description}</p>
-              </CardContent>
-            </Card>
+              </div>
+            </GlassCard>
 
             {/* Mood state */}
-            <Card className="bg-card/80 border-border">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{moodDisplay.emoji}</span>
-                    <div>
-                      <p className="font-black text-sm" style={{ color: moodDisplay.color }}>{moodDisplay.label}</p>
-                      <p className="text-xs text-muted-foreground">{moodDisplay.desc}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Mood</p>
-                    <p className="text-xs font-black capitalize">{moodState}</p>
+            <GlassCard className="p-4">
+              <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{moodDisplay.emoji}</span>
+                  <div>
+                    <p className="font-black text-sm" style={{ color: moodDisplay.color }}>{moodDisplay.label}</p>
+                    <p className="text-xs text-muted-foreground">{moodDisplay.desc}</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="text-right">
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Mood</p>
+                  <p className="text-xs font-black capitalize">{moodState}</p>
+                </div>
+              </div>
+            </GlassCard>
 
             {/* Friendship bond */}
-            <Card className="bg-card/80 border-border">
-              <CardContent className="p-4">
+            <GlassCard className="p-4">
+              <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-2">
                   <Heart className="w-4 h-4 text-pink-400" />
                   <p className="font-black text-sm text-pink-400">Friendship Bond</p>
@@ -466,12 +467,12 @@ export default function HatchlingDetail() {
                 <p className="text-[10px] text-muted-foreground mt-1.5">
                   {friendshipLevel < 30 ? "Still getting to know each other." : friendshipLevel < 70 ? "A strong bond is forming!" : "An unbreakable bond. True partners."}
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </GlassCard>
 
             {/* Personality */}
-            <Card className="bg-card/80 border-border">
-              <CardContent className="p-4">
+            <GlassCard className="p-4">
+              <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-2">
                   <Star className="w-4 h-4" style={{ color: realmConfig.color }} />
                   <p className="font-black text-sm">Personality — <span style={{ color: realmConfig.color }}>{personality}</span></p>
@@ -484,12 +485,12 @@ export default function HatchlingDetail() {
                     </span>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </GlassCard>
 
             {/* Vitals */}
-            <Card className="bg-card/80 border-border">
-              <CardContent className="p-5 space-y-3">
+            <GlassCard className="p-5">
+              <div className="relative z-10 space-y-3">
                 <h3 className="font-black text-base">Vitals</h3>
                 {[
                   { icon: Heart, label: "Happiness", value: hatchling.happiness, color: "#22c55e" },
@@ -507,20 +508,18 @@ export default function HatchlingDetail() {
                     </div>
                   </div>
                 ))}
-              </CardContent>
-            </Card>
+              </div>
+            </GlassCard>
 
             {/* Genetics */}
             {genetics && (
-              <Card className="bg-card/80 border-border">
-                <CardContent className="p-5">
+              <GlassCard className="p-5">
+                <div className="relative z-10">
                   <div className="flex items-center gap-2 mb-3">
                     <Shield className="w-4 h-4" style={{ color: realmConfig.color }} />
                     <h3 className="font-black text-sm">Genetics Profile</h3>
                     {genetics.mutationChance > 7 && (
-                      <Badge className="text-[10px] ml-auto font-black bg-yellow-500/20 text-yellow-400 border-yellow-500/40">
-                        ⚗ Mutation Risk
-                      </Badge>
+                      <GlowBadge tone="yellow" className="ml-auto">⚗ Mutation Risk</GlowBadge>
                     )}
                   </div>
                   <div className="space-y-2">
@@ -533,30 +532,30 @@ export default function HatchlingDetail() {
                       />
                     ))}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </GlassCard>
             )}
 
             {/* Ability */}
-            <Card className="bg-card/80 border-l-4 border-border" style={{ borderLeftColor: realmConfig.color }}>
-              <CardContent className="p-5">
+            <GlassCard glow="primary" className="p-5 border-l-4" style={{ borderLeftColor: realmConfig.color }}>
+              <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-1">
                   <Shield className="w-4 h-4" style={{ color: realmConfig.color }} />
                   <h3 className="font-black text-sm">Signature Ability</h3>
                 </div>
                 <p className="font-black text-base">{hatchling.abilityName || "Unknown Ability"}</p>
                 <p className="text-sm text-muted-foreground mt-1">{hatchling.abilityDesc || "This Pal hasn't discovered its true power yet."}</p>
-              </CardContent>
-            </Card>
+              </div>
+            </GlassCard>
 
             {/* Actions */}
             <div className="flex gap-3 pt-1">
-              <Button size="lg" className="flex-1 font-bold" onClick={handleTrain} disabled={updateMutation.isPending}>
+              <NeonButton size="lg" className="flex-1" onClick={handleTrain} disabled={updateMutation.isPending}>
                 <Sword className="w-4 h-4 mr-2" /> Train
-              </Button>
-              <Button size="lg" variant="secondary" className="flex-1 font-bold" onClick={handleFeed} disabled={updateMutation.isPending}>
+              </NeonButton>
+              <NeonButton size="lg" variant="secondary" className="flex-1" onClick={handleFeed} disabled={updateMutation.isPending}>
                 <Coffee className="w-4 h-4 mr-2" /> Feed
-              </Button>
+              </NeonButton>
             </div>
 
             <div className="flex justify-end">

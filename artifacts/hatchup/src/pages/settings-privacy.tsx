@@ -4,6 +4,9 @@ import { usePlayer } from "@/lib/playerContext";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { GlassCard } from "@/components/ui/glass-card";
+import { NeonButton } from "@/components/ui/neon-button";
+import { GlowBadge } from "@/components/ui/glow-badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -182,29 +185,29 @@ export default function SettingsPrivacy() {
         </div>
 
         {/* Verification badge */}
-        <Card className="border border-blue-500/20 bg-blue-950/10">
-          <CardContent className="p-4 flex items-center gap-3">
+        <GlassCard glow="cyan" className="p-4">
+          <div className="relative z-10 flex items-center gap-3">
             <CheckCircle className="w-8 h-8 text-blue-400 shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="font-bold text-sm">Profile Verification</p>
               <p className="text-xs text-muted-foreground font-medium">Verified profiles earn more trust and unlock group features.</p>
             </div>
             {(player as { isVerified?: boolean } | null)?.isVerified ? (
-              <Badge className="bg-blue-500 text-white font-black shrink-0">Verified ✓</Badge>
+              <GlowBadge tone="cyan" className="shrink-0">Verified ✓</GlowBadge>
             ) : verifyPending ? (
-              <Badge className="bg-amber-500 text-black font-black shrink-0 text-[10px]">Pending Review</Badge>
+              <GlowBadge tone="yellow" className="shrink-0">Pending Review</GlowBadge>
             ) : (
-              <Button
+              <NeonButton
                 size="sm"
-                variant="outline"
-                className="shrink-0 text-xs font-bold border-blue-500/30 text-blue-400"
+                variant="secondary"
+                className="shrink-0"
                 onClick={() => setVerifyOpen(true)}
               >
                 Start Verification
-              </Button>
+              </NeonButton>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </GlassCard>
 
         {/* Verification dialog */}
         <Dialog open={verifyOpen} onOpenChange={setVerifyOpen}>
@@ -261,14 +264,13 @@ export default function SettingsPrivacy() {
         </Dialog>
 
         {/* Location Visibility */}
-        <Card className="border">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-black flex items-center gap-2">
+        <GlassCard className="p-4">
+          <div className="relative z-10 space-y-3">
+            <div className="text-base font-black flex items-center gap-2">
               <Eye className="w-4 h-4 text-primary" />
               Location Visibility
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
+            </div>
+            <div className="space-y-2">
             {LOCATION_OPTIONS.map((opt) => (
               <motion.button
                 key={opt.value}
@@ -290,42 +292,41 @@ export default function SettingsPrivacy() {
                 )}
               </motion.button>
             ))}
-          </CardContent>
-        </Card>
+            </div>
+          </div>
+        </GlassCard>
 
         {/* Workout Approval */}
-        <Card className="border">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <Lock className="w-5 h-5 text-purple-400 shrink-0" />
-                <div>
-                  <p className="font-bold text-sm">Approve Workout Requests</p>
-                  <p className="text-xs text-muted-foreground font-medium">
-                    Manually approve before anyone can add you as a workout partner
-                  </p>
-                </div>
+        <GlassCard className="p-4">
+          <div className="relative z-10 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Lock className="w-5 h-5 text-purple-400 shrink-0" />
+              <div>
+                <p className="font-bold text-sm">Approve Workout Requests</p>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Manually approve before anyone can add you as a workout partner
+                </p>
               </div>
-              <Switch
-                checked={requireApproval}
-                onCheckedChange={setRequireApproval}
-              />
             </div>
-          </CardContent>
-        </Card>
+            <Switch
+              checked={requireApproval}
+              onCheckedChange={setRequireApproval}
+            />
+          </div>
+        </GlassCard>
 
         {/* Emergency Contact */}
-        <Card className="border border-green-500/20 bg-green-950/10">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-black flex items-center gap-2">
-              <Phone className="w-4 h-4 text-green-400" />
-              Emergency Contact
-            </CardTitle>
-            <p className="text-xs text-muted-foreground font-medium">
-              Displayed on your profile during live events so others know who to contact in an emergency.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <GlassCard glow="accent" className="p-4">
+          <div className="relative z-10 space-y-3">
+            <div>
+              <div className="text-base font-black flex items-center gap-2">
+                <Phone className="w-4 h-4 text-green-400" />
+                Emergency Contact
+              </div>
+              <p className="text-xs text-muted-foreground font-medium mt-1">
+                Displayed on your profile during live events so others know who to contact in an emergency.
+              </p>
+            </div>
             <div className="space-y-1.5">
               <Label htmlFor="ec-name" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                 Name
@@ -351,13 +352,12 @@ export default function SettingsPrivacy() {
                 type="tel"
               />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </GlassCard>
 
         {/* Minor account / parental controls */}
-        <Card className="border border-pink-500/20 bg-pink-950/10">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-4">
+        <GlassCard glow="primary" className="p-4">
+          <div className="relative z-10 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 min-w-0">
                 <Baby className="w-5 h-5 text-pink-400 shrink-0" />
                 <div className="min-w-0">
@@ -390,22 +390,21 @@ export default function SettingsPrivacy() {
                 }}
                 disabled={isMinor}
               />
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </GlassCard>
 
         {/* Push notifications */}
-        <Card className="border border-cyan-500/20 bg-cyan-950/10">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-black flex items-center gap-2">
-              <Bell className="w-4 h-4 text-cyan-400" />
-              Push Notifications
-            </CardTitle>
-            <p className="text-xs text-muted-foreground font-medium">
-              Get pinged about challenge invites and deadlines even when HatchUp is closed.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <GlassCard glow="cyan" className="p-4">
+          <div className="relative z-10 space-y-3">
+            <div>
+              <div className="text-base font-black flex items-center gap-2">
+                <Bell className="w-4 h-4 text-cyan-400" />
+                Push Notifications
+              </div>
+              <p className="text-xs text-muted-foreground font-medium mt-1">
+                Get pinged about challenge invites and deadlines even when HatchUp is closed.
+              </p>
+            </div>
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <p className="font-bold text-sm">Enable on this device</p>
@@ -446,41 +445,34 @@ export default function SettingsPrivacy() {
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </GlassCard>
 
         {/* MFA / account security pointer */}
-        <Card className="border border-indigo-500/20 bg-indigo-950/10">
-          <CardContent className="p-4">
-            <a
-              href="/user"
-              className="flex items-center gap-3"
-            >
-              <KeyRound className="w-5 h-5 text-indigo-400 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm">Account & security</p>
-                <p className="text-xs text-muted-foreground font-medium">
-                  Manage your password, two-factor authentication (MFA), connected devices, and account recovery.
-                </p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-            </a>
-          </CardContent>
-        </Card>
+        <GlassCard interactive className="p-4">
+          <a href="/user" className="relative z-10 flex items-center gap-3">
+            <KeyRound className="w-5 h-5 text-indigo-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm">Account & security</p>
+              <p className="text-xs text-muted-foreground font-medium">
+                Manage your password, two-factor authentication (MFA), connected devices, and account recovery.
+              </p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+          </a>
+        </GlassCard>
 
         {/* Block list link */}
-        <Card className="border border-red-500/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <Ban className="w-5 h-5 text-red-400 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm">Blocked Users</p>
-                <p className="text-xs text-muted-foreground font-medium">View and manage your block list</p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+        <GlassCard interactive className="p-4">
+          <div className="relative z-10 flex items-center gap-3">
+            <Ban className="w-5 h-5 text-red-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm">Blocked Users</p>
+              <p className="text-xs text-muted-foreground font-medium">View and manage your block list</p>
             </div>
-          </CardContent>
-        </Card>
+            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+          </div>
+        </GlassCard>
 
         {/* Safety Guidelines link */}
         <SafetyGuidelinesSheet
@@ -496,13 +488,14 @@ export default function SettingsPrivacy() {
           }
         />
 
-        <Button
+        <NeonButton
           onClick={handleSave}
           disabled={saving || !loaded}
-          className="w-full h-12 font-black text-base bg-gradient-to-r from-primary to-purple-600"
+          size="lg"
+          className="w-full"
         >
           {saving ? "Saving..." : "Save Privacy Settings"}
-        </Button>
+        </NeonButton>
       </div>
     </Layout>
   );

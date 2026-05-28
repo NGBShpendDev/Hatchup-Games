@@ -5,6 +5,8 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { NeonButton } from "@/components/ui/neon-button";
+import { GlassCard } from "@/components/ui/glass-card";
 import { useToast } from "@/hooks/use-toast";
 import { HatchlingCard } from "@/components/hatchling-card";
 
@@ -86,14 +88,14 @@ export default function Race() {
               </div>
 
               <div className="flex justify-center">
-                <Button 
-                  size="lg" 
-                  className="font-black text-2xl px-16 py-8 rounded-full shadow-xl active-elevate"
+                <NeonButton
+                  size="lg"
+                  className="text-2xl px-16 py-8 rounded-full"
                   disabled={!selectedHatchlingId}
                   onClick={startRace}
                 >
                   START RACE
-                </Button>
+                </NeonButton>
               </div>
             </motion.div>
           )}
@@ -115,31 +117,35 @@ export default function Race() {
           )}
 
           {gameState === 'result' && result && (
-            <motion.div 
+            <motion.div
               key="result"
               initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }}
-              className="text-center w-full max-w-lg bg-card border-2 border-border p-12 rounded-3xl shadow-2xl"
+              className="w-full max-w-lg"
             >
-              <h2 className="text-3xl font-black mb-2 uppercase text-muted-foreground">Race Finished</h2>
-              <div className="text-8xl font-black text-primary my-8 drop-shadow-lg">
-                #{result.rank}
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="bg-muted p-4 rounded-2xl">
-                  <p className="text-sm font-bold text-muted-foreground uppercase">XP Earned</p>
-                  <p className="text-3xl font-black text-green-500">+{result.xp}</p>
-                </div>
-                <div className="bg-muted p-4 rounded-2xl">
-                  <p className="text-sm font-bold text-muted-foreground uppercase">Coins Earned</p>
-                  <p className="text-3xl font-black text-yellow-500">+{result.coins}</p>
-                </div>
-              </div>
+              <GlassCard glow="primary" className="text-center p-12">
+                <div className="relative z-10">
+                  <h2 className="text-3xl font-black mb-2 uppercase text-muted-foreground">Race Finished</h2>
+                  <div className="text-8xl font-black text-primary my-8 drop-shadow-lg">
+                    #{result.rank}
+                  </div>
 
-              <div className="flex gap-4">
-                <Button size="lg" className="flex-1 font-bold" onClick={() => setGameState('select')}>Race Again</Button>
-                <Button size="lg" variant="secondary" className="flex-1 font-bold" onClick={() => setLocation('/compete')}>Back to Modes</Button>
-              </div>
+                  <div className="grid grid-cols-2 gap-4 mb-8">
+                    <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                      <p className="text-sm font-bold text-muted-foreground uppercase">XP Earned</p>
+                      <p className="text-3xl font-black text-green-500">+{result.xp}</p>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                      <p className="text-sm font-bold text-muted-foreground uppercase">Coins Earned</p>
+                      <p className="text-3xl font-black text-yellow-500">+{result.coins}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <NeonButton size="lg" className="flex-1" onClick={() => setGameState('select')}>Race Again</NeonButton>
+                    <NeonButton size="lg" variant="secondary" className="flex-1" onClick={() => setLocation('/compete')}>Back to Modes</NeonButton>
+                  </div>
+                </div>
+              </GlassCard>
             </motion.div>
           )}
 

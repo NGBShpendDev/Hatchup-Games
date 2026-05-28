@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
 import { Badge } from "@/components/ui/badge";
+import { GlowBadge } from "@/components/ui/glow-badge";
 import { Button } from "@/components/ui/button";
 import { SafetyBanner } from "@/components/safety-banner";
 import {
@@ -552,7 +553,7 @@ export default function Leaderboard() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1">
                             <p className="font-bold text-sm truncate">{entry.displayName ?? entry.username}</p>
-                            {entry.isMe && <Badge className="text-[10px] px-1 py-0 bg-pink-600 text-white flex-shrink-0">You</Badge>}
+                            {entry.isMe && <GlowBadge tone="primary" className="text-[10px] px-1 py-0 flex-shrink-0">You</GlowBadge>}
                           </div>
                           <p className="text-[10px] text-white/40">Lv.{entry.level}</p>
                         </div>
@@ -632,7 +633,7 @@ export default function Leaderboard() {
                                 }`}>
                                   {c.scope === "world" ? "🌍 Global" : `📍 ${c.scope}`}
                                 </Badge>
-                                {isEnded && <Badge className="text-[10px] px-1.5 py-0 bg-white/10 text-white/40">Ended</Badge>}
+                                {isEnded && <GlowBadge tone="violet" className="text-[10px] px-1.5 py-0">Ended</GlowBadge>}
                               </div>
                               {c.description && <p className="text-xs text-white/50 mt-0.5">{c.description}</p>}
                             </div>
@@ -669,7 +670,7 @@ export default function Leaderboard() {
                           {/* Action row */}
                           <div className="flex items-center gap-2">
                             {c.isJoined ? (
-                              <Badge className="bg-pink-600/20 text-pink-400 border border-pink-500/30 text-xs">✓ Joined</Badge>
+                              <GlowBadge tone="primary">✓ Joined</GlowBadge>
                             ) : !isEnded ? (
                               <Button
                                 size="sm"
@@ -730,7 +731,7 @@ export default function Leaderboard() {
                                                 </div>
                                               )}
                                               {w.isMe && w.rewardsAwarded && (
-                                                <Badge className="text-[9px] px-1 py-0 bg-pink-600 text-white">Awarded!</Badge>
+                                                <GlowBadge tone="primary" className="text-[9px] px-1 py-0">Awarded!</GlowBadge>
                                               )}
                                             </div>
                                           );
@@ -755,7 +756,7 @@ export default function Leaderboard() {
                                         <Link href={`/players/${e.playerId}`} className="flex-1 min-w-0 hover:opacity-80 transition-opacity" data-testid={`link-profile-${e.playerId}`}>
                                           <div className="flex items-center gap-1">
                                             <span className="font-bold text-xs truncate">{e.displayName ?? e.username}</span>
-                                            {e.isMe && <Badge className="text-[9px] px-1 py-0 bg-pink-600 text-white">You</Badge>}
+                                            {e.isMe && <GlowBadge tone="primary" className="text-[9px] px-1 py-0">You</GlowBadge>}
                                           </div>
                                         </Link>
                                         <span className="font-black text-xs text-pink-400">{e.currentValue.toLocaleString()}</span>
@@ -839,7 +840,7 @@ function RankedList({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <p className="font-bold text-sm truncate">{entry.displayName ?? entry.username}</p>
-                  {entry.isMe && <Badge className="text-[10px] px-1 py-0 bg-pink-600 text-white flex-shrink-0">You</Badge>}
+                  {entry.isMe && <GlowBadge tone="primary" className="text-[10px] px-1 py-0 flex-shrink-0">You</GlowBadge>}
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <RankBadge rank={entry.rank} size="sm" />
@@ -920,7 +921,7 @@ function ArtifactsLeaderboardPanel({ myPlayerId: _myPlayerId }: { myPlayerId: nu
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <p className="font-bold text-sm truncate">{entry.displayName ?? entry.username}</p>
-                    {entry.isMe && <Badge className="text-[10px] px-1 py-0 bg-cyan-600 text-white flex-shrink-0">You</Badge>}
+                    {entry.isMe && <GlowBadge tone="cyan" className="text-[10px] px-1 py-0 flex-shrink-0">You</GlowBadge>}
                   </div>
                   {entry.rarestRarity && (
                     <p className="text-[10px] text-white/40 truncate">

@@ -7,6 +7,9 @@ import { ComposeSheet } from "@/components/compose-sheet";
 import { REACTION_ICONS } from "@/components/post-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { GlassCard } from "@/components/ui/glass-card";
+import { NeonButton } from "@/components/ui/neon-button";
+import { GlowBadge } from "@/components/ui/glow-badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
@@ -518,8 +521,8 @@ export default function Home() {
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4">
           <Link href="/hatch">
-            <Card className="bg-card border-2 hover:border-primary/50 transition-colors cursor-pointer group active-elevate h-full">
-              <CardContent className="p-4 flex flex-col items-center text-center gap-2 h-full justify-center">
+            <GlassCard interactive glow="primary" className="p-4 h-full">
+              <div className="relative z-10 flex flex-col items-center text-center gap-2 h-full justify-center">
                 <div className="relative">
                   <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
                     <EggIcon className="w-6 h-6" />
@@ -534,8 +537,8 @@ export default function Home() {
                   <h3 className="font-bold text-sm">Incubator</h3>
                   <p className="text-[10px] text-muted-foreground font-medium uppercase mt-1">{(dashboard as any).eggs?.totalActive ?? 0} Active Eggs</p>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </GlassCard>
           </Link>
 
           {/* Log Activity Dialog */}
@@ -544,8 +547,8 @@ export default function Home() {
             if (!open) { setRepMode(false); setRepCount(10); setActivityValue(""); setDistanceMiles(""); }
           }}>
             <DialogTrigger asChild>
-              <Card className="bg-card border-2 hover:border-accent/50 transition-colors cursor-pointer group active-elevate h-full">
-                <CardContent className="p-4 flex flex-col items-center text-center gap-2 h-full justify-center">
+              <GlassCard interactive glow="cyan" className="p-4 h-full">
+                <div className="relative z-10 flex flex-col items-center text-center gap-2 h-full justify-center">
                   <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center text-accent group-hover:scale-110 transition-transform">
                     <PlusCircle className="w-6 h-6" />
                   </div>
@@ -553,8 +556,8 @@ export default function Home() {
                     <h3 className="font-bold text-sm">Log Activity</h3>
                     <p className="text-[10px] text-muted-foreground font-medium uppercase mt-1">Earn Quick XP</p>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </GlassCard>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md bg-card">
               <DialogHeader>
@@ -767,7 +770,7 @@ export default function Home() {
             <div className="flex justify-between items-end mb-3">
               <h2 className="text-lg font-black flex items-center gap-2">
                 <Trophy className="w-4 h-4 text-yellow-500" /> Badges
-                <Badge variant="outline" className="font-black text-xs">{badgeCount}</Badge>
+                <GlowBadge tone="yellow">{badgeCount}</GlowBadge>
               </h2>
               <Link href="/rewards" className="text-xs font-bold text-primary flex items-center hover:underline">
                 View All <ChevronRight className="w-3 h-3" />
@@ -849,8 +852,8 @@ export default function Home() {
 
           {dashboard.topHatchling ? (
             <Link href={`/hatchlings/${dashboard.topHatchling.id}`}>
-              <Card className="bg-card border-2 hover:border-primary/30 transition-colors cursor-pointer overflow-hidden group">
-                <div className="flex p-4 gap-4 items-center relative">
+              <GlassCard interactive glow="primary" className="overflow-hidden group">
+                <div className="relative z-10 flex p-4 gap-4 items-center">
                   <div className="w-24 h-24 bg-gradient-to-br from-primary/20 to-purple-500/20 rounded-2xl flex items-center justify-center shrink-0 border border-primary/20 group-hover:scale-105 transition-transform">
                     {dashboard.topHatchling.imageUrl ? (
                       <img src={dashboard.topHatchling.imageUrl} alt={dashboard.topHatchling.name} className="w-16 h-16 object-contain" />
@@ -862,20 +865,20 @@ export default function Home() {
                     <h3 className="font-black text-2xl leading-none mb-1">{dashboard.topHatchling.name}</h3>
                     <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-2">{dashboard.topHatchling.species}</p>
                     <div className="flex gap-2">
-                      <Badge className="bg-primary/20 text-primary border-0 font-black">Lvl {dashboard.topHatchling.level}</Badge>
-                      <Badge variant="outline" className="font-bold">{dashboard.topHatchling.category}</Badge>
+                      <GlowBadge tone="primary">Lvl {dashboard.topHatchling.level}</GlowBadge>
+                      <GlowBadge tone="violet">{dashboard.topHatchling.category}</GlowBadge>
                     </div>
                   </div>
                 </div>
-              </Card>
+              </GlassCard>
             </Link>
           ) : (
-            <Card className="bg-card border-dashed">
-              <CardContent className="p-6 text-center">
+            <GlassCard className="p-6 text-center">
+              <div className="relative z-10">
                 <p className="text-sm text-muted-foreground font-bold mb-3">No Pals yet!</p>
-                <Link href="/hatch"><Button size="sm" className="font-bold">Hatch your first Pal</Button></Link>
-              </CardContent>
-            </Card>
+                <Link href="/hatch"><NeonButton size="sm">Hatch your first Pal</NeonButton></Link>
+              </div>
+            </GlassCard>
           )}
         </section>
       </div>
@@ -948,8 +951,8 @@ function HighlightCard({
   }
 
   return (
-    <Card className="bg-card border-2 hover:border-primary/40 transition-colors overflow-hidden">
-      <CardContent className="p-3 space-y-2">
+    <GlassCard interactive className="overflow-hidden">
+      <div className="relative z-10 p-3 space-y-2">
         <div className="flex items-start gap-3">
           <Link href="/social" className="shrink-0">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/20 border border-primary/40 flex items-center justify-center font-black text-sm text-primary">
@@ -1064,8 +1067,8 @@ function HighlightCard({
             <Send className="w-3.5 h-3.5" />
           </Button>
         </form>
-      </CardContent>
-    </Card>
+      </div>
+    </GlassCard>
   );
 }
 

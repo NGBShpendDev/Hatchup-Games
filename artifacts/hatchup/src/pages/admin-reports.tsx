@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { GlassCard } from "@/components/ui/glass-card";
+import { NeonButton } from "@/components/ui/neon-button";
+import { GlowBadge } from "@/components/ui/glow-badge";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Shield, Flag, CheckCircle, X, AlertTriangle, User } from "lucide-react";
 import { motion } from "framer-motion";
@@ -31,10 +33,10 @@ const REASON_LABELS: Record<string, string> = {
   other: "Other",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  open: "bg-amber-500 text-black",
-  resolved: "bg-green-500 text-white",
-  dismissed: "bg-muted text-muted-foreground",
+const STATUS_TONES: Record<string, "yellow" | "green" | "violet"> = {
+  open: "yellow",
+  resolved: "green",
+  dismissed: "violet",
 };
 
 export default function AdminReports() {
@@ -127,16 +129,16 @@ export default function AdminReports() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <Card className="border">
-                  <CardContent className="p-4 space-y-3">
+                <GlassCard className="p-4">
+                  <div className="relative z-10 space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
                         <p className="font-black text-sm">{REASON_LABELS[report.reason] ?? report.reason}</p>
                       </div>
-                      <Badge className={`text-[10px] font-black uppercase ${STATUS_COLORS[report.status] ?? "bg-muted"}`}>
+                      <GlowBadge tone={STATUS_TONES[report.status] ?? "violet"}>
                         {report.status}
-                      </Badge>
+                      </GlowBadge>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-xs">
@@ -166,25 +168,25 @@ export default function AdminReports() {
 
                     {report.status === "open" && (
                       <div className="flex gap-2">
-                        <Button
+                        <NeonButton
                           size="sm"
                           onClick={() => handleAction(report.id, "resolved")}
-                          className="flex-1 h-8 text-xs font-bold bg-green-600 hover:bg-green-500"
+                          className="flex-1"
                         >
                           <CheckCircle className="w-3 h-3 mr-1" /> Resolve
-                        </Button>
-                        <Button
+                        </NeonButton>
+                        <NeonButton
                           size="sm"
-                          variant="outline"
+                          variant="secondary"
                           onClick={() => handleAction(report.id, "dismissed")}
-                          className="flex-1 h-8 text-xs font-bold text-muted-foreground"
+                          className="flex-1"
                         >
                           <X className="w-3 h-3 mr-1" /> Dismiss
-                        </Button>
+                        </NeonButton>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </GlassCard>
               </motion.div>
             ))}
           </div>

@@ -13,6 +13,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { GlassCard } from "@/components/ui/glass-card";
+import { NeonButton } from "@/components/ui/neon-button";
+import { GlowBadge } from "@/components/ui/glow-badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dumbbell, Target, Utensils, History, Zap, CheckCircle2, Trophy, Clock } from "lucide-react";
@@ -104,15 +107,15 @@ export default function Training() {
             {isLoadingWorkout || generateWorkout.isPending ? (
               <Skeleton className="h-96 w-full rounded-3xl" />
             ) : workoutError || !workoutPlan ? (
-              <Card className="border-2 border-dashed bg-card/50 text-center py-12">
-                <CardContent>
+              <GlassCard className="text-center py-12 px-6">
+                <div className="relative z-10">
                   <Dumbbell className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
                   <h3 className="text-2xl font-black mb-2">No Active Plan</h3>
                   <p className="text-muted-foreground mb-6">Generate a personalized workout plan to start training.</p>
-                  <div className="flex justify-center gap-4 mb-6">
+                  <div className="flex justify-center gap-4 mb-6 flex-wrap">
                     {["lose_weight", "gain_muscle", "improve_endurance"].map(goal => (
-                      <Button 
-                        key={goal} 
+                      <Button
+                        key={goal}
                         variant={workoutGoal === goal ? "default" : "outline"}
                         onClick={() => setWorkoutGoal(goal)}
                         className="font-bold capitalize"
@@ -121,28 +124,26 @@ export default function Training() {
                       </Button>
                     ))}
                   </div>
-                  <Button size="lg" className="font-black active-elevate" onClick={handleGenerateWorkout} disabled={generateWorkout.isPending}>
+                  <NeonButton size="lg" onClick={handleGenerateWorkout} disabled={generateWorkout.isPending}>
                     Generate AI Plan
-                  </Button>
-                </CardContent>
-              </Card>
+                  </NeonButton>
+                </div>
+              </GlassCard>
             ) : (
               <div className="space-y-6">
-                <Card className="border-2 border-primary/50 shadow-lg shadow-primary/10">
-                  <CardHeader>
-                    <CardTitle className="text-2xl font-black flex justify-between">
-                      <span>Today's Workout</span>
-                      <Badge variant="secondary" className="text-lg">Day {workoutPlan.days[0]?.name}</Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="flex gap-4 mb-6">
-                      <Badge className="bg-primary/20 text-primary hover:bg-primary/30 font-bold"><Clock className="w-3 h-3 mr-1"/> {workoutPlan.days[0]?.durationMinutes} min</Badge>
-                      <Badge className="bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30 font-bold"><Zap className="w-3 h-3 mr-1"/> {workoutPlan.days[0]?.xpReward} XP</Badge>
+                <GlassCard glow="primary" className="p-6">
+                  <div className="relative z-10 space-y-6">
+                    <div className="flex justify-between items-center">
+                      <h2 className="text-2xl font-black">Today's Workout</h2>
+                      <GlowBadge tone="primary">Day {workoutPlan.days[0]?.name}</GlowBadge>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      <GlowBadge tone="primary"><Clock className="w-3 h-3" /> {workoutPlan.days[0]?.durationMinutes} min</GlowBadge>
+                      <GlowBadge tone="yellow"><Zap className="w-3 h-3" /> {workoutPlan.days[0]?.xpReward} XP</GlowBadge>
                     </div>
                     <div className="space-y-4">
                       {workoutPlan.days[0]?.exercises.map((ex, i) => (
-                        <div key={i} className="flex justify-between items-center p-4 bg-muted/50 rounded-2xl border border-border">
+                        <div key={i} className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/10">
                           <div>
                             <h4 className="font-bold text-lg">{ex.name}</h4>
                             <p className="text-sm text-muted-foreground font-medium">{ex.sets} sets × {ex.reps} • rest {ex.rest}</p>
@@ -151,11 +152,11 @@ export default function Training() {
                         </div>
                       ))}
                     </div>
-                    <Button size="lg" className="w-full font-black text-lg h-14 mt-4 active-elevate" onClick={() => handleLogSession(workoutPlan.days[0]?.name || "workout", workoutPlan.days[0]?.durationMinutes || 30)}>
+                    <NeonButton size="lg" className="w-full" onClick={() => handleLogSession(workoutPlan.days[0]?.name || "workout", workoutPlan.days[0]?.durationMinutes || 30)}>
                       Log Workout Session
-                    </Button>
-                  </CardContent>
-                </Card>
+                    </NeonButton>
+                  </div>
+                </GlassCard>
               </div>
             )}
           </TabsContent>
@@ -166,15 +167,15 @@ export default function Training() {
             ) : quests?.length ? (
               quests.map(quest => (
                 <motion.div key={quest.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                  <Card className="border-2 hover:border-primary/50 transition-colors">
-                    <CardContent className="p-6">
+                  <GlassCard interactive className="p-6">
+                    <div className="relative z-10">
                       <div className="flex justify-between items-start mb-4">
                         <div>
                           <h3 className="font-black text-xl mb-1">{quest.title}</h3>
                           <p className="text-sm text-muted-foreground font-medium">{quest.description}</p>
                         </div>
-                        <div className="text-right">
-                          <Badge className="bg-yellow-500/20 text-yellow-500 mb-1 border-0">+{quest.coinReward} Coins</Badge>
+                        <div className="text-right space-y-1">
+                          <GlowBadge tone="yellow">+{quest.coinReward} Coins</GlowBadge>
                           <div className="text-xs font-bold text-primary">+{quest.xpReward} XP</div>
                         </div>
                       </div>
@@ -185,8 +186,8 @@ export default function Training() {
                         </div>
                         <Progress value={quest.progressPct} className="h-3 bg-muted [&>div]:bg-primary" />
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </GlassCard>
                 </motion.div>
               ))
             ) : (
@@ -198,37 +199,35 @@ export default function Training() {
             {isLoadingMeals || generateMeal.isPending ? (
               <Skeleton className="h-96 w-full rounded-3xl" />
             ) : mealError || !mealPlan ? (
-              <Card className="border-2 border-dashed bg-card/50 text-center py-12">
-                <CardContent>
+              <GlassCard className="text-center py-12 px-6">
+                <div className="relative z-10">
                   <Utensils className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
                   <h3 className="text-2xl font-black mb-2">No Meal Plan</h3>
                   <p className="text-muted-foreground mb-6">Generate a nutrition plan to fuel your evolutions.</p>
-                  <Button size="lg" className="font-black active-elevate" onClick={handleGenerateMeal} disabled={generateMeal.isPending}>
+                  <NeonButton size="lg" onClick={handleGenerateMeal} disabled={generateMeal.isPending}>
                     Generate Meal Plan
-                  </Button>
-                </CardContent>
-              </Card>
+                  </NeonButton>
+                </div>
+              </GlassCard>
             ) : (
               <div className="space-y-6">
-                <Card className="border-2 border-green-500/50 shadow-lg shadow-green-500/10">
-                  <CardHeader>
-                    <CardTitle className="text-2xl font-black flex justify-between items-center">
-                      <span>Today's Nutrition</span>
+                <GlassCard glow="accent" className="p-6">
+                  <div className="relative z-10 space-y-4">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <h2 className="text-2xl font-black">Today's Nutrition</h2>
                       <div className="flex gap-2">
-                        <Badge variant="outline" className="font-bold border-green-500 text-green-500">{mealPlan.days[0]?.totalCalories} kcal</Badge>
-                        <Badge variant="outline" className="font-bold border-blue-500 text-blue-500">{mealPlan.days[0]?.totalProtein}g protein</Badge>
+                        <GlowBadge tone="green">{mealPlan.days[0]?.totalCalories} kcal</GlowBadge>
+                        <GlowBadge tone="cyan">{mealPlan.days[0]?.totalProtein}g protein</GlowBadge>
                       </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+                    </div>
                     {['breakfast', 'lunch', 'dinner'].map(meal => (
-                      <div key={meal} className="p-4 bg-muted/50 rounded-2xl border border-border">
+                      <div key={meal} className="p-4 bg-white/5 rounded-2xl border border-white/10">
                         <h4 className="font-bold text-sm uppercase tracking-wider text-muted-foreground mb-2">{meal}</h4>
                         <p className="font-medium text-lg">{(mealPlan.days[0] as any)[meal]}</p>
                       </div>
                     ))}
-                  </CardContent>
-                </Card>
+                  </div>
+                </GlassCard>
               </div>
             )}
           </TabsContent>
@@ -239,8 +238,8 @@ export default function Training() {
             ) : sessions?.length ? (
               <div className="space-y-4">
                 {sessions.map(session => (
-                  <Card key={session.id} className="border bg-card">
-                    <CardContent className="p-4 flex items-center justify-between">
+                  <GlassCard key={session.id} className="p-4">
+                    <div className="relative z-10 flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                           <Dumbbell className="w-6 h-6" />
@@ -254,8 +253,8 @@ export default function Training() {
                         <div className="font-black text-primary">+{session.xpEarned} XP</div>
                         <div className="text-xs font-bold text-yellow-500">+{session.coinsEarned} Coins</div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </GlassCard>
                 ))}
               </div>
             ) : (

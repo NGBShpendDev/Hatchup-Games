@@ -11,6 +11,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { GlassCard } from "@/components/ui/glass-card";
+import { NeonButton } from "@/components/ui/neon-button";
+import { GlowBadge } from "@/components/ui/glow-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";
@@ -237,9 +240,9 @@ export default function Hatch() {
           <p className="text-lg text-muted-foreground font-medium">
             Train across five Realms to hatch your Pals. Every step, rep, and stretch counts!
           </p>
-          <Button onClick={handleAddEgg} disabled={addEggMutation.isPending} variant="outline" className="mt-6 font-bold border-primary text-primary hover:bg-primary/10">
+          <NeonButton onClick={handleAddEgg} disabled={addEggMutation.isPending} variant="secondary" className="mt-6">
             <Plus className="w-4 h-4 mr-2" /> Find New Egg
-          </Button>
+          </NeonButton>
         </div>
 
         {/* Active Eggs */}
@@ -256,7 +259,10 @@ export default function Hatch() {
                 const style = REALM_EGG_STYLES[realm] ?? REALM_EGG_STYLES["balance"];
                 return (
                   <motion.div key={egg.id} whileHover={{ y: -6 }}>
-                    <Card className={`overflow-hidden border-2 h-full relative ${egg.isReady ? `${style.border} shadow-xl ${style.glow}` : "border-border/40"} ${style.bg}`}>
+                    <GlassCard
+                      glow={egg.isReady ? "primary" : "none"}
+                      className={`overflow-hidden h-full relative ${style.bg}`}
+                    >
                       {egg.isReady && (
                         <motion.div
                           className={`absolute inset-0 bg-gradient-to-br ${style.auraClass} pointer-events-none`}
@@ -264,10 +270,10 @@ export default function Hatch() {
                           transition={{ repeat: Infinity, duration: 1.5 }}
                         />
                       )}
-                      <CardContent className="p-6 flex flex-col items-center text-center relative z-10">
+                      <div className="p-6 flex flex-col items-center text-center relative z-10">
                         {/* Realm badge */}
                         <div className="flex gap-2 mb-4 items-center">
-                          <Badge variant="outline" className="font-bold uppercase text-xs tracking-wider">{egg.eggType}</Badge>
+                          <GlowBadge tone="primary">{egg.eggType}</GlowBadge>
                           <span className="text-xs font-black text-muted-foreground">{style.label}</span>
                         </div>
 
@@ -281,36 +287,37 @@ export default function Hatch() {
                             <span className="text-muted-foreground">{egg.stepsRequired.toLocaleString()} steps</span>
                           </div>
                           <div className="text-center">
-                            <Badge variant="secondary" className="text-xs font-bold">{egg.rarity}</Badge>
+                            <GlowBadge tone="violet">{egg.rarity}</GlowBadge>
                           </div>
                         </div>
 
                         {egg.isReady ? (
                           <motion.div className="w-full mt-4" whileTap={{ scale: 0.97 }}>
-                            <Button
-                              className="w-full font-black text-lg h-12 active-elevate text-white border-0"
-                              style={{ background: `linear-gradient(135deg, ${style.crackColor}, ${style.crackColor}99)` }}
+                            <NeonButton
+                              className="w-full text-lg h-12"
                               onClick={() => handleHatchClick(egg.id, egg.eggType)}
                             >
                               {style.emoji} HATCH NOW!
-                            </Button>
+                            </NeonButton>
                           </motion.div>
                         ) : (
                           <Button className="w-full font-bold mt-4" variant="secondary" disabled>
                             Incubating ({Math.round(egg.progressPct ?? 0)}%)
                           </Button>
                         )}
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </GlassCard>
                   </motion.div>
                 );
               })}
             </div>
           ) : (
-            <div className="text-center p-12 bg-card/50 rounded-3xl border-2 border-dashed">
-              <p className="text-muted-foreground font-bold text-lg mb-4">Your incubator is empty — time to train!</p>
-              <Button onClick={handleAddEgg} disabled={addEggMutation.isPending} className="font-bold">Find an Egg</Button>
-            </div>
+            <GlassCard className="text-center p-12">
+              <div className="relative z-10">
+                <p className="text-muted-foreground font-bold text-lg mb-4">Your incubator is empty — time to train!</p>
+                <NeonButton onClick={handleAddEgg} disabled={addEggMutation.isPending}>Find an Egg</NeonButton>
+              </div>
+            </GlassCard>
           )}
         </div>
 
@@ -328,16 +335,16 @@ export default function Hatch() {
                 const style = REALM_EGG_STYLES[realm] ?? REALM_EGG_STYLES["balance"];
                 return (
                   <Link key={h.id} href={`/hatchlings/${h.id}`}>
-                    <Card className={`border-2 hover:${style.border} cursor-pointer transition-all overflow-hidden bg-card/50`}>
-                      <CardContent className="p-4 flex flex-col items-center text-center">
+                    <GlassCard interactive className="p-4">
+                      <div className="relative z-10 flex flex-col items-center text-center">
                         <div className="w-14 h-14 rounded-full flex items-center justify-center mb-2 text-2xl border border-white/10"
                           style={{ background: `radial-gradient(circle, ${style.crackColor}20, transparent)` }}>
                           {style.emoji}
                         </div>
                         <h3 className="font-bold text-xs truncate w-full">{h.name}</h3>
                         <p className="text-[10px] text-muted-foreground uppercase font-black tracking-wider mt-0.5">Lv {h.level}</p>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </GlassCard>
                   </Link>
                 );
               })}
@@ -382,10 +389,9 @@ export default function Hatch() {
                   />
                 </div>
                 <DialogFooter>
-                  <Button className="w-full h-14 text-xl font-black" onClick={submitHatch}
-                    style={{ background: `linear-gradient(135deg, ${resultStyle.crackColor}, ${resultStyle.crackColor}aa)` }}>
+                  <NeonButton className="w-full h-14 text-xl" onClick={submitHatch}>
                     Confirm & Hatch!
-                  </Button>
+                  </NeonButton>
                 </DialogFooter>
               </motion.div>
             )}
@@ -472,11 +478,9 @@ export default function Hatch() {
 
                 {/* Badges */}
                 <div className="flex gap-2 justify-center mb-4 relative z-10 flex-wrap">
-                  <Badge className="font-black" style={{ background: resultStyle.crackColor + "30", color: resultStyle.crackColor, border: `1px solid ${resultStyle.crackColor}60` }}>
-                    {resultStyle.label}
-                  </Badge>
-                  <Badge variant="outline" className="font-black">{hatchResult.hatchling.rarity}</Badge>
-                  {hatchResult.hatchling.isShiny && <Badge className="bg-yellow-500 text-black font-black">✦ SHINY</Badge>}
+                  <GlowBadge tone="primary">{resultStyle.label}</GlowBadge>
+                  <GlowBadge tone="violet">{hatchResult.hatchling.rarity}</GlowBadge>
+                  {hatchResult.hatchling.isShiny && <GlowBadge tone="yellow">✦ SHINY</GlowBadge>}
                 </div>
 
                 {/* Personality */}
@@ -508,11 +512,11 @@ export default function Hatch() {
                 )}
 
                 <div className="flex gap-3 relative z-10">
-                  <Button variant="outline" className="flex-1 h-11 font-bold" onClick={closeHatchModal}>Close</Button>
+                  <NeonButton variant="secondary" className="flex-1 h-11" onClick={closeHatchModal}>Close</NeonButton>
                   <Link href={`/hatchlings/${hatchResult.hatchling.id}`} className="flex-1">
-                    <Button className="w-full h-11 font-black" style={{ background: resultStyle.crackColor }}>
+                    <NeonButton className="w-full h-11">
                       <Zap className="w-4 h-4 mr-1" /> View Pal
-                    </Button>
+                    </NeonButton>
                   </Link>
                 </div>
               </motion.div>

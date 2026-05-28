@@ -4,8 +4,9 @@ import {
   useGetEvolutionRealms, getGetEvolutionRealmsQueryKey,
 } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { GlassCard } from "@/components/ui/glass-card";
+import { GlowBadge } from "@/components/ui/glow-badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, Lock } from "lucide-react";
 import { useState } from "react";
@@ -259,24 +260,24 @@ export default function Evolutions() {
 
         {/* Realm description */}
         {realms && (
-          <motion.div
-            key={selectedRealm}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className={`rounded-2xl border p-5 bg-gradient-to-br ${activeStyle.gradient}`}
-            style={{ borderColor: activeStyle.color + "40" }}
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">{activeStyle.emoji}</span>
-              <div>
-                <p className="font-black text-lg" style={{ color: activeStyle.color }}>
-                  {realms.find(r => r.id === selectedRealm)?.name}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {realms.find(r => r.id === selectedRealm)?.description}
-                </p>
+          <motion.div key={selectedRealm} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <GlassCard
+              glow="primary"
+              className={`p-5 bg-gradient-to-br ${activeStyle.gradient}`}
+              style={{ borderColor: activeStyle.color + "40" }}
+            >
+              <div className="relative z-10 flex items-center gap-3">
+                <span className="text-3xl">{activeStyle.emoji}</span>
+                <div>
+                  <p className="font-black text-lg" style={{ color: activeStyle.color }}>
+                    {realms.find(r => r.id === selectedRealm)?.name}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {realms.find(r => r.id === selectedRealm)?.description}
+                  </p>
+                </div>
               </div>
-            </div>
+            </GlassCard>
           </motion.div>
         )}
 
