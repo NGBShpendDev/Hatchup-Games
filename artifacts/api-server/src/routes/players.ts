@@ -3,7 +3,7 @@ import { createDecipheriv, createHash } from "crypto";
 import { db } from "@workspace/db";
 import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable, eggsTable, fitnessActivitiesTable, playerBadgesTable, playerArtifactsTable, artifactsTable, playerLocationTable, groupMembersTable, groupsTable } from "@workspace/db";
 import { eq, desc, and, gte, or, ilike, ne, inArray } from "drizzle-orm";
-import { getHiddenPlayerIds } from "./safety";
+import { getHiddenPlayerIds } from "./safety.ts";
 import {
   CreatePlayerBody,
   UpdatePlayerBody,
@@ -11,8 +11,8 @@ import {
   UpdatePlayerParams,
   GetPlayerDashboardParams,
 } from "@workspace/api-zod";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
-import { BADGE_MAP, computeLevelProgress, getDailyReward } from "../services/badgeService";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { BADGE_MAP, computeLevelProgress, getDailyReward } from "../services/badgeService.ts";
 
 const router = Router();
 
