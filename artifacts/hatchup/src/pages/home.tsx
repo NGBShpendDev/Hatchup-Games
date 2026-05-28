@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
-import { useGetPlayerDashboard, getGetPlayerDashboardQueryKey, useLogActivity, useGetSocialFeed, getGetSocialFeedQueryKey, useReactToPost } from "@workspace/api-client-react";
+import { useGetPlayerDashboard, getGetPlayerDashboardQueryKey, useLogActivity, useGetSocialFeed, getGetSocialFeedQueryKey, useReactToPost, useAddPostComment } from "@workspace/api-client-react";
+import type { PostComment } from "@workspace/api-client-react";
 import { ComposeSheet, REACTION_ICONS } from "@/pages/social";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot, Dumbbell, Minus, Plus, Users } from "lucide-react";
+import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot, Dumbbell, Minus, Plus, Users, MessageCircle, ChevronDown, ChevronUp, Send } from "lucide-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { XpBar } from "@/components/xp-bar";
@@ -738,69 +739,16 @@ export default function Home() {
 
           {socialFeed && socialFeed.posts && socialFeed.posts.length > 0 && (
             <div className="space-y-2">
-              {socialFeed.posts.slice(0, 3).map((post: any) => {
-                const myReaction = post.myReaction as string | null;
-                const typeIcon = HIGHLIGHT_POST_TYPE_ICONS[post.postType] ?? "💬";
-                return (
-                  <Card
-                    key={post.id}
-                    className="bg-card border-2 hover:border-primary/40 transition-colors overflow-hidden"
-                  >
-                    <CardContent className="p-3 space-y-2">
-                      <div className="flex items-start gap-3">
-                        <Link href="/social" className="shrink-0">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/20 border border-primary/40 flex items-center justify-center font-black text-sm text-primary">
-                            {post.authorAvatar ? (
-                              <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full object-cover" />
-                            ) : (
-                              (post.authorName?.[0] ?? "?").toUpperCase()
-                            )}
-                          </div>
-                        </Link>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                            <span className="font-black text-sm truncate">{post.authorName}</span>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1 shrink-0">
-                              <span>{typeIcon}</span>
-                              {(post.postType ?? "general").replace(/_/g, " ")}
-                            </span>
-                          </div>
-                          <Link href="/social">
-                            <p className="text-xs text-foreground/90 line-clamp-2 leading-snug cursor-pointer">
-                              {post.content}
-                            </p>
-                          </Link>
-                        </div>
-                      </div>
-
-                      {/* Full reaction picker — matches /social PostCard */}
-                      <div className="flex items-center gap-1 pt-1 border-t border-border/30">
-                        {Object.entries(REACTION_ICONS).map(([type, cfg]) => {
-                          const count = (post.reactionCounts as Record<string, number>)?.[type] ?? 0;
-                          const isActive = myReaction === type;
-                          return (
-                            <button
-                              key={type}
-                              onClick={() => handleHighlightReact(post.id, type)}
-                              disabled={reactToPost.isPending}
-                              className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold transition-all ${
-                                isActive
-                                  ? `bg-primary/20 ${cfg.color} scale-105`
-                                  : "text-muted-foreground hover:bg-muted/50 hover:scale-105"
-                              }`}
-                              aria-label={`React with ${cfg.label}`}
-                              data-testid={`button-home-react-${type}-${post.id}`}
-                            >
-                              <span className={isActive ? cfg.color : ""}>{cfg.icon}</span>
-                              {count > 0 && <span>{count}</span>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+              {socialFeed.posts.slice(0, 3).map((post: any) => (
+                <HighlightCard
+                  key={post.id}
+                  post={post}
+                  playerId={pid}
+                  typeIcon={HIGHLIGHT_POST_TYPE_ICONS[post.postType] ?? "💬"}
+                  onReact={handleHighlightReact}
+                  reactPending={reactToPost.isPending}
+                />
+              ))}
             </div>
           )}
         </section>
@@ -946,6 +894,177 @@ export default function Home() {
         </motion.button>
       </Link>
     </Layout>
+  );
+}
+
+function HighlightCard({
+  post,
+  playerId,
+  typeIcon,
+  onReact,
+  reactPending,
+}: {
+  post: any;
+  playerId: number;
+  typeIcon: string;
+  onReact: (postId: number, reactionType: string) => void;
+  reactPending: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [showComments, setShowComments] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const addComment = useAddPostComment();
+
+  const myReaction = post.myReaction as string | null;
+  const allComments: PostComment[] = post.comments ?? [];
+  const commentCount: number = post.commentCount ?? allComments.length;
+  const previewComments = showComments ? allComments : allComments.slice(-2);
+  const hiddenCount = Math.max(0, commentCount - previewComments.length);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!commentText.trim() || !playerId) return;
+    try {
+      await addComment.mutateAsync({
+        id: post.id,
+        data: { playerId, content: commentText.trim() },
+      });
+      setCommentText("");
+      queryClient.invalidateQueries({ queryKey: ["/api/social/feed"] });
+      toast({ title: "Comment added! 💬" });
+    } catch (err: any) {
+      if (err?.response?.status === 422) {
+        toast({
+          title: "Keep it positive! 🌟",
+          description: "That content doesn't meet our community guidelines.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Could not add comment", variant: "destructive" });
+      }
+    }
+  }
+
+  return (
+    <Card className="bg-card border-2 hover:border-primary/40 transition-colors overflow-hidden">
+      <CardContent className="p-3 space-y-2">
+        <div className="flex items-start gap-3">
+          <Link href="/social" className="shrink-0">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/20 border border-primary/40 flex items-center justify-center font-black text-sm text-primary">
+              {post.authorAvatar ? (
+                <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full object-cover" />
+              ) : (
+                (post.authorName?.[0] ?? "?").toUpperCase()
+              )}
+            </div>
+          </Link>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className="font-black text-sm truncate">{post.authorName}</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1 shrink-0">
+                <span>{typeIcon}</span>
+                {(post.postType ?? "general").replace(/_/g, " ")}
+              </span>
+            </div>
+            <Link href="/social">
+              <p className="text-xs text-foreground/90 line-clamp-2 leading-snug cursor-pointer">
+                {post.content}
+              </p>
+            </Link>
+          </div>
+        </div>
+
+        {/* Full reaction picker — matches /social PostCard */}
+        <div className="flex items-center gap-1 pt-1 border-t border-border/30">
+          {Object.entries(REACTION_ICONS).map(([type, cfg]) => {
+            const count = (post.reactionCounts as Record<string, number>)?.[type] ?? 0;
+            const isActive = myReaction === type;
+            return (
+              <button
+                key={type}
+                onClick={() => onReact(post.id, type)}
+                disabled={reactPending}
+                className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold transition-all ${
+                  isActive
+                    ? `bg-primary/20 ${cfg.color} scale-105`
+                    : "text-muted-foreground hover:bg-muted/50 hover:scale-105"
+                }`}
+                aria-label={`React with ${cfg.label}`}
+                data-testid={`button-home-react-${type}-${post.id}`}
+              >
+                <span className={isActive ? cfg.color : ""}>{cfg.icon}</span>
+                {count > 0 && <span>{count}</span>}
+              </button>
+            );
+          })}
+          <div className="flex-1" />
+          <button
+            onClick={() => setShowComments(v => !v)}
+            className="flex items-center gap-1 px-2 py-1 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors font-bold"
+            aria-label="Toggle comments"
+            data-testid={`button-home-toggle-comments-${post.id}`}
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+            {commentCount > 0 && <span>{commentCount}</span>}
+            {showComments ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+        </div>
+
+        {/* Comment previews + quick reply */}
+        {(previewComments.length > 0 || showComments) && (
+          <div className="space-y-1.5 pt-1">
+            {hiddenCount > 0 && !showComments && (
+              <button
+                onClick={() => setShowComments(true)}
+                className="text-[11px] font-bold text-muted-foreground hover:text-primary"
+                data-testid={`button-home-show-all-comments-${post.id}`}
+              >
+                View {hiddenCount} more {hiddenCount === 1 ? "comment" : "comments"}
+              </button>
+            )}
+            {previewComments.map(c => (
+              <div key={c.id} className="flex gap-2" data-testid={`home-comment-${c.id}`}>
+                <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                  {c.authorAvatar ? (
+                    <img src={c.authorAvatar} alt={c.authorName} className="w-6 h-6 object-cover" />
+                  ) : (
+                    <span className="text-[9px] font-bold">
+                      {(c.authorName ?? "?").substring(0, 2).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div className="bg-muted/50 rounded-xl px-2.5 py-1.5 flex-1 min-w-0">
+                  <span className="font-bold text-[11px]">{c.authorName}</span>
+                  <p className="text-xs text-muted-foreground break-words">{c.content}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="flex gap-2 pt-1">
+          <Input
+            value={commentText}
+            onChange={e => setCommentText(e.target.value)}
+            placeholder="Reply..."
+            className="h-8 text-xs rounded-full bg-muted/30"
+            maxLength={280}
+            data-testid={`input-home-comment-${post.id}`}
+          />
+          <Button
+            type="submit"
+            size="sm"
+            className="h-8 w-8 p-0 rounded-full"
+            disabled={addComment.isPending || !commentText.trim()}
+            aria-label="Post comment"
+            data-testid={`button-home-comment-submit-${post.id}`}
+          >
+            <Send className="w-3.5 h-3.5" />
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
