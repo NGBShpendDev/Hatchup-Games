@@ -242,32 +242,42 @@ export default function BattlePage() {
   // ── WS connection ─────────────────────────────────────────────────────────
   const connectWs = useCallback(() => {
     if (!pid) return;
-    const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${wsProto}//${window.location.host}${BASE}/api/ws/battle?playerId=${pid}`;
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    // Fetch a server-issued one-time token so the WS handshake is authenticated
+    // server-side instead of trusting a client-supplied ?playerId= query param.
+    fetch(`${BASE}/api/battles/ws-token`, { method: "POST", credentials: "include" })
+      .then(r => r.json())
+      .then(({ token }: { token: string }) => {
+        const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${wsProto}//${window.location.host}${BASE}/api/ws/battle?token=${token}`;
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
 
-    ws.onopen = () => {
-      if (selectedHatchling) {
-        ws.send(JSON.stringify({ type: "join_queue", hatchlingId: selectedHatchling.id, mode }));
-      }
-    };
+        ws.onopen = () => {
+          if (selectedHatchling) {
+            ws.send(JSON.stringify({ type: "join_queue", hatchlingId: selectedHatchling.id, mode }));
+          }
+        };
 
-    ws.onmessage = (ev) => {
-      try {
-        const msg = JSON.parse(ev.data as string) as { type: string; [k: string]: unknown };
-        handleWsMessage(msg);
-      } catch { /* ignore */ }
-    };
+        ws.onmessage = (ev) => {
+          try {
+            const msg = JSON.parse(ev.data as string) as { type: string; [k: string]: unknown };
+            handleWsMessage(msg);
+          } catch { /* ignore */ }
+        };
 
-    ws.onerror = () => {
-      toast({ title: "Connection error", description: "Battle connection failed.", variant: "destructive" });
-      setPhase("select");
-    };
+        ws.onerror = () => {
+          toast({ title: "Connection error", description: "Battle connection failed.", variant: "destructive" });
+          setPhase("select");
+        };
 
-    ws.onclose = () => {
-      if (queueTimerRef.current) clearInterval(queueTimerRef.current);
-    };
+        ws.onclose = () => {
+          if (queueTimerRef.current) clearInterval(queueTimerRef.current);
+        };
+      })
+      .catch(() => {
+        toast({ title: "Connection error", description: "Could not authenticate battle session.", variant: "destructive" });
+        setPhase("select");
+      });
   }, [pid, selectedHatchling, mode]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps

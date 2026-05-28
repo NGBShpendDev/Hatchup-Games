@@ -4,6 +4,7 @@ import { battlesTable, hatchlingsTable, playersTable } from "@workspace/db";
 import { eq, desc, or } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { issueWsToken } from "../services/matchmakingQueue";
 
 const router = Router();
 
@@ -25,6 +26,15 @@ router.post("/battles/queue/join", requireAuth, attachPlayer, async (req, res) =
   }
 
   res.json({ ok: true, message: "Connect via WebSocket at /api/ws/battle?playerId=" + playerId });
+});
+
+// ── POST /battles/ws-token ────────────────────────────────────────────────────
+// Issues a short-lived (60 s) one-time token tied to the authenticated player.
+// Frontend uses this token as ?token=<uuid> on the WS handshake so the server
+// can verify identity without trusting a client-supplied ?playerId= parameter.
+router.post("/battles/ws-token", requireAuth, attachPlayer, (req, res) => {
+  const token = issueWsToken(req.playerId!);
+  res.json({ token });
 });
 
 // ── DELETE /battles/queue/leave ──────────────────────────────────────────────

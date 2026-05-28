@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 import type { IncomingMessage } from "http";
@@ -38,9 +39,25 @@ interface ActiveBattle {
 }
 
 const queue: QueueEntry[] = [];
+const queuedPlayers = new Set<number>();          // prevents duplicate queue entries
 const activeBattles = new Map<number, ActiveBattle>();
 // playerId → battleId (for reconnection)
 const playerInBattle = new Map<number, number>();
+
+// ── WS token registry (one-time, 60 s TTL) ───────────────────────────────────
+interface WsTokenEntry { playerId: number; expires: number }
+const wsTokens = new Map<string, WsTokenEntry>();
+
+export function issueWsToken(playerId: number): string {
+  // Purge stale tokens
+  const now = Date.now();
+  for (const [k, v] of wsTokens) {
+    if (v.expires < now) wsTokens.delete(k);
+  }
+  const token = randomUUID();
+  wsTokens.set(token, { playerId, expires: now + 60_000 });
+  return token;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function send(ws: WebSocket | null, payload: unknown) {
@@ -125,7 +142,8 @@ async function finalizeBattle(battleId: number) {
     const p1Won = state.winner === 1;
     const p2Won = state.winner === 2;
 
-    if (isRanked && p1 && p2) {
+    // Draws (winner === 0) produce no ELO change
+    if (isRanked && p1 && p2 && state.winner !== 0) {
       const change = computeEloChange(
         p1Won ? p1.battleElo : p2!.battleElo,
         p1Won ? p2!.battleElo : p1.battleElo,
@@ -212,6 +230,8 @@ async function tryMatch() {
       // Found a match
       queue.splice(j, 1);
       queue.splice(i, 1);
+      queuedPlayers.delete(a.playerId);
+      queuedPlayers.delete(b.playerId);
       await startBattle(a, b);
       return;
     }
@@ -294,6 +314,7 @@ function scheduleBotFallback(entry: QueueEntry) {
     const idx = queue.findIndex(q => q.playerId === entry.playerId);
     if (idx !== -1) {
       queue.splice(idx, 1);
+      queuedPlayers.delete(entry.playerId);
       const botEntry: QueueEntry = {
         playerId: 0,
         hatchlingId: 0,
@@ -324,6 +345,10 @@ async function handleMessage(ws: WebSocket, playerId: number, raw: string) {
       send(ws, { type: "error", message: "Already in a battle" });
       return;
     }
+    if (queuedPlayers.has(playerId)) {
+      send(ws, { type: "error", message: "Already in queue" });
+      return;
+    }
     const hatchlingId = Number(msg.hatchlingId);
     const mode = (msg.mode === "ranked" ? "ranked" : "casual") as "casual" | "ranked";
 
@@ -345,6 +370,7 @@ async function handleMessage(ws: WebSocket, playerId: number, raw: string) {
 
     const entry: QueueEntry = { playerId, hatchlingId, hatchlingLevel: hatchling.level, mode, ws, joinedAt: Date.now() };
     queue.push(entry);
+    queuedPlayers.add(playerId);
     send(ws, { type: "queue_joined", position: queue.length, mode });
     scheduleBotFallback(entry);
     await tryMatch();
@@ -353,7 +379,7 @@ async function handleMessage(ws: WebSocket, playerId: number, raw: string) {
 
   if (msg.type === "leave_queue") {
     const idx = queue.findIndex(q => q.playerId === playerId);
-    if (idx !== -1) queue.splice(idx, 1);
+    if (idx !== -1) { queue.splice(idx, 1); queuedPlayers.delete(playerId); }
     const timer = botTimers.get(playerId);
     if (timer) { clearTimeout(timer); botTimers.delete(playerId); }
     send(ws, { type: "queue_left" });
@@ -396,10 +422,16 @@ export function attachBattleWss(server: import("http").Server) {
   const wss = new WebSocketServer({ server, path: "/api/ws/battle" });
 
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
-    // Extract playerId from query string ?playerId=N
+    // Authenticate via one-time server-issued token (?token=<uuid>)
     const url = new URL(req.url ?? "", "http://localhost");
-    const playerId = Number(url.searchParams.get("playerId"));
-    if (!playerId) { ws.close(1008, "playerId required"); return; }
+    const token = url.searchParams.get("token") ?? "";
+    const tokenEntry = wsTokens.get(token);
+    if (!tokenEntry || tokenEntry.expires < Date.now()) {
+      ws.close(1008, "Invalid or expired WS token");
+      return;
+    }
+    wsTokens.delete(token); // one-time use
+    const playerId = tokenEntry.playerId;
 
     ws.on("message", (raw) => {
       handleMessage(ws, playerId, raw.toString()).catch(err => {
@@ -410,7 +442,7 @@ export function attachBattleWss(server: import("http").Server) {
     ws.on("close", () => {
       // Remove from queue on disconnect
       const idx = queue.findIndex(q => q.playerId === playerId);
-      if (idx !== -1) queue.splice(idx, 1);
+      if (idx !== -1) { queue.splice(idx, 1); queuedPlayers.delete(playerId); }
       const timer = botTimers.get(playerId);
       if (timer) { clearTimeout(timer); botTimers.delete(playerId); }
     });

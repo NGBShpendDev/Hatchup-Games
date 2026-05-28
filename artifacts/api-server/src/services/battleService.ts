@@ -268,12 +268,14 @@ export function applyMove(
   let phase: BattleState["phase"] = "active";
   let winner: BattleState["winner"] = null;
 
-  if (newF2.currentHp <= 0) {
+  // Explicit slot identity: newF1 is always slot-1 fighter, newF2 always slot-2.
+  // Check by identity, not actingSlot, so KO attribution is always correct.
+  if (newF1.currentHp <= 0) {
     phase = "ended";
-    winner = actingSlot;
-  } else if (newF1.currentHp <= 0) {
+    winner = 2;
+  } else if (newF2.currentHp <= 0) {
     phase = "ended";
-    winner = actingSlot === 1 ? 2 : 1;
+    winner = 1;
   } else if (newTurnNumber >= MAX_TURNS) {
     phase = "ended";
     winner = newF1.currentHp > newF2.currentHp ? 1 : newF1.currentHp < newF2.currentHp ? 2 : 0;
