@@ -6029,6 +6029,16 @@ components:
         rarityScore:   { type: integer }
         rarestRarity:  { type: ["string", "null"] }
         rarestName:    { type: ["string", "null"] }
+        rarestImageSlug: { type: ["string", "null"] }
+        topArtifacts:
+          type: array
+          items:
+            type: object
+            required: [name, rarity, imageSlug]
+            properties:
+              name:      { type: string }
+              rarity:    { type: string }
+              imageSlug: { type: string }
         isMe:          { type: boolean }
 
     ScopedLeaderboardEntry:

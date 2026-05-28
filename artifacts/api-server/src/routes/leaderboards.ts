@@ -319,13 +319,22 @@ router.get("/leaderboards/artifacts", requireAuth, attachPlayer, async (req, res
 
   const topPlayerIds = aggRows.map(r => r.playerId);
 
-  // Fetch player info and the rarest artifact name per top player in parallel.
-  // DISTINCT ON picks one rarest-tier artifact per player (alphabetical tiebreak).
-  const [players, rarestRows] = await Promise.all([
+  // Fetch player info and each top player's owned artifacts (sorted by rarity weight)
+  // in parallel. We pull every owned artifact for the top players so we can surface
+  // both the rarest artifact (with imageSlug) and the top 3 thumbnails per row.
+  const [players, ownedRows] = await Promise.all([
     db.select().from(playersTable).where(inArray(playersTable.id, topPlayerIds)),
-    db.execute<{ player_id: number; rarity: string; name: string }>(sql`
-      SELECT DISTINCT ON (pa.player_id)
-        pa.player_id, a.rarity, a.name
+    db.execute<{ player_id: number; rarity: string; name: string; image_slug: string; weight: number }>(sql`
+      SELECT
+        pa.player_id,
+        a.rarity,
+        a.name,
+        a.image_slug,
+        CASE a.rarity
+          WHEN 'Celestial' THEN 7 WHEN 'Ancient' THEN 6 WHEN 'Mythic' THEN 5
+          WHEN 'Legendary' THEN 4 WHEN 'Epic' THEN 3 WHEN 'Rare' THEN 2
+          WHEN 'Common' THEN 1 ELSE 0
+        END AS weight
       FROM ${playerArtifactsTable} pa
       JOIN ${artifactsTable} a ON a.id = pa.artifact_id
       WHERE pa.player_id IN (${sql.join(topPlayerIds, sql`, `)})
@@ -340,27 +349,35 @@ router.get("/leaderboards/artifacts", requireAuth, attachPlayer, async (req, res
   ]);
 
   const playerMap = new Map(players.map(p => [p.id, p]));
-  const rarestMap = new Map<number, { rarity: string; name: string }>();
-  for (const r of rarestRows.rows ?? []) {
-    rarestMap.set(r.player_id, { rarity: r.rarity, name: r.name });
+  type TopArt = { name: string; rarity: string; imageSlug: string };
+  const ownedByPlayer = new Map<number, TopArt[]>();
+  for (const r of ownedRows.rows ?? []) {
+    const list = ownedByPlayer.get(r.player_id) ?? [];
+    if (list.length < 3) {
+      list.push({ name: r.name, rarity: r.rarity, imageSlug: r.image_slug });
+    }
+    ownedByPlayer.set(r.player_id, list);
   }
 
   res.json(aggRows.flatMap((a, i) => {
     const p = playerMap.get(a.playerId);
     if (!p) return [];
-    const rarest = rarestMap.get(a.playerId);
+    const topArtifacts = ownedByPlayer.get(a.playerId) ?? [];
+    const rarest = topArtifacts[0] ?? null;
     return [{
-      position:      i + 1,
-      playerId:      p.id,
-      username:      p.username,
-      displayName:   p.displayName,
-      avatarUrl:     p.avatarUrl,
-      rank:          p.rank,
-      artifactCount: a.count,
-      rarityScore:   a.score,
-      rarestRarity:  rarest?.rarity ?? null,
-      rarestName:    rarest?.name ?? null,
-      isMe:          p.id === req.playerId,
+      position:        i + 1,
+      playerId:        p.id,
+      username:        p.username,
+      displayName:     p.displayName,
+      avatarUrl:       p.avatarUrl,
+      rank:            p.rank,
+      artifactCount:   a.count,
+      rarityScore:     a.score,
+      rarestRarity:    rarest?.rarity ?? null,
+      rarestName:      rarest?.name ?? null,
+      rarestImageSlug: rarest?.imageSlug ?? null,
+      topArtifacts,
+      isMe:            p.id === req.playerId,
     }];
   }));
 });

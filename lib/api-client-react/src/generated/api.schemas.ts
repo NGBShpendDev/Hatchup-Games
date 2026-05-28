@@ -1803,6 +1803,12 @@ export interface PlayerLocationRecord {
   updatedAt: string;
 }
 
+export type ArtifactCollectorEntryTopArtifactsItem = {
+  name: string;
+  rarity: string;
+  imageSlug: string;
+};
+
 export interface ArtifactCollectorEntry {
   position: number;
   playerId: number;
@@ -1818,6 +1824,9 @@ export interface ArtifactCollectorEntry {
   rarestRarity?: string | null;
   /** @nullable */
   rarestName?: string | null;
+  /** @nullable */
+  rarestImageSlug?: string | null;
+  topArtifacts?: ArtifactCollectorEntryTopArtifactsItem[];
   isMe: boolean;
 }
 

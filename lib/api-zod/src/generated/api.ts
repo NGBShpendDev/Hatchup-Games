@@ -932,6 +932,12 @@ export const GetArtifactsLeaderboardResponseItem = zod.object({
   "rarityScore": zod.number(),
   "rarestRarity": zod.string().nullish(),
   "rarestName": zod.string().nullish(),
+  "rarestImageSlug": zod.string().nullish(),
+  "topArtifacts": zod.array(zod.object({
+  "name": zod.string(),
+  "rarity": zod.string(),
+  "imageSlug": zod.string()
+})).optional(),
   "isMe": zod.boolean()
 })
 export const GetArtifactsLeaderboardResponse = zod.array(GetArtifactsLeaderboardResponseItem)

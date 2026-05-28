@@ -942,6 +942,21 @@ function ArtifactsLeaderboardPanel({ myPlayerId: _myPlayerId }: { myPlayerId: nu
                   )}
                 </div>
               </Link>
+              {entry.topArtifacts && entry.topArtifacts.length > 0 && (
+                <div className="flex items-center gap-1 flex-shrink-0" data-testid={`top-artifacts-${entry.playerId}`}>
+                  {entry.topArtifacts.map((a, idx) => (
+                    <div
+                      key={`${a.imageSlug}-${idx}`}
+                      title={`${a.name} · ${a.rarity}`}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-base bg-white/5 border ${
+                        idx === 0 ? "border-cyan-400/40" : "border-white/10 hidden sm:flex"
+                      }`}
+                    >
+                      <ArtifactSlugEmoji slug={a.imageSlug} />
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="text-right flex-shrink-0">
                 <p className="font-black text-sm text-cyan-300 flex items-center justify-end gap-1">
                   <Medal className="w-3.5 h-3.5" />{entry.rarityScore}
@@ -960,4 +975,19 @@ function ArtifactsLeaderboardPanel({ myPlayerId: _myPlayerId }: { myPlayerId: nu
       )}
     </motion.div>
   );
+}
+
+function ArtifactSlugEmoji({ slug }: { slug: string }) {
+  const SLUG_EMOJIS: Record<string, string> = {
+    ember_spark: "🔥", bronze_strider: "🥾", iron_pact: "⚙️",
+    flame_keeper: "🕯️", crystal_horizon: "💎", iron_fist: "✊",
+    steel_resolve: "🛡️", thunderstride: "⚡", iron_devotee: "💪",
+    steel_form: "🗿", leg_day_legend: "🦵", centurion_flame: "👑",
+    crown_of_the_bracket: "👑",
+    marathon_spirit: "🏃", million_paces: "🌍", phoenix_core: "🦅",
+    obsidian_sovereign: "⚫", stellar_epoch: "⭐", void_whisper: "🌑",
+    agile_phantom: "🐆", eternal_vigil: "🌙",
+    mystery: "❓",
+  };
+  return <span>{SLUG_EMOJIS[slug] ?? "🏺"}</span>;
 }
