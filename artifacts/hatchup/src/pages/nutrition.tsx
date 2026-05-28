@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
 import { useToast } from "@/hooks/use-toast";
-import { Heart, MessageCircle, Zap, ChefHat, Plus, X, Sparkles, Droplets, Flame, Dumbbell, MoreHorizontal, Compass, Trophy, Camera, Loader2, Target } from "lucide-react";
+import { Heart, MessageCircle, Zap, ChefHat, Plus, X, Sparkles, Droplets, Flame, Dumbbell, MoreHorizontal, Compass, Trophy, Camera, Loader2, Target, AlertTriangle, RefreshCw } from "lucide-react";
 import { ReportBlockMenu } from "@/components/report-block-menu";
 import { HatchlingReaction, type HatchlingReactionData } from "@/components/hatchling-reaction";
 import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
@@ -68,6 +68,51 @@ const PHYSIQUE_GOALS = [
 ];
 
 const MEAL_EMOJIS = ["🍽️","🥗","🍗","🥩","🥑","🍳","🥛","🍱","🥙","🌮","🥦","🍠","🫐","🥜","🍚","🐟","🥚","🧇","🍎","🫚"];
+
+function errorMessage(err: unknown, fallback: string): string {
+  if (!err) return fallback;
+  if (typeof err === "object" && err !== null) {
+    const anyErr = err as { response?: { data?: { error?: string; message?: string } }; message?: string };
+    const apiErr = anyErr.response?.data?.error ?? anyErr.response?.data?.message;
+    if (apiErr) return apiErr;
+    if (anyErr.message) return anyErr.message;
+  }
+  if (typeof err === "string") return err;
+  return fallback;
+}
+
+function ErrorCard({
+  title,
+  description,
+  onRetry,
+  className,
+}: {
+  title: string;
+  description?: string;
+  onRetry: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={`rounded-2xl border border-red-500/40 bg-red-500/10 p-4 flex items-start gap-3 ${className ?? ""}`}>
+      <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <p className="font-black text-sm text-red-200">{title}</p>
+        <p className="text-[11px] text-red-300/80 mt-0.5">
+          {description ?? "We couldn't reach the server. Check your connection and try again."}
+        </p>
+      </div>
+      <Button
+        size="sm"
+        variant="outline"
+        className="border-red-500/40 text-red-200 hover:bg-red-500/20 text-xs font-black gap-1.5"
+        onClick={onRetry}
+      >
+        <RefreshCw className="w-3 h-3" />
+        Retry
+      </Button>
+    </div>
+  );
+}
 
 const MOOD_STYLES: Record<NutritionWeeklySummaryHatchlingMood, { ring: string; bg: string; label: string; tint: string }> = {
   thriving: { ring: "ring-green-500/60",  bg: "from-green-500/15 to-emerald-500/5",   label: "Thriving",    tint: "text-green-300"  },
@@ -164,18 +209,32 @@ export default function Nutrition() {
 
   // ── Queries ─────────────────────────────────────────────────────────────────
   const feedMode: "feed" | "discover" = activeTab === "discover" ? "discover" : "feed";
-  const { data: feedData, isLoading: postsLoading } = useListNutritionPosts(
+  const {
+    data: feedData,
+    isLoading: postsLoading,
+    isError: postsError,
+    refetch: refetchPosts,
+  } = useListNutritionPosts(
     { limit: 30, mode: feedMode },
     { query: { enabled: !!pid && activeTab !== "challenges", queryKey: getListNutritionPostsQueryKey({ limit: 30, mode: feedMode }) } },
   );
   const posts: MealPost[] = feedData?.posts ?? [];
   const fellBackToDiscover = feedData?.fellBackToDiscover ?? false;
 
-  const { data: challenges = [], isLoading: challengesLoading } = useListNutritionChallenges({
+  const {
+    data: challenges = [],
+    isLoading: challengesLoading,
+    isError: challengesError,
+    refetch: refetchChallenges,
+  } = useListNutritionChallenges({
     query: { enabled: !!pid, queryKey: getListNutritionChallengesQueryKey() },
   });
 
-  const { data: macroTarget } = useGetNutritionMacroTarget({
+  const {
+    data: macroTarget,
+    isError: macroTargetError,
+    refetch: refetchMacroTarget,
+  } = useGetNutritionMacroTarget({
     query: { enabled: !!pid, queryKey: getGetNutritionMacroTargetQueryKey() },
   });
 
@@ -183,7 +242,11 @@ export default function Nutrition() {
     query: { enabled: !!pid, queryKey: getGetNutritionSummaryQueryKey() },
   });
 
-  const { data: streak } = useGetNutritionStreak({
+  const {
+    data: streak,
+    isError: streakError,
+    refetch: refetchStreak,
+  } = useGetNutritionStreak({
     query: { enabled: !!pid, queryKey: getGetNutritionStreakQueryKey() },
   });
 
@@ -192,11 +255,15 @@ export default function Nutrition() {
     mutation: {
       onSuccess: () =>
         qc.invalidateQueries({ queryKey: getListNutritionPostsQueryKey({ limit: 30, mode: feedMode }) }),
+      onError: (err) =>
+        toast({ title: "Couldn't update like", description: errorMessage(err, "Check your connection and try again."), variant: "destructive" }),
     },
   });
 
   const challengeMutation = useIncrementNutritionChallengeProgress({
     mutation: {
+      onError: (err) =>
+        toast({ title: "Couldn't log progress", description: errorMessage(err, "Try again in a moment."), variant: "destructive" }),
       onSuccess: (data, variables) => {
         qc.invalidateQueries({ queryKey: getListNutritionChallengesQueryKey() });
         const entries: RewardEntry[] = [
@@ -222,11 +289,15 @@ export default function Nutrition() {
         setShowGoalPicker(false);
         toast({ title: "Goal updated!", description: "Your macro targets have been updated." });
       },
+      onError: (err) =>
+        toast({ title: "Couldn't update goal", description: errorMessage(err, "Try again in a moment."), variant: "destructive" }),
     },
   });
 
   const postMutation = useCreateMealPost({
     mutation: {
+      onError: (err) =>
+        toast({ title: "Couldn't post meal", description: errorMessage(err, "Check your connection and try again."), variant: "destructive" }),
       onSuccess: (data) => {
         qc.invalidateQueries({ queryKey: getListNutritionPostsQueryKey({ limit: 30, mode: feedMode }) });
         qc.invalidateQueries({ queryKey: getGetNutritionSummaryQueryKey() });
@@ -322,8 +393,8 @@ export default function Nutrition() {
       }));
       setAiResult(data);
       toast({ title: "AI Analysis complete!", description: `Quality score: ${data.quality_score ?? "?"}/10` });
-    } catch {
-      toast({ title: "Analysis failed", description: "Try again.", variant: "destructive" });
+    } catch (err) {
+      toast({ title: "Analysis failed", description: errorMessage(err, "Try again in a moment."), variant: "destructive" });
     } finally {
       setAnalyzing(false);
     }
@@ -352,6 +423,13 @@ export default function Nutrition() {
         </div>
 
         {/* Macro Target Banner */}
+        {macroTargetError && !macroTarget && (
+          <ErrorCard
+            title="Couldn't load your macro targets"
+            onRetry={() => refetchMacroTarget()}
+            className="mb-4"
+          />
+        )}
         {macroTarget && (
           <GlassCard glow="primary" className="p-4 mb-4">
             <div className="flex items-center justify-between mb-2">
@@ -396,6 +474,13 @@ export default function Nutrition() {
         ) : null}
 
         {/* Today progress strip — how today specifically is shaping up */}
+        {streakError && !streak && (
+          <ErrorCard
+            title="Couldn't load today's progress"
+            onRetry={() => refetchStreak()}
+            className="mb-4"
+          />
+        )}
         {streak && <TodayProgressStrip today={streak.today} />}
 
         {/* Daily macro-target streak */}
@@ -471,7 +556,12 @@ export default function Nutrition() {
         {/* ── FEED + DISCOVER TABS ── */}
         {(activeTab === "feed" || activeTab === "discover") && (
           <div className="space-y-4">
-            {postsLoading
+            {postsError && posts.length === 0 ? (
+              <ErrorCard
+                title="Couldn't load the nutrition feed"
+                onRetry={() => refetchPosts()}
+              />
+            ) : postsLoading
               ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-2xl" />)
               : posts.length === 0
                 ? (
@@ -494,7 +584,12 @@ export default function Nutrition() {
         {/* ── CHALLENGES TAB ── */}
         {activeTab === "challenges" && (
           <div className="space-y-4">
-            {challengesLoading
+            {challengesError && challenges.length === 0 ? (
+              <ErrorCard
+                title="Couldn't load challenges"
+                onRetry={() => refetchChallenges()}
+              />
+            ) : challengesLoading
               ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-2xl" />)
               : challenges.map((c, i) => {
                 const progress = Math.min(100, Math.round((c.currentValue / c.target) * 100));
@@ -1003,9 +1098,15 @@ function MealCard({ post, index, onLike }: { post: MealPost; index: number; onLi
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
   const { playerId } = usePlayer();
+  const { toast } = useToast();
   const pid = playerId ?? 0;
 
-  const { data: comments = [], refetch } = useListMealPostComments(post.id, {
+  const {
+    data: comments = [],
+    refetch,
+    isError: commentsError,
+    isLoading: commentsLoading,
+  } = useListMealPostComments(post.id, {
     query: { enabled: showComments, queryKey: getListMealPostCommentsQueryKey(post.id) },
   });
 
@@ -1013,9 +1114,13 @@ function MealCard({ post, index, onLike }: { post: MealPost; index: number; onLi
 
   const addComment = async () => {
     if (!newComment.trim()) return;
-    await addCommentMutation.mutateAsync({ id: post.id, data: { content: newComment } });
-    setNewComment("");
-    refetch();
+    try {
+      await addCommentMutation.mutateAsync({ id: post.id, data: { content: newComment } });
+      setNewComment("");
+      refetch();
+    } catch (err) {
+      toast({ title: "Couldn't post comment", description: errorMessage(err, "Try again in a moment."), variant: "destructive" });
+    }
   };
 
   const isOwnPost = post.playerId === pid;
@@ -1118,7 +1223,14 @@ function MealCard({ post, index, onLike }: { post: MealPost; index: number; onLi
             className="border-t border-border overflow-hidden"
           >
             <div className="px-4 py-3 space-y-2 max-h-48 overflow-y-auto">
-              {comments.length === 0
+              {commentsError && comments.length === 0 ? (
+                <ErrorCard
+                  title="Couldn't load comments"
+                  onRetry={() => refetch()}
+                />
+              ) : commentsLoading && comments.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Loading comments…</p>
+              ) : comments.length === 0
                 ? <p className="text-xs text-muted-foreground">No comments yet. Be first!</p>
                 : comments.map((c: any) => (
                   <div key={c.id} className="flex gap-2 text-xs">
