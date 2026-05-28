@@ -875,6 +875,170 @@ export interface ArtifactBattleXpEntry {
   evolutionStage: number;
 }
 
+export interface Challenge {
+  id: number;
+  creatorId: number;
+  title: string;
+  description: string;
+  metric: string;
+  targetValue: number;
+  durationDays: number;
+  type: string;
+  status: string;
+  rewardXp: number;
+  rewardCoins: number;
+  /** @nullable */
+  rewardArtifactId?: number | null;
+  requiresPublicMeetup: boolean;
+  startAt: string;
+  endAt: string;
+  maxParticipants: number;
+  isElimination: boolean;
+  currentRound: number;
+  createdAt: string;
+}
+
+export interface ChallengeListItem {
+  id: number;
+  creatorId: number;
+  title: string;
+  description?: string;
+  metric: string;
+  targetValue: number;
+  durationDays?: number;
+  type: string;
+  status: string;
+  rewardXp: number;
+  rewardCoins: number;
+  requiresPublicMeetup: boolean;
+  startAt: string;
+  endAt: string;
+  participantCount: number;
+  isJoined: boolean;
+  createdAt: string;
+}
+
+export interface ChallengeParticipant {
+  id: number;
+  challengeId: number;
+  playerId: number;
+  currentValue: number;
+  eliminated: boolean;
+  /** @nullable */
+  rank?: number | null;
+  joinedAt: string;
+  /** @nullable */
+  eliminatedRound?: number | null;
+}
+
+export type ChallengeDetailCreator = { [key: string]: unknown };
+
+export type ChallengeDetailLeaderboardItem = { [key: string]: unknown };
+
+export interface ChallengeDetail {
+  id: number;
+  creatorId: number;
+  title: string;
+  description: string;
+  metric: string;
+  targetValue: number;
+  durationDays?: number;
+  type: string;
+  status: string;
+  rewardXp: number;
+  rewardCoins: number;
+  /** @nullable */
+  rewardArtifactId?: number | null;
+  requiresPublicMeetup: boolean;
+  startAt: string;
+  endAt: string;
+  maxParticipants: number;
+  isElimination: boolean;
+  currentRound: number;
+  createdAt: string;
+  participantCount: number;
+  isJoined: boolean;
+  creator?: ChallengeDetailCreator;
+  leaderboard: ChallengeDetailLeaderboardItem[];
+}
+
+export type ChallengeInviteChallenge = { [key: string]: unknown };
+
+export interface ChallengeInvite {
+  id: number;
+  challengeId: number;
+  inviteeId: number;
+  inviterId: number;
+  status: string;
+  sentAt: string;
+  challenge?: ChallengeInviteChallenge;
+}
+
+export type CreateChallengeBodyType = typeof CreateChallengeBodyType[keyof typeof CreateChallengeBodyType];
+
+
+export const CreateChallengeBodyType = {
+  public: 'public',
+  private: 'private',
+  guild: 'guild',
+  city: 'city',
+} as const;
+
+export interface CreateChallengeBody {
+  /**
+     * @minLength 3
+     * @maxLength 80
+     */
+  title: string;
+  /** @maxLength 500 */
+  description?: string;
+  metric: string;
+  /** @minimum 1 */
+  targetValue: number;
+  /**
+     * @minimum 1
+     * @maximum 90
+     */
+  durationDays: number;
+  type?: CreateChallengeBodyType;
+  /** @minimum 0 */
+  rewardXp?: number;
+  /** @minimum 0 */
+  rewardCoins?: number;
+  requiresPublicMeetup?: boolean;
+  /**
+     * @minimum 2
+     * @maximum 500
+     */
+  maxParticipants?: number;
+  isElimination?: boolean;
+}
+
+export interface SubmitProgressBody {
+  /** @minimum 1 */
+  value: number;
+}
+
+export interface ReportChallengeBody {
+  reason?: string;
+}
+
+export interface InviteToChallengeBody {
+  inviteeId: number;
+}
+
+export type RespondToInviteBodyStatus = typeof RespondToInviteBodyStatus[keyof typeof RespondToInviteBodyStatus];
+
+
+export const RespondToInviteBodyStatus = {
+  accepted: 'accepted',
+  declined: 'declined',
+} as const;
+
+export interface RespondToInviteBody {
+  status: RespondToInviteBodyStatus;
+}
+
 export type ListHatchlingsParams = {
 playerId?: number;
 limit?: number;
@@ -978,4 +1142,22 @@ playerId: number;
 export type ListMyGroupsParams = {
 playerId: number;
 };
+
+export type ListChallengesParams = {
+tab?: ListChallengesTab;
+metric?: string;
+type?: string;
+};
+
+export type ListChallengesTab = typeof ListChallengesTab[keyof typeof ListChallengesTab];
+
+
+export const ListChallengesTab = {
+  trending: 'trending',
+  nearby: 'nearby',
+  friends: 'friends',
+  my: 'my',
+} as const;
+
+export type InviteToChallenge201 = { [key: string]: unknown };
 

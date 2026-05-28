@@ -38,6 +38,8 @@ tags:
     description: Workout groups, team energy, challenges, raids, and chat
   - name: coach
     description: AI Fitness Coach chat
+  - name: challenges
+    description: User-generated fitness challenges
 
 paths:
   /coach/chat:
@@ -1562,6 +1564,208 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResult"
 
+  # ── Challenges ────────────────────────────────────────────────────────────
+  /challenges:
+    get:
+      operationId: listChallenges
+      tags: [challenges]
+      summary: Browse challenges (trending, nearby, friends, my)
+      parameters:
+        - name: tab
+          in: query
+          schema:
+            type: string
+            enum: [trending, nearby, friends, my]
+        - name: metric
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of challenges
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChallengeListItem"
+    post:
+      operationId: createChallenge
+      tags: [challenges]
+      summary: Create a new challenge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChallengeBody"
+      responses:
+        "201":
+          description: Challenge created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Challenge"
+
+  /challenges/{id}:
+    get:
+      operationId: getChallenge
+      tags: [challenges]
+      summary: Get challenge detail with live leaderboard
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Challenge detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChallengeDetail"
+        "404":
+          description: Not found
+
+  /challenges/{id}/join:
+    post:
+      operationId: joinChallenge
+      tags: [challenges]
+      summary: Join a challenge
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: Joined
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChallengeParticipant"
+
+  /challenges/{id}/progress:
+    post:
+      operationId: submitChallengeProgress
+      tags: [challenges]
+      summary: Submit progress update
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitProgressBody"
+      responses:
+        "200":
+          description: Updated participant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChallengeParticipant"
+
+  /challenges/{id}/report:
+    post:
+      operationId: reportChallenge
+      tags: [challenges]
+      summary: Report a challenge for moderation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportChallengeBody"
+      responses:
+        "200":
+          description: Reported
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResult"
+
+  /challenges/{id}/invite:
+    post:
+      operationId: inviteToChallenge
+      tags: [challenges]
+      summary: Invite a player to a challenge
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteToChallengeBody"
+      responses:
+        "201":
+          description: Invited
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /challenge-invites:
+    get:
+      operationId: getMyChallengeInvites
+      tags: [challenges]
+      summary: Get pending challenge invites for the current player
+      responses:
+        "200":
+          description: Pending invites
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChallengeInvite"
+
+  /challenge-invites/{id}/respond:
+    post:
+      operationId: respondToChallengeInvite
+      tags: [challenges]
+      summary: Accept or decline a challenge invite
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RespondToInviteBody"
+      responses:
+        "200":
+          description: Responded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResult"
+
 components:
   schemas:
     HealthStatus:
@@ -2554,3 +2758,145 @@ components:
         imageSlug:        { type: string }
         battleXp:         { type: integer }
         evolutionStage:   { type: integer }
+
+    # ── Challenges ───────────────────────────────────────────────────────────
+    Challenge:
+      type: object
+      required: [id, creatorId, title, description, metric, targetValue, durationDays, type, status, rewardXp, rewardCoins, requiresPublicMeetup, startAt, endAt, maxParticipants, isElimination, currentRound, createdAt]
+      properties:
+        id:                   { type: integer }
+        creatorId:            { type: integer }
+        title:                { type: string }
+        description:          { type: string }
+        metric:               { type: string }
+        targetValue:          { type: integer }
+        durationDays:         { type: integer }
+        type:                 { type: string }
+        status:               { type: string }
+        rewardXp:             { type: integer }
+        rewardCoins:          { type: integer }
+        rewardArtifactId:     { type: ["integer", "null"] }
+        requiresPublicMeetup: { type: boolean }
+        startAt:              { type: string }
+        endAt:                { type: string }
+        maxParticipants:      { type: integer }
+        isElimination:        { type: boolean }
+        currentRound:         { type: integer }
+        createdAt:            { type: string }
+
+    ChallengeListItem:
+      type: object
+      required: [id, creatorId, title, metric, targetValue, type, status, rewardXp, rewardCoins, requiresPublicMeetup, startAt, endAt, participantCount, isJoined, createdAt]
+      properties:
+        id:                   { type: integer }
+        creatorId:            { type: integer }
+        title:                { type: string }
+        description:          { type: string }
+        metric:               { type: string }
+        targetValue:          { type: integer }
+        durationDays:         { type: integer }
+        type:                 { type: string }
+        status:               { type: string }
+        rewardXp:             { type: integer }
+        rewardCoins:          { type: integer }
+        requiresPublicMeetup: { type: boolean }
+        startAt:              { type: string }
+        endAt:                { type: string }
+        participantCount:     { type: integer }
+        isJoined:             { type: boolean }
+        createdAt:            { type: string }
+
+    ChallengeParticipant:
+      type: object
+      required: [id, challengeId, playerId, currentValue, eliminated, joinedAt]
+      properties:
+        id:             { type: integer }
+        challengeId:    { type: integer }
+        playerId:       { type: integer }
+        currentValue:   { type: integer }
+        eliminated:     { type: boolean }
+        rank:           { type: ["integer", "null"] }
+        joinedAt:       { type: string }
+        eliminatedRound: { type: ["integer", "null"] }
+
+    ChallengeDetail:
+      type: object
+      required: [id, creatorId, title, description, metric, targetValue, type, status, rewardXp, rewardCoins, requiresPublicMeetup, startAt, endAt, maxParticipants, isElimination, currentRound, createdAt, leaderboard, participantCount, isJoined]
+      properties:
+        id:                   { type: integer }
+        creatorId:            { type: integer }
+        title:                { type: string }
+        description:          { type: string }
+        metric:               { type: string }
+        targetValue:          { type: integer }
+        durationDays:         { type: integer }
+        type:                 { type: string }
+        status:               { type: string }
+        rewardXp:             { type: integer }
+        rewardCoins:          { type: integer }
+        rewardArtifactId:     { type: ["integer", "null"] }
+        requiresPublicMeetup: { type: boolean }
+        startAt:              { type: string }
+        endAt:                { type: string }
+        maxParticipants:      { type: integer }
+        isElimination:        { type: boolean }
+        currentRound:         { type: integer }
+        createdAt:            { type: string }
+        participantCount:     { type: integer }
+        isJoined:             { type: boolean }
+        creator:              { type: object }
+        leaderboard:
+          type: array
+          items:
+            type: object
+
+    ChallengeInvite:
+      type: object
+      required: [id, challengeId, inviteeId, inviterId, status, sentAt]
+      properties:
+        id:          { type: integer }
+        challengeId: { type: integer }
+        inviteeId:   { type: integer }
+        inviterId:   { type: integer }
+        status:      { type: string }
+        sentAt:      { type: string }
+        challenge:   { type: object }
+
+    CreateChallengeBody:
+      type: object
+      required: [title, metric, targetValue, durationDays]
+      properties:
+        title:                { type: string, minLength: 3, maxLength: 80 }
+        description:          { type: string, maxLength: 500 }
+        metric:               { type: string }
+        targetValue:          { type: integer, minimum: 1 }
+        durationDays:         { type: integer, minimum: 1, maximum: 90 }
+        type:                 { type: string, enum: [public, private, guild, city] }
+        rewardXp:             { type: integer, minimum: 0 }
+        rewardCoins:          { type: integer, minimum: 0 }
+        requiresPublicMeetup: { type: boolean }
+        maxParticipants:      { type: integer, minimum: 2, maximum: 500 }
+        isElimination:        { type: boolean }
+
+    SubmitProgressBody:
+      type: object
+      required: [value]
+      properties:
+        value: { type: integer, minimum: 1 }
+
+    ReportChallengeBody:
+      type: object
+      properties:
+        reason: { type: string }
+
+    InviteToChallengeBody:
+      type: object
+      required: [inviteeId]
+      properties:
+        inviteeId: { type: integer }
+
+    RespondToInviteBody:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [accepted, declined] }

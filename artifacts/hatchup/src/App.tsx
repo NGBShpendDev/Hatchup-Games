@@ -29,6 +29,9 @@ import Records from "@/pages/records";
 import Nutrition from "@/pages/nutrition";
 import Battle from "@/pages/battle";
 import ArtifactsPage from "@/pages/artifacts";
+import Challenges from "@/pages/challenges";
+import ChallengeDetail from "@/pages/challenge-detail";
+import ChallengeCreate from "@/pages/challenge-create";
 
 const queryClient = new QueryClient();
 
@@ -232,6 +235,9 @@ function AppRoutes() {
         <Route path="/records" component={Records} />
         <Route path="/nutrition" component={Nutrition} />
         <Route path="/artifacts" component={ArtifactsPage} />
+        <Route path="/challenges/create" component={ChallengeCreate} />
+        <Route path="/challenges/:id" component={ChallengeDetail} />
+        <Route path="/challenges" component={Challenges} />
         <Route component={NotFound} />
       </Switch>
     </>

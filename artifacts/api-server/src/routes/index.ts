@@ -21,6 +21,7 @@ import recordsRouter from "./records";
 import nutritionRouter from "./nutrition";
 import battlesRouter from "./battles";
 import artifactsRouter from "./artifacts";
+import challengesRouter from "./challenges";
 
 const router: IRouter = Router();
 
@@ -46,5 +47,6 @@ router.use(recordsRouter);
 router.use(nutritionRouter);
 router.use(battlesRouter);
 router.use(artifactsRouter);
+router.use(challengesRouter);
 
 export default router;

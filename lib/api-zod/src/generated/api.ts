@@ -1971,3 +1971,202 @@ export const TriggerHealthSyncResponse = zod.object({
 export const AcknowledgePassiveXpResponse = zod.object({
   "success": zod.boolean()
 })
+
+
+/**
+ * @summary Browse challenges (trending, nearby, friends, my)
+ */
+export const ListChallengesQueryParams = zod.object({
+  "tab": zod.enum(['trending', 'nearby', 'friends', 'my']).optional(),
+  "metric": zod.coerce.string().optional(),
+  "type": zod.coerce.string().optional()
+})
+
+export const ListChallengesResponseItem = zod.object({
+  "id": zod.number(),
+  "creatorId": zod.number(),
+  "title": zod.string(),
+  "description": zod.string().optional(),
+  "metric": zod.string(),
+  "targetValue": zod.number(),
+  "durationDays": zod.number().optional(),
+  "type": zod.string(),
+  "status": zod.string(),
+  "rewardXp": zod.number(),
+  "rewardCoins": zod.number(),
+  "requiresPublicMeetup": zod.boolean(),
+  "startAt": zod.string(),
+  "endAt": zod.string(),
+  "participantCount": zod.number(),
+  "isJoined": zod.boolean(),
+  "createdAt": zod.string()
+})
+export const ListChallengesResponse = zod.array(ListChallengesResponseItem)
+
+
+/**
+ * @summary Create a new challenge
+ */
+export const createChallengeBodyTitleMin = 3;
+export const createChallengeBodyTitleMax = 80;
+
+export const createChallengeBodyDescriptionMax = 500;
+
+
+export const createChallengeBodyDurationDaysMax = 90;
+
+export const createChallengeBodyRewardXpMin = 0;
+
+export const createChallengeBodyRewardCoinsMin = 0;
+
+export const createChallengeBodyMaxParticipantsMin = 2;
+export const createChallengeBodyMaxParticipantsMax = 500;
+
+
+
+export const CreateChallengeBody = zod.object({
+  "title": zod.string().min(createChallengeBodyTitleMin).max(createChallengeBodyTitleMax),
+  "description": zod.string().max(createChallengeBodyDescriptionMax).optional(),
+  "metric": zod.string(),
+  "targetValue": zod.number().min(1),
+  "durationDays": zod.number().min(1).max(createChallengeBodyDurationDaysMax),
+  "type": zod.enum(['public', 'private', 'guild', 'city']).optional(),
+  "rewardXp": zod.number().min(createChallengeBodyRewardXpMin).optional(),
+  "rewardCoins": zod.number().min(createChallengeBodyRewardCoinsMin).optional(),
+  "requiresPublicMeetup": zod.boolean().optional(),
+  "maxParticipants": zod.number().min(createChallengeBodyMaxParticipantsMin).max(createChallengeBodyMaxParticipantsMax).optional(),
+  "isElimination": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Get challenge detail with live leaderboard
+ */
+export const GetChallengeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetChallengeResponse = zod.object({
+  "id": zod.number(),
+  "creatorId": zod.number(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "metric": zod.string(),
+  "targetValue": zod.number(),
+  "durationDays": zod.number().optional(),
+  "type": zod.string(),
+  "status": zod.string(),
+  "rewardXp": zod.number(),
+  "rewardCoins": zod.number(),
+  "rewardArtifactId": zod.number().nullish(),
+  "requiresPublicMeetup": zod.boolean(),
+  "startAt": zod.string(),
+  "endAt": zod.string(),
+  "maxParticipants": zod.number(),
+  "isElimination": zod.boolean(),
+  "currentRound": zod.number(),
+  "createdAt": zod.string(),
+  "participantCount": zod.number(),
+  "isJoined": zod.boolean(),
+  "creator": zod.object({
+
+}).passthrough().optional(),
+  "leaderboard": zod.array(zod.object({
+
+}).passthrough())
+})
+
+
+/**
+ * @summary Join a challenge
+ */
+export const JoinChallengeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Submit progress update
+ */
+export const SubmitChallengeProgressParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const SubmitChallengeProgressBody = zod.object({
+  "value": zod.number().min(1)
+})
+
+export const SubmitChallengeProgressResponse = zod.object({
+  "id": zod.number(),
+  "challengeId": zod.number(),
+  "playerId": zod.number(),
+  "currentValue": zod.number(),
+  "eliminated": zod.boolean(),
+  "rank": zod.number().nullish(),
+  "joinedAt": zod.string(),
+  "eliminatedRound": zod.number().nullish()
+})
+
+
+/**
+ * @summary Report a challenge for moderation
+ */
+export const ReportChallengeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ReportChallengeBody = zod.object({
+  "reason": zod.string().optional()
+})
+
+export const ReportChallengeResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Invite a player to a challenge
+ */
+export const InviteToChallengeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const InviteToChallengeBody = zod.object({
+  "inviteeId": zod.number()
+})
+
+
+/**
+ * @summary Get pending challenge invites for the current player
+ */
+export const GetMyChallengeInvitesResponseItem = zod.object({
+  "id": zod.number(),
+  "challengeId": zod.number(),
+  "inviteeId": zod.number(),
+  "inviterId": zod.number(),
+  "status": zod.string(),
+  "sentAt": zod.string(),
+  "challenge": zod.object({
+
+}).passthrough().optional()
+})
+export const GetMyChallengeInvitesResponse = zod.array(GetMyChallengeInvitesResponseItem)
+
+
+/**
+ * @summary Accept or decline a challenge invite
+ */
+export const RespondToChallengeInviteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RespondToChallengeInviteBody = zod.object({
+  "status": zod.enum(['accepted', 'declined'])
+})
+
+export const RespondToChallengeInviteResponse = zod.object({
+  "success": zod.boolean()
+})

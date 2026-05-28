@@ -15,3 +15,4 @@ export * from "./safety";
 export * from "./nutrition";
 export * from "./battles";
 export * from "./artifacts";
+export * from "./challenges";
