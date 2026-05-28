@@ -3578,6 +3578,301 @@ paths:
               schema:
                 $ref: "#/components/schemas/StorageErrorEnvelope"
 
+  # ── Battles (REST) ───────────────────────────────────────────────────────
+  /battles/queue/join:
+    post:
+      operationId: joinBattleQueue
+      tags: [battles]
+      summary: REST fallback for joining the battle queue
+      description: |
+        Validates the chosen hatchling and mode and returns a hint pointing
+        clients to the live battle WebSocket. The actual matchmaking happens
+        over `/api/ws/battle` — this REST endpoint only exists for
+        environments that cannot speak the live socket directly.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BattleQueueJoinBody"
+      responses:
+        "200":
+          description: Queue join acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BattleQueueJoinResponse"
+        "400":
+          description: Invalid input
+        "403":
+          description: Invalid hatchling, ranked level gate, or daily battle cap reached.
+
+  /battles/ws-token:
+    post:
+      operationId: issueBattleWsToken
+      tags: [battles]
+      summary: Issue a short-lived battle WebSocket handshake token
+      description: |
+        Issues a 60-second one-time token bound to the authenticated player.
+        The frontend appends it as `?token=<uuid>` on the `/api/ws/battle`
+        handshake so the server can verify identity without trusting a
+        client-supplied `?playerId=` parameter.
+      responses:
+        "200":
+          description: New WS handshake token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BattleWsTokenResponse"
+
+  /battles/queue/leave:
+    delete:
+      operationId: leaveBattleQueue
+      tags: [battles]
+      summary: Acknowledge a queue leave request
+      description: |
+        Returns `{ ok: true }`. Real queue removal happens when the underlying
+        WebSocket closes — this endpoint exists so non-WS clients can signal
+        intent symmetrically with `joinBattleQueue`.
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /battles/history:
+    get:
+      operationId: listBattleHistory
+      tags: [battles]
+      summary: List the authenticated player's recent battles
+      description: |
+        Returns up to `limit` recent battles (default 10, max 20) for the
+        authenticated player, newest first. Each entry is enriched with the
+        viewer's perspective (own/opponent hatchling names, viewerWon, etc.).
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 20
+      responses:
+        "200":
+          description: Recent battles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BattleHistoryEntry"
+
+  /battles/rivals:
+    get:
+      operationId: listBattleRivals
+      tags: [battles]
+      summary: Aggregated head-to-head record vs human opponents
+      description: |
+        Returns opponents the authenticated player has battled at least twice
+        (bots are excluded). Sorted by total battles desc, then most recent
+        battle desc. Capped at `limit` rows (default 20, max 50).
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: Rival rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BattleRival"
+
+  /battles/{id}:
+    get:
+      operationId: getBattle
+      tags: [battles]
+      summary: Get a single battle by id
+      description: |
+        Returns the full battle row (including `turnsJson`) for a battle the
+        authenticated player participated in.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Battle detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BattleDetail"
+        "403":
+          description: Caller did not participate in this battle
+        "404":
+          description: Battle not found
+
+  /battles/rematch:
+    post:
+      operationId: createBattleRematch
+      tags: [battles]
+      summary: Send a rematch challenge to a previous opponent
+      description: |
+        Creates an in-memory rematch invite (5-minute expiry) targeted at the
+        opposing player from a prior battle, and drops a persistent
+        `rematch_invite` notification in their inbox.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BattleRematchCreateBody"
+      responses:
+        "201":
+          description: Invite created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BattleRematchInvite"
+        "400":
+          description: Invalid input or attempting to rematch a bot
+        "403":
+          description: Caller is not a participant in the referenced battle or does not own the hatchling
+        "404":
+          description: Battle or opponent not found
+
+  /battles/rematch/pending:
+    get:
+      operationId: listPendingBattleRematches
+      tags: [battles]
+      summary: List pending rematch invites involving the caller
+      description: |
+        Returns all pending invites where the caller is either the inviter
+        or the recipient, enriched with display names for both sides.
+      responses:
+        "200":
+          description: Pending invites
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BattleRematchInvite"
+
+  /battles/rematch/{id}:
+    get:
+      operationId: getBattleRematch
+      tags: [battles]
+      summary: Fetch a single rematch invite by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invite found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BattleRematchInvite"
+        "403":
+          description: Caller is not a participant in the invite
+        "404":
+          description: Invite not found or expired
+
+  /battles/rematch/{id}/accept:
+    post:
+      operationId: acceptBattleRematch
+      tags: [battles]
+      summary: Accept a rematch invite
+      description: |
+        Only the recipient of a pending invite may accept. Marks the invite
+        as `accepted` and notifies the inviter so they can hop into the
+        queue.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invite accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BattleRematchAcceptResponse"
+        "403":
+          description: Only the recipient may accept this invite
+        "404":
+          description: Invite not found or expired
+        "409":
+          description: Invite is no longer pending
+
+  /battles/rematch/{id}/decline:
+    post:
+      operationId: declineBattleRematch
+      tags: [battles]
+      summary: Decline (or cancel) a rematch invite
+      description: |
+        Either side may decline. The recipient declining notifies the
+        inviter. The inviter declining acts as a quiet cancellation.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "403":
+          description: Caller is not a participant in the invite
+        "404":
+          description: Invite not found or expired
+
+  /leaderboards/battle-elo:
+    get:
+      operationId: getBattleEloLeaderboard
+      tags: [leaderboards]
+      summary: Top players ranked by battle ELO
+      description: |
+        Returns the top `limit` players ordered by `battleElo` desc (default
+        100, max 100).
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Battle ELO leaderboard
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BattleEloLeaderboardEntry"
+
   # ── Live battle WebSocket protocol (documentation-only endpoints) ─────────
   # The real transport for these messages is the WebSocket at `/api/ws/battle`,
   # not these HTTP endpoints. They exist solely to attach the discriminated
@@ -5980,6 +6275,199 @@ components:
       required: [physiqueGoal]
       properties:
         physiqueGoal: { type: string }
+
+    # ── Battle (REST request/response schemas) ──────────────────────────────
+    OkResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+
+    BattleQueueJoinBody:
+      type: object
+      required: [hatchlingId]
+      properties:
+        hatchlingId: { type: integer }
+        mode:        { type: string, enum: [casual, ranked], default: casual }
+
+    BattleQueueJoinResponse:
+      type: object
+      required: [ok, message]
+      properties:
+        ok:      { type: boolean }
+        message: { type: string }
+
+    BattleWsTokenResponse:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string }
+
+    BattleHistoryEntry:
+      type: object
+      description: |
+        A row from `/battles/history`. Mirrors the underlying battle row plus
+        viewer-perspective fields. `winnerId` is `null` for draws or unresolved
+        battles, and `0` when a bot won.
+      required:
+        - id
+        - player1Id
+        - player2Id
+        - winnerId
+        - hatchling1Id
+        - hatchling2Id
+        - xpAwarded
+        - coinsAwarded
+        - battleMode
+        - eloChange
+        - createdAt
+        - isViewer1
+        - viewerWon
+        - opponent
+        - opponentPlayerId
+        - opponentUsername
+        - opponentDisplayName
+        - myHatchling
+        - opponentHatchling
+      properties:
+        id:                  { type: integer }
+        player1Id:           { type: integer }
+        player2Id:           { type: ["integer", "null"] }
+        winnerId:            { type: ["integer", "null"] }
+        hatchling1Id:        { type: integer }
+        hatchling2Id:        { type: ["integer", "null"] }
+        turnsJson:
+          description: Raw turn log (array of BattleTurnResult-shaped rows). Untyped here because legacy rows may be `null`.
+          nullable: true
+        xpAwarded:           { type: integer }
+        coinsAwarded:        { type: integer }
+        battleMode:          { type: string }
+        eloChange:           { type: integer }
+        createdAt:           { type: string, format: date-time }
+        isViewer1:           { type: boolean }
+        viewerWon:           { type: boolean }
+        opponent:            { type: string, description: "Opponent display name, or `Bot` for bot battles." }
+        opponentPlayerId:    { type: ["integer", "null"] }
+        opponentUsername:    { type: ["string", "null"] }
+        opponentDisplayName: { type: ["string", "null"] }
+        myHatchling:         { type: ["string", "null"] }
+        opponentHatchling:   { type: ["string", "null"] }
+
+    BattleDetail:
+      type: object
+      description: Full battle row including raw turn log, returned by `GET /battles/{id}`.
+      required:
+        - id
+        - player1Id
+        - player2Id
+        - winnerId
+        - hatchling1Id
+        - hatchling2Id
+        - xpAwarded
+        - coinsAwarded
+        - battleMode
+        - eloChange
+        - createdAt
+      properties:
+        id:           { type: integer }
+        player1Id:    { type: integer }
+        player2Id:    { type: ["integer", "null"] }
+        winnerId:     { type: ["integer", "null"] }
+        hatchling1Id: { type: integer }
+        hatchling2Id: { type: ["integer", "null"] }
+        turnsJson:
+          description: Raw turn log (array of BattleTurnResult-shaped rows). May be `null` on legacy rows.
+          nullable: true
+        xpAwarded:    { type: integer }
+        coinsAwarded: { type: integer }
+        battleMode:   { type: string }
+        eloChange:    { type: integer }
+        createdAt:    { type: string, format: date-time }
+
+    BattleRival:
+      type: object
+      required:
+        - opponentId
+        - opponentUsername
+        - opponentDisplayName
+        - totalBattles
+        - wins
+        - losses
+        - draws
+        - lastBattleAt
+        - lastBattleId
+      properties:
+        opponentId:          { type: integer }
+        opponentUsername:    { type: ["string", "null"] }
+        opponentDisplayName: { type: ["string", "null"] }
+        totalBattles:        { type: integer }
+        wins:                { type: integer }
+        losses:              { type: integer }
+        draws:               { type: integer }
+        lastBattleAt:        { type: string, format: date-time }
+        lastBattleId:        { type: integer }
+
+    BattleRematchCreateBody:
+      type: object
+      required: [battleId, hatchlingId]
+      properties:
+        battleId:    { type: integer }
+        hatchlingId: { type: integer }
+
+    BattleRematchInvite:
+      type: object
+      required:
+        - id
+        - fromPlayerId
+        - toPlayerId
+        - fromDisplayName
+        - toDisplayName
+        - mode
+        - fromHatchlingId
+        - fromHatchlingName
+        - fromBattleId
+        - status
+        - createdAt
+        - expiresAt
+      properties:
+        id:                 { type: string }
+        fromPlayerId:       { type: integer }
+        toPlayerId:         { type: integer }
+        fromDisplayName:    { type: ["string", "null"] }
+        toDisplayName:      { type: ["string", "null"] }
+        mode:               { type: string, enum: [casual, ranked] }
+        fromHatchlingId:    { type: integer }
+        fromHatchlingName:  { type: string }
+        fromBattleId:       { type: integer }
+        status:             { type: string, enum: [pending, accepted, declined, expired, consumed] }
+        createdAt:          { type: string, format: date-time }
+        expiresAt:          { type: string, format: date-time }
+
+    BattleRematchAcceptResponse:
+      type: object
+      required: [ok, inviteId]
+      properties:
+        ok:       { type: boolean }
+        inviteId: { type: string }
+
+    BattleEloLeaderboardEntry:
+      type: object
+      required:
+        - rank
+        - playerId
+        - username
+        - displayName
+        - battleElo
+        - totalBattleWins
+        - level
+      properties:
+        rank:            { type: integer }
+        playerId:        { type: integer }
+        username:        { type: ["string", "null"] }
+        displayName:     { type: ["string", "null"] }
+        battleElo:       { type: integer }
+        totalBattleWins: { type: integer }
+        level:           { type: integer }
 
     # ── Battle (live WebSocket payload schemas) ─────────────────────────────
     # These schemas mirror the fighter / battle state structures pushed over

@@ -15,11 +15,22 @@ import {
   Share2, Bookmark, Trash2, Star, Plus, X, Send,
 } from "lucide-react";
 import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
+import {
+  issueBattleWsToken,
+  listBattleHistory,
+  getBattleRematch,
+  createBattleRematch,
+  acceptBattleRematch,
+  declineBattleRematch,
+  useListBattleHistory,
+} from "@workspace/api-client-react";
 import type {
   BattleState,
   BattleTurnResult as TurnResult,
   EquippedArtifactSlot,
   FighterState,
+  BattleHistoryEntry,
+  BattleRematchInvite,
 } from "@workspace/api-client-react";
 import { BattleWsServerMessageSchema } from "@workspace/api-zod";
 
@@ -363,13 +374,7 @@ export default function BattlePage() {
   // Rematch invite state — when set, join_queue carries this id and the server
   // pairs the two invite parties directly instead of generic matchmaking.
   const [rematchInviteId, setRematchInviteId] = useState<string | null>(null);
-  interface RematchInviteDto {
-    id: string; fromPlayerId: number; toPlayerId: number;
-    fromDisplayName: string | null; toDisplayName: string | null;
-    mode: "casual" | "ranked"; fromHatchlingId: number; fromHatchlingName: string;
-    fromBattleId: number; status: string; createdAt: string; expiresAt: string;
-  }
-  const [incomingInvite, setIncomingInvite] = useState<RematchInviteDto | null>(null);
+  const [incomingInvite, setIncomingInvite] = useState<BattleRematchInvite | null>(null);
   const [sendingRematch, setSendingRematch] = useState(false);
 
   // Loadout state
@@ -394,11 +399,10 @@ export default function BattlePage() {
     enabled: !!pid,
   });
 
-  const { data: history = [] } = useQuery<{ id: number; opponent: string; opponentPlayerId: number | null; opponentUsername: string | null; opponentDisplayName: string | null; viewerWon: boolean; myHatchling: string; createdAt: string; battleMode: string }[]>({
-    queryKey: ["battle-history", pid],
-    queryFn: () => fetch(`${BASE}/api/battles/history`, { credentials: "include" }).then(r => r.json()),
-    enabled: !!pid,
-  });
+  const { data: history = [] } = useListBattleHistory<BattleHistoryEntry[]>(
+    undefined,
+    { query: { enabled: !!pid, queryKey: ["battle-history", pid] } },
+  );
 
   const { data: ownedArtifacts = [] } = useQuery<OwnedArtifact[]>({
     queryKey: ["owned-artifacts-loadout", pid],
@@ -457,9 +461,8 @@ export default function BattlePage() {
   // ── WS connection ─────────────────────────────────────────────────────────
   const connectWs = useCallback(() => {
     if (!pid) return;
-    fetch(`${BASE}/api/battles/ws-token`, { method: "POST", credentials: "include" })
-      .then(r => r.json())
-      .then(({ token }: { token: string }) => {
+    issueBattleWsToken()
+      .then(({ token }) => {
         const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
         const wsUrl = `${wsProto}//${window.location.host}${BASE}/api/ws/battle?token=${token}`;
         const ws = new WebSocket(wsUrl);
@@ -590,14 +593,7 @@ export default function BattlePage() {
     const params = new URLSearchParams(window.location.search);
     const inviteIdParam = params.get("rematch");
     if (!inviteIdParam) return;
-    fetch(`${BASE}/api/battles/rematch/${inviteIdParam}`, { credentials: "include" })
-      .then(async r => {
-        if (!r.ok) {
-          const err = await r.json().catch(() => ({}));
-          throw new Error(err.error ?? "Invite unavailable");
-        }
-        return r.json() as Promise<RematchInviteDto>;
-      })
+    getBattleRematch(inviteIdParam)
       .then((inv) => {
         setIncomingInvite(inv);
         setMode(inv.mode);
@@ -608,8 +604,9 @@ export default function BattlePage() {
           setRematchInviteId(inv.id);
         }
       })
-      .catch(err => {
-        toast({ title: "Rematch invite", description: String(err.message ?? err), variant: "destructive" });
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        toast({ title: "Rematch invite", description: message, variant: "destructive" });
       });
   }, [pid, toast]);
 
@@ -617,14 +614,7 @@ export default function BattlePage() {
   async function acceptRematch() {
     if (!incomingInvite) return;
     try {
-      const res = await fetch(`${BASE}/api/battles/rematch/${incomingInvite.id}/accept`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error ?? "Could not accept");
-      }
+      await acceptBattleRematch(incomingInvite.id);
       setRematchInviteId(incomingInvite.id);
       toast({
         title: "Rematch accepted!",
@@ -640,10 +630,7 @@ export default function BattlePage() {
   async function declineRematch() {
     if (!incomingInvite) return;
     try {
-      await fetch(`${BASE}/api/battles/rematch/${incomingInvite.id}/decline`, {
-        method: "POST",
-        credentials: "include",
-      });
+      await declineBattleRematch(incomingInvite.id);
     } catch { /* non-fatal */ }
     setIncomingInvite(null);
     setRematchInviteId(null);
@@ -659,18 +646,10 @@ export default function BattlePage() {
     if (!battleState || !myFighter || sendingRematch) return;
     setSendingRematch(true);
     try {
-      const res = await fetch(`${BASE}/api/battles/rematch`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          battleId: battleState.battleId,
-          hatchlingId: myFighter.hatchlingId,
-        }),
+      const invite = await createBattleRematch({
+        battleId: battleState.battleId,
+        hatchlingId: myFighter.hatchlingId,
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.error ?? "Could not send");
-      const invite = body as RematchInviteDto;
       setRematchInviteId(invite.id);
       toast({
         title: "Rematch sent!",
@@ -762,10 +741,7 @@ export default function BattlePage() {
     // If we were waiting on a rematch, cancel it so the other side doesn't
     // hang on a stale invite.
     if (rematchInviteId) {
-      fetch(`${BASE}/api/battles/rematch/${rematchInviteId}/decline`, {
-        method: "POST",
-        credentials: "include",
-      }).catch(() => {});
+      declineBattleRematch(rematchInviteId).catch(() => {});
       setRematchInviteId(null);
       setIncomingInvite(null);
       if (typeof window !== "undefined" && window.history?.replaceState && window.location.search.includes("rematch=")) {

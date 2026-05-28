@@ -30,8 +30,18 @@ import type {
   ArtifactLoadout,
   ArtifactMuseumEntry,
   ArtifactWorldNotification,
+  BattleDetail,
+  BattleEloLeaderboardEntry,
+  BattleHistoryEntry,
+  BattleQueueJoinBody,
+  BattleQueueJoinResponse,
+  BattleRematchAcceptResponse,
+  BattleRematchCreateBody,
+  BattleRematchInvite,
+  BattleRival,
   BattleWsClientMessage,
   BattleWsServerMessage,
+  BattleWsTokenResponse,
   Challenge,
   ChallengeDetail,
   ChallengeInvite,
@@ -80,6 +90,7 @@ import type {
   GeneratePlanInput,
   GetArtifactWorldNotificationsParams,
   GetArtifactsLeaderboardParams,
+  GetBattleEloLeaderboardParams,
   GetDailyMemoryParams,
   GetGlobalLeaderboardParams,
   GetMealPlanParams,
@@ -120,6 +131,8 @@ import type {
   LeaderboardEntry,
   LeaveFamilyGroup200,
   LeaveGroupInput,
+  ListBattleHistoryParams,
+  ListBattleRivalsParams,
   ListChallengesParams,
   ListClubsParams,
   ListCompetitionsParams,
@@ -165,6 +178,7 @@ import type {
   NutritionRecapSendResult,
   NutritionStreak,
   NutritionWeeklySummary,
+  OkResponse,
   OnboardingInput,
   OwnedArtifact,
   PhysiqueGoalInput,
@@ -12278,6 +12292,953 @@ export const usePreviewNutritionRecap = <TError = ErrorType<StorageErrorEnvelope
       > => {
       return useMutation(getPreviewNutritionRecapMutationOptions(options));
     }
+
+export const getJoinBattleQueueUrl = () => {
+
+
+
+
+  return `/api/battles/queue/join`
+}
+
+/**
+ * Validates the chosen hatchling and mode and returns a hint pointing
+clients to the live battle WebSocket. The actual matchmaking happens
+over `/api/ws/battle` — this REST endpoint only exists for
+environments that cannot speak the live socket directly.
+
+ * @summary REST fallback for joining the battle queue
+ */
+export const joinBattleQueue = async (battleQueueJoinBody: BattleQueueJoinBody, options?: RequestInit): Promise<BattleQueueJoinResponse> => {
+
+  return customFetch<BattleQueueJoinResponse>(getJoinBattleQueueUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      battleQueueJoinBody,)
+  }
+);}
+
+
+
+
+export const getJoinBattleQueueMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinBattleQueue>>, TError,{data: BodyType<BattleQueueJoinBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof joinBattleQueue>>, TError,{data: BodyType<BattleQueueJoinBody>}, TContext> => {
+
+const mutationKey = ['joinBattleQueue'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof joinBattleQueue>>, {data: BodyType<BattleQueueJoinBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  joinBattleQueue(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type JoinBattleQueueMutationResult = NonNullable<Awaited<ReturnType<typeof joinBattleQueue>>>
+    export type JoinBattleQueueMutationBody = BodyType<BattleQueueJoinBody>
+    export type JoinBattleQueueMutationError = ErrorType<void>
+
+    /**
+ * @summary REST fallback for joining the battle queue
+ */
+export const useJoinBattleQueue = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinBattleQueue>>, TError,{data: BodyType<BattleQueueJoinBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof joinBattleQueue>>,
+        TError,
+        {data: BodyType<BattleQueueJoinBody>},
+        TContext
+      > => {
+      return useMutation(getJoinBattleQueueMutationOptions(options));
+    }
+
+export const getIssueBattleWsTokenUrl = () => {
+
+
+
+
+  return `/api/battles/ws-token`
+}
+
+/**
+ * Issues a 60-second one-time token bound to the authenticated player.
+The frontend appends it as `?token=<uuid>` on the `/api/ws/battle`
+handshake so the server can verify identity without trusting a
+client-supplied `?playerId=` parameter.
+
+ * @summary Issue a short-lived battle WebSocket handshake token
+ */
+export const issueBattleWsToken = async ( options?: RequestInit): Promise<BattleWsTokenResponse> => {
+
+  return customFetch<BattleWsTokenResponse>(getIssueBattleWsTokenUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getIssueBattleWsTokenMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof issueBattleWsToken>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof issueBattleWsToken>>, TError,void, TContext> => {
+
+const mutationKey = ['issueBattleWsToken'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof issueBattleWsToken>>, void> = () => {
+
+
+          return  issueBattleWsToken(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type IssueBattleWsTokenMutationResult = NonNullable<Awaited<ReturnType<typeof issueBattleWsToken>>>
+
+    export type IssueBattleWsTokenMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Issue a short-lived battle WebSocket handshake token
+ */
+export const useIssueBattleWsToken = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof issueBattleWsToken>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof issueBattleWsToken>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getIssueBattleWsTokenMutationOptions(options));
+    }
+
+export const getLeaveBattleQueueUrl = () => {
+
+
+
+
+  return `/api/battles/queue/leave`
+}
+
+/**
+ * Returns `{ ok: true }`. Real queue removal happens when the underlying
+WebSocket closes — this endpoint exists so non-WS clients can signal
+intent symmetrically with `joinBattleQueue`.
+
+ * @summary Acknowledge a queue leave request
+ */
+export const leaveBattleQueue = async ( options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getLeaveBattleQueueUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getLeaveBattleQueueMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof leaveBattleQueue>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof leaveBattleQueue>>, TError,void, TContext> => {
+
+const mutationKey = ['leaveBattleQueue'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof leaveBattleQueue>>, void> = () => {
+
+
+          return  leaveBattleQueue(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LeaveBattleQueueMutationResult = NonNullable<Awaited<ReturnType<typeof leaveBattleQueue>>>
+
+    export type LeaveBattleQueueMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Acknowledge a queue leave request
+ */
+export const useLeaveBattleQueue = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof leaveBattleQueue>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof leaveBattleQueue>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getLeaveBattleQueueMutationOptions(options));
+    }
+
+export const getListBattleHistoryUrl = (params?: ListBattleHistoryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/battles/history?${stringifiedParams}` : `/api/battles/history`
+}
+
+/**
+ * Returns up to `limit` recent battles (default 10, max 20) for the
+authenticated player, newest first. Each entry is enriched with the
+viewer's perspective (own/opponent hatchling names, viewerWon, etc.).
+
+ * @summary List the authenticated player's recent battles
+ */
+export const listBattleHistory = async (params?: ListBattleHistoryParams, options?: RequestInit): Promise<BattleHistoryEntry[]> => {
+
+  return customFetch<BattleHistoryEntry[]>(getListBattleHistoryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBattleHistoryQueryKey = (params?: ListBattleHistoryParams,) => {
+    return [
+    `/api/battles/history`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListBattleHistoryQueryOptions = <TData = Awaited<ReturnType<typeof listBattleHistory>>, TError = ErrorType<unknown>>(params?: ListBattleHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBattleHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBattleHistoryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBattleHistory>>> = ({ signal }) => listBattleHistory(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBattleHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBattleHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof listBattleHistory>>>
+export type ListBattleHistoryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the authenticated player's recent battles
+ */
+
+export function useListBattleHistory<TData = Awaited<ReturnType<typeof listBattleHistory>>, TError = ErrorType<unknown>>(
+ params?: ListBattleHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBattleHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBattleHistoryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListBattleRivalsUrl = (params?: ListBattleRivalsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/battles/rivals?${stringifiedParams}` : `/api/battles/rivals`
+}
+
+/**
+ * Returns opponents the authenticated player has battled at least twice
+(bots are excluded). Sorted by total battles desc, then most recent
+battle desc. Capped at `limit` rows (default 20, max 50).
+
+ * @summary Aggregated head-to-head record vs human opponents
+ */
+export const listBattleRivals = async (params?: ListBattleRivalsParams, options?: RequestInit): Promise<BattleRival[]> => {
+
+  return customFetch<BattleRival[]>(getListBattleRivalsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBattleRivalsQueryKey = (params?: ListBattleRivalsParams,) => {
+    return [
+    `/api/battles/rivals`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListBattleRivalsQueryOptions = <TData = Awaited<ReturnType<typeof listBattleRivals>>, TError = ErrorType<unknown>>(params?: ListBattleRivalsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBattleRivals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBattleRivalsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBattleRivals>>> = ({ signal }) => listBattleRivals(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBattleRivals>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBattleRivalsQueryResult = NonNullable<Awaited<ReturnType<typeof listBattleRivals>>>
+export type ListBattleRivalsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Aggregated head-to-head record vs human opponents
+ */
+
+export function useListBattleRivals<TData = Awaited<ReturnType<typeof listBattleRivals>>, TError = ErrorType<unknown>>(
+ params?: ListBattleRivalsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBattleRivals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBattleRivalsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetBattleUrl = (id: number,) => {
+
+
+
+
+  return `/api/battles/${id}`
+}
+
+/**
+ * Returns the full battle row (including `turnsJson`) for a battle the
+authenticated player participated in.
+
+ * @summary Get a single battle by id
+ */
+export const getBattle = async (id: number, options?: RequestInit): Promise<BattleDetail> => {
+
+  return customFetch<BattleDetail>(getGetBattleUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBattleQueryKey = (id: number,) => {
+    return [
+    `/api/battles/${id}`
+    ] as const;
+    }
+
+
+export const getGetBattleQueryOptions = <TData = Awaited<ReturnType<typeof getBattle>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBattle>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBattleQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBattle>>> = ({ signal }) => getBattle(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBattle>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBattleQueryResult = NonNullable<Awaited<ReturnType<typeof getBattle>>>
+export type GetBattleQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a single battle by id
+ */
+
+export function useGetBattle<TData = Awaited<ReturnType<typeof getBattle>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBattle>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBattleQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateBattleRematchUrl = () => {
+
+
+
+
+  return `/api/battles/rematch`
+}
+
+/**
+ * Creates an in-memory rematch invite (5-minute expiry) targeted at the
+opposing player from a prior battle, and drops a persistent
+`rematch_invite` notification in their inbox.
+
+ * @summary Send a rematch challenge to a previous opponent
+ */
+export const createBattleRematch = async (battleRematchCreateBody: BattleRematchCreateBody, options?: RequestInit): Promise<BattleRematchInvite> => {
+
+  return customFetch<BattleRematchInvite>(getCreateBattleRematchUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      battleRematchCreateBody,)
+  }
+);}
+
+
+
+
+export const getCreateBattleRematchMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBattleRematch>>, TError,{data: BodyType<BattleRematchCreateBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createBattleRematch>>, TError,{data: BodyType<BattleRematchCreateBody>}, TContext> => {
+
+const mutationKey = ['createBattleRematch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createBattleRematch>>, {data: BodyType<BattleRematchCreateBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createBattleRematch(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateBattleRematchMutationResult = NonNullable<Awaited<ReturnType<typeof createBattleRematch>>>
+    export type CreateBattleRematchMutationBody = BodyType<BattleRematchCreateBody>
+    export type CreateBattleRematchMutationError = ErrorType<void>
+
+    /**
+ * @summary Send a rematch challenge to a previous opponent
+ */
+export const useCreateBattleRematch = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBattleRematch>>, TError,{data: BodyType<BattleRematchCreateBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createBattleRematch>>,
+        TError,
+        {data: BodyType<BattleRematchCreateBody>},
+        TContext
+      > => {
+      return useMutation(getCreateBattleRematchMutationOptions(options));
+    }
+
+export const getListPendingBattleRematchesUrl = () => {
+
+
+
+
+  return `/api/battles/rematch/pending`
+}
+
+/**
+ * Returns all pending invites where the caller is either the inviter
+or the recipient, enriched with display names for both sides.
+
+ * @summary List pending rematch invites involving the caller
+ */
+export const listPendingBattleRematches = async ( options?: RequestInit): Promise<BattleRematchInvite[]> => {
+
+  return customFetch<BattleRematchInvite[]>(getListPendingBattleRematchesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPendingBattleRematchesQueryKey = () => {
+    return [
+    `/api/battles/rematch/pending`
+    ] as const;
+    }
+
+
+export const getListPendingBattleRematchesQueryOptions = <TData = Awaited<ReturnType<typeof listPendingBattleRematches>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPendingBattleRematches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPendingBattleRematchesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPendingBattleRematches>>> = ({ signal }) => listPendingBattleRematches({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPendingBattleRematches>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPendingBattleRematchesQueryResult = NonNullable<Awaited<ReturnType<typeof listPendingBattleRematches>>>
+export type ListPendingBattleRematchesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List pending rematch invites involving the caller
+ */
+
+export function useListPendingBattleRematches<TData = Awaited<ReturnType<typeof listPendingBattleRematches>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPendingBattleRematches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPendingBattleRematchesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetBattleRematchUrl = (id: string,) => {
+
+
+
+
+  return `/api/battles/rematch/${id}`
+}
+
+/**
+ * @summary Fetch a single rematch invite by id
+ */
+export const getBattleRematch = async (id: string, options?: RequestInit): Promise<BattleRematchInvite> => {
+
+  return customFetch<BattleRematchInvite>(getGetBattleRematchUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBattleRematchQueryKey = (id: string,) => {
+    return [
+    `/api/battles/rematch/${id}`
+    ] as const;
+    }
+
+
+export const getGetBattleRematchQueryOptions = <TData = Awaited<ReturnType<typeof getBattleRematch>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBattleRematch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBattleRematchQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBattleRematch>>> = ({ signal }) => getBattleRematch(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBattleRematch>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBattleRematchQueryResult = NonNullable<Awaited<ReturnType<typeof getBattleRematch>>>
+export type GetBattleRematchQueryError = ErrorType<void>
+
+
+/**
+ * @summary Fetch a single rematch invite by id
+ */
+
+export function useGetBattleRematch<TData = Awaited<ReturnType<typeof getBattleRematch>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBattleRematch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBattleRematchQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getAcceptBattleRematchUrl = (id: string,) => {
+
+
+
+
+  return `/api/battles/rematch/${id}/accept`
+}
+
+/**
+ * Only the recipient of a pending invite may accept. Marks the invite
+as `accepted` and notifies the inviter so they can hop into the
+queue.
+
+ * @summary Accept a rematch invite
+ */
+export const acceptBattleRematch = async (id: string, options?: RequestInit): Promise<BattleRematchAcceptResponse> => {
+
+  return customFetch<BattleRematchAcceptResponse>(getAcceptBattleRematchUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getAcceptBattleRematchMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptBattleRematch>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof acceptBattleRematch>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['acceptBattleRematch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof acceptBattleRematch>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  acceptBattleRematch(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AcceptBattleRematchMutationResult = NonNullable<Awaited<ReturnType<typeof acceptBattleRematch>>>
+
+    export type AcceptBattleRematchMutationError = ErrorType<void>
+
+    /**
+ * @summary Accept a rematch invite
+ */
+export const useAcceptBattleRematch = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptBattleRematch>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof acceptBattleRematch>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getAcceptBattleRematchMutationOptions(options));
+    }
+
+export const getDeclineBattleRematchUrl = (id: string,) => {
+
+
+
+
+  return `/api/battles/rematch/${id}/decline`
+}
+
+/**
+ * Either side may decline. The recipient declining notifies the
+inviter. The inviter declining acts as a quiet cancellation.
+
+ * @summary Decline (or cancel) a rematch invite
+ */
+export const declineBattleRematch = async (id: string, options?: RequestInit): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getDeclineBattleRematchUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getDeclineBattleRematchMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof declineBattleRematch>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof declineBattleRematch>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['declineBattleRematch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof declineBattleRematch>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  declineBattleRematch(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeclineBattleRematchMutationResult = NonNullable<Awaited<ReturnType<typeof declineBattleRematch>>>
+
+    export type DeclineBattleRematchMutationError = ErrorType<void>
+
+    /**
+ * @summary Decline (or cancel) a rematch invite
+ */
+export const useDeclineBattleRematch = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof declineBattleRematch>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof declineBattleRematch>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeclineBattleRematchMutationOptions(options));
+    }
+
+export const getGetBattleEloLeaderboardUrl = (params?: GetBattleEloLeaderboardParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/leaderboards/battle-elo?${stringifiedParams}` : `/api/leaderboards/battle-elo`
+}
+
+/**
+ * Returns the top `limit` players ordered by `battleElo` desc (default
+100, max 100).
+
+ * @summary Top players ranked by battle ELO
+ */
+export const getBattleEloLeaderboard = async (params?: GetBattleEloLeaderboardParams, options?: RequestInit): Promise<BattleEloLeaderboardEntry[]> => {
+
+  return customFetch<BattleEloLeaderboardEntry[]>(getGetBattleEloLeaderboardUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBattleEloLeaderboardQueryKey = (params?: GetBattleEloLeaderboardParams,) => {
+    return [
+    `/api/leaderboards/battle-elo`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetBattleEloLeaderboardQueryOptions = <TData = Awaited<ReturnType<typeof getBattleEloLeaderboard>>, TError = ErrorType<unknown>>(params?: GetBattleEloLeaderboardParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBattleEloLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBattleEloLeaderboardQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBattleEloLeaderboard>>> = ({ signal }) => getBattleEloLeaderboard(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBattleEloLeaderboard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBattleEloLeaderboardQueryResult = NonNullable<Awaited<ReturnType<typeof getBattleEloLeaderboard>>>
+export type GetBattleEloLeaderboardQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Top players ranked by battle ELO
+ */
+
+export function useGetBattleEloLeaderboard<TData = Awaited<ReturnType<typeof getBattleEloLeaderboard>>, TError = ErrorType<unknown>>(
+ params?: GetBattleEloLeaderboardParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBattleEloLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBattleEloLeaderboardQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getDocsValidateBattleWsClientMessageUrl = () => {
 

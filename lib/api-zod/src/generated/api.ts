@@ -4084,6 +4084,267 @@ export const PreviewNutritionRecapResponse = zod.object({
 
 
 /**
+ * Validates the chosen hatchling and mode and returns a hint pointing
+clients to the live battle WebSocket. The actual matchmaking happens
+over `/api/ws/battle` — this REST endpoint only exists for
+environments that cannot speak the live socket directly.
+
+ * @summary REST fallback for joining the battle queue
+ */
+export const joinBattleQueueBodyModeDefault = `casual`;
+
+export const JoinBattleQueueBody = zod.object({
+  "hatchlingId": zod.number(),
+  "mode": zod.enum(['casual', 'ranked']).default(joinBattleQueueBodyModeDefault)
+})
+
+export const JoinBattleQueueResponse = zod.object({
+  "ok": zod.boolean(),
+  "message": zod.string()
+})
+
+
+/**
+ * Issues a 60-second one-time token bound to the authenticated player.
+The frontend appends it as `?token=<uuid>` on the `/api/ws/battle`
+handshake so the server can verify identity without trusting a
+client-supplied `?playerId=` parameter.
+
+ * @summary Issue a short-lived battle WebSocket handshake token
+ */
+export const IssueBattleWsTokenResponse = zod.object({
+  "token": zod.string()
+})
+
+
+/**
+ * Returns `{ ok: true }`. Real queue removal happens when the underlying
+WebSocket closes — this endpoint exists so non-WS clients can signal
+intent symmetrically with `joinBattleQueue`.
+
+ * @summary Acknowledge a queue leave request
+ */
+export const LeaveBattleQueueResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * Returns up to `limit` recent battles (default 10, max 20) for the
+authenticated player, newest first. Each entry is enriched with the
+viewer's perspective (own/opponent hatchling names, viewerWon, etc.).
+
+ * @summary List the authenticated player's recent battles
+ */
+export const listBattleHistoryQueryLimitDefault = 10;
+export const listBattleHistoryQueryLimitMax = 20;
+
+
+
+export const ListBattleHistoryQueryParams = zod.object({
+  "limit": zod.coerce.number().min(1).max(listBattleHistoryQueryLimitMax).default(listBattleHistoryQueryLimitDefault)
+})
+
+export const ListBattleHistoryResponseItem = zod.object({
+  "id": zod.number(),
+  "player1Id": zod.number(),
+  "player2Id": zod.number().nullable(),
+  "winnerId": zod.number().nullable(),
+  "hatchling1Id": zod.number(),
+  "hatchling2Id": zod.number().nullable(),
+  "turnsJson": zod.unknown().nullish().describe('Raw turn log (array of BattleTurnResult-shaped rows). Untyped here because legacy rows may be `null`.'),
+  "xpAwarded": zod.number(),
+  "coinsAwarded": zod.number(),
+  "battleMode": zod.string(),
+  "eloChange": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "isViewer1": zod.boolean(),
+  "viewerWon": zod.boolean(),
+  "opponent": zod.string().describe('Opponent display name, or `Bot` for bot battles.'),
+  "opponentPlayerId": zod.number().nullable(),
+  "opponentUsername": zod.string().nullable(),
+  "opponentDisplayName": zod.string().nullable(),
+  "myHatchling": zod.string().nullable(),
+  "opponentHatchling": zod.string().nullable()
+}).describe('A row from `\/battles\/history`. Mirrors the underlying battle row plus\nviewer-perspective fields. `winnerId` is `null` for draws or unresolved\nbattles, and `0` when a bot won.\n')
+export const ListBattleHistoryResponse = zod.array(ListBattleHistoryResponseItem)
+
+
+/**
+ * Returns opponents the authenticated player has battled at least twice
+(bots are excluded). Sorted by total battles desc, then most recent
+battle desc. Capped at `limit` rows (default 20, max 50).
+
+ * @summary Aggregated head-to-head record vs human opponents
+ */
+export const listBattleRivalsQueryLimitDefault = 20;
+export const listBattleRivalsQueryLimitMax = 50;
+
+
+
+export const ListBattleRivalsQueryParams = zod.object({
+  "limit": zod.coerce.number().min(1).max(listBattleRivalsQueryLimitMax).default(listBattleRivalsQueryLimitDefault)
+})
+
+export const ListBattleRivalsResponseItem = zod.object({
+  "opponentId": zod.number(),
+  "opponentUsername": zod.string().nullable(),
+  "opponentDisplayName": zod.string().nullable(),
+  "totalBattles": zod.number(),
+  "wins": zod.number(),
+  "losses": zod.number(),
+  "draws": zod.number(),
+  "lastBattleAt": zod.coerce.date(),
+  "lastBattleId": zod.number()
+})
+export const ListBattleRivalsResponse = zod.array(ListBattleRivalsResponseItem)
+
+
+/**
+ * Returns the full battle row (including `turnsJson`) for a battle the
+authenticated player participated in.
+
+ * @summary Get a single battle by id
+ */
+export const GetBattleParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetBattleResponse = zod.object({
+  "id": zod.number(),
+  "player1Id": zod.number(),
+  "player2Id": zod.number().nullable(),
+  "winnerId": zod.number().nullable(),
+  "hatchling1Id": zod.number(),
+  "hatchling2Id": zod.number().nullable(),
+  "turnsJson": zod.unknown().nullish().describe('Raw turn log (array of BattleTurnResult-shaped rows). May be `null` on legacy rows.'),
+  "xpAwarded": zod.number(),
+  "coinsAwarded": zod.number(),
+  "battleMode": zod.string(),
+  "eloChange": zod.number(),
+  "createdAt": zod.coerce.date()
+}).describe('Full battle row including raw turn log, returned by `GET \/battles\/{id}`.')
+
+
+/**
+ * Creates an in-memory rematch invite (5-minute expiry) targeted at the
+opposing player from a prior battle, and drops a persistent
+`rematch_invite` notification in their inbox.
+
+ * @summary Send a rematch challenge to a previous opponent
+ */
+export const CreateBattleRematchBody = zod.object({
+  "battleId": zod.number(),
+  "hatchlingId": zod.number()
+})
+
+
+/**
+ * Returns all pending invites where the caller is either the inviter
+or the recipient, enriched with display names for both sides.
+
+ * @summary List pending rematch invites involving the caller
+ */
+export const ListPendingBattleRematchesResponseItem = zod.object({
+  "id": zod.string(),
+  "fromPlayerId": zod.number(),
+  "toPlayerId": zod.number(),
+  "fromDisplayName": zod.string().nullable(),
+  "toDisplayName": zod.string().nullable(),
+  "mode": zod.enum(['casual', 'ranked']),
+  "fromHatchlingId": zod.number(),
+  "fromHatchlingName": zod.string(),
+  "fromBattleId": zod.number(),
+  "status": zod.enum(['pending', 'accepted', 'declined', 'expired', 'consumed']),
+  "createdAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date()
+})
+export const ListPendingBattleRematchesResponse = zod.array(ListPendingBattleRematchesResponseItem)
+
+
+/**
+ * @summary Fetch a single rematch invite by id
+ */
+export const GetBattleRematchParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetBattleRematchResponse = zod.object({
+  "id": zod.string(),
+  "fromPlayerId": zod.number(),
+  "toPlayerId": zod.number(),
+  "fromDisplayName": zod.string().nullable(),
+  "toDisplayName": zod.string().nullable(),
+  "mode": zod.enum(['casual', 'ranked']),
+  "fromHatchlingId": zod.number(),
+  "fromHatchlingName": zod.string(),
+  "fromBattleId": zod.number(),
+  "status": zod.enum(['pending', 'accepted', 'declined', 'expired', 'consumed']),
+  "createdAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date()
+})
+
+
+/**
+ * Only the recipient of a pending invite may accept. Marks the invite
+as `accepted` and notifies the inviter so they can hop into the
+queue.
+
+ * @summary Accept a rematch invite
+ */
+export const AcceptBattleRematchParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AcceptBattleRematchResponse = zod.object({
+  "ok": zod.boolean(),
+  "inviteId": zod.string()
+})
+
+
+/**
+ * Either side may decline. The recipient declining notifies the
+inviter. The inviter declining acts as a quiet cancellation.
+
+ * @summary Decline (or cancel) a rematch invite
+ */
+export const DeclineBattleRematchParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeclineBattleRematchResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * Returns the top `limit` players ordered by `battleElo` desc (default
+100, max 100).
+
+ * @summary Top players ranked by battle ELO
+ */
+export const getBattleEloLeaderboardQueryLimitDefault = 100;
+export const getBattleEloLeaderboardQueryLimitMax = 100;
+
+
+
+export const GetBattleEloLeaderboardQueryParams = zod.object({
+  "limit": zod.coerce.number().min(1).max(getBattleEloLeaderboardQueryLimitMax).default(getBattleEloLeaderboardQueryLimitDefault)
+})
+
+export const GetBattleEloLeaderboardResponseItem = zod.object({
+  "rank": zod.number(),
+  "playerId": zod.number(),
+  "username": zod.string().nullable(),
+  "displayName": zod.string().nullable(),
+  "battleElo": zod.number(),
+  "totalBattleWins": zod.number(),
+  "level": zod.number()
+})
+export const GetBattleEloLeaderboardResponse = zod.array(GetBattleEloLeaderboardResponseItem)
+
+
+/**
  * Documentation-only endpoint that defines the schema of messages the
 client sends over the live battle WebSocket (`/api/ws/battle`). The
 endpoint itself returns `410 Gone` — clients should send these

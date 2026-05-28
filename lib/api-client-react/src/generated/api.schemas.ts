@@ -2150,6 +2150,165 @@ export interface PhysiqueGoalResult {
   physiqueGoal: string;
 }
 
+export interface OkResponse {
+  ok: boolean;
+}
+
+export type BattleQueueJoinBodyMode = typeof BattleQueueJoinBodyMode[keyof typeof BattleQueueJoinBodyMode];
+
+
+export const BattleQueueJoinBodyMode = {
+  casual: 'casual',
+  ranked: 'ranked',
+} as const;
+
+export interface BattleQueueJoinBody {
+  hatchlingId: number;
+  mode?: BattleQueueJoinBodyMode;
+}
+
+export interface BattleQueueJoinResponse {
+  ok: boolean;
+  message: string;
+}
+
+export interface BattleWsTokenResponse {
+  token: string;
+}
+
+/**
+ * A row from `/battles/history`. Mirrors the underlying battle row plus
+viewer-perspective fields. `winnerId` is `null` for draws or unresolved
+battles, and `0` when a bot won.
+
+ */
+export interface BattleHistoryEntry {
+  id: number;
+  player1Id: number;
+  /** @nullable */
+  player2Id: number | null;
+  /** @nullable */
+  winnerId: number | null;
+  hatchling1Id: number;
+  /** @nullable */
+  hatchling2Id: number | null;
+  /** Raw turn log (array of BattleTurnResult-shaped rows). Untyped here because legacy rows may be `null`. */
+  turnsJson?: unknown | null;
+  xpAwarded: number;
+  coinsAwarded: number;
+  battleMode: string;
+  eloChange: number;
+  createdAt: string;
+  isViewer1: boolean;
+  viewerWon: boolean;
+  /** Opponent display name, or `Bot` for bot battles. */
+  opponent: string;
+  /** @nullable */
+  opponentPlayerId: number | null;
+  /** @nullable */
+  opponentUsername: string | null;
+  /** @nullable */
+  opponentDisplayName: string | null;
+  /** @nullable */
+  myHatchling: string | null;
+  /** @nullable */
+  opponentHatchling: string | null;
+}
+
+/**
+ * Full battle row including raw turn log, returned by `GET /battles/{id}`.
+ */
+export interface BattleDetail {
+  id: number;
+  player1Id: number;
+  /** @nullable */
+  player2Id: number | null;
+  /** @nullable */
+  winnerId: number | null;
+  hatchling1Id: number;
+  /** @nullable */
+  hatchling2Id: number | null;
+  /** Raw turn log (array of BattleTurnResult-shaped rows). May be `null` on legacy rows. */
+  turnsJson?: unknown | null;
+  xpAwarded: number;
+  coinsAwarded: number;
+  battleMode: string;
+  eloChange: number;
+  createdAt: string;
+}
+
+export interface BattleRival {
+  opponentId: number;
+  /** @nullable */
+  opponentUsername: string | null;
+  /** @nullable */
+  opponentDisplayName: string | null;
+  totalBattles: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  lastBattleAt: string;
+  lastBattleId: number;
+}
+
+export interface BattleRematchCreateBody {
+  battleId: number;
+  hatchlingId: number;
+}
+
+export type BattleRematchInviteMode = typeof BattleRematchInviteMode[keyof typeof BattleRematchInviteMode];
+
+
+export const BattleRematchInviteMode = {
+  casual: 'casual',
+  ranked: 'ranked',
+} as const;
+
+export type BattleRematchInviteStatus = typeof BattleRematchInviteStatus[keyof typeof BattleRematchInviteStatus];
+
+
+export const BattleRematchInviteStatus = {
+  pending: 'pending',
+  accepted: 'accepted',
+  declined: 'declined',
+  expired: 'expired',
+  consumed: 'consumed',
+} as const;
+
+export interface BattleRematchInvite {
+  id: string;
+  fromPlayerId: number;
+  toPlayerId: number;
+  /** @nullable */
+  fromDisplayName: string | null;
+  /** @nullable */
+  toDisplayName: string | null;
+  mode: BattleRematchInviteMode;
+  fromHatchlingId: number;
+  fromHatchlingName: string;
+  fromBattleId: number;
+  status: BattleRematchInviteStatus;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface BattleRematchAcceptResponse {
+  ok: boolean;
+  inviteId: string;
+}
+
+export interface BattleEloLeaderboardEntry {
+  rank: number;
+  playerId: number;
+  /** @nullable */
+  username: string | null;
+  /** @nullable */
+  displayName: string | null;
+  battleElo: number;
+  totalBattleWins: number;
+  level: number;
+}
+
 export type EquippedArtifactSlotSlot = typeof EquippedArtifactSlotSlot[keyof typeof EquippedArtifactSlotSlot];
 
 
@@ -2889,4 +3048,28 @@ export const ListNutritionPostsMode = {
   feed: 'feed',
   discover: 'discover',
 } as const;
+
+export type ListBattleHistoryParams = {
+/**
+ * @minimum 1
+ * @maximum 20
+ */
+limit?: number;
+};
+
+export type ListBattleRivalsParams = {
+/**
+ * @minimum 1
+ * @maximum 50
+ */
+limit?: number;
+};
+
+export type GetBattleEloLeaderboardParams = {
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
 
