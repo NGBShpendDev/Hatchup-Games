@@ -19,7 +19,8 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import { motion } from "framer-motion";
-import { ArrowLeft, Zap, Heart, Coffee, Shield, Trash2, ArrowUpCircle, Sword, Star } from "lucide-react";
+import { ArrowLeft, Zap, Heart, Coffee, Shield, Trash2, ArrowUpCircle, Sword, Star, Share2 } from "lucide-react";
+import { ComposeSheet } from "@/components/compose-sheet";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -155,6 +156,7 @@ export default function HatchlingDetail() {
   // buffing meal) play the same creature reaction the nutrition page shows.
   const prevStatsRef = useRef<{ happiness: number; energy: number } | null>(null);
   const [reaction, setReaction] = useState<HatchlingReactionData | null>(null);
+  const [composeOpen, setComposeOpen] = useState(false);
 
   useEffect(() => {
     if (!hatchling) return;
@@ -558,6 +560,16 @@ export default function HatchlingDetail() {
               </NeonButton>
             </div>
 
+            <NeonButton
+              size="lg"
+              variant="secondary"
+              className="w-full"
+              onClick={() => setComposeOpen(true)}
+              data-testid="button-share-hatchling"
+            >
+              <Share2 className="w-4 h-4 mr-2" /> Share {hatchling.name}
+            </NeonButton>
+
             <div className="flex justify-end">
               <Button variant="ghost" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 font-bold text-sm" onClick={handleRelease}>
                 <Trash2 className="w-4 h-4 mr-2" /> Release Pal
@@ -566,6 +578,17 @@ export default function HatchlingDetail() {
           </motion.div>
         </div>
       </div>
+
+      {player && (
+        <ComposeSheet
+          open={composeOpen}
+          onClose={() => setComposeOpen(false)}
+          playerId={player.id}
+          initialCreatureId={hatchling.id}
+          initialPostType="evolution"
+          title={`Share ${hatchling.name} ✨`}
+        />
+      )}
     </Layout>
   );
 }

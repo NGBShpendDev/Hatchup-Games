@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   useCreatePost,
   useListHatchlings,
@@ -30,17 +30,41 @@ export function ComposeSheet({
   open,
   onClose,
   playerId,
+  initialCreatureId,
+  initialPostType,
+  initialContent,
+  initialTags,
+  title,
 }: {
   open: boolean;
   onClose: () => void;
   playerId: number;
+  initialCreatureId?: number;
+  initialPostType?: string;
+  initialContent?: string;
+  initialTags?: string;
+  title?: string;
 }) {
-  const [content, setContent] = useState("");
+  const [content, setContent] = useState(initialContent ?? "");
   const [mediaUrl, setMediaUrl] = useState("");
-  const [tags, setTags] = useState("");
-  const [postType, setPostType] = useState("general");
-  const [creatureId, setCreatureId] = useState<string>("none");
+  const [tags, setTags] = useState(initialTags ?? "");
+  const [postType, setPostType] = useState(initialPostType ?? "general");
+  const [creatureId, setCreatureId] = useState<string>(
+    initialCreatureId != null ? String(initialCreatureId) : "none"
+  );
   const [arDataUrl, setArDataUrl] = useState<string | null>(null);
+
+  // Re-apply the initial values each time the sheet opens so the entry
+  // context (e.g. opening from a Hatchling's detail page) pre-fills the
+  // composer even if the user previously closed it with different state.
+  useEffect(() => {
+    if (!open) return;
+    setContent(initialContent ?? "");
+    setTags(initialTags ?? "");
+    setPostType(initialPostType ?? "general");
+    setCreatureId(initialCreatureId != null ? String(initialCreatureId) : "none");
+    setArDataUrl(null);
+  }, [open, initialContent, initialTags, initialPostType, initialCreatureId]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createPost = useCreatePost();
@@ -170,7 +194,7 @@ export function ComposeSheet({
     <Sheet open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <SheetContent side="bottom" className="h-[90vh] rounded-t-3xl overflow-y-auto">
         <SheetHeader className="mb-4">
-          <SheetTitle className="text-xl font-black">Share Your Journey ✨</SheetTitle>
+          <SheetTitle className="text-xl font-black">{title ?? "Share Your Journey ✨"}</SheetTitle>
         </SheetHeader>
 
         <div className="space-y-4">
