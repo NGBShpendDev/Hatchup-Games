@@ -1199,6 +1199,12 @@ export interface PostComment {
   updatedAt?: string | null;
   likeCount: number;
   myLiked: boolean;
+  /** True when this comment is the most-liked one on its post (likeCount > 0)
+  and is being surfaced as the lead comment in a preview. Only set by
+  endpoints that enrich a post with its comments (feed/highlights);
+  comment-mutation endpoints leave it unset.
+   */
+  isTopComment?: boolean;
 }
 
 export interface FeedPost {

@@ -2195,7 +2195,8 @@ export const GetSocialFeedResponse = zod.object({
   "createdAt": zod.string(),
   "updatedAt": zod.string().nullish(),
   "likeCount": zod.number(),
-  "myLiked": zod.boolean()
+  "myLiked": zod.boolean(),
+  "isTopComment": zod.boolean().optional().describe('True when this comment is the most-liked one on its post (likeCount > 0)\nand is being surfaced as the lead comment in a preview. Only set by\nendpoints that enrich a post with its comments (feed\/highlights);\ncomment-mutation endpoints leave it unset.\n')
 })).optional()
 })),
   "nextCursor": zod.number().nullable(),
@@ -2256,7 +2257,8 @@ export const GetTrendingPostsResponse = zod.object({
   "createdAt": zod.string(),
   "updatedAt": zod.string().nullish(),
   "likeCount": zod.number(),
-  "myLiked": zod.boolean()
+  "myLiked": zod.boolean(),
+  "isTopComment": zod.boolean().optional().describe('True when this comment is the most-liked one on its post (likeCount > 0)\nand is being surfaced as the lead comment in a preview. Only set by\nendpoints that enrich a post with its comments (feed\/highlights);\ncomment-mutation endpoints leave it unset.\n')
 })).optional()
 }).and(zod.object({
   "recentViewCount": zod.number().describe('Number of unique views recorded within the trending window.')
@@ -2330,7 +2332,8 @@ export const GetPostResponse = zod.object({
   "createdAt": zod.string(),
   "updatedAt": zod.string().nullish(),
   "likeCount": zod.number(),
-  "myLiked": zod.boolean()
+  "myLiked": zod.boolean(),
+  "isTopComment": zod.boolean().optional().describe('True when this comment is the most-liked one on its post (likeCount > 0)\nand is being surfaced as the lead comment in a preview. Only set by\nendpoints that enrich a post with its comments (feed\/highlights);\ncomment-mutation endpoints leave it unset.\n')
 })).optional()
 })
 
@@ -2402,7 +2405,8 @@ export const ListPostCommentsResponseItem = zod.object({
   "createdAt": zod.string(),
   "updatedAt": zod.string().nullish(),
   "likeCount": zod.number(),
-  "myLiked": zod.boolean()
+  "myLiked": zod.boolean(),
+  "isTopComment": zod.boolean().optional().describe('True when this comment is the most-liked one on its post (likeCount > 0)\nand is being surfaced as the lead comment in a preview. Only set by\nendpoints that enrich a post with its comments (feed\/highlights);\ncomment-mutation endpoints leave it unset.\n')
 })
 export const ListPostCommentsResponse = zod.array(ListPostCommentsResponseItem)
 
@@ -2452,7 +2456,8 @@ export const EditPostCommentResponse = zod.object({
   "createdAt": zod.string(),
   "updatedAt": zod.string().nullish(),
   "likeCount": zod.number(),
-  "myLiked": zod.boolean()
+  "myLiked": zod.boolean(),
+  "isTopComment": zod.boolean().optional().describe('True when this comment is the most-liked one on its post (likeCount > 0)\nand is being surfaced as the lead comment in a preview. Only set by\nendpoints that enrich a post with its comments (feed\/highlights);\ncomment-mutation endpoints leave it unset.\n')
 })
 
 
@@ -2643,7 +2648,8 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "createdAt": zod.string(),
   "updatedAt": zod.string().nullish(),
   "likeCount": zod.number(),
-  "myLiked": zod.boolean()
+  "myLiked": zod.boolean(),
+  "isTopComment": zod.boolean().optional().describe('True when this comment is the most-liked one on its post (likeCount > 0)\nand is being surfaced as the lead comment in a preview. Only set by\nendpoints that enrich a post with its comments (feed\/highlights);\ncomment-mutation endpoints leave it unset.\n')
 })).optional()
 })),
   "followerCount": zod.number(),
@@ -2687,7 +2693,8 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "createdAt": zod.string(),
   "updatedAt": zod.string().nullish(),
   "likeCount": zod.number(),
-  "myLiked": zod.boolean()
+  "myLiked": zod.boolean(),
+  "isTopComment": zod.boolean().optional().describe('True when this comment is the most-liked one on its post (likeCount > 0)\nand is being surfaced as the lead comment in a preview. Only set by\nendpoints that enrich a post with its comments (feed\/highlights);\ncomment-mutation endpoints leave it unset.\n')
 })).optional()
 }),
   "memoryType": zod.string(),
@@ -2934,7 +2941,8 @@ export const GetDailyMemoryResponse = zod.union([zod.object({
   "createdAt": zod.string(),
   "updatedAt": zod.string().nullish(),
   "likeCount": zod.number(),
-  "myLiked": zod.boolean()
+  "myLiked": zod.boolean(),
+  "isTopComment": zod.boolean().optional().describe('True when this comment is the most-liked one on its post (likeCount > 0)\nand is being surfaced as the lead comment in a preview. Only set by\nendpoints that enrich a post with its comments (feed\/highlights);\ncomment-mutation endpoints leave it unset.\n')
 })).optional()
 }),
   "memoryType": zod.string(),

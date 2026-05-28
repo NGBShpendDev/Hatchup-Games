@@ -19,7 +19,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import {
   Heart, Flame, Zap, Dumbbell, MessageCircle, Share2, Trash2,
-  Send, ChevronDown, ChevronUp, Award, Sparkles, Eye, Crown, Coins, Users, MoreHorizontal,
+  Send, ChevronDown, ChevronUp, Award, Sparkles, Eye, Crown, Coins, Users, MoreHorizontal, Trophy,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
@@ -169,6 +169,16 @@ export function CommentRow({
       <div className="bg-muted/50 rounded-xl px-2.5 py-1.5 flex-1 min-w-0">
         <div className="flex items-start gap-2">
           <span className="font-bold text-[11px]">{comment.authorName}</span>
+          {comment.isTopComment && (
+            <span
+              className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide"
+              title="Most-liked reply on this post"
+              data-testid={`badge-${testIdPrefix}-top-${comment.id}`}
+            >
+              <Trophy className="w-2.5 h-2.5" />
+              Top comment
+            </span>
+          )}
           {comment.updatedAt && (
             <span
               className="text-[10px] text-muted-foreground italic"

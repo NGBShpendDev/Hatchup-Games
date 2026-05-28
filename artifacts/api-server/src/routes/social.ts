@@ -125,16 +125,22 @@ async function enrichPost(
 
   const comments = selectTopComments(allComments, likeCountByComment, 3);
 
-  const enrichedComments = await Promise.all(comments.map(async c => {
+  const enrichedComments = await Promise.all(comments.map(async (c, idx) => {
     const commentAuthor = await db.query.playersTable.findFirst({ where: eq(playersTable.id, c.playerId) });
+    const likeCount = likeCountByComment.get(c.id) ?? 0;
+    // Mark the lead comment as the "Top comment" only when it actually owes
+    // its position to likes (not just recency). The list is pre-sorted by
+    // likes desc, so the first entry is the top when it has >0 likes.
+    const isTopComment = idx === 0 && likeCount > 0;
     return {
       ...c,
       authorName: commentAuthor?.displayName ?? commentAuthor?.username ?? "Trainer",
       authorAvatar: commentAuthor?.avatarUrl ?? null,
       createdAt: c.createdAt.toISOString(),
       updatedAt: c.updatedAt ? c.updatedAt.toISOString() : null,
-      likeCount: likeCountByComment.get(c.id) ?? 0,
+      likeCount,
       myLiked: myLikedByComment.get(c.id) ?? false,
+      isTopComment,
     };
   }));
 

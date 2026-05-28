@@ -4890,6 +4890,13 @@ components:
         updatedAt:  { type: ["string", "null"] }
         likeCount:  { type: integer }
         myLiked:    { type: boolean }
+        isTopComment:
+          type: boolean
+          description: |
+            True when this comment is the most-liked one on its post (likeCount > 0)
+            and is being surfaced as the lead comment in a preview. Only set by
+            endpoints that enrich a post with its comments (feed/highlights);
+            comment-mutation endpoints leave it unset.
 
     CommentLikeResult:
       type: object
