@@ -52,7 +52,7 @@ export default function Landing() {
             </span>
           </h1>
           <p className="text-white/60 text-lg mb-3 leading-relaxed">
-            HatchUp Fitness Pals is the fitness RPG where your real workouts hatch and evolve your Pals.
+            HatchUp Fitness Pals is the world's first fitness RPG where your real workouts hatch and evolve your Pals.
             Walk to hatch eggs. Train to evolve. Compete to become legend.
           </p>
           <p className="text-white/40 text-sm mb-8 font-medium">Fitness Is Better With Pals.</p>
