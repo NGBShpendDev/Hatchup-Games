@@ -4511,7 +4511,8 @@ export const GetNutritionSuggestNextResponse = zod.object({
   "tolerance": zod.number(),
   "goal": zod.string(),
   "usedAi": zod.boolean().optional().describe('True when AI personalization was attempted for this request (regardless of whether it succeeded).'),
-  "aiError": zod.string().optional().describe('Present when AI was attempted but failed; the catalog fallback was used.')
+  "aiError": zod.string().optional().describe('Present when AI was attempted but failed; the catalog fallback was used.'),
+  "savedPantry": zod.string().optional().describe('The player\'s saved free-text pantry notes (empty string when nothing\nis saved). Lets the UI pre-fill the pantry input without a separate\nrequest so the value follows the player across devices.\n')
 })
 
 
@@ -5283,6 +5284,27 @@ export const UpdatePhysiqueGoalBody = zod.object({
 
 export const UpdatePhysiqueGoalResponse = zod.object({
   "physiqueGoal": zod.string()
+})
+
+
+/**
+ * Persists the free-text "what I have on hand" string used to
+personalize the AI next-meal suggestion. Stored on the player so
+the value follows the user across devices and sessions. Pass an
+empty string to clear the saved pantry.
+
+ * @summary Save the player's pantry notes
+ */
+export const updatePantryNotesBodyPantryNotesMax = 300;
+
+
+
+export const UpdatePantryNotesBody = zod.object({
+  "pantryNotes": zod.string().max(updatePantryNotesBodyPantryNotesMax).describe('Free-text pantry contents. Empty string clears the saved value.')
+})
+
+export const UpdatePantryNotesResponse = zod.object({
+  "pantryNotes": zod.string().describe('The saved pantry text after the update (empty string when cleared).')
 })
 
 

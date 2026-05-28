@@ -4489,6 +4489,36 @@ paths:
               schema:
                 $ref: "#/components/schemas/StorageErrorEnvelope"
 
+  /nutrition/pantry:
+    put:
+      operationId: updatePantryNotes
+      tags: [nutrition]
+      summary: Save the player's pantry notes
+      description: |
+        Persists the free-text "what I have on hand" string used to
+        personalize the AI next-meal suggestion. Stored on the player so
+        the value follows the user across devices and sessions. Pass an
+        empty string to clear the saved pantry.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PantryNotesInput"
+      responses:
+        "200":
+          description: Updated pantry notes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PantryNotesResult"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+
   # ── Appeals ──────────────────────────────────────────────────────────────
   /account/appeals/mine:
     get:
@@ -7313,6 +7343,12 @@ components:
         aiError:
           type: string
           description: Present when AI was attempted but failed; the catalog fallback was used.
+        savedPantry:
+          type: string
+          description: |
+            The player's saved free-text pantry notes (empty string when nothing
+            is saved). Lets the UI pre-fill the pantry input without a separate
+            request so the value follows the player across devices.
 
     NutritionRecapSendResult:
       type: object
@@ -7342,6 +7378,23 @@ components:
       required: [physiqueGoal]
       properties:
         physiqueGoal: { type: string }
+
+    PantryNotesInput:
+      type: object
+      required: [pantryNotes]
+      properties:
+        pantryNotes:
+          type: string
+          maxLength: 300
+          description: Free-text pantry contents. Empty string clears the saved value.
+
+    PantryNotesResult:
+      type: object
+      required: [pantryNotes]
+      properties:
+        pantryNotes:
+          type: string
+          description: The saved pantry text after the update (empty string when cleared).
 
     # ── Battle (REST request/response schemas) ──────────────────────────────
     OkResponse:

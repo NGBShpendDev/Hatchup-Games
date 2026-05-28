@@ -201,6 +201,8 @@ import type {
   OkResponse,
   OnboardingInput,
   OwnedArtifact,
+  PantryNotesInput,
+  PantryNotesResult,
   PendingClubInvite,
   PhysiqueGoalInput,
   PhysiqueGoalResult,
@@ -14784,6 +14786,82 @@ export const useUpdatePhysiqueGoal = <TError = ErrorType<StorageErrorEnvelope>,
         TContext
       > => {
       return useMutation(getUpdatePhysiqueGoalMutationOptions(options));
+    }
+
+export const getUpdatePantryNotesUrl = () => {
+
+
+
+
+  return `/api/nutrition/pantry`
+}
+
+/**
+ * Persists the free-text "what I have on hand" string used to
+personalize the AI next-meal suggestion. Stored on the player so
+the value follows the user across devices and sessions. Pass an
+empty string to clear the saved pantry.
+
+ * @summary Save the player's pantry notes
+ */
+export const updatePantryNotes = async (pantryNotesInput: PantryNotesInput, options?: RequestInit): Promise<PantryNotesResult> => {
+
+  return customFetch<PantryNotesResult>(getUpdatePantryNotesUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      pantryNotesInput,)
+  }
+);}
+
+
+
+
+export const getUpdatePantryNotesMutationOptions = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePantryNotes>>, TError,{data: BodyType<PantryNotesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePantryNotes>>, TError,{data: BodyType<PantryNotesInput>}, TContext> => {
+
+const mutationKey = ['updatePantryNotes'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePantryNotes>>, {data: BodyType<PantryNotesInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updatePantryNotes(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePantryNotesMutationResult = NonNullable<Awaited<ReturnType<typeof updatePantryNotes>>>
+    export type UpdatePantryNotesMutationBody = BodyType<PantryNotesInput>
+    export type UpdatePantryNotesMutationError = ErrorType<StorageErrorEnvelope>
+
+    /**
+ * @summary Save the player's pantry notes
+ */
+export const useUpdatePantryNotes = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePantryNotes>>, TError,{data: BodyType<PantryNotesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updatePantryNotes>>,
+        TError,
+        {data: BodyType<PantryNotesInput>},
+        TContext
+      > => {
+      return useMutation(getUpdatePantryNotesMutationOptions(options));
     }
 
 export const getGetMyAppealUrl = () => {

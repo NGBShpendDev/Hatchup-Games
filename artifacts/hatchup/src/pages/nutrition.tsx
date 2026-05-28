@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -55,6 +55,7 @@ import {
   useGetNutritionMacroTarget,
   useGetNutritionStreak,
   useGetNutritionSuggestNext,
+  useUpdatePantryNotes,
   useUpdatePhysiqueGoal,
   getListNutritionPostsQueryKey,
   getListNutritionChallengesQueryKey,
@@ -248,9 +249,23 @@ export default function Nutrition() {
   // Pantry input drives optional AI personalization of the next-meal idea.
   // Empty pantry + ai-off keeps the request on the cheap deterministic catalog
   // path; the user opts in by adding ingredients or tapping "Personalize".
+  // The actual default is hydrated from the server's `savedPantry` (persisted
+  // per-player) once the suggest-next response arrives — see effect below.
   const [pantry, setPantry] = useState("");
   const [submittedPantry, setSubmittedPantry] = useState("");
   const [aiOptedIn, setAiOptedIn] = useState(false);
+  const [pantryHydrated, setPantryHydrated] = useState(false);
+
+  const pantryMutation = useUpdatePantryNotes({
+    mutation: {
+      onError: (err) =>
+        toast({
+          title: "Couldn't save pantry",
+          description: errorMessage(err, "Your suggestion still used it, but it won't be remembered."),
+          variant: "destructive",
+        }),
+    },
+  });
 
   const suggestParams = (() => {
     const p: { exclude?: string; useAi?: true; pantry?: string } = {};
@@ -264,6 +279,21 @@ export default function Nutrition() {
   const { data: nextMeal, isFetching: nextMealFetching } = useGetNutritionSuggestNext(suggestParams, {
     query: { enabled: !!pid, queryKey: getGetNutritionSuggestNextQueryKey(suggestParams) },
   });
+
+  // Pre-fill the pantry input from the player's saved value once the first
+  // suggest-next response arrives. Only runs once per page load so it doesn't
+  // clobber what the user is currently typing.
+  useEffect(() => {
+    if (pantryHydrated) return;
+    const saved = nextMeal?.savedPantry;
+    if (saved === undefined) return;
+    if (saved.length > 0) {
+      setPantry(saved);
+      setSubmittedPantry(saved);
+      setAiOptedIn(true);
+    }
+    setPantryHydrated(true);
+  }, [nextMeal?.savedPantry, pantryHydrated]);
 
   // ── Mutations ────────────────────────────────────────────────────────────────
   const likeMutation = useToggleMealPostLike({
@@ -556,8 +586,14 @@ export default function Nutrition() {
             pantry={pantry}
             onPantryChange={setPantry}
             onPersonalize={() => {
+              const trimmed = pantry.trim();
               setAiOptedIn(true);
-              setSubmittedPantry(pantry.trim());
+              setSubmittedPantry(trimmed);
+              // Persist the pantry so it follows the player across devices /
+              // future visits. Server stores empty string as cleared.
+              if (trimmed !== (nextMeal.savedPantry ?? "").trim()) {
+                pantryMutation.mutate({ data: { pantryNotes: trimmed } });
+              }
             }}
             isFetching={nextMealFetching}
             onLog={() => {

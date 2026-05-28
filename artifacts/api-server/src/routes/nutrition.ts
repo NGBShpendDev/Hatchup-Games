@@ -585,11 +585,16 @@ router.get("/nutrition/suggest-next", requireAuth, attachPlayer, async (req, res
   // Parse the optional AI personalization inputs (`pantry`, `useAi`).
   const parsedQuery = SuggestNextQuery.safeParse(req.query);
   if (!parsedQuery.success) { res.status(400).json({ error: "Invalid query" }); return; }
-  const pantry = parsedQuery.data.pantry?.trim() ?? "";
-  const wantAi = parsedQuery.data.useAi === true || pantry.length > 0;
+  const requestedPantry = parsedQuery.data.pantry?.trim();
 
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
   const goal = player?.physiqueGoal ?? "lean_athlete";
+  // Fall back to the player's saved pantry when the request doesn't pass one
+  // (e.g. first paint, before the user touches the personalize controls). The
+  // request can still send an explicit empty string to opt out of personalization.
+  const savedPantry = (player?.pantryNotes ?? "").trim();
+  const pantry = requestedPantry !== undefined ? requestedPantry : savedPantry;
+  const wantAi = parsedQuery.data.useAi === true || pantry.length > 0;
   const target = MACRO_GOAL_TARGETS[goal] ?? MACRO_GOAL_TARGETS["lean_athlete"]!;
 
   const totalsResult = await db.execute(sql`
@@ -742,6 +747,7 @@ router.get("/nutrition/suggest-next", requireAuth, attachPlayer, async (req, res
     tolerance: MACRO_TOLERANCE,
     goal,
     usedAi: wantAi,
+    savedPantry,
     ...(aiError ? { aiError } : {}),
   });
 });
@@ -1510,6 +1516,25 @@ router.put("/nutrition/physique-goal", requireAuth, attachPlayer, requirePlayerO
     .where(eq(playersTable.id, body.data.playerId));
 
   res.json({ physiqueGoal: body.data.physiqueGoal });
+});
+
+// ── PUT /nutrition/pantry ─────────────────────────────────────────────────────
+// Saves the player's free-text "what I have on hand" pantry string so the AI
+// next-meal flow can default to it on future visits without retyping. Empty
+// string clears the saved value.
+const PantryNotesBody = z.object({ pantryNotes: z.string().max(300) });
+
+router.put("/nutrition/pantry", requireAuth, attachPlayer, async (req, res) => {
+  const playerId = req.playerId!;
+  const body = PantryNotesBody.safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
+
+  const trimmed = body.data.pantryNotes.trim();
+  await db.update(playersTable)
+    .set({ pantryNotes: trimmed.length > 0 ? trimmed : null })
+    .where(eq(playersTable.id, playerId));
+
+  res.json({ pantryNotes: trimmed });
 });
 
 export default router;

@@ -67,6 +67,9 @@ export const playersTable = pgTable("players", {
   isDemo: boolean("is_demo").notNull().default(false),
   // Nutrition / body goal
   physiqueGoal: text("physique_goal"),
+  // Saved free-text "what I have on hand" for the AI meal-suggestion flow.
+  // Persisted so players don't retype their pantry every visit / device.
+  pantryNotes: text("pantry_notes"),
   // Battle Arena
   battleElo: integer("battle_elo").notNull().default(1000),
   totalBattleWins: integer("total_battle_wins").notNull().default(0),

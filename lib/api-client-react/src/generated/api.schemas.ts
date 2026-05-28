@@ -2595,6 +2595,11 @@ export interface NutritionNextMealSuggestion {
   usedAi?: boolean;
   /** Present when AI was attempted but failed; the catalog fallback was used. */
   aiError?: string;
+  /** The player's saved free-text pantry notes (empty string when nothing
+  is saved). Lets the UI pre-fill the pantry input without a separate
+  request so the value follows the player across devices.
+   */
+  savedPantry?: string;
 }
 
 export interface NutritionRecapSendResult {
@@ -2616,6 +2621,19 @@ export interface PhysiqueGoalInput {
 
 export interface PhysiqueGoalResult {
   physiqueGoal: string;
+}
+
+export interface PantryNotesInput {
+  /**
+     * Free-text pantry contents. Empty string clears the saved value.
+     * @maxLength 300
+     */
+  pantryNotes: string;
+}
+
+export interface PantryNotesResult {
+  /** The saved pantry text after the update (empty string when cleared). */
+  pantryNotes: string;
 }
 
 export interface OkResponse {
