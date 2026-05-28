@@ -5138,6 +5138,8 @@ components:
         fitnessRealm:  { type: string }
         dailyStepGoal: { type: integer }
         dailyWorkoutDeadlineHour: { type: integer }
+        weeklyWorkoutGoal: { type: integer }
+        dailyWaterGoal: { type: integer }
         waterCups:     { type: integer }
         activeHatchlingId: { type: ["integer", "null"] }
 
@@ -5549,6 +5551,13 @@ components:
         todayXp:        { type: integer }
         dailyStepGoal:  { type: integer }
         stepGoalPct:    { type: number }
+        weeklyWorkoutGoal:     { type: integer }
+        weeklyWorkoutsThisWeek: { type: integer }
+        weeklyWorkoutGoalPct:  { type: number }
+        dailyWaterGoal:        { type: integer }
+        todayWaterCups:        { type: integer }
+        waterGoalPct:          { type: number }
+        waterGoalMoodMiss:     { type: boolean }
         recentActivities:
           type: array
           items:

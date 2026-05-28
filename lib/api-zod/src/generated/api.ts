@@ -292,6 +292,8 @@ export const UpdatePlayerBody = zod.object({
   "fitnessRealm": zod.string().optional(),
   "dailyStepGoal": zod.number().optional(),
   "dailyWorkoutDeadlineHour": zod.number().optional(),
+  "weeklyWorkoutGoal": zod.number().optional(),
+  "dailyWaterGoal": zod.number().optional(),
   "waterCups": zod.number().optional(),
   "activeHatchlingId": zod.number().nullish()
 })
@@ -468,6 +470,13 @@ export const GetPlayerDashboardResponse = zod.object({
   "todayXp": zod.number(),
   "dailyStepGoal": zod.number(),
   "stepGoalPct": zod.number().optional(),
+  "weeklyWorkoutGoal": zod.number().optional(),
+  "weeklyWorkoutsThisWeek": zod.number().optional(),
+  "weeklyWorkoutGoalPct": zod.number().optional(),
+  "dailyWaterGoal": zod.number().optional(),
+  "todayWaterCups": zod.number().optional(),
+  "waterGoalPct": zod.number().optional(),
+  "waterGoalMoodMiss": zod.boolean().optional(),
   "recentActivities": zod.array(zod.object({
   "id": zod.number(),
   "playerId": zod.number(),
@@ -2020,6 +2029,13 @@ export const GetFitnessStatsResponse = zod.object({
   "todayXp": zod.number(),
   "dailyStepGoal": zod.number(),
   "stepGoalPct": zod.number().optional(),
+  "weeklyWorkoutGoal": zod.number().optional(),
+  "weeklyWorkoutsThisWeek": zod.number().optional(),
+  "weeklyWorkoutGoalPct": zod.number().optional(),
+  "dailyWaterGoal": zod.number().optional(),
+  "todayWaterCups": zod.number().optional(),
+  "waterGoalPct": zod.number().optional(),
+  "waterGoalMoodMiss": zod.boolean().optional(),
   "recentActivities": zod.array(zod.object({
   "id": zod.number(),
   "playerId": zod.number(),

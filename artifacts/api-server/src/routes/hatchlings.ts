@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { hatchlingsTable, evolutionTypesTable, playersTable, battlesTable } from "@workspace/db";
-import { eq, desc, sql, and, or, inArray } from "drizzle-orm";
+import { hatchlingsTable, evolutionTypesTable, playersTable, battlesTable, fitnessActivitiesTable, type FitnessActivity } from "@workspace/db";
+import { eq, desc, sql, and, or, inArray, gte } from "drizzle-orm";
 import {
   ListHatchlingsQueryParams,
   CreateHatchlingBody,
@@ -35,10 +35,13 @@ const router = Router();
 //   • no workout has been logged today and the local clock has passed the
 //     player's personal daily-goal deadline (default 20 = 8 pm).
 // "celebrating" wins over everything if the last workout was within 2 h.
+// waterMoodMiss: when true (< 50 % of daily water goal after 6 pm) the mood
+//   softly drops to "resting" instead of "happy" as a gentle hydration nudge.
 function computeMoodState(
   lastWorkoutAt: Date | null,
   motivationScore: number = 50,
   deadlineHour: number = 20,
+  waterMoodMiss: boolean = false,
 ): string {
   const now = new Date();
 
@@ -58,10 +61,10 @@ function computeMoodState(
   const clampedDeadline = Math.max(0, Math.min(23, Math.floor(deadlineHour)));
   if (!workedOutToday && now.getHours() >= clampedDeadline) return "sad";
 
-  if (!lastWorkoutAt) return "happy";
+  if (!lastWorkoutAt) return waterMoodMiss ? "resting" : "happy";
   const hoursTotal = (now.getTime() - lastWorkoutAt.getTime()) / (1000 * 60 * 60);
   if (hoursTotal > 24) return "resting";
-  return "happy";
+  return waterMoodMiss ? "resting" : "happy";
 }
 
 // ── Power score ────────────────────────────────────────────────────────────────
@@ -265,13 +268,29 @@ router.get("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, asy
   if (!query.success) { res.status(400).json({ error: "Invalid query" }); return; }
 
   // Fetch player goals so computeMoodState uses personal thresholds.
-  const playerGoals = req.playerId
-    ? await db.query.playersTable.findFirst({
-        where: eq(playersTable.id, req.playerId),
-        columns: { dailyWorkoutDeadlineHour: true },
-      })
-    : null;
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const [playerGoals, todayWaterActivities] = await Promise.all([
+    req.playerId
+      ? db.query.playersTable.findFirst({
+          where: eq(playersTable.id, req.playerId),
+          columns: { dailyWorkoutDeadlineHour: true, dailyWaterGoal: true },
+        })
+      : Promise.resolve(null),
+    req.playerId
+      ? db.query.fitnessActivitiesTable.findMany({
+          where: and(
+            eq(fitnessActivitiesTable.playerId, req.playerId),
+            eq(fitnessActivitiesTable.type, "hydration"),
+            gte(fitnessActivitiesTable.createdAt, todayStart),
+          ),
+        })
+      : Promise.resolve([] as FitnessActivity[]),
+  ]);
   const deadlineHour = playerGoals?.dailyWorkoutDeadlineHour ?? 20;
+  const dailyWaterGoal = playerGoals?.dailyWaterGoal ?? 8;
+  const todayWaterCups = todayWaterActivities.reduce((sum, a) => sum + a.value, 0);
+  const waterMoodMiss = new Date().getHours() >= 18 && todayWaterCups < dailyWaterGoal * 0.5;
 
   const rawResults = await db.query.hatchlingsTable.findMany({
     where: query.data.playerId ? eq(hatchlingsTable.playerId, query.data.playerId) : undefined,
@@ -285,7 +304,7 @@ router.get("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, asy
     const streak = streaks.get(h.id) ?? 0;
     return {
       ...h,
-      moodState: computeMoodState(h.lastWorkoutAt, h.motivationScore, deadlineHour),
+      moodState: computeMoodState(h.lastWorkoutAt, h.motivationScore, deadlineHour, waterMoodMiss),
       powerScore: computePowerScore(h.level, h.rarity, h.battleWins),
       stepsToEvolution: computeStepsToEvolution(h.xp, h.evolutionStage),
       streakCount: streak >= 2 ? streak : null,
@@ -428,20 +447,34 @@ router.get("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
   const raw = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, params.data.id) });
   if (!raw) { res.status(404).json({ error: "Hatchling not found" }); return; }
   if (raw.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
-  const [hatchling, playerGoals] = await Promise.all([
+  const todayStartSingle = new Date();
+  todayStartSingle.setHours(0, 0, 0, 0);
+  const [hatchling, playerGoals, todayWaterActivitiesSingle] = await Promise.all([
     applyPassiveDecay(raw),
     req.playerId
       ? db.query.playersTable.findFirst({
           where: eq(playersTable.id, req.playerId),
-          columns: { dailyWorkoutDeadlineHour: true, dailyStepGoal: true },
+          columns: { dailyWorkoutDeadlineHour: true, dailyStepGoal: true, dailyWaterGoal: true },
         })
       : Promise.resolve(null),
+    req.playerId
+      ? db.query.fitnessActivitiesTable.findMany({
+          where: and(
+            eq(fitnessActivitiesTable.playerId, req.playerId),
+            eq(fitnessActivitiesTable.type, "hydration"),
+            gte(fitnessActivitiesTable.createdAt, todayStartSingle),
+          ),
+        })
+      : Promise.resolve([] as FitnessActivity[]),
   ]);
   const deadlineHour = playerGoals?.dailyWorkoutDeadlineHour ?? 20;
+  const dailyWaterGoalSingle = playerGoals?.dailyWaterGoal ?? 8;
+  const todayWaterCupsSingle = todayWaterActivitiesSingle.reduce((sum, a) => sum + a.value, 0);
+  const waterMoodMissSingle = new Date().getHours() >= 18 && todayWaterCupsSingle < dailyWaterGoalSingle * 0.5;
   const streak = await computeStreak(hatchling.id);
   res.json({
     ...hatchling,
-    moodState: computeMoodState(hatchling.lastWorkoutAt, hatchling.motivationScore, deadlineHour),
+    moodState: computeMoodState(hatchling.lastWorkoutAt, hatchling.motivationScore, deadlineHour, waterMoodMissSingle),
     powerScore: computePowerScore(hatchling.level, hatchling.rarity, hatchling.battleWins),
     stepsToEvolution: computeStepsToEvolution(hatchling.xp, hatchling.evolutionStage),
     streakCount: streak >= 2 ? streak : null,

@@ -113,6 +113,8 @@ export interface PlayerUpdate {
   fitnessRealm?: string;
   dailyStepGoal?: number;
   dailyWorkoutDeadlineHour?: number;
+  weeklyWorkoutGoal?: number;
+  dailyWaterGoal?: number;
   waterCups?: number;
   /** @nullable */
   activeHatchlingId?: number | null;
@@ -288,6 +290,13 @@ export interface FitnessStats {
   todayXp: number;
   dailyStepGoal: number;
   stepGoalPct?: number;
+  weeklyWorkoutGoal?: number;
+  weeklyWorkoutsThisWeek?: number;
+  weeklyWorkoutGoalPct?: number;
+  dailyWaterGoal?: number;
+  todayWaterCups?: number;
+  waterGoalPct?: number;
+  waterGoalMoodMiss?: boolean;
   recentActivities?: FitnessActivity[];
 }
 

@@ -135,7 +135,25 @@ router.get("/fitness/stats/:playerId", requireAuth, attachPlayer, async (req, re
   const todaySteps = todayActivities
     .filter(a => a.type === "steps")
     .reduce((sum, a) => sum + a.value, 0);
+  const todayWaterCups = todayActivities
+    .filter(a => a.type === "hydration")
+    .reduce((sum, a) => sum + a.value, 0);
   const todayXp = todayActivities.reduce((sum, a) => sum + a.fitnessXpEarned, 0);
+
+  // Weekly workout count: activities this week that aren't passive-tracking types
+  const thisWeekStart = new Date();
+  thisWeekStart.setHours(0, 0, 0, 0);
+  thisWeekStart.setDate(thisWeekStart.getDate() - thisWeekStart.getDay());
+
+  const thisWeekActivities = await db.query.fitnessActivitiesTable.findMany({
+    where: and(
+      eq(fitnessActivitiesTable.playerId, params.data.playerId),
+      gte(fitnessActivitiesTable.createdAt, thisWeekStart),
+    ),
+  });
+
+  const WORKOUT_TYPES = new Set(["running", "walking", "weightlifting", "cycling", "swimming", "hiit", "yoga", "meditation", "stretching"]);
+  const weeklyWorkoutsThisWeek = thisWeekActivities.filter(a => WORKOUT_TYPES.has(a.type)).length;
 
   const recentActivities = await db.query.fitnessActivitiesTable.findMany({
     where: eq(fitnessActivitiesTable.playerId, params.data.playerId),
@@ -149,7 +167,13 @@ router.get("/fitness/stats/:playerId", requireAuth, attachPlayer, async (req, re
   }));
 
   const dailyStepGoal = player.dailyStepGoal ?? 8000;
+  const weeklyWorkoutGoal = player.weeklyWorkoutGoal ?? 3;
+  const dailyWaterGoal = player.dailyWaterGoal ?? 8;
   const stepGoalPct = Math.min(100, Math.round((todaySteps / dailyStepGoal) * 100));
+  const weeklyWorkoutGoalPct = Math.min(100, Math.round((weeklyWorkoutsThisWeek / weeklyWorkoutGoal) * 100));
+  const waterGoalPct = Math.min(100, Math.round((todayWaterCups / dailyWaterGoal) * 100));
+  // Water goal mood miss: past 6 pm and below 50 % of daily water goal
+  const waterGoalMoodMiss = new Date().getHours() >= 18 && todayWaterCups < dailyWaterGoal * 0.5;
 
   res.json({
     playerId: player.id,
@@ -164,6 +188,13 @@ router.get("/fitness/stats/:playerId", requireAuth, attachPlayer, async (req, re
     todayXp,
     dailyStepGoal,
     stepGoalPct,
+    weeklyWorkoutGoal,
+    weeklyWorkoutsThisWeek,
+    weeklyWorkoutGoalPct,
+    dailyWaterGoal,
+    todayWaterCups,
+    waterGoalPct,
+    waterGoalMoodMiss,
     recentActivities: recentFormatted,
   });
 });

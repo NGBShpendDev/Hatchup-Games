@@ -99,6 +99,8 @@ export default function SettingsPrivacy() {
   // Pal Goals
   const [dailyStepGoal, setDailyStepGoal] = useState(8000);
   const [dailyWorkoutDeadlineHour, setDailyWorkoutDeadlineHour] = useState(20);
+  const [weeklyWorkoutGoal, setWeeklyWorkoutGoal] = useState(3);
+  const [dailyWaterGoal, setDailyWaterGoal] = useState(8);
   const [goalsSaving, setGoalsSaving] = useState(false);
   const [shareAccentColor, setShareAccentColor] = useState<string | null>(null);
   const [accentOptions, setAccentOptions] = useState<Array<{
@@ -309,22 +311,36 @@ export default function SettingsPrivacy() {
   // Load pal goals from player context (available immediately once player is fetched).
   useEffect(() => {
     if (!player) return;
-    const p = player as { dailyStepGoal?: number; dailyWorkoutDeadlineHour?: number };
+    const p = player as { dailyStepGoal?: number; dailyWorkoutDeadlineHour?: number; weeklyWorkoutGoal?: number; dailyWaterGoal?: number };
     if (typeof p.dailyStepGoal === "number") setDailyStepGoal(p.dailyStepGoal);
     if (typeof p.dailyWorkoutDeadlineHour === "number") setDailyWorkoutDeadlineHour(p.dailyWorkoutDeadlineHour);
+    if (typeof p.weeklyWorkoutGoal === "number") setWeeklyWorkoutGoal(p.weeklyWorkoutGoal);
+    if (typeof p.dailyWaterGoal === "number") setDailyWaterGoal(p.dailyWaterGoal);
   }, [player]);
 
   const handleSaveGoals = () => {
     if (!playerId) return;
     const clampedSteps = Math.max(1000, Math.min(100000, Math.round(dailyStepGoal)));
     const clampedHour = Math.max(0, Math.min(23, Math.round(dailyWorkoutDeadlineHour)));
+    const clampedWeeklyWorkouts = Math.max(1, Math.min(14, Math.round(weeklyWorkoutGoal)));
+    const clampedWaterGoal = Math.max(1, Math.min(30, Math.round(dailyWaterGoal)));
     setGoalsSaving(true);
     updatePlayerMutation.mutate(
-      { id: playerId, data: { dailyStepGoal: clampedSteps, dailyWorkoutDeadlineHour: clampedHour } },
+      {
+        id: playerId,
+        data: {
+          dailyStepGoal: clampedSteps,
+          dailyWorkoutDeadlineHour: clampedHour,
+          weeklyWorkoutGoal: clampedWeeklyWorkouts,
+          dailyWaterGoal: clampedWaterGoal,
+        },
+      },
       {
         onSuccess: () => {
           setDailyStepGoal(clampedSteps);
           setDailyWorkoutDeadlineHour(clampedHour);
+          setWeeklyWorkoutGoal(clampedWeeklyWorkouts);
+          setDailyWaterGoal(clampedWaterGoal);
           toast({ title: "Pal goals saved", description: "Your Pal will use these thresholds going forward." });
         },
         onError: () => toast({ title: "Couldn't save goals", variant: "destructive" }),
@@ -878,6 +894,50 @@ export default function SettingsPrivacy() {
               <p className="text-[10px] text-muted-foreground">
                 Your Pal will feel sad if you haven't worked out by this time.
               </p>
+            </div>
+
+            {/* Weekly workout goal */}
+            <div className="space-y-1.5">
+              <Label htmlFor="weekly-workout-goal" className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Target className="w-3.5 h-3.5" />
+                Weekly Workout Goal
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="weekly-workout-goal"
+                  type="number"
+                  min={1}
+                  max={14}
+                  step={1}
+                  value={weeklyWorkoutGoal}
+                  onChange={e => setWeeklyWorkoutGoal(Number(e.target.value))}
+                  className="h-10 flex-1"
+                />
+                <span className="text-xs text-muted-foreground font-bold shrink-0">sessions/week</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Recommended: 3–5 sessions per week</p>
+            </div>
+
+            {/* Daily water goal */}
+            <div className="space-y-1.5">
+              <Label htmlFor="daily-water-goal" className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Footprints className="w-3.5 h-3.5" />
+                Daily Water Goal
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="daily-water-goal"
+                  type="number"
+                  min={1}
+                  max={30}
+                  step={1}
+                  value={dailyWaterGoal}
+                  onChange={e => setDailyWaterGoal(Number(e.target.value))}
+                  className="h-10 flex-1"
+                />
+                <span className="text-xs text-muted-foreground font-bold shrink-0">cups/day</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Recommended: 8 cups (about 2 L). Your Pal's mood dips if you miss by 6 pm.</p>
             </div>
 
             <NeonButton
