@@ -272,7 +272,11 @@ mock.module("../../services/postPurgeJob.ts", {
   namedExports: { hardDeletePosts: async (_ids: number[]) => {}, RETENTION_DAYS: 30 },
 });
 mock.module("../sharedGroups.ts", {
-  namedExports: { groupSharedGroupRows: (rows: unknown[]) => rows },
+  namedExports: {
+    groupSharedGroupRows: (rows: unknown[]) => rows,
+    loadSharedGroupsForViewer: async () => new Map(),
+    loadMutualWorkoutPartnersForViewer: async () => new Map(),
+  },
 });
 mock.module("../socialCommentOrdering.ts", {
   namedExports: { selectTopComments: <T,>(rows: T[]) => rows },

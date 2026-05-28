@@ -94,10 +94,24 @@ mock.module("drizzle-orm", {
     and: (...args: unknown[]) => ({ op: "and", args }),
     or: (...args: unknown[]) => ({ op: "or", args }),
     ne: (col: unknown, val: unknown) => ({ op: "ne", col, val }),
+    gt: (col: unknown, val: unknown) => ({ op: "gt", col, val }),
     gte: () => ({}),
     desc: () => ({}),
     ilike: () => ({}),
     inArray: (col: unknown, vals: unknown[]) => ({ op: "inArray", col, vals }),
+  },
+});
+mock.module("drizzle-orm/pg-core", {
+  namedExports: {
+    alias: <T,>(t: T, _name: string) => t,
+  },
+});
+mock.module("../sharedGroups.ts", {
+  namedExports: {
+    groupMutualWorkoutPartnerRows: () => new Map(),
+    MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT: 3,
+    loadSharedGroupsForViewer: async () => new Map(),
+    loadMutualWorkoutPartnersForViewer: async () => new Map(),
   },
 });
 

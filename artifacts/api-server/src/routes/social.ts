@@ -25,7 +25,10 @@ import { blockMinorSocialWrite } from "../middlewares/minorGuard.ts";
 import { blockSuspendedSocialWrite } from "../middlewares/suspendedGuard.ts";
 import { socialWriteLimiter, postViewLimiter } from "../middlewares/rateLimiters.ts";
 import { selectTopComments } from "./socialCommentOrdering.ts";
-import { groupSharedGroupRows } from "./sharedGroups.ts";
+import {
+  loadSharedGroupsForViewer,
+  loadMutualWorkoutPartnersForViewer,
+} from "./sharedGroups.ts";
 import { sendPushToPlayer } from "../services/pushNotifications.ts";
 import { notificationsTable } from "@workspace/db";
 import { createHmac } from "node:crypto";
@@ -1504,33 +1507,6 @@ router.get("/social/players/:id/mutual-following", requireAuth, attachPlayer, as
   res.json({ players, total, nextCursor });
 });
 
-// Shared-group helper: for the viewer, build a map of playerId -> groups they
-// both belong to. Single SQL round-trip via a self-join on group_members + groups
-// (indexed on (player_id, group_id)) so latency stays flat as the viewer's
-// group count grows. Used to populate `sharedGroups` on PlayerStub responses.
-async function loadSharedGroupsForViewer(
-  viewerId: number,
-  playerIds: number[],
-): Promise<Map<number, Array<{ id: number; name: string }>>> {
-  const out = new Map<number, Array<{ id: number; name: string }>>();
-  if (playerIds.length === 0) return out;
-  const viewerGm = alias(groupMembersTable, "viewer_gm");
-  const rows = await db
-    .select({
-      playerId: groupMembersTable.playerId,
-      groupId: groupsTable.id,
-      groupName: groupsTable.name,
-    })
-    .from(groupMembersTable)
-    .innerJoin(
-      viewerGm,
-      and(eq(viewerGm.groupId, groupMembersTable.groupId), eq(viewerGm.playerId, viewerId)),
-    )
-    .innerJoin(groupsTable, eq(groupsTable.id, groupMembersTable.groupId))
-    .where(inArray(groupMembersTable.playerId, playerIds));
-  return groupSharedGroupRows(rows);
-}
-
 // ── GET /social/players/:id/followers ──────────────────────────────────────
 
 router.get("/social/players/:id/followers", requireAuth, attachPlayer, async (req, res) => {
@@ -1562,7 +1538,11 @@ router.get("/social/players/:id/followers", requireAuth, attachPlayer, async (re
     .offset(cursor);
 
   const pageIds = rows.map(r => r.id);
-  const sharedGroupsByPlayer = await loadSharedGroupsForViewer(viewerId, pageIds);
+  const hiddenIds = await getHiddenPlayerIds(viewerId);
+  const [sharedGroupsByPlayer, mutualWorkoutPartnersByPlayer] = await Promise.all([
+    loadSharedGroupsForViewer(viewerId, pageIds),
+    loadMutualWorkoutPartnersForViewer(viewerId, pageIds, hiddenIds),
+  ]);
   const players = rows.map(p => ({
     id: p.id,
     username: p.username,
@@ -1570,6 +1550,7 @@ router.get("/social/players/:id/followers", requireAuth, attachPlayer, async (re
     avatarUrl: p.avatarUrl ?? null,
     creatorBadge: p.creatorBadge ?? null,
     sharedGroups: sharedGroupsByPlayer.get(p.id) ?? [],
+    mutualWorkoutPartners: mutualWorkoutPartnersByPlayer.get(p.id) ?? [],
   }));
 
   const nextOffset = cursor + rows.length;
@@ -1609,7 +1590,11 @@ router.get("/social/players/:id/following", requireAuth, attachPlayer, async (re
     .offset(cursor);
 
   const pageIds = rows.map(r => r.id);
-  const sharedGroupsByPlayer = await loadSharedGroupsForViewer(viewerId, pageIds);
+  const hiddenIds = await getHiddenPlayerIds(viewerId);
+  const [sharedGroupsByPlayer, mutualWorkoutPartnersByPlayer] = await Promise.all([
+    loadSharedGroupsForViewer(viewerId, pageIds),
+    loadMutualWorkoutPartnersForViewer(viewerId, pageIds, hiddenIds),
+  ]);
   const players = rows.map(p => ({
     id: p.id,
     username: p.username,
@@ -1617,6 +1602,7 @@ router.get("/social/players/:id/following", requireAuth, attachPlayer, async (re
     avatarUrl: p.avatarUrl ?? null,
     creatorBadge: p.creatorBadge ?? null,
     sharedGroups: sharedGroupsByPlayer.get(p.id) ?? [],
+    mutualWorkoutPartners: mutualWorkoutPartnersByPlayer.get(p.id) ?? [],
   }));
 
   const nextOffset = cursor + rows.length;
@@ -1862,31 +1848,15 @@ router.get("/social/search", requireAuth, attachPlayer, async (req, res) => {
     .groupBy(playerFollowsTable.followeeId);
   const followerCounts = new Map(followerRows.map(r => [r.followeeId, r.count]));
 
-  // Shared groups per match: groups where both viewer and the match are members.
-  // Single SQL round-trip via a self-join on group_members + groups (indexed on
-  // (player_id, group_id)) so latency stays flat as the viewer's group count grows.
-  const sharedGroupsByPlayer = new Map<number, Array<{ id: number; name: string }>>();
-  {
-    const viewerGm = alias(groupMembersTable, "viewer_gm");
-    const sharedRows = await db
-      .select({
-        playerId: groupMembersTable.playerId,
-        groupId: groupsTable.id,
-        groupName: groupsTable.name,
-      })
-      .from(groupMembersTable)
-      .innerJoin(
-        viewerGm,
-        and(eq(viewerGm.groupId, groupMembersTable.groupId), eq(viewerGm.playerId, viewerId)),
-      )
-      .innerJoin(groupsTable, eq(groupsTable.id, groupMembersTable.groupId))
-      .where(inArray(groupMembersTable.playerId, ids));
-    for (const r of sharedRows) {
-      const list = sharedGroupsByPlayer.get(r.playerId) ?? [];
-      list.push({ id: r.groupId, name: r.groupName });
-      sharedGroupsByPlayer.set(r.playerId, list);
-    }
-  }
+  // Shared groups + mutual workout partners per match: viewer ∩ candidate
+  // trust signals. Single SQL round-trip each via self-joins on group_members
+  // so latency stays flat as the viewer's group count grows. Mutual partners
+  // additionally filter out hidden/minor/blocked third-party identities
+  // (reuses the hiddenIds set computed above for the candidate filter).
+  const [sharedGroupsByPlayer, mutualWorkoutPartnersByPlayer] = await Promise.all([
+    loadSharedGroupsForViewer(viewerId, ids),
+    loadMutualWorkoutPartnersForViewer(viewerId, ids, hiddenIds),
+  ]);
 
   // Rank: username prefix match first, then displayName prefix, then others
   const lowerQ = q.toLowerCase();
@@ -1911,6 +1881,7 @@ router.get("/social/search", requireAuth, attachPlayer, async (req, res) => {
     reason: "search",
     reasonDetail: null,
     sharedGroups: sharedGroupsByPlayer.get(p.id) ?? [],
+    mutualWorkoutPartners: mutualWorkoutPartnersByPlayer.get(p.id) ?? [],
   })));
 });
 

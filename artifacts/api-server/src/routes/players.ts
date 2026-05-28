@@ -3,7 +3,11 @@ import { createDecipheriv, createHash } from "crypto";
 import { db } from "@workspace/db";
 import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable, eggsTable, fitnessActivitiesTable, playerBadgesTable, playerArtifactsTable, artifactsTable, playerLocationTable, groupMembersTable, groupsTable } from "@workspace/db";
 import { eq, desc, and, gte, or, ilike, ne, inArray } from "drizzle-orm";
-import { filterDiscoverableCandidates } from "./safety.ts";
+import { filterDiscoverableCandidates, getHiddenPlayerIds } from "./safety.ts";
+import {
+  loadMutualWorkoutPartnersForViewer,
+  type MutualWorkoutPartner,
+} from "./sharedGroups.ts";
 import {
   CreatePlayerBody,
   UpdatePlayerBody,
@@ -122,7 +126,9 @@ router.get("/players/search", requireAuth, attachPlayer, async (req, res) => {
   // surface "Also in <group> with you" — same trust signal as the social
   // discover card.
   const sharedGroupsByPlayer = new Map<number, Array<{ id: number; name: string }>>();
+  const mutualWorkoutPartnersByPlayer = new Map<number, MutualWorkoutPartner[]>();
   if (viewerId && rows.length > 0) {
+    const matchIds = rows.map(r => r.id);
     const viewerMemberships = await db.query.groupMembersTable.findMany({
       where: eq(groupMembersTable.playerId, viewerId),
     });
@@ -130,7 +136,7 @@ router.get("/players/search", requireAuth, attachPlayer, async (req, res) => {
     if (viewerGroupIds.length > 0) {
       const matchMemberships = await db.query.groupMembersTable.findMany({
         where: and(
-          inArray(groupMembersTable.playerId, rows.map(r => r.id)),
+          inArray(groupMembersTable.playerId, matchIds),
           inArray(groupMembersTable.groupId, viewerGroupIds),
         ),
       });
@@ -148,6 +154,14 @@ router.get("/players/search", requireAuth, attachPlayer, async (req, res) => {
           sharedGroupsByPlayer.set(m.playerId, list);
         }
       }
+
+      // Mutual workout partners (viewer ∩ each match). Delegates to the
+      // shared helper next to the SharedGroups loader so the same safety
+      // filtering (block/hidden/minor) is enforced on every surface
+      // exposing this trust signal.
+      const hiddenIds = await getHiddenPlayerIds(viewerId);
+      const grouped = await loadMutualWorkoutPartnersForViewer(viewerId, matchIds, hiddenIds);
+      for (const [k, v] of grouped) mutualWorkoutPartnersByPlayer.set(k, v);
     }
   }
 
@@ -158,6 +172,7 @@ router.get("/players/search", requireAuth, attachPlayer, async (req, res) => {
     avatarUrl: p.avatarUrl ?? null,
     creatorBadge: p.creatorBadge ?? null,
     sharedGroups: sharedGroupsByPlayer.get(p.id) ?? [],
+    mutualWorkoutPartners: mutualWorkoutPartnersByPlayer.get(p.id) ?? [],
   })));
 });
 

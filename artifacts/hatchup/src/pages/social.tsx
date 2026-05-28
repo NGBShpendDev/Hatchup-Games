@@ -440,6 +440,7 @@ type PlayerStubRow = {
   avatarUrl: string | null;
   creatorBadge: string | null;
   sharedGroups?: Array<{ id: number; name: string }>;
+  mutualWorkoutPartners?: Array<{ id: number; displayName: string }>;
 };
 
 function formatSharedGroups(groups: Array<{ id: number; name: string }>): string {
@@ -452,6 +453,18 @@ function formatSharedGroups(groups: Array<{ id: number; name: string }>): string
     : `Also in ${preview} with you`;
 }
 
+function formatMutualWorkoutPartners(
+  partners: Array<{ id: number; displayName: string }>,
+): string {
+  const names = partners.map(p => p.displayName);
+  if (names.length === 0) return "";
+  const preview = names.slice(0, 2).join(" & ");
+  const extra = names.length - 2;
+  return extra > 0
+    ? `Workouts with ${preview} +${extra} more`
+    : `Workouts with ${preview}`;
+}
+
 function PlayerListRow({
   player,
   testIdPrefix,
@@ -462,6 +475,7 @@ function PlayerListRow({
   onViewProfile: (pid: number) => void;
 }) {
   const sharedGroups = player.sharedGroups ?? [];
+  const mutualWorkoutPartners = player.mutualWorkoutPartners ?? [];
   return (
     <div
       className="flex items-start gap-3 bg-muted/30 border border-border/40 rounded-2xl p-3"
@@ -490,6 +504,15 @@ function PlayerListRow({
           >
             <Users2 className="w-3 h-3 shrink-0" />
             <span className="truncate">{formatSharedGroups(sharedGroups)}</span>
+          </p>
+        )}
+        {mutualWorkoutPartners.length > 0 && (
+          <p
+            className="text-[11px] text-emerald-300 font-bold mt-0.5 flex items-center gap-1 truncate"
+            data-testid={`text-${testIdPrefix}-mutual-partners-${player.id}`}
+          >
+            <Dumbbell className="w-3 h-3 shrink-0" />
+            <span className="truncate">{formatMutualWorkoutPartners(mutualWorkoutPartners)}</span>
           </p>
         )}
       </div>
@@ -1092,6 +1115,17 @@ function PlayerDiscoverCard({
             <p className={`text-[10px] font-bold mt-0.5 flex items-center gap-1 ${reasonColor}`}>
               {reasonIcon}
               {reasonText}
+            </p>
+          )}
+          {(player.mutualWorkoutPartners ?? []).length > 0 && (
+            <p
+              className="text-[10px] font-bold mt-0.5 flex items-center gap-1 text-emerald-400 truncate"
+              data-testid={`text-discover-mutual-partners-${player.id}`}
+            >
+              <Dumbbell className="w-3 h-3 shrink-0" />
+              <span className="truncate">
+                {formatMutualWorkoutPartners(player.mutualWorkoutPartners ?? [])}
+              </span>
             </p>
           )}
         </div>

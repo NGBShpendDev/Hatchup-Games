@@ -363,6 +363,10 @@ mock.module("../services/postPurgeJob.ts", {
 mock.module("./sharedGroups.ts", {
   namedExports: {
     groupSharedGroupRows: (rows: unknown[]) => rows,
+    groupMutualWorkoutPartnerRows: () => new Map(),
+    MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT: 3,
+    loadSharedGroupsForViewer: async () => new Map(),
+    loadMutualWorkoutPartnersForViewer: async () => new Map(),
   },
 });
 mock.module("./socialCommentOrdering.ts", {

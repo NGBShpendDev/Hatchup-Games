@@ -1311,6 +1311,11 @@ export interface SharedGroup {
   name: string;
 }
 
+export interface MutualWorkoutPartner {
+  id: number;
+  displayName: string;
+}
+
 export interface PlayerStub {
   id: number;
   username: string;
@@ -1326,6 +1331,14 @@ export interface PlayerStub {
   so the player feels trustworthy at every social touchpoint.
    */
   sharedGroups?: SharedGroup[];
+  /** Up to a small number of third players who have actually worked out
+  (logged a co-workout in a shared group) with BOTH the viewer and
+  this player. Optional — only populated on people-discovery surfaces
+  (invite picker, social search, followers, following). Strengthens
+  the trust signal beyond raw shared-group overlap: "you've both
+  sweated with X" is a stronger reason to trust an unfamiliar profile.
+   */
+  mutualWorkoutPartners?: MutualWorkoutPartner[];
 }
 
 /**

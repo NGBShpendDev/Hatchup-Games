@@ -136,9 +136,11 @@ mock.module("drizzle-orm", {
     or: () => ({}),
     ne: (c: { __col?: string }, v: unknown) => ({ __op: "ne", col: c, val: v }),
     desc: () => ({}),
+    gt: () => ({}),
     gte: (c: { __col?: string }, v: unknown) => ({ __op: "gte", col: c, val: v }),
     ilike: () => ({}),
     inArray: () => ({}),
+    notInArray: () => ({}),
     isNull: () => ({}),
     isNotNull: () => ({}),
     sql: Object.assign(

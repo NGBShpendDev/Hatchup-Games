@@ -1,6 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { groupSharedGroupRows } from "./sharedGroups.ts";
+import {
+  groupSharedGroupRows,
+  groupMutualWorkoutPartnerRows,
+  MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT,
+} from "./sharedGroups.ts";
 
 describe("groupSharedGroupRows", () => {
   it("returns an empty map when there are no rows (viewer + target share zero groups)", () => {
@@ -58,5 +62,62 @@ describe("groupSharedGroupRows", () => {
       { id: 300, name: "C" },
     ]);
     assert.deepEqual(result.get(2), [{ id: 200, name: "B" }]);
+  });
+});
+
+describe("groupMutualWorkoutPartnerRows", () => {
+  it("returns an empty map for no rows", () => {
+    const result = groupMutualWorkoutPartnerRows([]);
+    assert.equal(result.size, 0);
+  });
+
+  it("groups partners per candidate", () => {
+    const result = groupMutualWorkoutPartnerRows([
+      { candidateId: 10, partnerId: 1, partnerDisplayName: "Alex" },
+      { candidateId: 10, partnerId: 2, partnerDisplayName: "Sam" },
+      { candidateId: 11, partnerId: 1, partnerDisplayName: "Alex" },
+    ]);
+    assert.deepEqual(result.get(10), [
+      { id: 1, displayName: "Alex" },
+      { id: 2, displayName: "Sam" },
+    ]);
+    assert.deepEqual(result.get(11), [{ id: 1, displayName: "Alex" }]);
+  });
+
+  it("dedups the same partner appearing across multiple shared groups", () => {
+    // A partner can join the viewer+candidate twice if they share two groups
+    // where everyone has co-workouted. We want one entry per partner per row.
+    const result = groupMutualWorkoutPartnerRows([
+      { candidateId: 10, partnerId: 1, partnerDisplayName: "Alex" },
+      { candidateId: 10, partnerId: 1, partnerDisplayName: "Alex" },
+      { candidateId: 10, partnerId: 2, partnerDisplayName: "Sam" },
+    ]);
+    assert.deepEqual(result.get(10), [
+      { id: 1, displayName: "Alex" },
+      { id: 2, displayName: "Sam" },
+    ]);
+  });
+
+  it("caps each candidate's list at the preview limit", () => {
+    const rows = Array.from({ length: 10 }, (_, i) => ({
+      candidateId: 10,
+      partnerId: i + 1,
+      partnerDisplayName: `Buddy ${i + 1}`,
+    }));
+    const result = groupMutualWorkoutPartnerRows(rows);
+    assert.equal(result.get(10)!.length, MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT);
+  });
+
+  it("respects a custom limit", () => {
+    const rows = [
+      { candidateId: 10, partnerId: 1, partnerDisplayName: "A" },
+      { candidateId: 10, partnerId: 2, partnerDisplayName: "B" },
+      { candidateId: 10, partnerId: 3, partnerDisplayName: "C" },
+    ];
+    const result = groupMutualWorkoutPartnerRows(rows, 2);
+    assert.deepEqual(result.get(10), [
+      { id: 1, displayName: "A" },
+      { id: 2, displayName: "B" },
+    ]);
   });
 });

@@ -5391,6 +5391,24 @@ components:
             so the player feels trustworthy at every social touchpoint.
           items:
             $ref: "#/components/schemas/SharedGroup"
+        mutualWorkoutPartners:
+          type: array
+          description: |
+            Up to a small number of third players who have actually worked out
+            (logged a co-workout in a shared group) with BOTH the viewer and
+            this player. Optional — only populated on people-discovery surfaces
+            (invite picker, social search, followers, following). Strengthens
+            the trust signal beyond raw shared-group overlap: "you've both
+            sweated with X" is a stronger reason to trust an unfamiliar profile.
+          items:
+            $ref: "#/components/schemas/MutualWorkoutPartner"
+
+    MutualWorkoutPartner:
+      type: object
+      required: [id, displayName]
+      properties:
+        id:          { type: integer }
+        displayName: { type: string }
 
     NearbyPlayer:
       type: object
