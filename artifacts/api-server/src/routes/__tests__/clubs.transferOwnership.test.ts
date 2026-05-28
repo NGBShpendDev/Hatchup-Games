@@ -49,7 +49,13 @@ interface NotificationInsert {
 
 interface PlayerUpdate {
   id: number;
-  clubRole: string | null;
+  clubRole?: string | null;
+  clubId?: number | null;
+}
+
+interface ClubUpdate {
+  id: number;
+  memberCount?: number;
 }
 
 const state = {
@@ -59,6 +65,7 @@ const state = {
   notifications: [] as NotificationInsert[],
   inserted: [] as Array<{ id: number } & NotificationInsert>,
   playerUpdates: [] as PlayerUpdate[],
+  clubUpdates: [] as ClubUpdate[],
   pushSends: [] as Array<{ playerId: number; tag?: string }>,
   nextNotifId: 1,
 };
@@ -70,6 +77,7 @@ function resetState() {
   state.notifications = [];
   state.inserted = [];
   state.playerUpdates = [];
+  state.clubUpdates = [];
   state.pushSends = [];
   state.nextNotifId = 1;
 }
@@ -122,10 +130,14 @@ mock.module("drizzle-orm", {
   },
 });
 
+const playersTableRef = { id: { __c: "id" }, clubId: { __c: "clubId" } };
+const clubsTableRef = { id: { __c: "clubId" } };
+
 // Minimal fake of the drizzle query/update/insert/transaction surface
 // used by the transfer-ownership handler.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fakeDb: any = {
+  __tables: { players: playersTableRef, clubs: clubsTableRef },
   query: {
     clubsTable: {
       findFirst: async ({ where }: { where?: { val?: unknown } }) => {
@@ -143,15 +155,32 @@ const fakeDb: any = {
       findMany: async () => Array.from(state.players.values()),
     },
   },
-  update: (_table: unknown) => ({
-    set: (vals: { clubRole?: string | null }) => ({
+  update: (table: unknown) => ({
+    set: (vals: { clubRole?: string | null; clubId?: number | null; memberCount?: number }) => ({
       where: async (pred: { val?: unknown }) => {
         const id = pred?.val as number | undefined;
         if (id === undefined) return;
-        const row = state.players.get(id);
-        if (row && vals.clubRole !== undefined) {
-          row.clubRole = vals.clubRole;
-          state.playerUpdates.push({ id, clubRole: vals.clubRole });
+        // Distinguish player vs. club updates by table reference.
+        if (table === fakeDb.__tables.players) {
+          const row = state.players.get(id);
+          if (!row) return;
+          const upd: PlayerUpdate = { id };
+          if (vals.clubRole !== undefined) {
+            row.clubRole = vals.clubRole;
+            upd.clubRole = vals.clubRole;
+          }
+          if (vals.clubId !== undefined) {
+            row.clubId = vals.clubId;
+            upd.clubId = vals.clubId;
+          }
+          state.playerUpdates.push(upd);
+        } else if (table === fakeDb.__tables.clubs) {
+          const row = state.clubs.get(id);
+          if (!row) return;
+          if (vals.memberCount !== undefined) {
+            row.memberCount = vals.memberCount;
+            state.clubUpdates.push({ id, memberCount: vals.memberCount });
+          }
         }
       },
     }),
@@ -174,10 +203,10 @@ const fakeDb: any = {
 mock.module("@workspace/db", {
   namedExports: {
     db: fakeDb,
-    clubsTable: { id: { __c: "clubId" } },
+    clubsTable: clubsTableRef,
     clubInvitesTable: {},
     notificationsTable: { __t: "notifications" },
-    playersTable: { id: { __c: "id" }, clubId: { __c: "clubId" } },
+    playersTable: playersTableRef,
     emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
     rateLimitAttemptsTable: { id: {}, scope: {}, key: {}, createdAt: {} },
   },
@@ -252,6 +281,7 @@ describe("POST /clubs/:id/transfer-ownership", () => {
   it("happy path — swaps roles, persists, and notifies the new owner", async () => {
     seedClubWithOwner();
     state.authPlayerId = OWNER_ID;
+    const memberCountBefore = state.clubs.get(CLUB_ID)!.memberCount;
 
     const res = await postTransfer(MEMBER_ID);
     assert.equal(res.status, 200);
@@ -265,6 +295,12 @@ describe("POST /clubs/:id/transfer-ownership", () => {
     // Roles swapped: previous owner -> officer, target -> owner.
     assert.equal(state.players.get(OWNER_ID)!.clubRole, "officer");
     assert.equal(state.players.get(MEMBER_ID)!.clubRole, "owner");
+    // Former owner stays in the club — clubId must not be cleared.
+    assert.equal(state.players.get(OWNER_ID)!.clubId, CLUB_ID);
+
+    // memberCount is untouched on the default path — no leave happened.
+    assert.equal(state.clubs.get(CLUB_ID)!.memberCount, memberCountBefore);
+    assert.equal(state.clubUpdates.length, 0);
 
     // Both updates were issued. We don't pin the order — only that
     // each player was updated exactly once with the expected role.
@@ -282,6 +318,44 @@ describe("POST /clubs/:id/transfer-ownership", () => {
     assert.equal(n.sourceId, CLUB_ID);
     assert.ok(n.title.toLowerCase().includes("owner"));
 
+    assert.equal(state.pushSends.length, 1);
+    assert.equal(state.pushSends[0].playerId, MEMBER_ID);
+  });
+
+  it("alsoLeave=true — promotes target, removes former owner from club, decrements memberCount", async () => {
+    seedClubWithOwner();
+    state.authPlayerId = OWNER_ID;
+    const memberCountBefore = state.clubs.get(CLUB_ID)!.memberCount;
+
+    const res = await fetch(`${baseUrl}/clubs/${CLUB_ID}/transfer-ownership`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ newOwnerId: MEMBER_ID, alsoLeave: true }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json() as { success: boolean; newOwnerId: number; leftClub: boolean };
+    assert.equal(body.success, true);
+    assert.equal(body.newOwnerId, MEMBER_ID);
+    assert.equal(body.leftClub, true);
+
+    // Target promoted to owner.
+    assert.equal(state.players.get(MEMBER_ID)!.clubRole, "owner");
+    assert.equal(state.players.get(MEMBER_ID)!.clubId, CLUB_ID);
+
+    // Former owner fully exited the club.
+    assert.equal(state.players.get(OWNER_ID)!.clubId, null);
+    assert.equal(state.players.get(OWNER_ID)!.clubRole, null);
+
+    // memberCount decreased by exactly 1.
+    assert.equal(state.clubs.get(CLUB_ID)!.memberCount, memberCountBefore - 1);
+    assert.equal(state.clubUpdates.length, 1);
+    assert.equal(state.clubUpdates[0].id, CLUB_ID);
+    assert.equal(state.clubUpdates[0].memberCount, memberCountBefore - 1);
+
+    // The new owner still gets exactly one promotion notification + push.
+    assert.equal(state.notifications.length, 1);
+    assert.equal(state.notifications[0].playerId, MEMBER_ID);
+    assert.equal(state.notifications[0].type, "club_role_promoted");
     assert.equal(state.pushSends.length, 1);
     assert.equal(state.pushSends[0].playerId, MEMBER_ID);
   });
