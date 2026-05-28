@@ -74,10 +74,26 @@ const dbEliminationStore: EliminationStore = {
       .set({ currentValue: 0 })
       .where(inArray(challengeParticipantsTable.id, ids));
   },
-  async updateChallengeRound(id, nextRound, nextEndAt) {
-    await db.update(challengesTable)
-      .set({ currentRound: nextRound, endAt: nextEndAt })
-      .where(eq(challengesTable.id, id));
+  async tryClaimRoundResolution(id, expectedRound, nextRound, nextEndAt) {
+    // Conditional UPDATE acts as the idempotency claim. Two concurrent
+    // finalize attempts on the same active round will both reach this
+    // statement; only the one that matches `current_round = expectedRound
+    // AND status = 'active'` updates a row and gets `result.length > 0`.
+    // The losing caller sees `false` and bails out without re-running
+    // markEliminated / resetSurvivorProgress.
+    const updateSet: { currentRound: number; endAt?: Date } = {
+      currentRound: nextRound,
+    };
+    if (nextEndAt !== null) updateSet.endAt = nextEndAt;
+    const result = await db.update(challengesTable)
+      .set(updateSet)
+      .where(and(
+        eq(challengesTable.id, id),
+        eq(challengesTable.currentRound, expectedRound),
+        eq(challengesTable.status, "active"),
+      ))
+      .returning({ id: challengesTable.id });
+    return result.length > 0;
   },
 };
 

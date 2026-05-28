@@ -320,9 +320,18 @@ function makeStore(
         if (ids.includes(p.id)) p.currentValue = 0;
       }
     },
-    async updateChallengeRound(_id, nextRound, nextEndAt) {
+    async tryClaimRoundResolution(_id, expectedRound, nextRound, nextEndAt) {
+      if (
+        state.challenge.currentRound !== expectedRound ||
+        (state.challenge.status && state.challenge.status !== "active")
+      ) {
+        return false;
+      }
       state.challenge.currentRound = nextRound;
-      (state.challenge as { endAt?: Date }).endAt = nextEndAt;
+      if (nextEndAt !== null) {
+        (state.challenge as { endAt?: Date }).endAt = nextEndAt;
+      }
+      return true;
     },
   };
   return { store, state };
@@ -382,8 +391,10 @@ describe("advanceEliminationRound", () => {
     if (outcome.kind !== "champion") return;
     assert.deepEqual(outcome.eliminatedParticipantIds, [11]);
     assert.equal(outcome.eliminatedRound, 3);
-    // Round must NOT be incremented and endAt must NOT be extended.
-    assert.equal(state.challenge.currentRound, 3);
+    // currentRound is bumped as the idempotency claim (so a concurrent
+    // racer can't re-resolve this same round), but endAt is NOT extended
+    // — the bracket is done and the caller will run finalization next.
+    assert.equal(state.challenge.currentRound, 4);
     assert.equal(state.challenge.endAt, undefined);
     // Loser eliminated, champion's progress preserved (not reset).
     const byId = new Map(state.participants.map(p => [p.id, p]));
@@ -482,13 +493,83 @@ describe("advanceEliminationRound", () => {
     assert.equal(state.challenge.currentRound, 1);
   });
 
+  it("two concurrent advance calls only eliminate each loser once and only bump the round once", async () => {
+    // Simulates the race the leaderboard route can trigger: two near-
+    // simultaneous finalize attempts on the same expired elimination
+    // round. Without the atomic claim, both would call markEliminated for
+    // the same losers and both would bump current_round.
+    const now = new Date("2026-05-01T00:00:00Z");
+    const { store: base, state } = makeStore(
+      { id: 99, isElimination: true, currentRound: 1, durationDays: 2, status: "active" },
+      [
+        { id: 1, currentValue: 100, eliminated: false, eliminatedRound: null },
+        { id: 2, currentValue: 80, eliminated: false, eliminatedRound: null },
+        { id: 3, currentValue: 60, eliminated: false, eliminatedRound: null },
+        { id: 4, currentValue: 40, eliminated: false, eliminatedRound: null },
+      ],
+    );
+
+    // Wrap the store to count mutation calls so we can assert idempotency.
+    const markEliminatedCalls: Array<{ ids: number[]; round: number }> = [];
+    const resetCalls: number[][] = [];
+    let claimSucceeded = 0;
+    const store: EliminationStore = {
+      getChallenge: base.getChallenge,
+      getActiveParticipants: base.getActiveParticipants,
+      async markEliminated(ids, round) {
+        markEliminatedCalls.push({ ids: [...ids], round });
+        return base.markEliminated(ids, round);
+      },
+      async resetSurvivorProgress(ids) {
+        resetCalls.push([...ids]);
+        return base.resetSurvivorProgress(ids);
+      },
+      async tryClaimRoundResolution(id, expectedRound, nextRound, nextEndAt) {
+        const ok = await base.tryClaimRoundResolution(id, expectedRound, nextRound, nextEndAt);
+        if (ok) claimSucceeded++;
+        return ok;
+      },
+    };
+
+    const [a, b] = await Promise.all([
+      advanceEliminationRound(store, 99, now),
+      advanceEliminationRound(store, 99, now),
+    ]);
+
+    // Exactly one caller won the claim; the other returned a clean noop.
+    assert.equal(claimSucceeded, 1, "only one tryClaimRoundResolution succeeded");
+    const outcomes = [a.kind, b.kind].sort();
+    assert.deepEqual(outcomes, ["advance", "noop"], "one advance, one noop");
+
+    // markEliminated and resetSurvivorProgress fired exactly once.
+    assert.equal(markEliminatedCalls.length, 1, "markEliminated called once");
+    assert.deepEqual(markEliminatedCalls[0].ids, [3, 4]);
+    assert.equal(markEliminatedCalls[0].round, 1);
+    assert.equal(resetCalls.length, 1, "resetSurvivorProgress called once");
+    assert.deepEqual(resetCalls[0], [1, 2]);
+
+    // Round bumped exactly once: 1 → 2 (not 3).
+    assert.equal(state.challenge.currentRound, 2, "round bumped exactly once");
+    assert.equal(
+      state.challenge.endAt?.toISOString(),
+      new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+    );
+
+    // Losers eliminated once, eliminatedRound recorded as round 1 (not 2).
+    const byId = new Map(state.participants.map(p => [p.id, p]));
+    assert.equal(byId.get(3)!.eliminated, true);
+    assert.equal(byId.get(3)!.eliminatedRound, 1);
+    assert.equal(byId.get(4)!.eliminated, true);
+    assert.equal(byId.get(4)!.eliminatedRound, 1);
+  });
+
   it("returns noop when the challenge does not exist", async () => {
     const store: EliminationStore = {
       async getChallenge() { return null; },
       async getActiveParticipants() { return []; },
       async markEliminated() { throw new Error("should not be called"); },
       async resetSurvivorProgress() { throw new Error("should not be called"); },
-      async updateChallengeRound() { throw new Error("should not be called"); },
+      async tryClaimRoundResolution() { throw new Error("should not be called"); },
     };
     const outcome = await advanceEliminationRound(store, 404);
     assert.equal(outcome.kind, "noop");
