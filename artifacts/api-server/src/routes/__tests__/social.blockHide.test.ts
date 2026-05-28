@@ -124,7 +124,6 @@ mock.module("drizzle-orm", {
     desc: () => ({}),
     gt: () => ({}),
     gte: () => ({}),
-    notInArray: () => ({}),
     ilike: () => ({}),
     inArray: (c: { __col?: string; __table?: string }, v: unknown[]) => ({ __op: "inArray", col: c, val: v }),
     notInArray: (c: { __col?: string; __table?: string }, v: unknown[]) => ({ __op: "notInArray", col: c, val: v }),

@@ -165,7 +165,6 @@ mock.module("drizzle-orm", {
     ilike: () => ({ __op: "ilike" }),
     gt: () => ({ __op: "gt" }),
     gte: () => ({ __op: "gte" }),
-    notInArray: (col: any, vals: any[]) => ({ __op: "notInArray", col, vals }),
     sql: Object.assign(
       (_s: TemplateStringsArray, ..._v: unknown[]) => ({ __sql: true }),
       { raw: (_s: string) => ({ __sql: true }) },

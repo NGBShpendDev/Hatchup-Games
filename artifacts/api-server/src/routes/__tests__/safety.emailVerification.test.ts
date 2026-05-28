@@ -86,6 +86,7 @@ mock.module("drizzle-orm", {
     desc: () => ({}),
     lt: () => ({}),
     notInArray: () => ({}),
+    inArray: () => ({}),
   },
 });
 
@@ -217,6 +218,8 @@ mock.module("@workspace/db", {
     },
     blockedUsersTable: { blockerId: {}, blockedId: {}, createdAt: {} },
     moderationAuditLogTable: { id: {}, actorId: {}, action: {}, targetPlayerId: {}, targetReportId: {}, reason: {}, metadata: {}, createdAt: {} },
+    accountAppealsTable: { id: {}, playerId: {}, status: {}, reason: {}, decision: {}, decidedByAdminId: {}, decidedAt: {}, createdAt: {} },
+    notificationsTable: { id: {}, playerId: {}, type: {}, title: {}, body: {}, link: {}, sourceId: {}, createdAt: {} },
     bouncedEmailsTable: { id: {}, email: {} },
     emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
   },

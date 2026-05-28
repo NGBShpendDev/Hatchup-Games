@@ -292,7 +292,7 @@ const fakeDb = {
         return updated;
       },
       then(resolve: (v: unknown) => void, reject: (e: unknown) => void) {
-        chain.returning!().then(resolve as never, reject);
+        (chain.returning as () => Promise<unknown>)().then(resolve as never, reject);
       },
     };
     return chain;
