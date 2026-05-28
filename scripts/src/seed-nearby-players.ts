@@ -55,6 +55,46 @@ const REALMS = ["strength", "endurance", "agility"];
 
 const PER_CITY = 10;
 
+// Hatchling catalog used for demo creatures.
+const DEMO_HATCHLINGS: { species: string; realm: string; category: string; ability: { name: string; desc: string } }[] = [
+  { species: "Cragborn Pup", realm: "strength", category: "beasts", ability: { name: "Stone Fist", desc: "Slams the ground causing shockwaves that stagger opponents." } },
+  { species: "Emberstrike Cub", realm: "strength", category: "beasts", ability: { name: "Iron Fortress", desc: "Hardens shell to block 60% of incoming damage." } },
+  { species: "Zephyr Fawn", realm: "cardio", category: "beasts", ability: { name: "Quick Dash", desc: "Surges forward at lightning speed leaving a trail of sparks." } },
+  { species: "Stormwing Chick", realm: "cardio", category: "dragons", ability: { name: "Tailwind Surge", desc: "Generates a powerful gust that accelerates ally speed by 40%." } },
+  { species: "Lumin Seedling", realm: "balance", category: "spirits", ability: { name: "Aura Flare", desc: "Emits a calming aura that reduces opponent aggression by 30%." } },
+  { species: "Starbloom Fae", realm: "balance", category: "spirits", ability: { name: "Celestial Mend", desc: "Radiates starlight energy restoring 25% HP to all allies." } },
+  { species: "Shadowpaw Runt", realm: "beast", category: "beasts", ability: { name: "Feral Lunge", desc: "Leaps from shadows with primal ferocity doubling strike speed." } },
+  { species: "Prism Wisp", realm: "mythic", category: "spirits", ability: { name: "Prismatic Burst", desc: "Explodes in a rainbow of energy hitting opponents of every type." } },
+];
+
+const HATCHLING_NAMES = [
+  "Sparky", "Pebble", "Mochi", "Ziggy", "Coco", "Nimbus", "Pixel", "Biscuit",
+  "Juno", "Tango", "Echo", "Wisp", "Clover", "Bramble", "Solstice", "Marble",
+];
+
+const ACTIVITY_TEMPLATES: { type: string; unit: string; min: number; max: number; xp: number; realm: string; note: string; distanceMiles?: [number, number] }[] = [
+  { type: "steps", unit: "steps", min: 3200, max: 12500, xp: 40, realm: "cardio", note: "Hit my step goal!" },
+  { type: "running", unit: "miles", min: 2, max: 6, xp: 80, realm: "cardio", note: "Morning run done.", distanceMiles: [2, 6] },
+  { type: "walking", unit: "miles", min: 1, max: 4, xp: 30, realm: "cardio", note: "Lunch walk.", distanceMiles: [1, 4] },
+  { type: "strength", unit: "minutes", min: 25, max: 60, xp: 90, realm: "strength", note: "Lifted heavy today." },
+  { type: "yoga", unit: "minutes", min: 20, max: 45, xp: 50, realm: "balance", note: "Stretched it out." },
+  { type: "cycling", unit: "miles", min: 5, max: 18, xp: 70, realm: "cardio", note: "Quick spin on the bike.", distanceMiles: [5, 18] },
+  { type: "hike", unit: "miles", min: 2, max: 8, xp: 100, realm: "balance", note: "Trail day!", distanceMiles: [2, 8] },
+];
+
+const INTRO_POSTS = [
+  "New to HatchUp — excited to find some workout buddies!",
+  "Day one streak. Let's see how long I can keep this going.",
+  "Just hatched my first creature 🐣 — anyone got tips?",
+  "Looking for a running group near me. Hit me up!",
+  "Calmer mornings, stronger evenings. Loving the routine.",
+  "Quick lift this morning. Small steps, every day.",
+  "Stretched, hydrated, ready. Have a great one out there!",
+  "Hatchlings keep me honest — gotta walk to feed 'em.",
+];
+
+const INTRO_RATIO = 0.4; // ~40% of demo accounts get an intro post.
+
 function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
@@ -70,6 +110,18 @@ function seededRandom(seed: number): () => number {
 
 function pick<T>(arr: T[], rand: () => number): T {
   return arr[Math.floor(rand() * arr.length)]!;
+}
+
+// Derive a deterministic seed from a string. Used to give each artifact type
+// (hatchling, each activity slot, intro decision) its own independent PRNG
+// stream so idempotency holds even when some inserts are skipped on rerun.
+function seedFromString(s: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
 }
 
 async function seedCity(city: DemoCity): Promise<{ inserted: number; updated: number; skipped: number }> {
@@ -177,9 +229,113 @@ async function seedCity(city: DemoCity): Promise<{ inserted: number; updated: nu
         [playerId, city.city, city.state, city.country, city.countryCode],
       );
     }
+
+    await seedHatchling(playerId, username);
+    await seedActivities(playerId, username);
+    await maybeSeedIntroPost(playerId, username);
   }
 
   return { inserted, updated, skipped };
+}
+
+async function seedHatchling(playerId: number, username: string): Promise<void> {
+  // Each artifact type gets its own PRNG stream derived deterministically
+  // from the username, so the values used here are stable regardless of
+  // whether prior inserts ran or were skipped on a previous pass.
+  const rand = seededRandom(seedFromString(`${username}::hatchling`));
+  const tpl = pick(DEMO_HATCHLINGS, rand);
+  const hatchlingName = `${pick(HATCHLING_NAMES, rand)} (${username.slice(-4)})`;
+
+  // Idempotent: skip if the demo player already has any hatchling.
+  const anyExisting = await pool.query<{ id: number }>(
+    `SELECT id FROM hatchlings WHERE player_id = $1 LIMIT 1`,
+    [playerId],
+  );
+  if (anyExisting.rowCount && anyExisting.rows[0]) return;
+
+  const level = 1 + Math.floor(rand() * 12);
+  const xp = level * 80 + Math.floor(rand() * 80);
+  const friendship = Math.floor(rand() * 60);
+  const imageUrl = `https://api.dicebear.com/9.x/bottts/svg?seed=${encodeURIComponent(`${username}-${tpl.species}`)}`;
+
+  await pool.query(
+    `INSERT INTO hatchlings
+       (player_id, name, species, category, rarity, personality, mood,
+        level, xp, happiness, hunger, energy,
+        ability_name, ability_desc, image_url, realm, friendship_level, mood_state)
+     VALUES ($1, $2, $3, $4, 'Common', 'Calm', 'happy',
+             $5, $6, 80, 60, 90,
+             $7, $8, $9, $10, $11, 'happy')`,
+    [
+      playerId, hatchlingName, tpl.species, tpl.category,
+      level, xp,
+      tpl.ability.name, tpl.ability.desc, imageUrl, tpl.realm, friendship,
+    ],
+  );
+}
+
+async function seedActivities(playerId: number, username: string): Promise<void> {
+  // Derive a deterministic activity count (1..3) up front so reruns always
+  // target the same set of slots, even if some were inserted previously.
+  const countRand = seededRandom(seedFromString(`${username}::activity-count`));
+  const count = 1 + Math.floor(countRand() * 3);
+
+  for (let i = 0; i < count; i++) {
+    const externalId = `demo_seed:${username}:${i}`;
+    const existing = await pool.query<{ id: number }>(
+      `SELECT id FROM fitness_activities WHERE external_id = $1 LIMIT 1`,
+      [externalId],
+    );
+    if (existing.rowCount && existing.rows[0]) continue;
+
+    // Each slot gets its own independent PRNG stream.
+    const rand = seededRandom(seedFromString(`${username}::activity::${i}`));
+    const tpl = pick(ACTIVITY_TEMPLATES, rand);
+    const value = tpl.min + Math.floor(rand() * (tpl.max - tpl.min + 1));
+    const distance = tpl.distanceMiles
+      ? tpl.distanceMiles[0] + rand() * (tpl.distanceMiles[1] - tpl.distanceMiles[0])
+      : null;
+    const hoursAgo = Math.floor(rand() * 24 * 7) + i * 2;
+
+    await pool.query(
+      `INSERT INTO fitness_activities
+         (player_id, type, value, unit, fitness_xp_earned, realm, note,
+          external_id, distance_miles, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW() - ($10 || ' hours')::interval)`,
+      [
+        playerId, tpl.type, value, tpl.unit, tpl.xp, tpl.realm, tpl.note,
+        externalId, distance, String(hoursAgo),
+      ],
+    );
+  }
+}
+
+async function maybeSeedIntroPost(playerId: number, username: string): Promise<void> {
+  // Deterministic decision: stable across reruns regardless of other inserts.
+  const rand = seededRandom(seedFromString(`${username}::intro`));
+  if (rand() > INTRO_RATIO) return;
+
+  const existing = await pool.query<{ id: number }>(
+    `SELECT id FROM posts
+       WHERE player_id = $1
+         AND metadata IS NOT NULL
+         AND metadata->>'demoSeed' = 'intro'
+       LIMIT 1`,
+    [playerId],
+  );
+  if (existing.rowCount && existing.rows[0]) return;
+
+  const contentIdx = Math.floor(rand() * INTRO_POSTS.length);
+  const content = INTRO_POSTS[contentIdx]!;
+  const hoursAgo = 6 + Math.floor(rand() * 72); // 6h - 3d ago
+
+  await pool.query(
+    `INSERT INTO posts
+       (player_id, content, post_type, metadata, created_at)
+     VALUES ($1, $2, 'general', $3::jsonb,
+             NOW() - ($4 || ' hours')::interval)`,
+    [playerId, content, JSON.stringify({ demoSeed: "intro" }), String(hoursAgo)],
+  );
 }
 
 async function main() {
