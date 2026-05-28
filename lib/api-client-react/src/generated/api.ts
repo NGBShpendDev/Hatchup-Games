@@ -24,6 +24,7 @@ import type {
   ActivityLogResult,
   AddCommentInput,
   AddEggInput,
+  AddMealCommentInput,
   ArtifactBattleXpEntry,
   ArtifactCollectorEntry,
   ArtifactLoadout,
@@ -34,6 +35,8 @@ import type {
   ChallengeInvite,
   ChallengeListItem,
   ChallengeParticipant,
+  ChallengeProgressInput,
+  ChallengeProgressResult,
   Club,
   ClubInput,
   ClubMember,
@@ -45,6 +48,8 @@ import type {
   CreateChallengeBody,
   CreateFamilyGroupInput,
   CreateGroupInput,
+  CreateMealPostInput,
+  CreateMealPostResult,
   CreatePostInput,
   DeletePostCommentParams,
   DeletePostParams,
@@ -117,6 +122,7 @@ import type {
   ListMutualFollowersParams,
   ListMyGroupsParams,
   ListNotificationsParams,
+  ListNutritionPostsParams,
   ListRealmsParams,
   ListWorkoutSessionsParams,
   LiveEvent,
@@ -126,14 +132,25 @@ import type {
   LogActivityInput,
   LogGroupWorkoutInput,
   LogSessionInput,
+  MealComment,
+  MealLikeResult,
   MealPlan,
+  MealPostFeedPage,
   MemoryPost,
   ModerationError,
   MutualFollowersPage,
   Notification,
+  NutritionAnalyzeInput,
+  NutritionAnalyzeResult,
+  NutritionChallenge,
+  NutritionMacroTarget,
+  NutritionRecapSendResult,
+  NutritionStreak,
   NutritionWeeklySummary,
   OnboardingInput,
   OwnedArtifact,
+  PhysiqueGoalInput,
+  PhysiqueGoalResult,
   Player,
   PlayerDashboard,
   PlayerInput,
@@ -10467,4 +10484,936 @@ export function useGetNutritionSummary<TData = Awaited<ReturnType<typeof getNutr
 
 
 
+
+export const getListNutritionPostsUrl = (params?: ListNutritionPostsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/nutrition/posts?${stringifiedParams}` : `/api/nutrition/posts`
+}
+
+/**
+ * Returns a page of meal posts. In `feed` mode, results are restricted to
+the viewer and people they share a group with. When the viewer has no
+follow/group connections yet, the server automatically falls back to
+the global `discover` feed and reports that via `fellBackToDiscover`.
+Posts from blocked / blocking players are filtered out.
+
+ * @summary List meal posts for the authenticated player
+ */
+export const listNutritionPosts = async (params?: ListNutritionPostsParams, options?: RequestInit): Promise<MealPostFeedPage> => {
+
+  return customFetch<MealPostFeedPage>(getListNutritionPostsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListNutritionPostsQueryKey = (params?: ListNutritionPostsParams,) => {
+    return [
+    `/api/nutrition/posts`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListNutritionPostsQueryOptions = <TData = Awaited<ReturnType<typeof listNutritionPosts>>, TError = ErrorType<unknown>>(params?: ListNutritionPostsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNutritionPosts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListNutritionPostsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listNutritionPosts>>> = ({ signal }) => listNutritionPosts(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listNutritionPosts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListNutritionPostsQueryResult = NonNullable<Awaited<ReturnType<typeof listNutritionPosts>>>
+export type ListNutritionPostsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List meal posts for the authenticated player
+ */
+
+export function useListNutritionPosts<TData = Awaited<ReturnType<typeof listNutritionPosts>>, TError = ErrorType<unknown>>(
+ params?: ListNutritionPostsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNutritionPosts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListNutritionPostsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateMealPostUrl = () => {
+
+
+
+
+  return `/api/nutrition/posts`
+}
+
+/**
+ * Logs a meal for the authenticated player. Optionally accepts macros and
+an AI-derived quality score; the server independently derives a quality
+score from the macros and uses the more conservative value to buff or
+debuff the player's active Hatchling. May also award badges and trigger
+the daily macro-target streak reward when all four macros land within
+±10% of the player's daily target.
+
+ * @summary Create a meal post
+ */
+export const createMealPost = async (createMealPostInput: CreateMealPostInput, options?: RequestInit): Promise<CreateMealPostResult> => {
+
+  return customFetch<CreateMealPostResult>(getCreateMealPostUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createMealPostInput,)
+  }
+);}
+
+
+
+
+export const getCreateMealPostMutationOptions = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMealPost>>, TError,{data: BodyType<CreateMealPostInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createMealPost>>, TError,{data: BodyType<CreateMealPostInput>}, TContext> => {
+
+const mutationKey = ['createMealPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createMealPost>>, {data: BodyType<CreateMealPostInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createMealPost(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateMealPostMutationResult = NonNullable<Awaited<ReturnType<typeof createMealPost>>>
+    export type CreateMealPostMutationBody = BodyType<CreateMealPostInput>
+    export type CreateMealPostMutationError = ErrorType<StorageErrorEnvelope>
+
+    /**
+ * @summary Create a meal post
+ */
+export const useCreateMealPost = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMealPost>>, TError,{data: BodyType<CreateMealPostInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createMealPost>>,
+        TError,
+        {data: BodyType<CreateMealPostInput>},
+        TContext
+      > => {
+      return useMutation(getCreateMealPostMutationOptions(options));
+    }
+
+export const getToggleMealPostLikeUrl = (id: number,) => {
+
+
+
+
+  return `/api/nutrition/posts/${id}/like`
+}
+
+/**
+ * Idempotent toggle: liking an already-liked post unlikes it. The likes
+counter on the post is updated atomically and never drops below zero.
+
+ * @summary Toggle a like on a meal post
+ */
+export const toggleMealPostLike = async (id: number, options?: RequestInit): Promise<MealLikeResult> => {
+
+  return customFetch<MealLikeResult>(getToggleMealPostLikeUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getToggleMealPostLikeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleMealPostLike>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof toggleMealPostLike>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['toggleMealPostLike'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof toggleMealPostLike>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  toggleMealPostLike(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ToggleMealPostLikeMutationResult = NonNullable<Awaited<ReturnType<typeof toggleMealPostLike>>>
+
+    export type ToggleMealPostLikeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Toggle a like on a meal post
+ */
+export const useToggleMealPostLike = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleMealPostLike>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof toggleMealPostLike>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getToggleMealPostLikeMutationOptions(options));
+    }
+
+export const getListMealPostCommentsUrl = (id: number,) => {
+
+
+
+
+  return `/api/nutrition/posts/${id}/comments`
+}
+
+/**
+ * @summary List comments on a meal post
+ */
+export const listMealPostComments = async (id: number, options?: RequestInit): Promise<MealComment[]> => {
+
+  return customFetch<MealComment[]>(getListMealPostCommentsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMealPostCommentsQueryKey = (id: number,) => {
+    return [
+    `/api/nutrition/posts/${id}/comments`
+    ] as const;
+    }
+
+
+export const getListMealPostCommentsQueryOptions = <TData = Awaited<ReturnType<typeof listMealPostComments>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMealPostComments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMealPostCommentsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMealPostComments>>> = ({ signal }) => listMealPostComments(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMealPostComments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMealPostCommentsQueryResult = NonNullable<Awaited<ReturnType<typeof listMealPostComments>>>
+export type ListMealPostCommentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List comments on a meal post
+ */
+
+export function useListMealPostComments<TData = Awaited<ReturnType<typeof listMealPostComments>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMealPostComments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMealPostCommentsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getAddMealPostCommentUrl = (id: number,) => {
+
+
+
+
+  return `/api/nutrition/posts/${id}/comments`
+}
+
+/**
+ * @summary Add a comment to a meal post
+ */
+export const addMealPostComment = async (id: number,
+    addMealCommentInput: AddMealCommentInput, options?: RequestInit): Promise<MealComment> => {
+
+  return customFetch<MealComment>(getAddMealPostCommentUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      addMealCommentInput,)
+  }
+);}
+
+
+
+
+export const getAddMealPostCommentMutationOptions = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addMealPostComment>>, TError,{id: number;data: BodyType<AddMealCommentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addMealPostComment>>, TError,{id: number;data: BodyType<AddMealCommentInput>}, TContext> => {
+
+const mutationKey = ['addMealPostComment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addMealPostComment>>, {id: number;data: BodyType<AddMealCommentInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  addMealPostComment(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddMealPostCommentMutationResult = NonNullable<Awaited<ReturnType<typeof addMealPostComment>>>
+    export type AddMealPostCommentMutationBody = BodyType<AddMealCommentInput>
+    export type AddMealPostCommentMutationError = ErrorType<StorageErrorEnvelope>
+
+    /**
+ * @summary Add a comment to a meal post
+ */
+export const useAddMealPostComment = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addMealPostComment>>, TError,{id: number;data: BodyType<AddMealCommentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addMealPostComment>>,
+        TError,
+        {id: number;data: BodyType<AddMealCommentInput>},
+        TContext
+      > => {
+      return useMutation(getAddMealPostCommentMutationOptions(options));
+    }
+
+export const getAnalyzeMealDescriptionUrl = () => {
+
+
+
+
+  return `/api/nutrition/analyze`
+}
+
+/**
+ * Sends a free-form meal description to the AI sports-nutritionist model
+and returns estimated macros, a 1-10 quality score, and 1-3 short
+improvement suggestions. Returns a static fallback estimate if the
+model response cannot be parsed.
+
+ * @summary Estimate macros + quality score from a meal description
+ */
+export const analyzeMealDescription = async (nutritionAnalyzeInput: NutritionAnalyzeInput, options?: RequestInit): Promise<NutritionAnalyzeResult> => {
+
+  return customFetch<NutritionAnalyzeResult>(getAnalyzeMealDescriptionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      nutritionAnalyzeInput,)
+  }
+);}
+
+
+
+
+export const getAnalyzeMealDescriptionMutationOptions = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeMealDescription>>, TError,{data: BodyType<NutritionAnalyzeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof analyzeMealDescription>>, TError,{data: BodyType<NutritionAnalyzeInput>}, TContext> => {
+
+const mutationKey = ['analyzeMealDescription'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof analyzeMealDescription>>, {data: BodyType<NutritionAnalyzeInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  analyzeMealDescription(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnalyzeMealDescriptionMutationResult = NonNullable<Awaited<ReturnType<typeof analyzeMealDescription>>>
+    export type AnalyzeMealDescriptionMutationBody = BodyType<NutritionAnalyzeInput>
+    export type AnalyzeMealDescriptionMutationError = ErrorType<StorageErrorEnvelope>
+
+    /**
+ * @summary Estimate macros + quality score from a meal description
+ */
+export const useAnalyzeMealDescription = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeMealDescription>>, TError,{data: BodyType<NutritionAnalyzeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof analyzeMealDescription>>,
+        TError,
+        {data: BodyType<NutritionAnalyzeInput>},
+        TContext
+      > => {
+      return useMutation(getAnalyzeMealDescriptionMutationOptions(options));
+    }
+
+export const getListNutritionChallengesUrl = () => {
+
+
+
+
+  return `/api/nutrition/challenges`
+}
+
+/**
+ * @summary List nutrition challenges with the player's current progress
+ */
+export const listNutritionChallenges = async ( options?: RequestInit): Promise<NutritionChallenge[]> => {
+
+  return customFetch<NutritionChallenge[]>(getListNutritionChallengesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListNutritionChallengesQueryKey = () => {
+    return [
+    `/api/nutrition/challenges`
+    ] as const;
+    }
+
+
+export const getListNutritionChallengesQueryOptions = <TData = Awaited<ReturnType<typeof listNutritionChallenges>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNutritionChallenges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListNutritionChallengesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listNutritionChallenges>>> = ({ signal }) => listNutritionChallenges({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listNutritionChallenges>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListNutritionChallengesQueryResult = NonNullable<Awaited<ReturnType<typeof listNutritionChallenges>>>
+export type ListNutritionChallengesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List nutrition challenges with the player's current progress
+ */
+
+export function useListNutritionChallenges<TData = Awaited<ReturnType<typeof listNutritionChallenges>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNutritionChallenges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListNutritionChallengesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getIncrementNutritionChallengeProgressUrl = (key: string,) => {
+
+
+
+
+  return `/api/nutrition/challenges/${key}/progress`
+}
+
+/**
+ * Advances the player's progress for `key` by `increment`. When the
+challenge is completed for the first time, XP, coins, and the
+associated badge are awarded. Already-completed challenges return
+`alreadyCompleted=true` without applying further increments.
+
+ * @summary Increment progress on a nutrition challenge
+ */
+export const incrementNutritionChallengeProgress = async (key: string,
+    challengeProgressInput: ChallengeProgressInput, options?: RequestInit): Promise<ChallengeProgressResult> => {
+
+  return customFetch<ChallengeProgressResult>(getIncrementNutritionChallengeProgressUrl(key),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      challengeProgressInput,)
+  }
+);}
+
+
+
+
+export const getIncrementNutritionChallengeProgressMutationOptions = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof incrementNutritionChallengeProgress>>, TError,{key: string;data: BodyType<ChallengeProgressInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof incrementNutritionChallengeProgress>>, TError,{key: string;data: BodyType<ChallengeProgressInput>}, TContext> => {
+
+const mutationKey = ['incrementNutritionChallengeProgress'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof incrementNutritionChallengeProgress>>, {key: string;data: BodyType<ChallengeProgressInput>}> = (props) => {
+          const {key,data} = props ?? {};
+
+          return  incrementNutritionChallengeProgress(key,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type IncrementNutritionChallengeProgressMutationResult = NonNullable<Awaited<ReturnType<typeof incrementNutritionChallengeProgress>>>
+    export type IncrementNutritionChallengeProgressMutationBody = BodyType<ChallengeProgressInput>
+    export type IncrementNutritionChallengeProgressMutationError = ErrorType<StorageErrorEnvelope>
+
+    /**
+ * @summary Increment progress on a nutrition challenge
+ */
+export const useIncrementNutritionChallengeProgress = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof incrementNutritionChallengeProgress>>, TError,{key: string;data: BodyType<ChallengeProgressInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof incrementNutritionChallengeProgress>>,
+        TError,
+        {key: string;data: BodyType<ChallengeProgressInput>},
+        TContext
+      > => {
+      return useMutation(getIncrementNutritionChallengeProgressMutationOptions(options));
+    }
+
+export const getGetNutritionMacroTargetUrl = () => {
+
+
+
+
+  return `/api/nutrition/macro-target`
+}
+
+/**
+ * Returns the daily macro target for the authenticated player's physique
+goal. The server attempts an AI-personalized target first (using the
+player's level + fitness XP); if the AI call fails or returns invalid
+JSON, it falls back to the static per-goal table. `aiPersonalized`
+indicates which path produced the result.
+
+ * @summary Get the player's daily macro target
+ */
+export const getNutritionMacroTarget = async ( options?: RequestInit): Promise<NutritionMacroTarget> => {
+
+  return customFetch<NutritionMacroTarget>(getGetNutritionMacroTargetUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNutritionMacroTargetQueryKey = () => {
+    return [
+    `/api/nutrition/macro-target`
+    ] as const;
+    }
+
+
+export const getGetNutritionMacroTargetQueryOptions = <TData = Awaited<ReturnType<typeof getNutritionMacroTarget>>, TError = ErrorType<StorageErrorEnvelope>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNutritionMacroTarget>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNutritionMacroTargetQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNutritionMacroTarget>>> = ({ signal }) => getNutritionMacroTarget({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNutritionMacroTarget>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNutritionMacroTargetQueryResult = NonNullable<Awaited<ReturnType<typeof getNutritionMacroTarget>>>
+export type GetNutritionMacroTargetQueryError = ErrorType<StorageErrorEnvelope>
+
+
+/**
+ * @summary Get the player's daily macro target
+ */
+
+export function useGetNutritionMacroTarget<TData = Awaited<ReturnType<typeof getNutritionMacroTarget>>, TError = ErrorType<StorageErrorEnvelope>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNutritionMacroTarget>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNutritionMacroTargetQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetNutritionStreakUrl = () => {
+
+
+
+
+  return `/api/nutrition/streak`
+}
+
+/**
+ * Returns the current and longest daily macro-target streak for the
+authenticated player, plus today's totals and target so the UI can
+render a progress meter without a second request. A streak lapses
+automatically when the player misses a day.
+
+ * @summary Get the player's daily macro-target streak
+ */
+export const getNutritionStreak = async ( options?: RequestInit): Promise<NutritionStreak> => {
+
+  return customFetch<NutritionStreak>(getGetNutritionStreakUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNutritionStreakQueryKey = () => {
+    return [
+    `/api/nutrition/streak`
+    ] as const;
+    }
+
+
+export const getGetNutritionStreakQueryOptions = <TData = Awaited<ReturnType<typeof getNutritionStreak>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNutritionStreak>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNutritionStreakQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNutritionStreak>>> = ({ signal }) => getNutritionStreak({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNutritionStreak>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNutritionStreakQueryResult = NonNullable<Awaited<ReturnType<typeof getNutritionStreak>>>
+export type GetNutritionStreakQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the player's daily macro-target streak
+ */
+
+export function useGetNutritionStreak<TData = Awaited<ReturnType<typeof getNutritionStreak>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNutritionStreak>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNutritionStreakQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSendNutritionRecapUrl = () => {
+
+
+
+
+  return `/api/nutrition/recap/send`
+}
+
+/**
+ * Idempotent on-demand trigger. Creates this week's recap notification
+for the authenticated player if one has not already been delivered.
+
+ * @summary Send this week's nutrition recap notification
+ */
+export const sendNutritionRecap = async ( options?: RequestInit): Promise<NutritionRecapSendResult> => {
+
+  return customFetch<NutritionRecapSendResult>(getSendNutritionRecapUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getSendNutritionRecapMutationOptions = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendNutritionRecap>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendNutritionRecap>>, TError,void, TContext> => {
+
+const mutationKey = ['sendNutritionRecap'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendNutritionRecap>>, void> = () => {
+
+
+          return  sendNutritionRecap(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendNutritionRecapMutationResult = NonNullable<Awaited<ReturnType<typeof sendNutritionRecap>>>
+
+    export type SendNutritionRecapMutationError = ErrorType<StorageErrorEnvelope>
+
+    /**
+ * @summary Send this week's nutrition recap notification
+ */
+export const useSendNutritionRecap = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendNutritionRecap>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendNutritionRecap>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getSendNutritionRecapMutationOptions(options));
+    }
+
+export const getUpdatePhysiqueGoalUrl = () => {
+
+
+
+
+  return `/api/nutrition/physique-goal`
+}
+
+/**
+ * Updates the physique goal used to derive daily macro targets and
+Hatchling reward tuning. The caller must own `playerId`.
+
+ * @summary Update the player's physique goal
+ */
+export const updatePhysiqueGoal = async (physiqueGoalInput: PhysiqueGoalInput, options?: RequestInit): Promise<PhysiqueGoalResult> => {
+
+  return customFetch<PhysiqueGoalResult>(getUpdatePhysiqueGoalUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      physiqueGoalInput,)
+  }
+);}
+
+
+
+
+export const getUpdatePhysiqueGoalMutationOptions = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePhysiqueGoal>>, TError,{data: BodyType<PhysiqueGoalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePhysiqueGoal>>, TError,{data: BodyType<PhysiqueGoalInput>}, TContext> => {
+
+const mutationKey = ['updatePhysiqueGoal'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePhysiqueGoal>>, {data: BodyType<PhysiqueGoalInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updatePhysiqueGoal(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePhysiqueGoalMutationResult = NonNullable<Awaited<ReturnType<typeof updatePhysiqueGoal>>>
+    export type UpdatePhysiqueGoalMutationBody = BodyType<PhysiqueGoalInput>
+    export type UpdatePhysiqueGoalMutationError = ErrorType<StorageErrorEnvelope>
+
+    /**
+ * @summary Update the player's physique goal
+ */
+export const useUpdatePhysiqueGoal = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePhysiqueGoal>>, TError,{data: BodyType<PhysiqueGoalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updatePhysiqueGoal>>,
+        TError,
+        {data: BodyType<PhysiqueGoalInput>},
+        TContext
+      > => {
+      return useMutation(getUpdatePhysiqueGoalMutationOptions(options));
+    }
 

@@ -629,7 +629,15 @@ router.post("/nutrition/posts/:id/comments", requireAuth, attachPlayer, async (r
 
   await db.update(mealPostsTable).set({ commentsCount: sql`comments_count + 1` }).where(eq(mealPostsTable.id, postId));
 
-  res.status(201).json({ ...comment, createdAt: comment!.createdAt.toISOString() });
+  const author = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
+
+  res.status(201).json({
+    ...comment,
+    createdAt: comment!.createdAt.toISOString(),
+    author: author
+      ? { username: author.username, displayName: author.displayName }
+      : { username: "user", displayName: null },
+  });
 });
 
 // ── POST /nutrition/analyze ───────────────────────────────────────────────────

@@ -3381,3 +3381,297 @@ export const GetNutritionSummaryResponse = zod.object({
   "aiTip": zod.string(),
   "aiSource": zod.enum(['ai', 'fallback'])
 })
+
+
+/**
+ * Returns a page of meal posts. In `feed` mode, results are restricted to
+the viewer and people they share a group with. When the viewer has no
+follow/group connections yet, the server automatically falls back to
+the global `discover` feed and reports that via `fellBackToDiscover`.
+Posts from blocked / blocking players are filtered out.
+
+ * @summary List meal posts for the authenticated player
+ */
+export const listNutritionPostsQueryLimitDefault = 20;
+export const listNutritionPostsQueryLimitMax = 50;
+
+export const listNutritionPostsQueryModeDefault = `feed`;
+
+export const ListNutritionPostsQueryParams = zod.object({
+  "limit": zod.coerce.number().min(1).max(listNutritionPostsQueryLimitMax).default(listNutritionPostsQueryLimitDefault),
+  "mode": zod.enum(['feed', 'discover']).default(listNutritionPostsQueryModeDefault)
+})
+
+export const ListNutritionPostsResponse = zod.object({
+  "mode": zod.enum(['feed', 'discover']),
+  "fellBackToDiscover": zod.boolean(),
+  "posts": zod.array(zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "emoji": zod.string(),
+  "name": zod.string(),
+  "tag": zod.string(),
+  "description": zod.string().nullish(),
+  "calories": zod.number().nullish(),
+  "proteinG": zod.number().nullish(),
+  "carbsG": zod.number().nullish(),
+  "fatG": zod.number().nullish(),
+  "aiAnalyzed": zod.boolean(),
+  "likesCount": zod.number(),
+  "commentsCount": zod.number(),
+  "createdAt": zod.string(),
+  "liked": zod.boolean(),
+  "author": zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullable()
+})
+}))
+})
+
+
+/**
+ * Logs a meal for the authenticated player. Optionally accepts macros and
+an AI-derived quality score; the server independently derives a quality
+score from the macros and uses the more conservative value to buff or
+debuff the player's active Hatchling. May also award badges and trigger
+the daily macro-target streak reward when all four macros land within
+±10% of the player's daily target.
+
+ * @summary Create a meal post
+ */
+export const createMealPostBodyNameMax = 100;
+
+export const createMealPostBodyImageUrlMax = 500;
+
+export const createMealPostBodyUploadTokenMax = 256;
+
+export const createMealPostBodyQualityScoreMax = 10;
+
+
+
+export const CreateMealPostBody = zod.object({
+  "playerId": zod.number(),
+  "name": zod.string().min(1).max(createMealPostBodyNameMax),
+  "emoji": zod.string().optional(),
+  "tag": zod.string().optional(),
+  "description": zod.string().optional(),
+  "imageUrl": zod.string().max(createMealPostBodyImageUrlMax).optional().describe('Object path returned by `\/storage\/uploads\/request-url`. Must start with `\/objects\/`.'),
+  "uploadToken": zod.string().min(1).max(createMealPostBodyUploadTokenMax).optional().describe('HMAC token issued alongside the presigned upload URL. Required when `imageUrl` is provided.'),
+  "calories": zod.number().optional(),
+  "proteinG": zod.number().optional(),
+  "carbsG": zod.number().optional(),
+  "fatG": zod.number().optional(),
+  "aiAnalyzed": zod.boolean().optional(),
+  "qualityScore": zod.number().min(1).max(createMealPostBodyQualityScoreMax).optional()
+})
+
+
+/**
+ * Idempotent toggle: liking an already-liked post unlikes it. The likes
+counter on the post is updated atomically and never drops below zero.
+
+ * @summary Toggle a like on a meal post
+ */
+export const ToggleMealPostLikeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ToggleMealPostLikeResponse = zod.object({
+  "liked": zod.boolean(),
+  "likesCount": zod.number()
+})
+
+
+/**
+ * @summary List comments on a meal post
+ */
+export const ListMealPostCommentsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListMealPostCommentsResponseItem = zod.object({
+  "id": zod.number(),
+  "mealPostId": zod.number(),
+  "playerId": zod.number(),
+  "content": zod.string(),
+  "createdAt": zod.string(),
+  "author": zod.object({
+  "username": zod.string(),
+  "displayName": zod.string().nullable()
+})
+})
+export const ListMealPostCommentsResponse = zod.array(ListMealPostCommentsResponseItem)
+
+
+/**
+ * @summary Add a comment to a meal post
+ */
+export const AddMealPostCommentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const addMealPostCommentBodyContentMax = 500;
+
+
+
+export const AddMealPostCommentBody = zod.object({
+  "content": zod.string().min(1).max(addMealPostCommentBodyContentMax)
+})
+
+
+/**
+ * Sends a free-form meal description to the AI sports-nutritionist model
+and returns estimated macros, a 1-10 quality score, and 1-3 short
+improvement suggestions. Returns a static fallback estimate if the
+model response cannot be parsed.
+
+ * @summary Estimate macros + quality score from a meal description
+ */
+export const analyzeMealDescriptionBodyDescriptionMin = 3;
+export const analyzeMealDescriptionBodyDescriptionMax = 500;
+
+
+
+export const AnalyzeMealDescriptionBody = zod.object({
+  "description": zod.string().min(analyzeMealDescriptionBodyDescriptionMin).max(analyzeMealDescriptionBodyDescriptionMax)
+})
+
+export const analyzeMealDescriptionResponseQualityScoreMax = 10;
+
+
+
+export const AnalyzeMealDescriptionResponse = zod.object({
+  "calories": zod.number().optional(),
+  "protein_g": zod.number().optional(),
+  "carbs_g": zod.number().optional(),
+  "fat_g": zod.number().optional(),
+  "quality_score": zod.number().min(1).max(analyzeMealDescriptionResponseQualityScoreMax).optional(),
+  "suggestions": zod.array(zod.string()).optional()
+})
+
+
+/**
+ * @summary List nutrition challenges with the player's current progress
+ */
+export const ListNutritionChallengesResponseItem = zod.object({
+  "key": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "target": zod.number(),
+  "unit": zod.string(),
+  "xpReward": zod.number(),
+  "coinsReward": zod.number(),
+  "badge": zod.string(),
+  "icon": zod.string(),
+  "currentValue": zod.number(),
+  "completedAt": zod.string().nullable()
+})
+export const ListNutritionChallengesResponse = zod.array(ListNutritionChallengesResponseItem)
+
+
+/**
+ * Advances the player's progress for `key` by `increment`. When the
+challenge is completed for the first time, XP, coins, and the
+associated badge are awarded. Already-completed challenges return
+`alreadyCompleted=true` without applying further increments.
+
+ * @summary Increment progress on a nutrition challenge
+ */
+export const IncrementNutritionChallengeProgressParams = zod.object({
+  "key": zod.coerce.string()
+})
+
+export const incrementNutritionChallengeProgressBodyIncrementDefault = 1;
+
+export const IncrementNutritionChallengeProgressBody = zod.object({
+  "playerId": zod.number(),
+  "increment": zod.number().default(incrementNutritionChallengeProgressBodyIncrementDefault)
+})
+
+export const IncrementNutritionChallengeProgressResponse = zod.object({
+  "currentValue": zod.number(),
+  "target": zod.number(),
+  "isComplete": zod.boolean().optional(),
+  "alreadyCompleted": zod.boolean().optional(),
+  "newBadge": zod.string().nullish()
+})
+
+
+/**
+ * Returns the daily macro target for the authenticated player's physique
+goal. The server attempts an AI-personalized target first (using the
+player's level + fitness XP); if the AI call fails or returns invalid
+JSON, it falls back to the static per-goal table. `aiPersonalized`
+indicates which path produced the result.
+
+ * @summary Get the player's daily macro target
+ */
+export const GetNutritionMacroTargetResponse = zod.object({
+  "goal": zod.string(),
+  "calories": zod.number(),
+  "protein": zod.number(),
+  "carbs": zod.number(),
+  "fat": zod.number(),
+  "tip": zod.string(),
+  "aiPersonalized": zod.boolean()
+})
+
+
+/**
+ * Returns the current and longest daily macro-target streak for the
+authenticated player, plus today's totals and target so the UI can
+render a progress meter without a second request. A streak lapses
+automatically when the player misses a day.
+
+ * @summary Get the player's daily macro-target streak
+ */
+export const GetNutritionStreakResponse = zod.object({
+  "currentStreak": zod.number(),
+  "longestStreak": zod.number(),
+  "lastHitDate": zod.string().nullable(),
+  "hitToday": zod.boolean(),
+  "today": zod.object({
+  "totals": zod.object({
+  "calories": zod.number(),
+  "protein": zod.number(),
+  "carbs": zod.number(),
+  "fat": zod.number()
+}),
+  "target": zod.object({
+  "calories": zod.number(),
+  "protein": zod.number(),
+  "carbs": zod.number(),
+  "fat": zod.number()
+}),
+  "tolerance": zod.number()
+})
+})
+
+
+/**
+ * Idempotent on-demand trigger. Creates this week's recap notification
+for the authenticated player if one has not already been delivered.
+
+ * @summary Send this week's nutrition recap notification
+ */
+export const SendNutritionRecapResponse = zod.object({
+  "sent": zod.boolean()
+})
+
+
+/**
+ * Updates the physique goal used to derive daily macro targets and
+Hatchling reward tuning. The caller must own `playerId`.
+
+ * @summary Update the player's physique goal
+ */
+export const UpdatePhysiqueGoalBody = zod.object({
+  "playerId": zod.number(),
+  "physiqueGoal": zod.string()
+})
+
+export const UpdatePhysiqueGoalResponse = zod.object({
+  "physiqueGoal": zod.string()
+})

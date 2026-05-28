@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { motion, AnimatePresence } from "framer-motion";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,8 +15,30 @@ import { HatchlingReaction, type HatchlingReactionData } from "@/components/hatc
 import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
 import {
   useGetNutritionSummary,
+  useListNutritionPosts,
+  useCreateMealPost,
+  useToggleMealPostLike,
+  useListMealPostComments,
+  useAddMealPostComment,
+  useAnalyzeMealDescription,
+  useListNutritionChallenges,
+  useIncrementNutritionChallengeProgress,
+  useGetNutritionMacroTarget,
+  useGetNutritionStreak,
+  useUpdatePhysiqueGoal,
+  getListNutritionPostsQueryKey,
+  getListNutritionChallengesQueryKey,
+  getGetNutritionMacroTargetQueryKey,
+  getGetNutritionStreakQueryKey,
+  getGetNutritionSummaryQueryKey,
+  getListMealPostCommentsQueryKey,
   type NutritionWeeklySummary,
   type NutritionWeeklySummaryHatchlingMood,
+  type MealPost,
+  type NutritionChallenge,
+  type NutritionMacroTarget,
+  type NutritionStreak,
+  type NutritionAnalyzeResult,
 } from "@workspace/api-client-react";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
@@ -47,48 +69,6 @@ const PHYSIQUE_GOALS = [
 
 const MEAL_EMOJIS = ["🍽️","🥗","🍗","🥩","🥑","🍳","🥛","🍱","🥙","🌮","🥦","🍠","🫐","🥜","🍚","🐟","🥚","🧇","🍎","🫚"];
 
-interface MealPost {
-  id: number;
-  playerId: number;
-  imageUrl: string | null;
-  emoji: string;
-  name: string;
-  tag: string;
-  description: string | null;
-  calories: number | null;
-  proteinG: number | null;
-  carbsG: number | null;
-  fatG: number | null;
-  aiAnalyzed: boolean;
-  likesCount: number;
-  commentsCount: number;
-  createdAt: string;
-  liked: boolean;
-  author: { id: number; username: string; displayName: string | null };
-}
-
-interface NutritionChallenge {
-  key: string;
-  name: string;
-  description: string;
-  target: number;
-  unit: string;
-  xpReward: number;
-  coinsReward: number;
-  icon: string;
-  currentValue: number;
-  completedAt: string | null;
-}
-
-interface MacroTarget {
-  goal: string;
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  tip: string;
-}
-
 const MOOD_STYLES: Record<NutritionWeeklySummaryHatchlingMood, { ring: string; bg: string; label: string; tint: string }> = {
   thriving: { ring: "ring-green-500/60",  bg: "from-green-500/15 to-emerald-500/5",   label: "Thriving",    tint: "text-green-300"  },
   happy:    { ring: "ring-cyan-500/60",   bg: "from-cyan-500/15 to-blue-500/5",       label: "Happy",       tint: "text-cyan-300"   },
@@ -96,18 +76,6 @@ const MOOD_STYLES: Record<NutritionWeeklySummaryHatchlingMood, { ring: string; b
   hungry:   { ring: "ring-orange-500/60", bg: "from-orange-500/15 to-red-500/5",      label: "Hungry",      tint: "text-orange-300" },
   sad:      { ring: "ring-rose-500/60",   bg: "from-rose-500/15 to-pink-500/5",       label: "Underfed",    tint: "text-rose-300"   },
 };
-
-interface NutritionStreak {
-  currentStreak: number;
-  longestStreak: number;
-  lastHitDate: string | null;
-  hitToday: boolean;
-  today: {
-    totals: { calories: number; protein: number; carbs: number; fat: number };
-    target: { calories: number; protein: number; carbs: number; fat: number };
-    tolerance: number;
-  };
-}
 
 
 export default function Nutrition() {
@@ -134,7 +102,7 @@ export default function Nutrition() {
     fatG: "",
   });
   const [analyzing, setAnalyzing] = useState(false);
-  const [aiResult, setAiResult] = useState<{ quality_score?: number; suggestions?: string[] } | null>(null);
+  const [aiResult, setAiResult] = useState<NutritionAnalyzeResult | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploadToken, setUploadToken] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -195,111 +163,74 @@ export default function Nutrition() {
   };
 
   // ── Queries ─────────────────────────────────────────────────────────────────
-  const feedMode = activeTab === "discover" ? "discover" : "feed";
-  const { data: feedData, isLoading: postsLoading } = useQuery<{ mode: string; fellBackToDiscover: boolean; posts: MealPost[] }>({
-    queryKey: ["nutrition-posts", pid, feedMode],
-    queryFn: () => fetch(`${BASE}/api/nutrition/posts?limit=30&mode=${feedMode}`, { credentials: "include" }).then(r => r.json()),
-    enabled: !!pid && activeTab !== "challenges",
-  });
+  const feedMode: "feed" | "discover" = activeTab === "discover" ? "discover" : "feed";
+  const { data: feedData, isLoading: postsLoading } = useListNutritionPosts(
+    { limit: 30, mode: feedMode },
+    { query: { enabled: !!pid && activeTab !== "challenges", queryKey: getListNutritionPostsQueryKey({ limit: 30, mode: feedMode }) } },
+  );
   const posts: MealPost[] = feedData?.posts ?? [];
   const fellBackToDiscover = feedData?.fellBackToDiscover ?? false;
 
-  const { data: challenges = [], isLoading: challengesLoading } = useQuery<NutritionChallenge[]>({
-    queryKey: ["nutrition-challenges", pid],
-    queryFn: () => fetch(`${BASE}/api/nutrition/challenges`, { credentials: "include" }).then(r => r.json()),
-    enabled: !!pid,
+  const { data: challenges = [], isLoading: challengesLoading } = useListNutritionChallenges({
+    query: { enabled: !!pid, queryKey: getListNutritionChallengesQueryKey() },
   });
 
-  const { data: macroTarget } = useQuery<MacroTarget>({
-    queryKey: ["macro-target", pid],
-    queryFn: () => fetch(`${BASE}/api/nutrition/macro-target`, { credentials: "include" }).then(r => r.json()),
-    enabled: !!pid,
+  const { data: macroTarget } = useGetNutritionMacroTarget({
+    query: { enabled: !!pid, queryKey: getGetNutritionMacroTargetQueryKey() },
   });
 
   const { data: weekly, isLoading: weeklyLoading } = useGetNutritionSummary({
-    query: { enabled: !!pid, queryKey: ["nutrition-summary", pid] },
+    query: { enabled: !!pid, queryKey: getGetNutritionSummaryQueryKey() },
   });
 
-  const { data: streak } = useQuery<NutritionStreak>({
-    queryKey: ["nutrition-streak", pid],
-    queryFn: () => fetch(`${BASE}/api/nutrition/streak`, { credentials: "include" }).then(r => r.json()),
-    enabled: !!pid,
+  const { data: streak } = useGetNutritionStreak({
+    query: { enabled: !!pid, queryKey: getGetNutritionStreakQueryKey() },
   });
 
   // ── Mutations ────────────────────────────────────────────────────────────────
-  const likeMutation = useMutation({
-    mutationFn: (postId: number) =>
-      fetch(`${BASE}/api/nutrition/posts/${postId}/like`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      }).then(r => r.json()),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["nutrition-posts", pid] }),
-  });
-
-  const challengeMutation = useMutation({
-    mutationFn: (key: string) =>
-      fetch(`${BASE}/api/nutrition/challenges/${key}/progress`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId: pid, increment: 1 }),
-      }).then(r => r.json()),
-    onSuccess: (data, key) => {
-      qc.invalidateQueries({ queryKey: ["nutrition-challenges", pid] });
-      const entries: RewardEntry[] = [
-        { kind: "challenge", label: "Challenge progress", value: `${data.currentValue}/${data.target}`, detail: `${key.replace(/_/g, " ")}` },
-      ];
-      if (data.isComplete) {
-        if (data.xpReward) entries.push({ kind: "xp", label: "Challenge bonus", value: data.xpReward });
-        if (data.coinsReward) entries.push({ kind: "artifact", label: "Coins", value: data.coinsReward });
-        entries.push({ kind: "challenge", label: "Badge unlocked!", detail: "Check your collection." });
-      }
-      setRewardSummary({ open: true, entries, title: data.isComplete ? "Challenge Complete!" : "Progress Logged" });
+  const likeMutation = useToggleMealPostLike({
+    mutation: {
+      onSuccess: () =>
+        qc.invalidateQueries({ queryKey: getListNutritionPostsQueryKey({ limit: 30, mode: feedMode }) }),
     },
   });
 
-  const goalMutation = useMutation({
-    mutationFn: (goal: string) =>
-      fetch(`${BASE}/api/nutrition/physique-goal`, {
-        method: "PUT",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId: pid, physiqueGoal: goal }),
-      }).then(r => r.json()),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["macro-target", pid] });
-      setShowGoalPicker(false);
-      toast({ title: "Goal updated!", description: "Your macro targets have been updated." });
+  const challengeMutation = useIncrementNutritionChallengeProgress({
+    mutation: {
+      onSuccess: (data, variables) => {
+        qc.invalidateQueries({ queryKey: getListNutritionChallengesQueryKey() });
+        const entries: RewardEntry[] = [
+          {
+            kind: "challenge",
+            label: "Challenge progress",
+            value: `${data.currentValue}/${data.target}`,
+            detail: `${variables.key.replace(/_/g, " ")}`,
+          },
+        ];
+        if (data.isComplete) {
+          entries.push({ kind: "challenge", label: "Badge unlocked!", detail: "Check your collection." });
+        }
+        setRewardSummary({ open: true, entries, title: data.isComplete ? "Challenge Complete!" : "Progress Logged" });
+      },
     },
   });
 
-  const postMutation = useMutation({
-    mutationFn: () =>
-      fetch(`${BASE}/api/nutrition/posts`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          playerId: pid,
-          name: form.name,
-          emoji: form.emoji,
-          tag: form.tag,
-          description: form.description || undefined,
-          imageUrl: imageUrl ?? undefined,
-          uploadToken: uploadToken ?? undefined,
-          calories: form.calories ? Number(form.calories) : undefined,
-          proteinG: form.proteinG ? Number(form.proteinG) : undefined,
-          carbsG: form.carbsG ? Number(form.carbsG) : undefined,
-          fatG: form.fatG ? Number(form.fatG) : undefined,
-          aiAnalyzed: !!aiResult,
-          qualityScore: aiResult?.quality_score,
-        }),
-      }).then(r => r.json()),
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ["nutrition-posts", pid] });
-      qc.invalidateQueries({ queryKey: ["nutrition-summary", pid] });
-      qc.invalidateQueries({ queryKey: ["nutrition-streak", pid] });
+  const goalMutation = useUpdatePhysiqueGoal({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getGetNutritionMacroTargetQueryKey() });
+        setShowGoalPicker(false);
+        toast({ title: "Goal updated!", description: "Your macro targets have been updated." });
+      },
+    },
+  });
+
+  const postMutation = useCreateMealPost({
+    mutation: {
+      onSuccess: (data) => {
+        qc.invalidateQueries({ queryKey: getListNutritionPostsQueryKey({ limit: 30, mode: feedMode }) });
+        qc.invalidateQueries({ queryKey: getGetNutritionSummaryQueryKey() });
+        qc.invalidateQueries({ queryKey: getGetNutritionStreakQueryKey() });
       // Refresh hatchling stats since nutrition can buff/debuff the active Hatchling.
       // Generated query keys are arrays starting with "/api/hatchlings" (list) or
       // "/api/hatchlings/:id" (detail) — match either by prefix.
@@ -371,29 +302,26 @@ export default function Nutrition() {
         }
       }
       setRewardSummary({ open: true, entries, title: "Meal Rewards" });
+      },
     },
   });
+
+  const analyzeMutation = useAnalyzeMealDescription();
 
   const handleAnalyze = async () => {
     if (!form.description) return;
     setAnalyzing(true);
     try {
-      const res = await fetch(`${BASE}/api/nutrition/analyze`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: form.description }),
-      });
-      const data = await res.json();
+      const data = await analyzeMutation.mutateAsync({ data: { description: form.description } });
       setForm(f => ({
         ...f,
-        calories: String(data.calories ?? f.calories),
-        proteinG: String(data.protein_g ?? f.proteinG),
-        carbsG: String(data.carbs_g ?? f.carbsG),
-        fatG: String(data.fat_g ?? f.fatG),
+        calories: data.calories != null ? String(data.calories) : f.calories,
+        proteinG: data.protein_g != null ? String(data.protein_g) : f.proteinG,
+        carbsG:   data.carbs_g   != null ? String(data.carbs_g)   : f.carbsG,
+        fatG:     data.fat_g     != null ? String(data.fat_g)     : f.fatG,
       }));
       setAiResult(data);
-      toast({ title: "AI Analysis complete!", description: `Quality score: ${data.quality_score}/10` });
+      toast({ title: "AI Analysis complete!", description: `Quality score: ${data.quality_score ?? "?"}/10` });
     } catch {
       toast({ title: "Analysis failed", description: "Try again.", variant: "destructive" });
     } finally {
@@ -557,7 +485,7 @@ export default function Nutrition() {
                   </div>
                 )
                 : posts.map((post, i) => (
-                  <MealCard key={post.id} post={post} index={i} onLike={() => likeMutation.mutate(post.id)} />
+                  <MealCard key={post.id} post={post} index={i} onLike={() => likeMutation.mutate({ id: post.id })} />
                 ))
             }
           </div>
@@ -611,7 +539,7 @@ export default function Nutrition() {
                         size="sm"
                         variant="outline"
                         className="mt-3 w-full text-xs font-black"
-                        onClick={() => challengeMutation.mutate(c.key)}
+                        onClick={() => challengeMutation.mutate({ key: c.key, data: { playerId: pid, increment: 1 } })}
                         disabled={challengeMutation.isPending}
                       >
                         Log Progress +1
@@ -815,7 +743,21 @@ export default function Nutrition() {
 
                 <Button
                   className="w-full font-black bg-primary h-12"
-                  onClick={() => postMutation.mutate()}
+                  onClick={() => postMutation.mutate({ data: {
+                    playerId: pid,
+                    name: form.name,
+                    emoji: form.emoji,
+                    tag: form.tag,
+                    description: form.description || undefined,
+                    imageUrl: imageUrl ?? undefined,
+                    uploadToken: uploadToken ?? undefined,
+                    calories: form.calories ? Number(form.calories) : undefined,
+                    proteinG: form.proteinG ? Number(form.proteinG) : undefined,
+                    carbsG: form.carbsG ? Number(form.carbsG) : undefined,
+                    fatG: form.fatG ? Number(form.fatG) : undefined,
+                    aiAnalyzed: !!aiResult,
+                    qualityScore: aiResult?.quality_score,
+                  } })}
                   disabled={!form.name || postMutation.isPending}
                 >
                   {postMutation.isPending ? "Posting..." : "Post Meal 🍽️"}
@@ -845,7 +787,7 @@ export default function Nutrition() {
                 {PHYSIQUE_GOALS.map(g => (
                   <button
                     key={g.key}
-                    onClick={() => goalMutation.mutate(g.key)}
+                    onClick={() => goalMutation.mutate({ data: { playerId: pid, physiqueGoal: g.key } })}
                     className={`rounded-2xl border p-4 text-left transition-all ${
                       macroTarget?.goal === g.key ? "border-primary bg-primary/10" : "border-border bg-muted/20 hover:bg-muted/40"
                     }`}
@@ -1061,24 +1003,17 @@ function MealCard({ post, index, onLike }: { post: MealPost; index: number; onLi
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
   const { playerId } = usePlayer();
-  const { toast } = useToast();
-  const qc = useQueryClient();
   const pid = playerId ?? 0;
 
-  const { data: comments = [], refetch } = useQuery<any[]>({
-    queryKey: ["meal-comments", post.id],
-    queryFn: () => fetch(`${BASE}/api/nutrition/posts/${post.id}/comments`, { credentials: "include" }).then(r => r.json()),
-    enabled: showComments,
+  const { data: comments = [], refetch } = useListMealPostComments(post.id, {
+    query: { enabled: showComments, queryKey: getListMealPostCommentsQueryKey(post.id) },
   });
+
+  const addCommentMutation = useAddMealPostComment();
 
   const addComment = async () => {
     if (!newComment.trim()) return;
-    await fetch(`${BASE}/api/nutrition/posts/${post.id}/comments`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: newComment }),
-    });
+    await addCommentMutation.mutateAsync({ id: post.id, data: { content: newComment } });
     setNewComment("");
     refetch();
   };

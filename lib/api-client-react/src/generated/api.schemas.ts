@@ -1672,6 +1672,257 @@ export interface NutritionWeeklySummary {
   aiSource: NutritionWeeklySummaryAiSource;
 }
 
+export interface MealAuthor {
+  id: number;
+  username: string;
+  /** @nullable */
+  displayName: string | null;
+}
+
+export interface MealPost {
+  id: number;
+  playerId: number;
+  /** @nullable */
+  imageUrl?: string | null;
+  emoji: string;
+  name: string;
+  tag: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  calories?: number | null;
+  /** @nullable */
+  proteinG?: number | null;
+  /** @nullable */
+  carbsG?: number | null;
+  /** @nullable */
+  fatG?: number | null;
+  aiAnalyzed: boolean;
+  likesCount: number;
+  commentsCount: number;
+  createdAt: string;
+  liked: boolean;
+  author: MealAuthor;
+}
+
+export type MealPostFeedPageMode = typeof MealPostFeedPageMode[keyof typeof MealPostFeedPageMode];
+
+
+export const MealPostFeedPageMode = {
+  feed: 'feed',
+  discover: 'discover',
+} as const;
+
+export interface MealPostFeedPage {
+  mode: MealPostFeedPageMode;
+  fellBackToDiscover: boolean;
+  posts: MealPost[];
+}
+
+export interface CreateMealPostInput {
+  playerId: number;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  name: string;
+  emoji?: string;
+  tag?: string;
+  description?: string;
+  /**
+     * Object path returned by `/storage/uploads/request-url`. Must start with `/objects/`.
+     * @maxLength 500
+     */
+  imageUrl?: string;
+  /**
+     * HMAC token issued alongside the presigned upload URL. Required when `imageUrl` is provided.
+     * @minLength 1
+     * @maxLength 256
+     */
+  uploadToken?: string;
+  calories?: number;
+  proteinG?: number;
+  carbsG?: number;
+  fatG?: number;
+  aiAnalyzed?: boolean;
+  /**
+     * @minimum 1
+     * @maximum 10
+     */
+  qualityScore?: number;
+}
+
+export interface MealHatchlingStatChange {
+  hatchlingId: number;
+  hatchlingName: string;
+  happinessDelta: number;
+  energyDelta: number;
+  happiness: number;
+  energy: number;
+  buffActive: boolean;
+}
+
+export interface MealDailyMacroRewardHatchling {
+  hatchlingId: number;
+  hatchlingName: string;
+  bondDelta: number;
+  xpDelta: number;
+}
+
+export interface MealDailyMacroReward {
+  currentStreak: number;
+  longestStreak: number;
+  playerXpDelta: number;
+  playerCoinsDelta: number;
+  hatchlingReward: MealDailyMacroRewardHatchling | null;
+  goal: string;
+  totals: NutritionMacroBreakdown;
+  target: NutritionMacroBreakdown;
+}
+
+export interface CreateMealPostResult {
+  id: number;
+  playerId: number;
+  /** @nullable */
+  imageUrl?: string | null;
+  emoji: string;
+  name: string;
+  tag: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  calories?: number | null;
+  /** @nullable */
+  proteinG?: number | null;
+  /** @nullable */
+  carbsG?: number | null;
+  /** @nullable */
+  fatG?: number | null;
+  aiAnalyzed: boolean;
+  likesCount: number;
+  commentsCount: number;
+  createdAt: string;
+  newBadges: string[];
+  hatchlingStatChange: MealHatchlingStatChange | null;
+  dailyMacroReward: MealDailyMacroReward | null;
+}
+
+export interface MealLikeResult {
+  liked: boolean;
+  likesCount: number;
+}
+
+export interface MealCommentAuthor {
+  username: string;
+  /** @nullable */
+  displayName: string | null;
+}
+
+export interface MealComment {
+  id: number;
+  mealPostId: number;
+  playerId: number;
+  content: string;
+  createdAt: string;
+  author: MealCommentAuthor;
+}
+
+export interface AddMealCommentInput {
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  content: string;
+}
+
+export interface NutritionAnalyzeInput {
+  /**
+     * @minLength 3
+     * @maxLength 500
+     */
+  description: string;
+}
+
+export interface NutritionAnalyzeResult {
+  calories?: number;
+  protein_g?: number;
+  carbs_g?: number;
+  fat_g?: number;
+  /**
+     * @minimum 1
+     * @maximum 10
+     */
+  quality_score?: number;
+  suggestions?: string[];
+}
+
+export interface NutritionChallenge {
+  key: string;
+  name: string;
+  description: string;
+  target: number;
+  unit: string;
+  xpReward: number;
+  coinsReward: number;
+  badge: string;
+  icon: string;
+  currentValue: number;
+  /** @nullable */
+  completedAt: string | null;
+}
+
+export interface ChallengeProgressInput {
+  playerId: number;
+  increment?: number;
+}
+
+export interface ChallengeProgressResult {
+  currentValue: number;
+  target: number;
+  isComplete?: boolean;
+  alreadyCompleted?: boolean;
+  /** @nullable */
+  newBadge?: string | null;
+}
+
+export interface NutritionMacroTarget {
+  goal: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  tip: string;
+  aiPersonalized: boolean;
+}
+
+export interface NutritionStreakToday {
+  totals: NutritionMacroBreakdown;
+  target: NutritionMacroBreakdown;
+  tolerance: number;
+}
+
+export interface NutritionStreak {
+  currentStreak: number;
+  longestStreak: number;
+  /** @nullable */
+  lastHitDate: string | null;
+  hitToday: boolean;
+  today: NutritionStreakToday;
+}
+
+export interface NutritionRecapSendResult {
+  sent: boolean;
+}
+
+export interface PhysiqueGoalInput {
+  playerId: number;
+  physiqueGoal: string;
+}
+
+export interface PhysiqueGoalResult {
+  physiqueGoal: string;
+}
+
 export type SearchPlayersParams = {
 /**
  * @minLength 1
@@ -1945,4 +2196,21 @@ export type JoinLocalChallenge200 = {
   joined?: boolean;
   alreadyJoined?: boolean;
 };
+
+export type ListNutritionPostsParams = {
+/**
+ * @minimum 1
+ * @maximum 50
+ */
+limit?: number;
+mode?: ListNutritionPostsMode;
+};
+
+export type ListNutritionPostsMode = typeof ListNutritionPostsMode[keyof typeof ListNutritionPostsMode];
+
+
+export const ListNutritionPostsMode = {
+  feed: 'feed',
+  discover: 'discover',
+} as const;
 

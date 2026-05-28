@@ -2911,6 +2911,333 @@ paths:
               schema:
                 $ref: "#/components/schemas/StorageErrorEnvelope"
 
+  /nutrition/posts:
+    get:
+      operationId: listNutritionPosts
+      tags: [nutrition]
+      summary: List meal posts for the authenticated player
+      description: |
+        Returns a page of meal posts. In `feed` mode, results are restricted to
+        the viewer and people they share a group with. When the viewer has no
+        follow/group connections yet, the server automatically falls back to
+        the global `discover` feed and reports that via `fellBackToDiscover`.
+        Posts from blocked / blocking players are filtered out.
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 50
+        - name: mode
+          in: query
+          schema:
+            type: string
+            enum: [feed, discover]
+            default: feed
+      responses:
+        "200":
+          description: Meal post feed page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MealPostFeedPage"
+    post:
+      operationId: createMealPost
+      tags: [nutrition]
+      summary: Create a meal post
+      description: |
+        Logs a meal for the authenticated player. Optionally accepts macros and
+        an AI-derived quality score; the server independently derives a quality
+        score from the macros and uses the more conservative value to buff or
+        debuff the player's active Hatchling. May also award badges and trigger
+        the daily macro-target streak reward when all four macros land within
+        ±10% of the player's daily target.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMealPostInput"
+      responses:
+        "201":
+          description: Meal post created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateMealPostResult"
+        "400":
+          description: Invalid input or upload not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+        "403":
+          description: Invalid or missing uploadToken for imageUrl
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+
+  /nutrition/posts/{id}/like:
+    post:
+      operationId: toggleMealPostLike
+      tags: [nutrition]
+      summary: Toggle a like on a meal post
+      description: |
+        Idempotent toggle: liking an already-liked post unlikes it. The likes
+        counter on the post is updated atomically and never drops below zero.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated like state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MealLikeResult"
+
+  /nutrition/posts/{id}/comments:
+    get:
+      operationId: listMealPostComments
+      tags: [nutrition]
+      summary: List comments on a meal post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Comments on the meal post
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MealComment"
+    post:
+      operationId: addMealPostComment
+      tags: [nutrition]
+      summary: Add a comment to a meal post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddMealCommentInput"
+      responses:
+        "201":
+          description: Comment added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MealComment"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+
+  /nutrition/analyze:
+    post:
+      operationId: analyzeMealDescription
+      tags: [nutrition]
+      summary: Estimate macros + quality score from a meal description
+      description: |
+        Sends a free-form meal description to the AI sports-nutritionist model
+        and returns estimated macros, a 1-10 quality score, and 1-3 short
+        improvement suggestions. Returns a static fallback estimate if the
+        model response cannot be parsed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NutritionAnalyzeInput"
+      responses:
+        "200":
+          description: Estimated macros + AI suggestions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NutritionAnalyzeResult"
+        "400":
+          description: Description missing or too short
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+        "503":
+          description: AI service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+
+  /nutrition/challenges:
+    get:
+      operationId: listNutritionChallenges
+      tags: [nutrition]
+      summary: List nutrition challenges with the player's current progress
+      responses:
+        "200":
+          description: Challenges with player progress
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NutritionChallenge"
+
+  /nutrition/challenges/{key}/progress:
+    post:
+      operationId: incrementNutritionChallengeProgress
+      tags: [nutrition]
+      summary: Increment progress on a nutrition challenge
+      description: |
+        Advances the player's progress for `key` by `increment`. When the
+        challenge is completed for the first time, XP, coins, and the
+        associated badge are awarded. Already-completed challenges return
+        `alreadyCompleted=true` without applying further increments.
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChallengeProgressInput"
+      responses:
+        "200":
+          description: Updated challenge progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChallengeProgressResult"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+        "404":
+          description: Challenge key not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+
+  /nutrition/macro-target:
+    get:
+      operationId: getNutritionMacroTarget
+      tags: [nutrition]
+      summary: Get the player's daily macro target
+      description: |
+        Returns the daily macro target for the authenticated player's physique
+        goal. The server attempts an AI-personalized target first (using the
+        player's level + fitness XP); if the AI call fails or returns invalid
+        JSON, it falls back to the static per-goal table. `aiPersonalized`
+        indicates which path produced the result.
+      responses:
+        "200":
+          description: Daily macro target
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NutritionMacroTarget"
+        "404":
+          description: Player not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+
+  /nutrition/streak:
+    get:
+      operationId: getNutritionStreak
+      tags: [nutrition]
+      summary: Get the player's daily macro-target streak
+      description: |
+        Returns the current and longest daily macro-target streak for the
+        authenticated player, plus today's totals and target so the UI can
+        render a progress meter without a second request. A streak lapses
+        automatically when the player misses a day.
+      responses:
+        "200":
+          description: Streak snapshot + today's progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NutritionStreak"
+
+  /nutrition/recap/send:
+    post:
+      operationId: sendNutritionRecap
+      tags: [nutrition]
+      summary: Send this week's nutrition recap notification
+      description: |
+        Idempotent on-demand trigger. Creates this week's recap notification
+        for the authenticated player if one has not already been delivered.
+      responses:
+        "200":
+          description: Whether a recap was sent on this call
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NutritionRecapSendResult"
+        "500":
+          description: Recap delivery failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+
+  /nutrition/physique-goal:
+    put:
+      operationId: updatePhysiqueGoal
+      tags: [nutrition]
+      summary: Update the player's physique goal
+      description: |
+        Updates the physique goal used to derive daily macro targets and
+        Hatchling reward tuning. The caller must own `playerId`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhysiqueGoalInput"
+      responses:
+        "200":
+          description: Updated physique goal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhysiqueGoalResult"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+
 components:
   schemas:
     UploadUrlRequest:
@@ -4688,3 +5015,315 @@ components:
         aiSource:
           type: string
           enum: [ai, fallback]
+
+    MealAuthor:
+      type: object
+      required: [id, username, displayName]
+      properties:
+        id:          { type: integer }
+        username:    { type: string }
+        displayName: { type: ["string", "null"] }
+
+    MealPost:
+      type: object
+      required:
+        - id
+        - playerId
+        - emoji
+        - name
+        - tag
+        - aiAnalyzed
+        - likesCount
+        - commentsCount
+        - createdAt
+        - liked
+        - author
+      properties:
+        id:            { type: integer }
+        playerId:      { type: integer }
+        imageUrl:      { type: ["string", "null"] }
+        emoji:         { type: string }
+        name:          { type: string }
+        tag:           { type: string }
+        description:   { type: ["string", "null"] }
+        calories:      { type: ["integer", "null"] }
+        proteinG:      { type: ["number", "null"] }
+        carbsG:        { type: ["number", "null"] }
+        fatG:          { type: ["number", "null"] }
+        aiAnalyzed:    { type: boolean }
+        likesCount:    { type: integer }
+        commentsCount: { type: integer }
+        createdAt:     { type: string }
+        liked:         { type: boolean }
+        author:
+          $ref: "#/components/schemas/MealAuthor"
+
+    MealPostFeedPage:
+      type: object
+      required: [mode, fellBackToDiscover, posts]
+      properties:
+        mode:
+          type: string
+          enum: [feed, discover]
+        fellBackToDiscover: { type: boolean }
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/MealPost"
+
+    CreateMealPostInput:
+      type: object
+      required: [playerId, name]
+      properties:
+        playerId:     { type: integer }
+        name:         { type: string, minLength: 1, maxLength: 100 }
+        emoji:        { type: string }
+        tag:          { type: string }
+        description:  { type: string }
+        imageUrl:
+          type: string
+          description: Object path returned by `/storage/uploads/request-url`. Must start with `/objects/`.
+          maxLength: 500
+        uploadToken:
+          type: string
+          description: HMAC token issued alongside the presigned upload URL. Required when `imageUrl` is provided.
+          minLength: 1
+          maxLength: 256
+        calories:     { type: number }
+        proteinG:     { type: number }
+        carbsG:       { type: number }
+        fatG:         { type: number }
+        aiAnalyzed:   { type: boolean }
+        qualityScore: { type: integer, minimum: 1, maximum: 10 }
+
+    MealHatchlingStatChange:
+      type: object
+      required: [hatchlingId, hatchlingName, happinessDelta, energyDelta, happiness, energy, buffActive]
+      properties:
+        hatchlingId:    { type: integer }
+        hatchlingName:  { type: string }
+        happinessDelta: { type: integer }
+        energyDelta:    { type: integer }
+        happiness:      { type: integer }
+        energy:         { type: integer }
+        buffActive:     { type: boolean }
+
+    MealDailyMacroRewardHatchling:
+      type: object
+      required: [hatchlingId, hatchlingName, bondDelta, xpDelta]
+      properties:
+        hatchlingId:   { type: integer }
+        hatchlingName: { type: string }
+        bondDelta:     { type: integer }
+        xpDelta:       { type: integer }
+
+    MealDailyMacroReward:
+      type: object
+      required:
+        - currentStreak
+        - longestStreak
+        - playerXpDelta
+        - playerCoinsDelta
+        - hatchlingReward
+        - goal
+        - totals
+        - target
+      properties:
+        currentStreak:    { type: integer }
+        longestStreak:    { type: integer }
+        playerXpDelta:    { type: integer }
+        playerCoinsDelta: { type: integer }
+        hatchlingReward:
+          oneOf:
+            - $ref: "#/components/schemas/MealDailyMacroRewardHatchling"
+            - type: "null"
+        goal:   { type: string }
+        totals: { $ref: "#/components/schemas/NutritionMacroBreakdown" }
+        target: { $ref: "#/components/schemas/NutritionMacroBreakdown" }
+
+    CreateMealPostResult:
+      type: object
+      required:
+        - id
+        - playerId
+        - emoji
+        - name
+        - tag
+        - aiAnalyzed
+        - likesCount
+        - commentsCount
+        - createdAt
+        - newBadges
+        - hatchlingStatChange
+        - dailyMacroReward
+      properties:
+        id:            { type: integer }
+        playerId:      { type: integer }
+        imageUrl:      { type: ["string", "null"] }
+        emoji:         { type: string }
+        name:          { type: string }
+        tag:           { type: string }
+        description:   { type: ["string", "null"] }
+        calories:      { type: ["integer", "null"] }
+        proteinG:      { type: ["number", "null"] }
+        carbsG:        { type: ["number", "null"] }
+        fatG:          { type: ["number", "null"] }
+        aiAnalyzed:    { type: boolean }
+        likesCount:    { type: integer }
+        commentsCount: { type: integer }
+        createdAt:     { type: string }
+        newBadges:
+          type: array
+          items: { type: string }
+        hatchlingStatChange:
+          oneOf:
+            - $ref: "#/components/schemas/MealHatchlingStatChange"
+            - type: "null"
+        dailyMacroReward:
+          oneOf:
+            - $ref: "#/components/schemas/MealDailyMacroReward"
+            - type: "null"
+
+    MealLikeResult:
+      type: object
+      required: [liked, likesCount]
+      properties:
+        liked:      { type: boolean }
+        likesCount: { type: integer }
+
+    MealCommentAuthor:
+      type: object
+      required: [username, displayName]
+      properties:
+        username:    { type: string }
+        displayName: { type: ["string", "null"] }
+
+    MealComment:
+      type: object
+      required: [id, mealPostId, playerId, content, createdAt, author]
+      properties:
+        id:         { type: integer }
+        mealPostId: { type: integer }
+        playerId:   { type: integer }
+        content:    { type: string }
+        createdAt:  { type: string }
+        author:
+          $ref: "#/components/schemas/MealCommentAuthor"
+
+    AddMealCommentInput:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string, minLength: 1, maxLength: 500 }
+
+    NutritionAnalyzeInput:
+      type: object
+      required: [description]
+      properties:
+        description: { type: string, minLength: 3, maxLength: 500 }
+
+    NutritionAnalyzeResult:
+      type: object
+      properties:
+        calories:      { type: number }
+        protein_g:     { type: number }
+        carbs_g:       { type: number }
+        fat_g:         { type: number }
+        quality_score: { type: integer, minimum: 1, maximum: 10 }
+        suggestions:
+          type: array
+          items: { type: string }
+
+    NutritionChallenge:
+      type: object
+      required:
+        - key
+        - name
+        - description
+        - target
+        - unit
+        - xpReward
+        - coinsReward
+        - badge
+        - icon
+        - currentValue
+        - completedAt
+      properties:
+        key:          { type: string }
+        name:         { type: string }
+        description:  { type: string }
+        target:       { type: integer }
+        unit:         { type: string }
+        xpReward:     { type: integer }
+        coinsReward:  { type: integer }
+        badge:        { type: string }
+        icon:         { type: string }
+        currentValue: { type: integer }
+        completedAt:  { type: ["string", "null"] }
+
+    ChallengeProgressInput:
+      type: object
+      required: [playerId]
+      properties:
+        playerId:  { type: integer }
+        increment: { type: integer, default: 1 }
+
+    ChallengeProgressResult:
+      type: object
+      required: [currentValue, target]
+      properties:
+        currentValue:     { type: integer }
+        target:           { type: integer }
+        isComplete:       { type: boolean }
+        alreadyCompleted: { type: boolean }
+        newBadge:         { type: ["string", "null"] }
+
+    NutritionMacroTarget:
+      type: object
+      required: [goal, calories, protein, carbs, fat, tip, aiPersonalized]
+      properties:
+        goal:           { type: string }
+        calories:       { type: number }
+        protein:        { type: number }
+        carbs:          { type: number }
+        fat:            { type: number }
+        tip:            { type: string }
+        aiPersonalized: { type: boolean }
+
+    NutritionStreakToday:
+      type: object
+      required: [totals, target, tolerance]
+      properties:
+        totals:    { $ref: "#/components/schemas/NutritionMacroBreakdown" }
+        target:    { $ref: "#/components/schemas/NutritionMacroBreakdown" }
+        tolerance: { type: number }
+
+    NutritionStreak:
+      type: object
+      required: [currentStreak, longestStreak, lastHitDate, hitToday, today]
+      properties:
+        currentStreak: { type: integer }
+        longestStreak: { type: integer }
+        lastHitDate:   { type: ["string", "null"] }
+        hitToday:      { type: boolean }
+        today:
+          $ref: "#/components/schemas/NutritionStreakToday"
+
+    NutritionRecapSendResult:
+      type: object
+      required: [sent]
+      properties:
+        sent: { type: boolean }
+
+    PhysiqueGoalInput:
+      type: object
+      required: [playerId, physiqueGoal]
+      properties:
+        playerId:     { type: integer }
+        physiqueGoal: { type: string }
+
+    PhysiqueGoalResult:
+      type: object
+      required: [physiqueGoal]
+      properties:
+        physiqueGoal: { type: string }
