@@ -60,6 +60,8 @@ export default function Events() {
               ? `${target.name} is ready to earn ${eventName} rewards.`
               : `You're in for ${eventName}. Hatch a Pal to earn evolution rewards.`,
           });
+          // Refresh the events list so participant counts update immediately.
+          queryClient.invalidateQueries({ queryKey: getListEventsQueryKey({}) });
           if (pid) {
             queryClient.invalidateQueries({
               queryKey: getListHatchlingsQueryKey({ playerId: pid }),

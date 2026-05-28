@@ -16,6 +16,27 @@ const XP_PER_LEVEL = 100;
 
 const router = Router();
 
+// Map a DB row to the OpenAPI LiveEvent response shape.
+// DB columns  : startsAt, endsAt, participants, reward (text)
+// API contract: startTime, endTime, participantCount, rewardXp
+function toApiEvent(e: typeof liveEventsTable.$inferSelect) {
+  return {
+    id:               e.id,
+    name:             e.name,
+    description:      e.description,
+    type:             e.type,
+    status:           e.status,
+    startTime:        e.startsAt.toISOString(),
+    endTime:          e.endsAt.toISOString(),
+    participantCount: e.participants,
+    rewardXp:         e.reward != null ? (parseInt(e.reward, 10) || null) : null,
+    rewardCoins:      null,
+    imageUrl:         e.imageUrl ?? null,
+    isFeatured:       e.isFeatured,
+    color:            e.color ?? null,
+  };
+}
+
 router.get("/events", async (req, res) => {
   const query = ListEventsQueryParams.safeParse({ status: req.query.status as string | undefined });
   if (!query.success) { res.status(400).json({ error: "Invalid query" }); return; }
@@ -23,7 +44,7 @@ router.get("/events", async (req, res) => {
   let results = await db.query.liveEventsTable.findMany();
   if (query.data.status) results = results.filter(e => e.status === query.data.status);
 
-  res.json(results.map(e => ({ ...e, startsAt: e.startsAt.toISOString(), endsAt: e.endsAt.toISOString() })));
+  res.json(results.map(toApiEvent));
 });
 
 router.get("/events/:id", async (req, res) => {
@@ -32,7 +53,7 @@ router.get("/events/:id", async (req, res) => {
 
   const event = await db.query.liveEventsTable.findFirst({ where: eq(liveEventsTable.id, params.data.id) });
   if (!event) { res.status(404).json({ error: "Event not found" }); return; }
-  res.json({ ...event, startsAt: event.startsAt.toISOString(), endsAt: event.endsAt.toISOString() });
+  res.json(toApiEvent(event));
 });
 
 // Server-side event join. Idempotent — uses the unique
