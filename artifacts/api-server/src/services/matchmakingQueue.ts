@@ -357,6 +357,22 @@ async function finalizeBattle(battleId: number) {
         : Promise.resolve(undefined),
     ]);
 
+    // Confidence & loyalty boost on battle win — winner's Pal gets a morale bump
+    const winnerHatchlingId = p1Won ? state.fighter1.hatchlingId : (p2Won ? state.fighter2.hatchlingId : null);
+    if (winnerHatchlingId) {
+      const winnerPal = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, winnerHatchlingId) });
+      if (winnerPal) {
+        await db.update(hatchlingsTable).set({
+          happiness:       Math.min(100, winnerPal.happiness + 10),
+          loyaltyScore:    Math.min(100, (winnerPal.loyaltyScore ?? 50) + 5),
+          motivationScore: Math.min(100, (winnerPal.motivationScore ?? 50) + 5),
+          confidenceScore: Math.min(100, (winnerPal.confidenceScore ?? 50) + 8),
+          battleWins:      (winnerPal.battleWins ?? 0) + 1,
+          moodState:       "celebrating",
+        }).where(eq(hatchlingsTable.id, winnerHatchlingId));
+      }
+    }
+
     // Award artifact battle XP to both fighters' equipped artifacts
     const [artifactXpP1, artifactXpP2] = await Promise.all([
       awardArtifactBattleXp(state.fighter1.playerId, state.fighter1.hatchlingId, p1Won),

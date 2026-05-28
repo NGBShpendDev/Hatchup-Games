@@ -578,9 +578,11 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-              <div className="flex flex-col items-center gap-1 text-yellow-400">
+              <div className="flex flex-col items-center gap-2 text-yellow-400">
                 <Dumbbell className="w-4 h-4" />
-                <ChevronRight className="w-4 h-4" />
+                <Link href="/my-pal" onClick={e => e.stopPropagation()}>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-yellow-400/20 border border-yellow-400/40 text-yellow-300 whitespace-nowrap">My Pal</span>
+                </Link>
               </div>
             </motion.div>
           </Link>

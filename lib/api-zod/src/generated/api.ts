@@ -390,6 +390,12 @@ export const GetPlayerDashboardResponse = zod.object({
   "friendshipLevel": zod.number(),
   "moodState": zod.string(),
   "lastWorkoutAt": zod.string().nullish(),
+  "loyaltyScore": zod.number().optional(),
+  "motivationScore": zod.number().optional(),
+  "confidenceScore": zod.number().optional(),
+  "battleWins": zod.number().optional(),
+  "powerScore": zod.number().optional(),
+  "stepsToEvolution": zod.number().optional(),
   "createdAt": zod.string()
 }),
   "activeEggs": zod.array(zod.object({
@@ -479,6 +485,12 @@ export const ListHatchlingsResponseItem = zod.object({
   "friendshipLevel": zod.number(),
   "moodState": zod.string(),
   "lastWorkoutAt": zod.string().nullish(),
+  "loyaltyScore": zod.number().optional(),
+  "motivationScore": zod.number().optional(),
+  "confidenceScore": zod.number().optional(),
+  "battleWins": zod.number().optional(),
+  "powerScore": zod.number().optional(),
+  "stepsToEvolution": zod.number().optional(),
   "createdAt": zod.string()
 })
 export const ListHatchlingsResponse = zod.array(ListHatchlingsResponseItem)
@@ -537,6 +549,12 @@ export const GetHatchlingResponse = zod.object({
   "friendshipLevel": zod.number(),
   "moodState": zod.string(),
   "lastWorkoutAt": zod.string().nullish(),
+  "loyaltyScore": zod.number().optional(),
+  "motivationScore": zod.number().optional(),
+  "confidenceScore": zod.number().optional(),
+  "battleWins": zod.number().optional(),
+  "powerScore": zod.number().optional(),
+  "stepsToEvolution": zod.number().optional(),
   "createdAt": zod.string()
 })
 
@@ -590,6 +608,12 @@ export const UpdateHatchlingResponse = zod.object({
   "friendshipLevel": zod.number(),
   "moodState": zod.string(),
   "lastWorkoutAt": zod.string().nullish(),
+  "loyaltyScore": zod.number().optional(),
+  "motivationScore": zod.number().optional(),
+  "confidenceScore": zod.number().optional(),
+  "battleWins": zod.number().optional(),
+  "powerScore": zod.number().optional(),
+  "stepsToEvolution": zod.number().optional(),
   "createdAt": zod.string()
 })
 
@@ -644,6 +668,12 @@ export const EvolveHatchlingResponse = zod.object({
   "friendshipLevel": zod.number(),
   "moodState": zod.string(),
   "lastWorkoutAt": zod.string().nullish(),
+  "loyaltyScore": zod.number().optional(),
+  "motivationScore": zod.number().optional(),
+  "confidenceScore": zod.number().optional(),
+  "battleWins": zod.number().optional(),
+  "powerScore": zod.number().optional(),
+  "stepsToEvolution": zod.number().optional(),
   "createdAt": zod.string()
 })
 
@@ -682,6 +712,12 @@ export const GetHatchlingShowcaseResponseItem = zod.object({
   "friendshipLevel": zod.number(),
   "moodState": zod.string(),
   "lastWorkoutAt": zod.string().nullish(),
+  "loyaltyScore": zod.number().optional(),
+  "motivationScore": zod.number().optional(),
+  "confidenceScore": zod.number().optional(),
+  "battleWins": zod.number().optional(),
+  "powerScore": zod.number().optional(),
+  "stepsToEvolution": zod.number().optional(),
   "createdAt": zod.string()
 })
 export const GetHatchlingShowcaseResponse = zod.array(GetHatchlingShowcaseResponseItem)
@@ -1358,6 +1394,12 @@ export const UseItemResponse = zod.object({
   "friendshipLevel": zod.number(),
   "moodState": zod.string(),
   "lastWorkoutAt": zod.string().nullish(),
+  "loyaltyScore": zod.number().optional(),
+  "motivationScore": zod.number().optional(),
+  "confidenceScore": zod.number().optional(),
+  "battleWins": zod.number().optional(),
+  "powerScore": zod.number().optional(),
+  "stepsToEvolution": zod.number().optional(),
   "createdAt": zod.string()
 })
 
@@ -1765,6 +1807,12 @@ export const HatchEggResponse = zod.object({
   "friendshipLevel": zod.number(),
   "moodState": zod.string(),
   "lastWorkoutAt": zod.string().nullish(),
+  "loyaltyScore": zod.number().optional(),
+  "motivationScore": zod.number().optional(),
+  "confidenceScore": zod.number().optional(),
+  "battleWins": zod.number().optional(),
+  "powerScore": zod.number().optional(),
+  "stepsToEvolution": zod.number().optional(),
   "createdAt": zod.string()
 })
 })

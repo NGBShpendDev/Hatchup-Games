@@ -117,8 +117,16 @@ async function applyNutritionStatBuff(playerId: number, qualityScore: number) {
   // High-quality meals also extend a 24h "well-fed" buff that halves the
   // passive decay rate (read by applyPassiveDecay in hatchlings.ts). This
   // is the "buffs slow the decay rate for the day" part of the loop.
-  const buffPatch: { happiness: number; energy: number; nutritionBuffExpiresAt?: Date } =
-    { happiness: newHappiness, energy: newEnergy };
+  // High-quality meals boost loyalty (+2) and motivation (+5) as well — eating
+  // well is a form of care that strengthens the Pal bond.
+  const newLoyalty     = qualityScore >= 7 ? Math.min(100, (active.loyaltyScore ?? 50) + 2)    : (active.loyaltyScore ?? 50);
+  const newMotivation  = qualityScore >= 7 ? Math.min(100, (active.motivationScore ?? 50) + 5) : (active.motivationScore ?? 50);
+
+  const buffPatch: {
+    happiness: number; energy: number;
+    loyaltyScore: number; motivationScore: number;
+    nutritionBuffExpiresAt?: Date;
+  } = { happiness: newHappiness, energy: newEnergy, loyaltyScore: newLoyalty, motivationScore: newMotivation };
   if (qualityScore >= 7) {
     buffPatch.nutritionBuffExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
   }

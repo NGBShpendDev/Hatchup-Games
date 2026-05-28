@@ -254,15 +254,19 @@ export async function logFitnessActivity(
   if (isWorkout || isStrength) {
     const partner = await resolveActivePartner(playerId);
     if (partner) {
-      const newHappiness  = Math.min(100, partner.happiness + 2);
-      const newEnergy     = Math.max(0,   partner.energy    - 1);
-      const newFriendship = Math.min(100, partner.friendshipLevel + 5);
+      const newHappiness   = Math.min(100, partner.happiness + 2);
+      const newEnergy      = Math.max(0,   partner.energy    - 1);
+      const newFriendship  = Math.min(100, partner.friendshipLevel + 5);
+      const newLoyalty     = Math.min(100, (partner.loyaltyScore ?? 50) + 2);
+      const newMotivation  = Math.min(100, (partner.motivationScore ?? 50) + 8);
       await db.update(hatchlingsTable).set({
         happiness: newHappiness,
         energy: newEnergy,
         friendshipLevel: newFriendship,
         moodState: "celebrating",
         lastWorkoutAt: new Date(),
+        loyaltyScore: newLoyalty,
+        motivationScore: newMotivation,
       }).where(eq(hatchlingsTable.id, partner.id));
     }
   }

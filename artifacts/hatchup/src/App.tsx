@@ -53,6 +53,7 @@ import ClubDetail from "@/pages/club-detail";
 import Events from "@/pages/events";
 import NotificationsPage from "@/pages/notifications";
 import PostDetail from "@/pages/post-detail";
+import MyPalPage from "@/pages/my-pal";
 import { PageTransition } from "@/components/page-transition";
 import { EpicMomentProvider } from "@/components/epic-moment-overlay";
 import { EvolutionShareProvider } from "@/components/evolution-share-provider";
@@ -294,6 +295,7 @@ function AppRoutes() {
         <Route path="/subscription" component={SubscriptionPage} />
         <Route path="/events" component={Events} />
         <Route path="/notifications" component={NotificationsPage} />
+        <Route path="/my-pal" component={MyPalPage} />
         <Route component={NotFound} />
       </Switch>
       </PageTransition>

@@ -28,6 +28,30 @@ function computeMoodState(lastWorkoutAt: Date | null): string {
   return "happy";
 }
 
+// ── Power score ────────────────────────────────────────────────────────────────
+// Formula: level × 10 × rarityMultiplier + battleWins × 5
+function computePowerScore(level: number, rarity: string | null, battleWins: number): number {
+  const mult =
+    rarity === "Celestial" ? 6 :
+    rarity === "Ancient"   ? 5 :
+    rarity === "Mythic"    ? 4 :
+    rarity === "Legendary" ? 3 :
+    rarity === "Epic"      ? 2 :
+    rarity === "Rare"      ? 1.5 : 1;
+  return Math.round(level * 10 * mult + battleWins * 5);
+}
+
+// ── Steps to evolution ─────────────────────────────────────────────────────────
+// Stage 1→2 requires 500 cumulative XP; Stage 2→3 requires 1500.
+// Each step ≈ 0.1 XP, so multiply XP gap by 10 to get steps.
+const STAGE_XP_THRESHOLDS: Record<number, number> = { 1: 500, 2: 1500 };
+
+function computeStepsToEvolution(xp: number, stage: number): number {
+  const threshold = STAGE_XP_THRESHOLDS[stage];
+  if (!threshold) return 0;
+  return Math.max(0, (threshold - xp) * 10);
+}
+
 // ── Passive decay ──────────────────────────────────────────────────────────────
 // Stats slowly fall over time. The decay rate is *halved* while a nutrition
 // buff is active (set by POST /nutrition/posts when a high-quality meal is
@@ -70,11 +94,25 @@ async function applyPassiveDecay(h: DecayableHatchling): Promise<DecayableHatchl
   const newHunger    = Math.max(0, h.hunger    - drop);
   const newEnergy    = Math.max(0, h.energy    - drop);
 
+  // Motivation decay: if the player has gone >24h without a workout,
+  // motivation drops 1 pt per 4 extra hours beyond the 24h threshold.
+  const MOTIVATION_GRACE_MS = 24 * 60 * 60 * 1000;
+  const lastWorkoutMs = h.lastWorkoutAt?.getTime() ?? 0;
+  const overdueMs = Math.max(0, now.getTime() - lastWorkoutMs - MOTIVATION_GRACE_MS);
+  const motivationDrop = Math.floor(overdueMs / (4 * 60 * 60 * 1000));
+  const newMotivation = motivationDrop > 0
+    ? Math.max(0, (h.motivationScore ?? 50) - Math.min(motivationDrop, drop))
+    : (h.motivationScore ?? 50);
+
+  const decayPatch = motivationDrop > 0
+    ? { happiness: newHappiness, hunger: newHunger, energy: newEnergy, lastDecayAt: now, motivationScore: newMotivation }
+    : { happiness: newHappiness, hunger: newHunger, energy: newEnergy, lastDecayAt: now };
+
   await db.update(hatchlingsTable)
-    .set({ happiness: newHappiness, hunger: newHunger, energy: newEnergy, lastDecayAt: now })
+    .set(decayPatch)
     .where(eq(hatchlingsTable.id, h.id));
 
-  return { ...h, happiness: newHappiness, hunger: newHunger, energy: newEnergy, lastDecayAt: now };
+  return { ...h, happiness: newHappiness, hunger: newHunger, energy: newEnergy, motivationScore: newMotivation, lastDecayAt: now };
 }
 
 router.get("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
@@ -89,6 +127,8 @@ router.get("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, asy
   res.json(results.map(h => ({
     ...h,
     moodState: computeMoodState(h.lastWorkoutAt),
+    powerScore: computePowerScore(h.level, h.rarity, h.battleWins),
+    stepsToEvolution: computeStepsToEvolution(h.xp, h.evolutionStage),
     createdAt: h.createdAt.toISOString(),
     lastWorkoutAt: h.lastWorkoutAt?.toISOString() ?? null,
   })));
@@ -145,6 +185,8 @@ router.get("/hatchlings/showcase", async (req, res) => {
   res.json(results.map(h => ({
     ...h,
     moodState: computeMoodState(h.lastWorkoutAt),
+    powerScore: computePowerScore(h.level, h.rarity, h.battleWins),
+    stepsToEvolution: computeStepsToEvolution(h.xp, h.evolutionStage),
     createdAt: h.createdAt.toISOString(),
     lastWorkoutAt: h.lastWorkoutAt?.toISOString() ?? null,
   })));
@@ -160,6 +202,8 @@ router.get("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
   res.json({
     ...hatchling,
     moodState: computeMoodState(hatchling.lastWorkoutAt),
+    powerScore: computePowerScore(hatchling.level, hatchling.rarity, hatchling.battleWins),
+    stepsToEvolution: computeStepsToEvolution(hatchling.xp, hatchling.evolutionStage),
     createdAt: hatchling.createdAt.toISOString(),
     lastWorkoutAt: hatchling.lastWorkoutAt?.toISOString() ?? null,
   });
@@ -183,12 +227,15 @@ router.patch("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
   const { lastWorkoutAt: lastWorkoutAtStr, ...restBody } = body.data;
   const updateData: HatchlingPatch = { ...restBody };
 
-  // If a workout is being logged (lastWorkoutAt sent), auto-increment friendship and set mood
+  // If a workout is being logged (lastWorkoutAt sent), auto-increment friendship, loyalty and set mood
   if (body.data.lastWorkoutAt) {
     if (current) {
       updateData.friendshipLevel = Math.min(100, current.friendshipLevel + 5);
       updateData.moodState = "celebrating";
       updateData.lastWorkoutAt = new Date(body.data.lastWorkoutAt);
+      // Loyalty grows with each workout; motivation resets toward 100
+      (updateData as Record<string, unknown>).loyaltyScore = Math.min(100, (current.loyaltyScore ?? 50) + 3);
+      (updateData as Record<string, unknown>).motivationScore = Math.min(100, (current.motivationScore ?? 50) + 10);
     }
   }
 
@@ -201,6 +248,8 @@ router.patch("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
   res.json({
     ...updated[0],
     moodState: computeMoodState(updated[0].lastWorkoutAt),
+    powerScore: computePowerScore(updated[0].level, updated[0].rarity, updated[0].battleWins),
+    stepsToEvolution: computeStepsToEvolution(updated[0].xp, updated[0].evolutionStage),
     createdAt: updated[0].createdAt.toISOString(),
     lastWorkoutAt: updated[0].lastWorkoutAt?.toISOString() ?? null,
   });
@@ -257,6 +306,8 @@ router.post("/hatchlings/:id/evolve", requireAuth, attachPlayer, async (req, res
   res.json({
     ...updated[0],
     moodState: "celebrating",
+    powerScore: computePowerScore(updated[0].level, updated[0].rarity, updated[0].battleWins),
+    stepsToEvolution: computeStepsToEvolution(updated[0].xp, updated[0].evolutionStage),
     createdAt: updated[0].createdAt.toISOString(),
     lastWorkoutAt: updated[0].lastWorkoutAt?.toISOString() ?? null,
   });

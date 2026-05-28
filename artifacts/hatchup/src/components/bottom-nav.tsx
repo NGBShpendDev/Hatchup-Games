@@ -20,7 +20,7 @@ export function BottomNav() {
   // Social is hidden in child accessibility mode.
   const allNavItems = [
     { href: "/", label: "Home", icon: <Home className="w-6 h-6" />, badge: hasPassiveXp, count: 0, showInChild: true, match: (l: string) => l === "/" },
-    { href: "/explore", label: "Hatchlings", icon: <Sparkles className="w-6 h-6" />, badge: false, count: 0, showInChild: true, match: (l: string) => l.startsWith("/explore") || l.startsWith("/hatch") || l.startsWith("/hatchlings") },
+    { href: "/explore", label: "Hatchlings", icon: <Sparkles className="w-6 h-6" />, badge: false, count: 0, showInChild: true, match: (l: string) => l.startsWith("/explore") || l.startsWith("/hatch") || l.startsWith("/hatchlings") || l.startsWith("/my-pal") },
     { href: "/challenges", label: "Compete", icon: <Swords className="w-6 h-6" />, badge: pendingInvites > 0, count: pendingInvites, showInChild: true, match: (l: string) => l.startsWith("/challenges") || l.startsWith("/compete") },
     { href: "/social", label: "Social", icon: <MessageSquare className="w-6 h-6" />, badge: false, count: 0, showInChild: false, match: (l: string) => l.startsWith("/social") || l.startsWith("/groups") },
     { href: "/health-settings", label: "Profile", icon: <User className="w-6 h-6" />, badge: false, count: 0, showInChild: true, match: (l: string) => l.startsWith("/health-settings") || l.startsWith("/settings") || l.startsWith("/safety") || l.startsWith("/family") },

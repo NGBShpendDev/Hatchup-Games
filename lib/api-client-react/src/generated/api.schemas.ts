@@ -184,6 +184,12 @@ export interface Hatchling {
   moodState: string;
   /** @nullable */
   lastWorkoutAt?: string | null;
+  loyaltyScore?: number;
+  motivationScore?: number;
+  confidenceScore?: number;
+  battleWins?: number;
+  powerScore?: number;
+  stepsToEvolution?: number;
   createdAt: string;
 }
 

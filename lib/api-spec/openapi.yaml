@@ -4887,7 +4887,13 @@ components:
         friendshipLevel: { type: integer }
         moodState:      { type: string }
         lastWorkoutAt:  { type: ["string", "null"] }
-        createdAt:      { type: string }
+        loyaltyScore:    { type: integer }
+        motivationScore: { type: integer }
+        confidenceScore: { type: integer }
+        battleWins:      { type: integer }
+        powerScore:      { type: integer }
+        stepsToEvolution: { type: integer }
+        createdAt:       { type: string }
 
     HatchlingInput:
       type: object

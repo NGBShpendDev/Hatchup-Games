@@ -32,6 +32,12 @@ export const hatchlingsTable = pgTable("hatchlings", {
   friendshipLevel: integer("friendship_level").notNull().default(0),
   moodState: text("mood_state").notNull().default("happy"),
   lastWorkoutAt: timestamp("last_workout_at", { withTimezone: true }),
+  // Loyalty, motivation & confidence scores (0–100)
+  loyaltyScore: integer("loyalty_score").notNull().default(50),
+  motivationScore: integer("motivation_score").notNull().default(50),
+  confidenceScore: integer("confidence_score").notNull().default(50),
+  // Per-hatchling battle win counter (used in power score derivation)
+  battleWins: integer("battle_wins").notNull().default(0),
   // Passive decay accounting + nutrition buff modifier
   lastDecayAt: timestamp("last_decay_at", { withTimezone: true }),
   nutritionBuffExpiresAt: timestamp("nutrition_buff_expires_at", { withTimezone: true }),
