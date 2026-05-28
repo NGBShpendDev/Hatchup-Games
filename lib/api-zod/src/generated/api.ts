@@ -396,6 +396,7 @@ export const GetPlayerDashboardResponse = zod.object({
   "battleWins": zod.number().optional(),
   "powerScore": zod.number().optional(),
   "stepsToEvolution": zod.number().optional(),
+  "streakCount": zod.number().nullish(),
   "createdAt": zod.string()
 }),
   "activeEggs": zod.array(zod.object({
@@ -491,6 +492,7 @@ export const ListHatchlingsResponseItem = zod.object({
   "battleWins": zod.number().optional(),
   "powerScore": zod.number().optional(),
   "stepsToEvolution": zod.number().optional(),
+  "streakCount": zod.number().nullish(),
   "createdAt": zod.string()
 })
 export const ListHatchlingsResponse = zod.array(ListHatchlingsResponseItem)
@@ -555,6 +557,7 @@ export const GetHatchlingResponse = zod.object({
   "battleWins": zod.number().optional(),
   "powerScore": zod.number().optional(),
   "stepsToEvolution": zod.number().optional(),
+  "streakCount": zod.number().nullish(),
   "createdAt": zod.string()
 })
 
@@ -614,6 +617,7 @@ export const UpdateHatchlingResponse = zod.object({
   "battleWins": zod.number().optional(),
   "powerScore": zod.number().optional(),
   "stepsToEvolution": zod.number().optional(),
+  "streakCount": zod.number().nullish(),
   "createdAt": zod.string()
 })
 
@@ -697,6 +701,7 @@ export const EvolveHatchlingResponse = zod.object({
   "battleWins": zod.number().optional(),
   "powerScore": zod.number().optional(),
   "stepsToEvolution": zod.number().optional(),
+  "streakCount": zod.number().nullish(),
   "createdAt": zod.string()
 })
 
@@ -741,6 +746,7 @@ export const GetHatchlingShowcaseResponseItem = zod.object({
   "battleWins": zod.number().optional(),
   "powerScore": zod.number().optional(),
   "stepsToEvolution": zod.number().optional(),
+  "streakCount": zod.number().nullish(),
   "createdAt": zod.string()
 })
 export const GetHatchlingShowcaseResponse = zod.array(GetHatchlingShowcaseResponseItem)
@@ -1491,6 +1497,7 @@ export const UseItemResponse = zod.object({
   "battleWins": zod.number().optional(),
   "powerScore": zod.number().optional(),
   "stepsToEvolution": zod.number().optional(),
+  "streakCount": zod.number().nullish(),
   "createdAt": zod.string()
 })
 
@@ -1904,6 +1911,7 @@ export const HatchEggResponse = zod.object({
   "battleWins": zod.number().optional(),
   "powerScore": zod.number().optional(),
   "stepsToEvolution": zod.number().optional(),
+  "streakCount": zod.number().nullish(),
   "createdAt": zod.string()
 })
 })

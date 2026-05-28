@@ -439,6 +439,11 @@ export default function HatchlingDetail() {
                     <Star className="w-3 h-3 fill-yellow-300" /> Active Partner
                   </GlowBadge>
                 )}
+                {(hatchling.streakCount ?? 0) >= 2 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-full bg-orange-500/15 border border-orange-500/40 text-orange-400">
+                    🔥 W{hatchling.streakCount} Streak
+                  </span>
+                )}
               </div>
             </div>
 

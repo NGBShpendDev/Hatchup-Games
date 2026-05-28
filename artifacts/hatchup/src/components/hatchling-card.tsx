@@ -226,6 +226,14 @@ export function HatchlingCard({ hatchling, onClick }: HatchlingCardProps) {
         <Progress value={hatchling.friendshipLevel ?? 0} className="h-1 [&>div]:bg-pink-500" />
       </div>
 
+      {/* Hot streak badge */}
+      {(hatchling.streakCount ?? 0) >= 2 && (
+        <div className="mt-2 relative z-10 flex items-center gap-1.5 bg-orange-500/15 border border-orange-500/40 rounded-lg px-2.5 py-1">
+          <span className="text-sm leading-none">🔥</span>
+          <span className="text-[11px] font-black text-orange-400 tracking-wide">W{hatchling.streakCount} Streak</span>
+        </div>
+      )}
+
       {/* Active partner toggle */}
       <div className="mt-3 relative z-10">
         <Button

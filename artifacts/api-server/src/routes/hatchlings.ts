@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { hatchlingsTable, evolutionTypesTable, playersTable } from "@workspace/db";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { hatchlingsTable, evolutionTypesTable, playersTable, battlesTable } from "@workspace/db";
+import { eq, desc, sql, and, or, inArray } from "drizzle-orm";
 import {
   ListHatchlingsQueryParams,
   CreateHatchlingBody,
@@ -62,6 +62,84 @@ function computeStepsToEvolution(xp: number, stage: number): number {
   const threshold = STAGE_XP_THRESHOLDS[stage];
   if (!threshold) return 0;
   return Math.max(0, (threshold - xp) * 10);
+}
+
+// ── Streak computation ─────────────────────────────────────────────────────
+// Counts consecutive wins from the most-recent battle backwards, across all
+// opponents. Resets on any loss or draw. Returns 0 when no data.
+
+function computeStreakFromBattles(
+  hatchlingId: number,
+  battles: Array<{ hatchling1Id: number; hatchling2Id: number | null; player1Id: number; player2Id: number | null; winnerId: number | null; createdAt: Date }>,
+): number {
+  // battles must already be sorted newest → oldest for this hatchling
+  let streak = 0;
+  for (const b of battles) {
+    if (b.winnerId === null) break; // draw / ongoing → reset
+    const isHatchling1 = b.hatchling1Id === hatchlingId;
+    const ownerPlayerId = isHatchling1 ? b.player1Id : b.player2Id;
+    if (ownerPlayerId === null) break;
+    if (b.winnerId === ownerPlayerId) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+async function computeStreak(hatchlingId: number): Promise<number> {
+  const battles = await db.select({
+    hatchling1Id: battlesTable.hatchling1Id,
+    hatchling2Id: battlesTable.hatchling2Id,
+    player1Id: battlesTable.player1Id,
+    player2Id: battlesTable.player2Id,
+    winnerId: battlesTable.winnerId,
+    createdAt: battlesTable.createdAt,
+  })
+    .from(battlesTable)
+    .where(or(
+      eq(battlesTable.hatchling1Id, hatchlingId),
+      eq(battlesTable.hatchling2Id, hatchlingId),
+    ))
+    .orderBy(desc(battlesTable.createdAt))
+    .limit(50);
+  return computeStreakFromBattles(hatchlingId, battles);
+}
+
+async function computeStreakBatch(hatchlingIds: number[]): Promise<Map<number, number>> {
+  if (hatchlingIds.length === 0) return new Map();
+  const battles = await db.select({
+    hatchling1Id: battlesTable.hatchling1Id,
+    hatchling2Id: battlesTable.hatchling2Id,
+    player1Id: battlesTable.player1Id,
+    player2Id: battlesTable.player2Id,
+    winnerId: battlesTable.winnerId,
+    createdAt: battlesTable.createdAt,
+  })
+    .from(battlesTable)
+    .where(or(
+      inArray(battlesTable.hatchling1Id, hatchlingIds),
+      inArray(battlesTable.hatchling2Id, hatchlingIds),
+    ))
+    .orderBy(desc(battlesTable.createdAt))
+    .limit(500);
+
+  // Group per hatchling in DESC order (already sorted globally DESC, so
+  // appending preserves relative order within each per-hatchling list).
+  const perHatchling = new Map<number, typeof battles>();
+  for (const id of hatchlingIds) perHatchling.set(id, []);
+
+  for (const b of battles) {
+    if (perHatchling.has(b.hatchling1Id)) perHatchling.get(b.hatchling1Id)!.push(b);
+    if (b.hatchling2Id !== null && perHatchling.has(b.hatchling2Id)) perHatchling.get(b.hatchling2Id)!.push(b);
+  }
+
+  const result = new Map<number, number>();
+  for (const [id, hBattles] of perHatchling) {
+    result.set(id, computeStreakFromBattles(id, hBattles));
+  }
+  return result;
 }
 
 // ── Passive decay ──────────────────────────────────────────────────────────────
@@ -167,14 +245,20 @@ router.get("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, asy
     orderBy: [desc(hatchlingsTable.createdAt)],
   });
   const results = await Promise.all(rawResults.map(applyPassiveDecay));
-  res.json(results.map(h => ({
-    ...h,
-    moodState: computeMoodState(h.lastWorkoutAt),
-    powerScore: computePowerScore(h.level, h.rarity, h.battleWins),
-    stepsToEvolution: computeStepsToEvolution(h.xp, h.evolutionStage),
-    createdAt: h.createdAt.toISOString(),
-    lastWorkoutAt: h.lastWorkoutAt?.toISOString() ?? null,
-  })));
+  const hatchlingIds = results.map(h => h.id);
+  const streaks = await computeStreakBatch(hatchlingIds);
+  res.json(results.map(h => {
+    const streak = streaks.get(h.id) ?? 0;
+    return {
+      ...h,
+      moodState: computeMoodState(h.lastWorkoutAt),
+      powerScore: computePowerScore(h.level, h.rarity, h.battleWins),
+      stepsToEvolution: computeStepsToEvolution(h.xp, h.evolutionStage),
+      streakCount: streak >= 2 ? streak : null,
+      createdAt: h.createdAt.toISOString(),
+      lastWorkoutAt: h.lastWorkoutAt?.toISOString() ?? null,
+    };
+  }));
 });
 
 router.post("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, attachEntitlement, enforceHatchlingCap, async (req, res) => {
@@ -225,14 +309,20 @@ router.get("/hatchlings/showcase", async (req, res) => {
     limit: 8,
   });
   const results = await Promise.all(rawResults.map(applyPassiveDecay));
-  res.json(results.map(h => ({
-    ...h,
-    moodState: computeMoodState(h.lastWorkoutAt),
-    powerScore: computePowerScore(h.level, h.rarity, h.battleWins),
-    stepsToEvolution: computeStepsToEvolution(h.xp, h.evolutionStage),
-    createdAt: h.createdAt.toISOString(),
-    lastWorkoutAt: h.lastWorkoutAt?.toISOString() ?? null,
-  })));
+  const hatchlingIds = results.map(h => h.id);
+  const streaks = await computeStreakBatch(hatchlingIds);
+  res.json(results.map(h => {
+    const streak = streaks.get(h.id) ?? 0;
+    return {
+      ...h,
+      moodState: computeMoodState(h.lastWorkoutAt),
+      powerScore: computePowerScore(h.level, h.rarity, h.battleWins),
+      stepsToEvolution: computeStepsToEvolution(h.xp, h.evolutionStage),
+      streakCount: streak >= 2 ? streak : null,
+      createdAt: h.createdAt.toISOString(),
+      lastWorkoutAt: h.lastWorkoutAt?.toISOString() ?? null,
+    };
+  }));
 });
 
 // ── GET /hatchlings/:id/share-image — public PNG share card ───────────────────
@@ -305,11 +395,13 @@ router.get("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
   if (!raw) { res.status(404).json({ error: "Hatchling not found" }); return; }
   if (raw.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
   const hatchling = await applyPassiveDecay(raw);
+  const streak = await computeStreak(hatchling.id);
   res.json({
     ...hatchling,
     moodState: computeMoodState(hatchling.lastWorkoutAt),
     powerScore: computePowerScore(hatchling.level, hatchling.rarity, hatchling.battleWins),
     stepsToEvolution: computeStepsToEvolution(hatchling.xp, hatchling.evolutionStage),
+    streakCount: streak >= 2 ? streak : null,
     createdAt: hatchling.createdAt.toISOString(),
     lastWorkoutAt: hatchling.lastWorkoutAt?.toISOString() ?? null,
   });
@@ -353,11 +445,13 @@ router.patch("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
     .where(eq(hatchlingsTable.id, params.data.id))
     .returning();
   if (!updated.length) { res.status(404).json({ error: "Hatchling not found" }); return; }
+  const patchStreak = await computeStreak(updated[0].id);
   res.json({
     ...updated[0],
     moodState: computeMoodState(updated[0].lastWorkoutAt),
     powerScore: computePowerScore(updated[0].level, updated[0].rarity, updated[0].battleWins),
     stepsToEvolution: computeStepsToEvolution(updated[0].xp, updated[0].evolutionStage),
+    streakCount: patchStreak >= 2 ? patchStreak : null,
     createdAt: updated[0].createdAt.toISOString(),
     lastWorkoutAt: updated[0].lastWorkoutAt?.toISOString() ?? null,
   });
@@ -414,11 +508,13 @@ router.post("/hatchlings/:id/evolve", requireAuth, attachPlayer, async (req, res
   const evolved = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, params.data.id) });
   if (!evolved) { res.status(404).json({ error: "Hatchling not found after evolve" }); return; }
 
+  const evolveStreak = await computeStreak(evolved.id);
   res.json({
     ...evolved,
     moodState: "celebrating",
     powerScore: computePowerScore(evolved.level, evolved.rarity, evolved.battleWins),
     stepsToEvolution: computeStepsToEvolution(evolved.xp, evolved.evolutionStage),
+    streakCount: evolveStreak >= 2 ? evolveStreak : null,
     createdAt: evolved.createdAt.toISOString(),
     lastWorkoutAt: evolved.lastWorkoutAt?.toISOString() ?? null,
   });

@@ -4990,6 +4990,7 @@ components:
         battleWins:      { type: integer }
         powerScore:      { type: integer }
         stepsToEvolution: { type: integer }
+        streakCount:     { type: ["integer", "null"] }
         createdAt:       { type: string }
 
     HatchlingInput:

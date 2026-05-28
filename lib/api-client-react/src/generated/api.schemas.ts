@@ -190,6 +190,8 @@ export interface Hatchling {
   battleWins?: number;
   powerScore?: number;
   stepsToEvolution?: number;
+  /** @nullable */
+  streakCount?: number | null;
   createdAt: string;
 }
 
