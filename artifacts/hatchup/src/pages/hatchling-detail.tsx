@@ -1,5 +1,7 @@
+import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { Layout } from "@/components/layout";
+import { HatchlingReaction, type HatchlingReactionData } from "@/components/hatchling-reaction";
 import {
   useGetHatchling, getGetHatchlingQueryKey,
   useUpdateHatchling,
@@ -144,6 +146,29 @@ export default function HatchlingDetail() {
     query: { enabled: !!hatchlingId, queryKey: getGetHatchlingQueryKey(hatchlingId) }
   });
 
+  // Track happiness/energy across refetches so external changes (e.g. posting a
+  // buffing meal) play the same creature reaction the nutrition page shows.
+  const prevStatsRef = useRef<{ happiness: number; energy: number } | null>(null);
+  const [reaction, setReaction] = useState<HatchlingReactionData | null>(null);
+
+  useEffect(() => {
+    if (!hatchling) return;
+    const prev = prevStatsRef.current;
+    const next = { happiness: hatchling.happiness, energy: hatchling.energy };
+    if (prev) {
+      const happinessDelta = next.happiness - prev.happiness;
+      const energyDelta = next.energy - prev.energy;
+      if (happinessDelta !== 0 || energyDelta !== 0) {
+        setReaction({
+          hatchlingName: hatchling.name,
+          happinessDelta,
+          energyDelta,
+        });
+      }
+    }
+    prevStatsRef.current = next;
+  }, [hatchling]);
+
   const updateMutation = useUpdateHatchling();
   const evolveMutation = useEvolveHatchling();
   const deleteMutation = useDeleteHatchling();
@@ -255,6 +280,7 @@ export default function HatchlingDetail() {
 
   return (
     <Layout>
+      <HatchlingReaction reaction={reaction} onDismiss={() => setReaction(null)} />
       <div className="max-w-5xl mx-auto pb-12">
         <Button variant="ghost" className="mb-6 font-bold" onClick={() => setLocation("/hatch")}>
           <ArrowLeft className="w-4 h-4 mr-2" /> Back

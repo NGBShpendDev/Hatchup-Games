@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Heart, MessageCircle, Zap, ChefHat, Plus, X, Sparkles, Droplets, Flame, Dumbbell, MoreHorizontal, Compass, Trophy, Camera, Loader2 } from "lucide-react";
 import { ReportBlockMenu } from "@/components/report-block-menu";
+import { HatchlingReaction, type HatchlingReactionData } from "@/components/hatchling-reaction";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -113,6 +114,7 @@ export default function Nutrition() {
   const [activeTab, setActiveTab] = useState<"feed" | "discover" | "challenges">("feed");
   const [showCreateSheet, setShowCreateSheet] = useState(false);
   const [showGoalPicker, setShowGoalPicker] = useState(false);
+  const [reaction, setReaction] = useState<HatchlingReactionData | null>(null);
 
   // Create form state
   const [form, setForm] = useState({
@@ -302,14 +304,15 @@ export default function Nutrition() {
         toast({ title: "New badge unlocked! 🏅", description: data.newBadges.join(", ") });
       } else if (data.hatchlingStatChange) {
         const c = data.hatchlingStatChange;
-        const parts: string[] = [];
-        if (c.happinessDelta) parts.push(`${c.happinessDelta > 0 ? "+" : ""}${c.happinessDelta} happiness`);
-        if (c.energyDelta)    parts.push(`${c.energyDelta > 0 ? "+" : ""}${c.energyDelta} energy`);
-        const positive = (c.happinessDelta ?? 0) >= 0;
-        toast({
-          title: positive ? `${c.hatchlingName} loved it! 💖` : `${c.hatchlingName} isn't feeling great…`,
-          description: parts.join(" · ") || "Meal posted.",
-        });
+        if ((c.happinessDelta ?? 0) !== 0 || (c.energyDelta ?? 0) !== 0) {
+          setReaction({
+            hatchlingName: c.hatchlingName,
+            happinessDelta: c.happinessDelta ?? 0,
+            energyDelta: c.energyDelta ?? 0,
+          });
+        } else {
+          toast({ title: "Meal posted!", description: "Your meal is on the feed." });
+        }
       } else {
         toast({ title: "Meal posted!", description: "Your meal is on the feed." });
       }
@@ -523,6 +526,9 @@ export default function Nutrition() {
           </div>
         )}
       </div>
+
+      {/* Hatchling reaction overlay — plays when a posted meal buffs/debuffs the active Pal */}
+      <HatchlingReaction reaction={reaction} onDismiss={() => setReaction(null)} />
 
       {/* ── CREATE POST SHEET ── */}
       <AnimatePresence>
