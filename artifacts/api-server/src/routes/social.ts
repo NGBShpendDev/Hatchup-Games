@@ -29,6 +29,7 @@ import { groupSharedGroupRows } from "./sharedGroups.ts";
 import { sendPushToPlayer } from "../services/pushNotifications.ts";
 import { notificationsTable } from "@workspace/db";
 import { createHmac } from "node:crypto";
+import { logger } from "../lib/logger.ts";
 import {
   CreatePostBody,
   ReactToPostBody,
@@ -485,7 +486,35 @@ router.get("/social/posts/:id", async (req, res) => {
 // (120/min/IP), we cap the number of *distinct* posts a single viewerKey can
 // count in any rolling hour. Anything above the cap returns counted=false
 // (still 200) so legitimate browsing UIs keep working.
-export const VIEW_DISTINCT_POSTS_PER_HOUR = 60;
+const DEFAULT_VIEW_DISTINCT_POSTS_PER_HOUR = 60;
+
+export function resolveViewDistinctPostsPerHour(
+  raw: string | undefined = process.env.VIEW_DISTINCT_POSTS_PER_HOUR,
+): number {
+  if (raw == null || raw === "") return DEFAULT_VIEW_DISTINCT_POSTS_PER_HOUR;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
+    logger.warn(
+      { value: raw, fallback: DEFAULT_VIEW_DISTINCT_POSTS_PER_HOUR },
+      "Invalid VIEW_DISTINCT_POSTS_PER_HOUR, falling back to default",
+    );
+    return DEFAULT_VIEW_DISTINCT_POSTS_PER_HOUR;
+  }
+  return parsed;
+}
+
+export const VIEW_DISTINCT_POSTS_PER_HOUR = resolveViewDistinctPostsPerHour();
+
+logger.info(
+  {
+    cap: VIEW_DISTINCT_POSTS_PER_HOUR,
+    default: DEFAULT_VIEW_DISTINCT_POSTS_PER_HOUR,
+    fromEnv:
+      process.env.VIEW_DISTINCT_POSTS_PER_HOUR != null &&
+      process.env.VIEW_DISTINCT_POSTS_PER_HOUR !== "",
+  },
+  "Configured distinct-posts-per-hour cap",
+);
 
 router.post("/social/posts/:id/view", postViewLimiter, async (req, res) => {
   const id = Number(req.params.id);

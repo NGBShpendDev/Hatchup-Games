@@ -272,7 +272,7 @@ mock.module("@workspace/db", {
 // ── Imports that depend on the mocks above ───────────────────────────────────
 const express = (await import("express")).default;
 const socialRouter = (await import("../social.ts")).default;
-const { VIEW_DISTINCT_POSTS_PER_HOUR } = await import("../social.ts");
+const { VIEW_DISTINCT_POSTS_PER_HOUR, resolveViewDistinctPostsPerHour } = await import("../social.ts");
 const { postViewLimiter } = await import("../../middlewares/rateLimiters.ts");
 
 let baseUrl: string;
@@ -424,6 +424,29 @@ describe("POST /social/posts/:id/view — abuse protection", () => {
 
     const fresh = await postView(3999, { "x-forwarded-for": "1.2.3.4" });
     assert.equal(fresh.body.counted, true, "stale views must not consume the current hour's budget");
+  });
+
+  it("the distinct-posts cap defaults to 60 when no env var is set", () => {
+    // The default is intentionally pinned here: even though the cap is now
+    // env-tunable, the production default must stay 60 unless someone
+    // consciously changes it (and updates this test).
+    assert.equal(VIEW_DISTINCT_POSTS_PER_HOUR, 60);
+    assert.equal(resolveViewDistinctPostsPerHour(undefined), 60);
+    assert.equal(resolveViewDistinctPostsPerHour(""), 60);
+  });
+
+  it("the distinct-posts cap honors a valid env override", () => {
+    assert.equal(resolveViewDistinctPostsPerHour("75"), 75);
+    assert.equal(resolveViewDistinctPostsPerHour("1"), 1);
+  });
+
+  it("the distinct-posts cap falls back to 60 for invalid env values", () => {
+    // Non-numeric, zero, negative, and non-integer values should all be
+    // rejected so a misconfigured env can never silently disable the cap.
+    assert.equal(resolveViewDistinctPostsPerHour("not-a-number"), 60);
+    assert.equal(resolveViewDistinctPostsPerHour("0"), 60);
+    assert.equal(resolveViewDistinctPostsPerHour("-5"), 60);
+    assert.equal(resolveViewDistinctPostsPerHour("12.5"), 60);
   });
 
   it("postViewLimiter blocks bursts above the per-minute threshold", async () => {
