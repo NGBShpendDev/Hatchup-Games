@@ -110,17 +110,20 @@ export default function PlayerProfilePage() {
     },
   });
 
+  const patchOwnedArtifact = async (artifactId: number, isFeatured: boolean) => {
+    const res = await fetch(`${BASE}/api/players/me/artifacts/${artifactId}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isFeatured }),
+    });
+    if (!res.ok) throw new Error("Failed to update");
+    return res.json();
+  };
+
   const toggleFeatured = useMutation({
-    mutationFn: async ({ artifactId, isFeatured }: { artifactId: number; isFeatured: boolean }) => {
-      const res = await fetch(`${BASE}/api/players/me/artifacts/${artifactId}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isFeatured }),
-      });
-      if (!res.ok) throw new Error("Failed to update");
-      return res.json();
-    },
+    mutationFn: ({ artifactId, isFeatured }: { artifactId: number; isFeatured: boolean }) =>
+      patchOwnedArtifact(artifactId, isFeatured),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["player-profile", profileId] });
       qc.invalidateQueries({ queryKey: ["artifacts-museum", viewerId] });
@@ -134,18 +137,43 @@ export default function PlayerProfilePage() {
     },
   });
 
+  const swapFeatured = useMutation({
+    mutationFn: async ({ removeId, addId }: { removeId: number; addId: number }) => {
+      // Unfeature the outgoing artifact first so the cap check on the server
+      // doesn't block the incoming feature call.
+      await patchOwnedArtifact(removeId, false);
+      try {
+        await patchOwnedArtifact(addId, true);
+      } catch (err) {
+        // Best-effort rollback so the player isn't left with an empty slot if
+        // the second call fails.
+        await patchOwnedArtifact(removeId, true).catch(() => undefined);
+        throw err;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["player-profile", profileId] });
+      qc.invalidateQueries({ queryKey: ["artifacts-museum", viewerId] });
+      toast({
+        title: "Showcase swapped",
+        description: "Your new artifact now shines on your profile.",
+      });
+    },
+    onError: (err: Error) => {
+      qc.invalidateQueries({ queryKey: ["player-profile", profileId] });
+      qc.invalidateQueries({ queryKey: ["artifacts-museum", viewerId] });
+      toast({ title: "Couldn't swap", description: err.message, variant: "destructive" });
+    },
+  });
+
   const featuredCount = (profile?.artifactShowcase ?? []).filter(a => a.isFeatured).length;
 
   const handleAddFeatured = (artifactId: number) => {
-    if (featuredCount >= MAX_FEATURED) {
-      toast({
-        title: `Showcase full (${MAX_FEATURED} max)`,
-        description: "Unfeature one to feature another.",
-        variant: "destructive",
-      });
-      return;
-    }
     toggleFeatured.mutate({ artifactId, isFeatured: true });
+  };
+
+  const handleSwapFeatured = (removeId: number, addId: number) => {
+    swapFeatured.mutate({ removeId, addId });
   };
 
   const handleRemoveFeatured = (artifactId: number) => {
@@ -191,8 +219,9 @@ export default function PlayerProfilePage() {
               featuredCount={featuredCount}
               onReorder={(ids) => reorderFeatured.mutate(ids)}
               onAddFeatured={handleAddFeatured}
+              onSwapFeatured={handleSwapFeatured}
               onRemoveFeatured={handleRemoveFeatured}
-              isToggling={toggleFeatured.isPending}
+              isToggling={toggleFeatured.isPending || swapFeatured.isPending}
             />
             {isOwnProfile && <PostInsightsSection />}
           </>
@@ -260,6 +289,7 @@ function ShowcaseStrip({
   featuredCount,
   onReorder,
   onAddFeatured,
+  onSwapFeatured,
   onRemoveFeatured,
   isToggling,
 }: {
@@ -270,6 +300,7 @@ function ShowcaseStrip({
   featuredCount: number;
   onReorder: (ids: number[]) => void;
   onAddFeatured: (id: number) => void;
+  onSwapFeatured: (removeId: number, addId: number) => void;
   onRemoveFeatured: (id: number) => void;
   isToggling: boolean;
 }) {
@@ -301,10 +332,12 @@ function ShowcaseStrip({
   const addTile = isOwnProfile ? (
     <AddArtifactTile
       addable={addableArtifacts}
+      featured={featured}
       canAddMore={canAddMore}
       featuredCount={featuredCount}
       isToggling={isToggling}
       onAdd={onAddFeatured}
+      onSwap={onSwapFeatured}
     />
   ) : null;
 
@@ -331,10 +364,12 @@ function ShowcaseStrip({
               {addableArtifacts.length > 0 ? (
                 <AddArtifactTile
                   addable={addableArtifacts}
+                  featured={featured}
                   canAddMore={canAddMore}
                   featuredCount={featuredCount}
                   isToggling={isToggling}
                   onAdd={onAddFeatured}
+                  onSwap={onSwapFeatured}
                   variant="inline"
                 />
               ) : (
@@ -470,30 +505,56 @@ function ShowcaseCard({
 
 function AddArtifactTile({
   addable,
+  featured,
   canAddMore,
   featuredCount,
   isToggling,
   onAdd,
+  onSwap,
   variant = "card",
 }: {
   addable: MuseumArtifact[];
+  featured: ShowcaseArtifact[];
   canAddMore: boolean;
   featuredCount: number;
   isToggling: boolean;
   onAdd: (id: number) => void;
+  onSwap: (removeId: number, addId: number) => void;
   variant?: "card" | "inline";
 }) {
   const [open, setOpen] = useState(false);
+  const [pendingAddId, setPendingAddId] = useState<number | null>(null);
 
-  const disabled = !canAddMore || addable.length === 0;
-  const triggerLabel = !canAddMore
-    ? `${MAX_FEATURED}/${MAX_FEATURED} featured`
-    : addable.length === 0
-      ? "Nothing to add yet"
-      : "Add artifact";
+  // Sheet stays usable when the showcase is full — picking an artifact then
+  // prompts for a swap target. Only fully disable when nothing is available.
+  const disabled = addable.length === 0;
+  const triggerLabel = addable.length === 0
+    ? "Nothing to add yet"
+    : canAddMore
+      ? "Add artifact"
+      : "Swap artifact";
 
-  const handleAdd = (id: number) => {
-    onAdd(id);
+  // Reset swap pick whenever the sheet closes so a fresh open starts at step 1.
+  useEffect(() => {
+    if (!open) setPendingAddId(null);
+  }, [open]);
+
+  const pendingArtifact = pendingAddId != null
+    ? addable.find(a => a.id === pendingAddId) ?? null
+    : null;
+
+  const handlePick = (id: number) => {
+    if (canAddMore) {
+      onAdd(id);
+      setOpen(false);
+      return;
+    }
+    setPendingAddId(id);
+  };
+
+  const handleSwapTarget = (removeId: number) => {
+    if (pendingAddId == null) return;
+    onSwap(removeId, pendingAddId);
     setOpen(false);
   };
 
@@ -518,72 +579,125 @@ function AddArtifactTile({
             className="flex-shrink-0 w-40 rounded-3xl border-2 border-dashed border-border bg-muted/10 hover:border-primary/60 hover:bg-primary/5 transition-colors p-4 flex flex-col items-center justify-center gap-2 text-center disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-border disabled:hover:bg-muted/10"
           >
             <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/40 flex items-center justify-center">
-              {canAddMore ? (
-                <Plus className="w-5 h-5 text-primary" />
-              ) : (
+              {addable.length === 0 ? (
                 <Lock className="w-5 h-5 text-muted-foreground" />
+              ) : (
+                <Plus className="w-5 h-5 text-primary" />
               )}
             </div>
             <p className="text-xs font-black uppercase tracking-wider text-white leading-tight">
-              {canAddMore ? "Add artifact" : "Showcase full"}
+              {triggerLabel}
             </p>
             <p className="text-[10px] text-muted-foreground leading-tight">
-              {canAddMore
-                ? addable.length === 0
-                  ? "Earn more to feature"
-                  : `${addable.length} to choose from`
-                : `${featuredCount}/${MAX_FEATURED} featured`}
+              {addable.length === 0
+                ? "Earn more to feature"
+                : canAddMore
+                  ? `${addable.length} to choose from`
+                  : `${featuredCount}/${MAX_FEATURED} featured · tap to swap`}
             </p>
           </button>
         )}
       </SheetTrigger>
       <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto">
-        <SheetHeader className="text-left">
-          <SheetTitle className="text-white">Feature on your profile</SheetTitle>
-          <p className="text-xs text-muted-foreground">
-            Pick an artifact to add to your showcase ({featuredCount}/{MAX_FEATURED} used).
-          </p>
-        </SheetHeader>
-        {addable.length === 0 ? (
-          <div className="py-10 text-center space-y-3">
-            <span className="text-4xl block">🏺</span>
-            <p className="text-sm text-muted-foreground">
-              You've already featured everything you've discovered. Earn more artifacts in the Museum.
-            </p>
-            <Link href="/artifacts">
-              <button
-                onClick={() => setOpen(false)}
-                className="text-xs font-bold text-primary hover:underline"
-                data-testid="link-sheet-to-museum"
-              >
-                Visit the Museum →
-              </button>
-            </Link>
-          </div>
+        {pendingArtifact ? (
+          <>
+            <SheetHeader className="text-left">
+              <SheetTitle className="text-white">Swap with…</SheetTitle>
+              <p className="text-xs text-muted-foreground">
+                Your showcase is full ({featuredCount}/{MAX_FEATURED}). Pick which featured artifact to replace with{" "}
+                <span className={RARITY_STYLES[pendingArtifact.rarity]?.text ?? "text-white"}>
+                  {pendingArtifact.name}
+                </span>
+                .
+              </p>
+            </SheetHeader>
+            <div className="mt-4 grid grid-cols-2 gap-3 pb-3">
+              {featured.map((artifact) => {
+                const s = RARITY_STYLES[artifact.rarity] ?? RARITY_STYLES.Common!;
+                return (
+                  <button
+                    key={artifact.id}
+                    type="button"
+                    onClick={() => handleSwapTarget(artifact.id)}
+                    disabled={isToggling}
+                    data-testid={`button-swap-target-${artifact.id}`}
+                    className={`text-left rounded-2xl border-2 ${s.border} ${s.bg} p-3 hover:brightness-125 transition-all disabled:opacity-50`}
+                  >
+                    <div className={`w-full aspect-square rounded-xl ${s.bg} border ${s.border} flex items-center justify-center text-3xl mb-2`}>
+                      {SLUG_EMOJIS[artifact.imageSlug] ?? "🏺"}
+                    </div>
+                    <Badge className={`text-[9px] font-black uppercase tracking-wider mb-1 ${s.label}`}>
+                      {artifact.rarity}
+                    </Badge>
+                    <p className={`text-xs font-black leading-tight ${s.text}`}>{artifact.name}</p>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => setPendingAddId(null)}
+              disabled={isToggling}
+              data-testid="button-swap-cancel"
+              className="w-full text-center text-xs font-bold text-muted-foreground hover:text-white py-2 mb-4 disabled:opacity-50"
+            >
+              ← Pick a different artifact
+            </button>
+          </>
         ) : (
-          <div className="mt-4 grid grid-cols-2 gap-3 pb-6">
-            {addable.map((artifact) => {
-              const s = RARITY_STYLES[artifact.rarity] ?? RARITY_STYLES.Common!;
-              return (
-                <button
-                  key={artifact.id}
-                  type="button"
-                  onClick={() => handleAdd(artifact.id)}
-                  disabled={isToggling}
-                  data-testid={`button-feature-from-sheet-${artifact.id}`}
-                  className={`text-left rounded-2xl border-2 ${s.border} ${s.bg} p-3 hover:brightness-125 transition-all disabled:opacity-50`}
-                >
-                  <div className={`w-full aspect-square rounded-xl ${s.bg} border ${s.border} flex items-center justify-center text-3xl mb-2`}>
-                    {SLUG_EMOJIS[artifact.imageSlug] ?? "🏺"}
-                  </div>
-                  <Badge className={`text-[9px] font-black uppercase tracking-wider mb-1 ${s.label}`}>
-                    {artifact.rarity}
-                  </Badge>
-                  <p className={`text-xs font-black leading-tight ${s.text}`}>{artifact.name}</p>
-                </button>
-              );
-            })}
-          </div>
+          <>
+            <SheetHeader className="text-left">
+              <SheetTitle className="text-white">
+                {canAddMore ? "Feature on your profile" : "Swap into your showcase"}
+              </SheetTitle>
+              <p className="text-xs text-muted-foreground">
+                {canAddMore
+                  ? `Pick an artifact to add to your showcase (${featuredCount}/${MAX_FEATURED} used).`
+                  : `Showcase full (${featuredCount}/${MAX_FEATURED}). Pick a new artifact — you'll choose which one it replaces next.`}
+              </p>
+            </SheetHeader>
+            {addable.length === 0 ? (
+              <div className="py-10 text-center space-y-3">
+                <span className="text-4xl block">🏺</span>
+                <p className="text-sm text-muted-foreground">
+                  You've already featured everything you've discovered. Earn more artifacts in the Museum.
+                </p>
+                <Link href="/artifacts">
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="text-xs font-bold text-primary hover:underline"
+                    data-testid="link-sheet-to-museum"
+                  >
+                    Visit the Museum →
+                  </button>
+                </Link>
+              </div>
+            ) : (
+              <div className="mt-4 grid grid-cols-2 gap-3 pb-6">
+                {addable.map((artifact) => {
+                  const s = RARITY_STYLES[artifact.rarity] ?? RARITY_STYLES.Common!;
+                  return (
+                    <button
+                      key={artifact.id}
+                      type="button"
+                      onClick={() => handlePick(artifact.id)}
+                      disabled={isToggling}
+                      data-testid={`button-feature-from-sheet-${artifact.id}`}
+                      className={`text-left rounded-2xl border-2 ${s.border} ${s.bg} p-3 hover:brightness-125 transition-all disabled:opacity-50`}
+                    >
+                      <div className={`w-full aspect-square rounded-xl ${s.bg} border ${s.border} flex items-center justify-center text-3xl mb-2`}>
+                        {SLUG_EMOJIS[artifact.imageSlug] ?? "🏺"}
+                      </div>
+                      <Badge className={`text-[9px] font-black uppercase tracking-wider mb-1 ${s.label}`}>
+                        {artifact.rarity}
+                      </Badge>
+                      <p className={`text-xs font-black leading-tight ${s.text}`}>{artifact.name}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </SheetContent>
     </Sheet>
