@@ -140,9 +140,13 @@ router.get("/nutrition/posts", requireAuth, attachPlayer, async (req, res) => {
   // Block filtering: drop posts from anyone the viewer blocked or who blocked viewer
   const hiddenIds = await getHiddenPlayerIds(playerId);
 
-  // Feed = posts from people in the same groups as the viewer (or own posts);
-  //   Discover = global, sorted by likes.
+  // Feed = posts from people the user follows (via group co-membership as the
+  //   social-follow proxy in this app) + own posts. If the user has no
+  //   follow connections yet, automatically fall back to the global Discover
+  //   feed so the tab is never empty for new users.
+  // Discover = global, sorted by likes.
   let visiblePlayerIds: number[] | null = null;
+  let fellBackToDiscover = false;
   if (mode === "feed") {
     const myGroups = await db.select({ gid: groupMembersTable.groupId })
       .from(groupMembersTable)
@@ -151,11 +155,18 @@ router.get("/nutrition/posts", requireAuth, attachPlayer, async (req, res) => {
       const sameGroupMembers = await db.select({ pid: groupMembersTable.playerId })
         .from(groupMembersTable)
         .where(inArray(groupMembersTable.groupId, myGroups.map(g => g.gid)));
-      visiblePlayerIds = [...new Set([playerId, ...sameGroupMembers.map(m => m.pid)])];
+      const followIds = new Set([playerId, ...sameGroupMembers.map(m => m.pid)]);
+      if (followIds.size > 1) {
+        visiblePlayerIds = [...followIds];
+      } else {
+        // Only own posts would show → fall back to discover
+        fellBackToDiscover = true;
+      }
     } else {
-      visiblePlayerIds = [playerId]; // no groups yet → just own posts in feed
+      fellBackToDiscover = true;
     }
   }
+  const effectiveMode = fellBackToDiscover ? "discover" : mode;
 
   const whereClauses = [
     hiddenIds.length > 0 ? notInArray(mealPostsTable.playerId, hiddenIds) : undefined,
@@ -164,7 +175,7 @@ router.get("/nutrition/posts", requireAuth, attachPlayer, async (req, res) => {
 
   const posts = await db.query.mealPostsTable.findMany({
     where: whereClauses.length > 0 ? and(...whereClauses) : undefined,
-    orderBy: mode === "discover"
+    orderBy: effectiveMode === "discover"
       ? [desc(mealPostsTable.likesCount), desc(mealPostsTable.createdAt)]
       : [desc(mealPostsTable.createdAt)],
     limit,
@@ -185,17 +196,24 @@ router.get("/nutrition/posts", requireAuth, attachPlayer, async (req, res) => {
     : [];
   const playerMap = Object.fromEntries(players.map(p => [p.id, p]));
 
-  res.json(posts.map(p => ({
-    ...p,
-    createdAt: p.createdAt.toISOString(),
-    liked: likedSet.has(p.id),
-    author: playerMap[p.playerId]
-      ? { id: p.playerId, username: playerMap[p.playerId]!.username, displayName: playerMap[p.playerId]!.displayName }
-      : { id: p.playerId, username: "user", displayName: null },
-  })));
+  res.json({
+    mode: effectiveMode,
+    fellBackToDiscover,
+    posts: posts.map(p => ({
+      ...p,
+      createdAt: p.createdAt.toISOString(),
+      liked: likedSet.has(p.id),
+      author: playerMap[p.playerId]
+        ? { id: p.playerId, username: playerMap[p.playerId]!.username, displayName: playerMap[p.playerId]!.displayName }
+        : { id: p.playerId, username: "user", displayName: null },
+    })),
+  });
 });
 
 // ── POST /nutrition/posts/:id/like ────────────────────────────────────────────
+// Concurrency-safe toggle: only decrement/increment when the row actually
+// changed in this request (use .returning() on insert/delete to confirm a
+// real state change, preventing counter drift from duplicate clicks).
 router.post("/nutrition/posts/:id/like", requireAuth, attachPlayer, async (req, res) => {
   const postId = Number(req.params.id);
   const playerId = req.playerId!; // derived server-side from auth token
@@ -206,12 +224,26 @@ router.post("/nutrition/posts/:id/like", requireAuth, attachPlayer, async (req, 
 
   let liked: boolean;
   if (existing) {
-    await db.delete(mealLikesTable).where(and(eq(mealLikesTable.mealPostId, postId), eq(mealLikesTable.playerId, playerId)));
-    await db.update(mealPostsTable).set({ likesCount: sql`likes_count - 1` }).where(eq(mealPostsTable.id, postId));
+    const deleted = await db.delete(mealLikesTable)
+      .where(and(eq(mealLikesTable.mealPostId, postId), eq(mealLikesTable.playerId, playerId)))
+      .returning({ id: mealLikesTable.id });
+    if (deleted.length > 0) {
+      // Conditional decrement: never go below 0
+      await db.update(mealPostsTable)
+        .set({ likesCount: sql`GREATEST(0, ${mealPostsTable.likesCount} - 1)` })
+        .where(eq(mealPostsTable.id, postId));
+    }
     liked = false;
   } else {
-    await db.insert(mealLikesTable).values({ mealPostId: postId, playerId }).onConflictDoNothing();
-    await db.update(mealPostsTable).set({ likesCount: sql`likes_count + 1` }).where(eq(mealPostsTable.id, postId));
+    const inserted = await db.insert(mealLikesTable)
+      .values({ mealPostId: postId, playerId })
+      .onConflictDoNothing()
+      .returning({ id: mealLikesTable.id });
+    if (inserted.length > 0) {
+      await db.update(mealPostsTable)
+        .set({ likesCount: sql`${mealPostsTable.likesCount} + 1` })
+        .where(eq(mealPostsTable.id, postId));
+    }
     liked = true;
   }
 

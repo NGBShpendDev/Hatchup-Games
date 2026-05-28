@@ -105,11 +105,13 @@ export default function Nutrition() {
 
   // ── Queries ─────────────────────────────────────────────────────────────────
   const feedMode = activeTab === "discover" ? "discover" : "feed";
-  const { data: posts = [], isLoading: postsLoading } = useQuery<MealPost[]>({
+  const { data: feedData, isLoading: postsLoading } = useQuery<{ mode: string; fellBackToDiscover: boolean; posts: MealPost[] }>({
     queryKey: ["nutrition-posts", pid, feedMode],
     queryFn: () => fetch(`${BASE}/api/nutrition/posts?limit=30&mode=${feedMode}`, { credentials: "include" }).then(r => r.json()),
     enabled: !!pid && activeTab !== "challenges",
   });
+  const posts: MealPost[] = feedData?.posts ?? [];
+  const fellBackToDiscover = feedData?.fellBackToDiscover ?? false;
 
   const { data: challenges = [], isLoading: challengesLoading } = useQuery<NutritionChallenge[]>({
     queryKey: ["nutrition-challenges", pid],
@@ -304,6 +306,14 @@ export default function Nutrition() {
           <div className="rounded-xl bg-purple-500/10 border border-purple-500/30 px-3 py-2 mb-3 flex items-center gap-2">
             <Sparkles className="w-3.5 h-3.5 text-purple-400" />
             <p className="text-[11px] font-bold text-purple-300">Trending meals from the community — sorted by likes.</p>
+          </div>
+        )}
+
+        {/* Auto-fallback banner: feed empty → showing discover */}
+        {activeTab === "feed" && fellBackToDiscover && (
+          <div className="rounded-xl bg-cyan-500/10 border border-cyan-500/30 px-3 py-2 mb-3 flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+            <p className="text-[11px] font-bold text-cyan-300">No follows yet — showing trending meals from the community.</p>
           </div>
         )}
 
