@@ -1,7 +1,7 @@
 import { db, mealPostsTable, playersTable, notificationsTable } from "@workspace/db";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { logger } from "../lib/logger";
+import { logger } from "../lib/logger.ts";
 import { isEmailConfigured, sendTransactionalEmail } from "./emailService";
 import { renderRecapEmailHtml } from "./nutritionRecapEmail";
 
@@ -109,21 +109,7 @@ export async function computeWeeklyRecap(playerId: number): Promise<WeeklyRecap 
     ? 0
     : (ratios.calories + ratios.protein + ratios.carbs + ratios.fat) / 4;
 
-  let hatchlingMood: HatchlingMood;
-  let hatchlingEmoji: string;
-  if (daysLogged === 0) {
-    hatchlingMood = "hungry"; hatchlingEmoji = "😟";
-  } else if (adherence >= 0.85 && adherence <= 1.15 && daysLogged >= 5) {
-    hatchlingMood = "thriving"; hatchlingEmoji = "🤩";
-  } else if (adherence >= 0.7 && adherence <= 1.3) {
-    hatchlingMood = "happy"; hatchlingEmoji = "😊";
-  } else if (adherence >= 0.5) {
-    hatchlingMood = "okay"; hatchlingEmoji = "🙂";
-  } else if (adherence > 0) {
-    hatchlingMood = "hungry"; hatchlingEmoji = "🥺";
-  } else {
-    hatchlingMood = "sad"; hatchlingEmoji = "😢";
-  }
+  const { mood: hatchlingMood, emoji: hatchlingEmoji } = deriveHatchlingMood(adherence, daysLogged);
 
   const gaps = {
     calories: averages.calories - targets.calories,
@@ -200,7 +186,20 @@ export function isoWeekKey(d: Date): number {
   return date.getUTCFullYear() * 100 + week;
 }
 
-function buildRecapMessage(recap: WeeklyRecap): { title: string; body: string } {
+/**
+ * Map adherence ratio + days logged onto a Hatchling mood band.
+ * Pure function — exported for testing.
+ */
+export function deriveHatchlingMood(adherence: number, daysLogged: number): { mood: HatchlingMood; emoji: string } {
+  if (daysLogged === 0)                                                return { mood: "hungry",   emoji: "😟" };
+  if (adherence >= 0.85 && adherence <= 1.15 && daysLogged >= 5)       return { mood: "thriving", emoji: "🤩" };
+  if (adherence >= 0.7  && adherence <= 1.3)                           return { mood: "happy",    emoji: "😊" };
+  if (adherence >= 0.5)                                                return { mood: "okay",     emoji: "🙂" };
+  if (adherence > 0)                                                   return { mood: "hungry",   emoji: "🥺" };
+  return                                                                      { mood: "sad",      emoji: "😢" };
+}
+
+export function buildRecapMessage(recap: WeeklyRecap): { title: string; body: string } {
   if (recap.daysLogged === 0) {
     return {
       title: `${recap.hatchlingEmoji} Your Hatchling missed you this week`,
