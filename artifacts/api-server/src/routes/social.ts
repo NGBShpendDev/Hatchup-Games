@@ -5,6 +5,7 @@ import {
   postViewsTable,
   postReactionsTable,
   postCommentsTable,
+  postCommentReactionsTable,
   playerFollowsTable,
   postRepostsTable,
   playersTable,
@@ -100,6 +101,19 @@ async function enrichPost(
     limit: 3,
   });
 
+  const commentIds = comments.map(c => c.id);
+  const commentLikes = commentIds.length
+    ? await db.query.postCommentReactionsTable.findMany({
+        where: inArray(postCommentReactionsTable.commentId, commentIds),
+      })
+    : [];
+  const likeCountByComment = new Map<number, number>();
+  const myLikedByComment = new Map<number, boolean>();
+  for (const r of commentLikes) {
+    likeCountByComment.set(r.commentId, (likeCountByComment.get(r.commentId) ?? 0) + 1);
+    if (viewerPlayerId && r.playerId === viewerPlayerId) myLikedByComment.set(r.commentId, true);
+  }
+
   const enrichedComments = await Promise.all(comments.map(async c => {
     const commentAuthor = await db.query.playersTable.findFirst({ where: eq(playersTable.id, c.playerId) });
     return {
@@ -107,6 +121,8 @@ async function enrichPost(
       authorName: commentAuthor?.displayName ?? commentAuthor?.username ?? "Trainer",
       authorAvatar: commentAuthor?.avatarUrl ?? null,
       createdAt: c.createdAt.toISOString(),
+      likeCount: likeCountByComment.get(c.id) ?? 0,
+      myLiked: myLikedByComment.get(c.id) ?? false,
     };
   }));
 
@@ -376,6 +392,11 @@ router.delete("/social/posts/:id", requireAuth, attachPlayer, async (req, res) =
   if (post.playerId !== playerId) { res.status(403).json({ error: "Not your post" }); return; }
 
   await db.delete(postReactionsTable).where(eq(postReactionsTable.postId, id));
+  const postComments = await db.query.postCommentsTable.findMany({ where: eq(postCommentsTable.postId, id) });
+  if (postComments.length) {
+    await db.delete(postCommentReactionsTable)
+      .where(inArray(postCommentReactionsTable.commentId, postComments.map(c => c.id)));
+  }
   await db.delete(postCommentsTable).where(eq(postCommentsTable.postId, id));
   await db.delete(postRepostsTable).where(eq(postRepostsTable.postId, id));
   await db.delete(postsTable).where(eq(postsTable.id, id));
@@ -496,6 +517,20 @@ router.get("/social/posts/:id/comments", requireAuth, attachPlayer, async (req, 
     orderBy: [desc(postCommentsTable.createdAt)],
   });
 
+  const viewerId = req.playerId ?? null;
+  const commentIds = comments.map(c => c.id);
+  const commentLikes = commentIds.length
+    ? await db.query.postCommentReactionsTable.findMany({
+        where: inArray(postCommentReactionsTable.commentId, commentIds),
+      })
+    : [];
+  const likeCountByComment = new Map<number, number>();
+  const myLikedByComment = new Map<number, boolean>();
+  for (const r of commentLikes) {
+    likeCountByComment.set(r.commentId, (likeCountByComment.get(r.commentId) ?? 0) + 1);
+    if (viewerId && r.playerId === viewerId) myLikedByComment.set(r.commentId, true);
+  }
+
   const enriched = await Promise.all(comments.map(async c => {
     const author = await db.query.playersTable.findFirst({ where: eq(playersTable.id, c.playerId) });
     return {
@@ -503,6 +538,8 @@ router.get("/social/posts/:id/comments", requireAuth, attachPlayer, async (req, 
       authorName: author?.displayName ?? author?.username ?? "Trainer",
       authorAvatar: author?.avatarUrl ?? null,
       createdAt: c.createdAt.toISOString(),
+      likeCount: likeCountByComment.get(c.id) ?? 0,
+      myLiked: myLikedByComment.get(c.id) ?? false,
     };
   }));
 
@@ -557,6 +594,8 @@ router.post("/social/posts/:id/comments", socialWriteLimiter, requireAuth, attac
     authorName: author?.displayName ?? author?.username ?? "Trainer",
     authorAvatar: author?.avatarUrl ?? null,
     createdAt: comment.createdAt.toISOString(),
+    likeCount: 0,
+    myLiked: false,
   });
 });
 
@@ -588,14 +627,78 @@ router.patch("/social/posts/:id/comments/:commentId", socialWriteLimiter, requir
     .where(eq(postCommentsTable.id, commentId))
     .returning();
 
+  const likeCount = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(postCommentReactionsTable)
+    .where(eq(postCommentReactionsTable.commentId, commentId))
+    .then(r => r[0]?.count ?? 0);
+  const myLike = await db.query.postCommentReactionsTable.findFirst({
+    where: and(
+      eq(postCommentReactionsTable.commentId, commentId),
+      eq(postCommentReactionsTable.playerId, playerId),
+    ),
+  });
+
   const author = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
   res.json({
     ...updated,
     authorName: author?.displayName ?? author?.username ?? "Trainer",
     authorAvatar: author?.avatarUrl ?? null,
     createdAt: updated.createdAt.toISOString(),
+    likeCount,
+    myLiked: !!myLike,
   });
 });
+
+// ── POST /social/posts/:id/comments/:commentId/like ────────────────────────
+
+router.post(
+  "/social/posts/:id/comments/:commentId/like",
+  socialWriteLimiter,
+  requireAuth,
+  attachPlayer,
+  blockMinorSocialWrite,
+  async (req, res) => {
+    const commentId = Number(req.params.commentId);
+    const playerId = req.playerId!;
+    if (!Number.isFinite(commentId)) {
+      res.status(404).json({ error: "Comment not found" });
+      return;
+    }
+
+    const comment = await db.query.postCommentsTable.findFirst({
+      where: eq(postCommentsTable.id, commentId),
+    });
+    if (!comment) {
+      res.status(404).json({ error: "Comment not found" });
+      return;
+    }
+
+    const existing = await db.query.postCommentReactionsTable.findFirst({
+      where: and(
+        eq(postCommentReactionsTable.commentId, commentId),
+        eq(postCommentReactionsTable.playerId, playerId),
+      ),
+    });
+
+    let liked: boolean;
+    if (existing) {
+      await db.delete(postCommentReactionsTable).where(eq(postCommentReactionsTable.id, existing.id));
+      liked = false;
+    } else {
+      await db.insert(postCommentReactionsTable).values({ commentId, playerId, reactionType: "like" });
+      liked = true;
+    }
+
+    const likeCount = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(postCommentReactionsTable)
+      .where(eq(postCommentReactionsTable.commentId, commentId))
+      .then(r => r[0]?.count ?? 0);
+
+    res.json({ liked, likeCount });
+  },
+);
 
 // ── DELETE /social/posts/:id/comments/:commentId ────────────────────────────
 
@@ -607,6 +710,7 @@ router.delete("/social/posts/:id/comments/:commentId", requireAuth, attachPlayer
   if (!comment) { res.status(404).json({ error: "Comment not found" }); return; }
   if (comment.playerId !== playerId) { res.status(403).json({ error: "Not your comment" }); return; }
 
+  await db.delete(postCommentReactionsTable).where(eq(postCommentReactionsTable.commentId, commentId));
   await db.delete(postCommentsTable).where(eq(postCommentsTable.id, commentId));
   res.status(204).send();
 });

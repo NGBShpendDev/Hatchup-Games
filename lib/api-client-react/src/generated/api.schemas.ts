@@ -1185,6 +1185,8 @@ export interface PostComment {
   content: string;
   isFlagged: boolean;
   createdAt: string;
+  likeCount: number;
+  myLiked: boolean;
 }
 
 export interface FeedPost {
@@ -1221,6 +1223,15 @@ export interface FeedPage {
   /** @nullable */
   nextCursor: number | null;
   total?: number;
+}
+
+export interface CommentLikeResult {
+  liked: boolean;
+  likeCount: number;
+}
+
+export interface CommentLikeInput {
+  playerId: number;
 }
 
 export interface PlayerStub {

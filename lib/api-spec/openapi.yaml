@@ -1978,6 +1978,38 @@ paths:
         "204":
           description: Deleted
 
+  /social/posts/{id}/comments/{commentId}/like:
+    post:
+      operationId: toggleCommentLike
+      tags: [social]
+      summary: Toggle a like on a comment (idempotent per player)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommentLikeInput"
+      responses:
+        "200":
+          description: Like toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentLikeResult"
+        "404":
+          description: Comment not found
+
   /social/posts/{id}/repost:
     post:
       operationId: repostPost
@@ -4615,7 +4647,7 @@ components:
 
     PostComment:
       type: object
-      required: [id, postId, playerId, content, isFlagged, createdAt, authorName]
+      required: [id, postId, playerId, content, isFlagged, createdAt, authorName, likeCount, myLiked]
       properties:
         id:         { type: integer }
         postId:     { type: integer }
@@ -4625,6 +4657,21 @@ components:
         content:    { type: string }
         isFlagged:  { type: boolean }
         createdAt:  { type: string }
+        likeCount:  { type: integer }
+        myLiked:    { type: boolean }
+
+    CommentLikeResult:
+      type: object
+      required: [liked, likeCount]
+      properties:
+        liked:     { type: boolean }
+        likeCount: { type: integer }
+
+    CommentLikeInput:
+      type: object
+      required: [playerId]
+      properties:
+        playerId: { type: integer }
 
     PlayerStub:
       type: object

@@ -42,6 +42,14 @@ export const postCommentsTable = pgTable("post_comments", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const postCommentReactionsTable = pgTable("post_comment_reactions", {
+  id: serial("id").primaryKey(),
+  commentId: integer("comment_id").notNull(),
+  playerId: integer("player_id").notNull(),
+  reactionType: text("reaction_type").notNull().default("like"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique("post_comment_reactions_comment_player_unique").on(t.commentId, t.playerId)]);
+
 export const playerFollowsTable = pgTable("player_follows", {
   id: serial("id").primaryKey(),
   followerId: integer("follower_id").notNull(),
@@ -75,6 +83,10 @@ export type PostReaction = typeof postReactionsTable.$inferSelect;
 export const insertPostCommentSchema = createInsertSchema(postCommentsTable).omit({ id: true, createdAt: true });
 export type InsertPostComment = z.infer<typeof insertPostCommentSchema>;
 export type PostComment = typeof postCommentsTable.$inferSelect;
+
+export const insertPostCommentReactionSchema = createInsertSchema(postCommentReactionsTable).omit({ id: true, createdAt: true });
+export type InsertPostCommentReaction = z.infer<typeof insertPostCommentReactionSchema>;
+export type PostCommentReaction = typeof postCommentReactionsTable.$inferSelect;
 
 export const insertPlayerFollowSchema = createInsertSchema(playerFollowsTable).omit({ id: true, createdAt: true });
 export type InsertPlayerFollow = z.infer<typeof insertPlayerFollowSchema>;

@@ -2155,7 +2155,9 @@ export const GetSocialFeedResponse = zod.object({
   "authorAvatar": zod.string().nullish(),
   "content": zod.string(),
   "isFlagged": zod.boolean(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "likeCount": zod.number(),
+  "myLiked": zod.boolean()
 })).optional()
 })),
   "nextCursor": zod.number().nullable(),
@@ -2223,7 +2225,9 @@ export const GetPostResponse = zod.object({
   "authorAvatar": zod.string().nullish(),
   "content": zod.string(),
   "isFlagged": zod.boolean(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "likeCount": zod.number(),
+  "myLiked": zod.boolean()
 })).optional()
 })
 
@@ -2292,7 +2296,9 @@ export const ListPostCommentsResponseItem = zod.object({
   "authorAvatar": zod.string().nullish(),
   "content": zod.string(),
   "isFlagged": zod.boolean(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "likeCount": zod.number(),
+  "myLiked": zod.boolean()
 })
 export const ListPostCommentsResponse = zod.array(ListPostCommentsResponseItem)
 
@@ -2353,6 +2359,24 @@ export const DeletePostCommentParams = zod.object({
 
 export const DeletePostCommentQueryParams = zod.object({
   "playerId": zod.coerce.number()
+})
+
+
+/**
+ * @summary Toggle a like on a comment (idempotent per player)
+ */
+export const ToggleCommentLikeParams = zod.object({
+  "id": zod.coerce.number(),
+  "commentId": zod.coerce.number()
+})
+
+export const ToggleCommentLikeBody = zod.object({
+  "playerId": zod.number()
+})
+
+export const ToggleCommentLikeResponse = zod.object({
+  "liked": zod.boolean(),
+  "likeCount": zod.number()
 })
 
 
@@ -2504,7 +2528,9 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "authorAvatar": zod.string().nullish(),
   "content": zod.string(),
   "isFlagged": zod.boolean(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "likeCount": zod.number(),
+  "myLiked": zod.boolean()
 })).optional()
 })),
   "followerCount": zod.number(),
@@ -2544,7 +2570,9 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "authorAvatar": zod.string().nullish(),
   "content": zod.string(),
   "isFlagged": zod.boolean(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "likeCount": zod.number(),
+  "myLiked": zod.boolean()
 })).optional()
 }),
   "memoryType": zod.string(),
@@ -2670,7 +2698,9 @@ export const GetDailyMemoryResponse = zod.union([zod.object({
   "authorAvatar": zod.string().nullish(),
   "content": zod.string(),
   "isFlagged": zod.boolean(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "likeCount": zod.number(),
+  "myLiked": zod.boolean()
 })).optional()
 }),
   "memoryType": zod.string(),

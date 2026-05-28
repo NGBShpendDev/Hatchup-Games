@@ -41,6 +41,8 @@ import type {
   ClubInput,
   ClubMember,
   CoachChatBody,
+  CommentLikeInput,
+  CommentLikeResult,
   Competition,
   CompetitionInput,
   CompetitionResultInput,
@@ -7017,6 +7019,80 @@ export const useDeletePostComment = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeletePostCommentMutationOptions(options));
+    }
+
+export const getToggleCommentLikeUrl = (id: number,
+    commentId: number,) => {
+
+
+
+
+  return `/api/social/posts/${id}/comments/${commentId}/like`
+}
+
+/**
+ * @summary Toggle a like on a comment (idempotent per player)
+ */
+export const toggleCommentLike = async (id: number,
+    commentId: number,
+    commentLikeInput: CommentLikeInput, options?: RequestInit): Promise<CommentLikeResult> => {
+
+  return customFetch<CommentLikeResult>(getToggleCommentLikeUrl(id,commentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      commentLikeInput,)
+  }
+);}
+
+
+
+
+export const getToggleCommentLikeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleCommentLike>>, TError,{id: number;commentId: number;data: BodyType<CommentLikeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof toggleCommentLike>>, TError,{id: number;commentId: number;data: BodyType<CommentLikeInput>}, TContext> => {
+
+const mutationKey = ['toggleCommentLike'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof toggleCommentLike>>, {id: number;commentId: number;data: BodyType<CommentLikeInput>}> = (props) => {
+          const {id,commentId,data} = props ?? {};
+
+          return  toggleCommentLike(id,commentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ToggleCommentLikeMutationResult = NonNullable<Awaited<ReturnType<typeof toggleCommentLike>>>
+    export type ToggleCommentLikeMutationBody = BodyType<CommentLikeInput>
+    export type ToggleCommentLikeMutationError = ErrorType<void>
+
+    /**
+ * @summary Toggle a like on a comment (idempotent per player)
+ */
+export const useToggleCommentLike = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleCommentLike>>, TError,{id: number;commentId: number;data: BodyType<CommentLikeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof toggleCommentLike>>,
+        TError,
+        {id: number;commentId: number;data: BodyType<CommentLikeInput>},
+        TContext
+      > => {
+      return useMutation(getToggleCommentLikeMutationOptions(options));
     }
 
 export const getRepostPostUrl = (id: number,) => {

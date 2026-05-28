@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
-import { useGetPlayerDashboard, getGetPlayerDashboardQueryKey, useLogActivity, useGetSocialFeed, getGetSocialFeedQueryKey, useReactToPost, useAddPostComment, useEditPostComment, useDeletePostComment } from "@workspace/api-client-react";
+import { useGetPlayerDashboard, getGetPlayerDashboardQueryKey, useLogActivity, useGetSocialFeed, getGetSocialFeedQueryKey, useReactToPost, useAddPostComment } from "@workspace/api-client-react";
 import type { PostComment } from "@workspace/api-client-react";
 import { ComposeSheet } from "@/components/compose-sheet";
-import { REACTION_ICONS } from "@/components/post-card";
+import { REACTION_ICONS, CommentRow } from "@/components/post-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -918,11 +918,7 @@ function HighlightCard({
   const { toast } = useToast();
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
-  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
-  const [editingText, setEditingText] = useState("");
   const addComment = useAddPostComment();
-  const editComment = useEditPostComment();
-  const deleteComment = useDeletePostComment();
 
   const myReaction = post.myReaction as string | null;
   const allComments: PostComment[] = post.comments ?? [];
@@ -951,47 +947,6 @@ function HighlightCard({
       } else {
         toast({ title: "Could not add comment", variant: "destructive" });
       }
-    }
-  }
-
-  async function handleSaveEdit(commentId: number) {
-    if (!playerId || !editingText.trim()) return;
-    try {
-      await editComment.mutateAsync({
-        id: post.id,
-        commentId,
-        data: { playerId, content: editingText.trim() },
-      });
-      setEditingCommentId(null);
-      setEditingText("");
-      queryClient.invalidateQueries({ queryKey: ["/api/social/feed"] });
-      toast({ title: "Comment updated ✏️" });
-    } catch (err: any) {
-      if (err?.response?.status === 422) {
-        toast({
-          title: "Keep it positive! 🌟",
-          description: "That content doesn't meet our community guidelines.",
-          variant: "destructive",
-        });
-      } else {
-        toast({ title: "Could not update comment", variant: "destructive" });
-      }
-    }
-  }
-
-  async function handleDelete(commentId: number) {
-    if (!playerId) return;
-    if (typeof window !== "undefined" && !window.confirm("Delete this comment?")) return;
-    try {
-      await deleteComment.mutateAsync({
-        id: post.id,
-        commentId,
-        params: { playerId },
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/social/feed"] });
-      toast({ title: "Comment deleted" });
-    } catch {
-      toast({ title: "Could not delete comment", variant: "destructive" });
     }
   }
 
@@ -1072,86 +1027,15 @@ function HighlightCard({
                 View {hiddenCount} more {hiddenCount === 1 ? "comment" : "comments"}
               </button>
             )}
-            {previewComments.map(c => {
-              const isOwn = playerId != null && c.playerId === playerId;
-              const isEditing = editingCommentId === c.id;
-              return (
-                <div key={c.id} className="flex gap-2" data-testid={`home-comment-${c.id}`}>
-                  <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0">
-                    {c.authorAvatar ? (
-                      <img src={c.authorAvatar} alt={c.authorName} className="w-6 h-6 object-cover" />
-                    ) : (
-                      <span className="text-[9px] font-bold">
-                        {(c.authorName ?? "?").substring(0, 2).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                  <div className="bg-muted/50 rounded-xl px-2.5 py-1.5 flex-1 min-w-0">
-                    <div className="flex items-start gap-2">
-                      <span className="font-bold text-[11px]">{c.authorName}</span>
-                      {isOwn && !isEditing && (
-                        <div className="ml-auto flex items-center gap-1">
-                          <button
-                            onClick={() => { setEditingCommentId(c.id); setEditingText(c.content); }}
-                            className="text-[10px] font-bold text-muted-foreground hover:text-primary"
-                            aria-label="Edit comment"
-                            data-testid={`button-home-edit-comment-${c.id}`}
-                          >
-                            Edit
-                          </button>
-                          <span className="text-muted-foreground/40">·</span>
-                          <button
-                            onClick={() => handleDelete(c.id)}
-                            disabled={deleteComment.isPending}
-                            className="text-[10px] font-bold text-muted-foreground hover:text-destructive disabled:opacity-50"
-                            aria-label="Delete comment"
-                            data-testid={`button-home-delete-comment-${c.id}`}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    {isEditing ? (
-                      <form
-                        onSubmit={e => { e.preventDefault(); handleSaveEdit(c.id); }}
-                        className="flex gap-1 pt-1"
-                      >
-                        <Input
-                          value={editingText}
-                          onChange={e => setEditingText(e.target.value)}
-                          className="h-7 text-xs rounded-full bg-background/60"
-                          maxLength={280}
-                          autoFocus
-                          data-testid={`input-home-edit-comment-${c.id}`}
-                        />
-                        <Button
-                          type="submit"
-                          size="sm"
-                          className="h-7 px-2 text-[10px] rounded-full"
-                          disabled={editComment.isPending || !editingText.trim() || editingText.trim() === c.content}
-                          data-testid={`button-home-save-edit-comment-${c.id}`}
-                        >
-                          Save
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 px-2 text-[10px] rounded-full"
-                          onClick={() => { setEditingCommentId(null); setEditingText(""); }}
-                          data-testid={`button-home-cancel-edit-comment-${c.id}`}
-                        >
-                          Cancel
-                        </Button>
-                      </form>
-                    ) : (
-                      <p className="text-xs text-muted-foreground break-words">{c.content}</p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {previewComments.map(c => (
+              <CommentRow
+                key={c.id}
+                comment={c}
+                postId={post.id}
+                playerId={playerId}
+                testIdPrefix="home-comment"
+              />
+            ))}
           </div>
         )}
 
