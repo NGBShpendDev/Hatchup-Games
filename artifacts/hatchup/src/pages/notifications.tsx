@@ -8,16 +8,20 @@ import {
   useMarkAllNotificationsRead,
   useAcceptBattleRematch,
   useDeclineBattleRematch,
+  useGetMyChallengeInvites,
+  getGetMyChallengeInvitesQueryKey,
   type Notification,
+  type ChallengeInvite,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Bell, CheckCheck, Mail, Trophy, Clock, Sparkles, Users, Swords, Check, X, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 const POLL_MS = 30_000;
@@ -76,11 +80,14 @@ function formatRelative(iso: string): string {
   }
 }
 
+type BusyKey = string;
+
 export default function NotificationsPage() {
   const [, navigate] = useLocation();
   const qc = useQueryClient();
   const { toast } = useToast();
-  const [busyInvite, setBusyInvite] = useState<{ id: number; action: "accept" | "decline" } | null>(null);
+  const [busy, setBusy] = useState<{ key: BusyKey; action: "accept" | "decline" } | null>(null);
+  const [tab, setTab] = useState<"all" | "invites">("all");
 
   const listParams = { limit: 50 };
   const { data, isLoading } = useListNotifications(listParams, {
@@ -98,6 +105,14 @@ export default function NotificationsPage() {
       refetchOnWindowFocus: true,
     },
   });
+  const { data: challengeInvitesData, isLoading: isLoadingInvites } = useGetMyChallengeInvites({
+    query: {
+      queryKey: getGetMyChallengeInvitesQueryKey(),
+      refetchInterval: POLL_MS,
+      refetchOnWindowFocus: true,
+      staleTime: 10_000,
+    },
+  });
 
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
@@ -108,6 +123,7 @@ export default function NotificationsPage() {
     qc.invalidateQueries({ queryKey: getListNotificationsQueryKey(listParams) });
     qc.invalidateQueries({ queryKey: getGetUnreadNotificationCountQueryKey() });
     qc.invalidateQueries({ queryKey: getListNotificationsQueryKey({ limit: 20 }) });
+    qc.invalidateQueries({ queryKey: getGetMyChallengeInvitesQueryKey() });
   };
 
   const open = (n: Notification) => {
@@ -120,7 +136,7 @@ export default function NotificationsPage() {
   };
 
   const acceptRematch = async (n: Notification, inviteId: string) => {
-    setBusyInvite({ id: n.id, action: "accept" });
+    setBusy({ key: `n-${n.id}`, action: "accept" });
     try {
       await acceptInvite.mutateAsync({ id: inviteId });
       if (!n.read) markRead.mutate({ id: n.id });
@@ -134,27 +150,18 @@ export default function NotificationsPage() {
         variant: "destructive",
       });
     } finally {
-      setBusyInvite(null);
+      setBusy(null);
     }
   };
 
-  const respondToChallengeInvite = async (
+  const respondToChallengeInviteByNotification = async (
     n: Notification,
     inviteId: number,
     status: "accepted" | "declined",
   ) => {
-    setBusyInvite({ id: n.id, action: status === "accepted" ? "accept" : "decline" });
+    setBusy({ key: `n-${n.id}`, action: status === "accepted" ? "accept" : "decline" });
     try {
-      const res = await fetch(`${BASE}/api/challenge-invites/${inviteId}/respond`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error ?? `HTTP ${res.status}`);
-      }
+      await respondToInviteRequest(inviteId, status);
       // The responder endpoint already marks the related notification read,
       // but invalidate locally so the UI reflects it immediately.
       if (!n.read) markRead.mutate({ id: n.id });
@@ -172,7 +179,32 @@ export default function NotificationsPage() {
         variant: "destructive",
       });
     } finally {
-      setBusyInvite(null);
+      setBusy(null);
+    }
+  };
+
+  const respondToChallengeInviteRaw = async (
+    invite: ChallengeInvite,
+    status: "accepted" | "declined",
+  ) => {
+    setBusy({ key: `c-${invite.id}`, action: status === "accepted" ? "accept" : "decline" });
+    try {
+      await respondToInviteRequest(invite.id, status);
+      refresh();
+      if (status === "accepted") {
+        toast({ title: "Challenge accepted", description: "You're in. Good luck!" });
+        navigate(`/challenges/${invite.challengeId}`);
+      } else {
+        toast({ title: "Challenge declined" });
+      }
+    } catch (err) {
+      toast({
+        title: status === "accepted" ? "Could not accept invite" : "Could not decline invite",
+        description: String((err as Error).message),
+        variant: "destructive",
+      });
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -181,7 +213,7 @@ export default function NotificationsPage() {
     inviteId: number,
     status: "accepted" | "declined",
   ) => {
-    setBusyInvite({ id: n.id, action: status === "accepted" ? "accept" : "decline" });
+    setBusy({ key: `n-${n.id}`, action: status === "accepted" ? "accept" : "decline" });
     try {
       const res = await fetch(`${BASE}/api/club-invites/${inviteId}/respond`, {
         method: "POST",
@@ -208,12 +240,12 @@ export default function NotificationsPage() {
         variant: "destructive",
       });
     } finally {
-      setBusyInvite(null);
+      setBusy(null);
     }
   };
 
   const dismissNotification = async (n: Notification) => {
-    setBusyInvite({ id: n.id, action: "decline" });
+    setBusy({ key: `n-${n.id}`, action: "decline" });
     try {
       if (!n.read) {
         await new Promise<void>((resolve, reject) => {
@@ -232,12 +264,12 @@ export default function NotificationsPage() {
         variant: "destructive",
       });
     } finally {
-      setBusyInvite(null);
+      setBusy(null);
     }
   };
 
   const declineRematch = async (n: Notification, inviteId: string) => {
-    setBusyInvite({ id: n.id, action: "decline" });
+    setBusy({ key: `n-${n.id}`, action: "decline" });
     try {
       await declineInvite.mutateAsync({ id: inviteId });
       if (!n.read) markRead.mutate({ id: n.id });
@@ -250,12 +282,339 @@ export default function NotificationsPage() {
         variant: "destructive",
       });
     } finally {
-      setBusyInvite(null);
+      setBusy(null);
     }
   };
 
   const items = data ?? [];
   const unread = countData?.count ?? 0;
+  const challengeInvites = challengeInvitesData ?? [];
+
+  const pendingRematchNotifs = useMemo(
+    () => items.filter(isPendingRematchInvite),
+    [items],
+  );
+
+  // Build the unified Invites list. Challenge invites come from the dedicated
+  // endpoint (source of truth for pending status). Rematch invites only live as
+  // notifications today, so we surface those filtered.
+  type InviteRow =
+    | { kind: "challenge"; invite: ChallengeInvite; sortKey: number }
+    | { kind: "rematch"; notification: Notification; rematchId: string; sortKey: number };
+
+  const inviteRows: InviteRow[] = useMemo(() => {
+    const rows: InviteRow[] = [];
+    for (const inv of challengeInvites) {
+      rows.push({
+        kind: "challenge",
+        invite: inv,
+        sortKey: new Date(inv.sentAt).getTime(),
+      });
+    }
+    for (const n of pendingRematchNotifs) {
+      const rematchId = extractRematchId(n.link);
+      if (!rematchId) continue;
+      rows.push({
+        kind: "rematch",
+        notification: n,
+        rematchId,
+        sortKey: new Date(n.createdAt).getTime(),
+      });
+    }
+    rows.sort((a, b) => b.sortKey - a.sortKey);
+    return rows;
+  }, [challengeInvites, pendingRematchNotifs]);
+
+  const inviteCount = inviteRows.length;
+
+  const renderNotificationRow = (n: Notification, idx: number) => {
+    const meta = iconFor(n.type);
+    const Icon = meta.icon;
+    const rematchId = isPendingRematchInvite(n) ? extractRematchId(n.link) : null;
+    const challengeId = challengeInviteId(n);
+    const clubInvId = !n.read ? clubInviteId(n) : null;
+    const clubMention = isClubMention(n) && !n.read ? n : null;
+    const hasInlineActions = Boolean(rematchId || challengeId || clubInvId || clubMention);
+    const rowBusy = busy?.key === `n-${n.id}` ? busy.action : null;
+    const rowClass = `w-full text-left rounded-xl border bg-card/60 backdrop-blur p-3 flex items-start gap-3 transition-all hover:bg-card hover:border-border ${
+      n.read ? "border-border/30 opacity-70" : "border-primary/40 shadow-[0_0_12px_-4px_hsl(var(--primary)/0.6)]"
+    }`;
+
+    const inner = (
+      <>
+        <div className={`shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br ${meta.color} flex items-center justify-center text-white shadow-md`}>
+          <Icon className="w-5 h-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold leading-tight flex-1 truncate">{n.title}</span>
+            {!n.read && (
+              <span className="w-2 h-2 rounded-full bg-primary shrink-0 shadow-[0_0_6px_rgba(var(--primary),0.8)]" />
+            )}
+          </div>
+          {n.body && (
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>
+          )}
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mt-1">
+            {formatRelative(n.createdAt)}
+          </p>
+          {rematchId && (
+            <div className="mt-2 flex gap-2">
+              <Button
+                size="sm"
+                className="h-7 px-2.5 gap-1 bg-gradient-to-br from-red-500 to-pink-600 hover:from-red-500/90 hover:to-pink-600/90"
+                disabled={rowBusy !== null}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  acceptRematch(n, rematchId);
+                }}
+                data-testid={`button-accept-rematch-${n.id}`}
+              >
+                {rowBusy === "accept"
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Check className="w-3.5 h-3.5" />}
+                Accept
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2.5 gap-1"
+                disabled={rowBusy !== null}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  declineRematch(n, rematchId);
+                }}
+                data-testid={`button-decline-rematch-${n.id}`}
+              >
+                {rowBusy === "decline"
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <X className="w-3.5 h-3.5" />}
+                Decline
+              </Button>
+            </div>
+          )}
+          {challengeId !== null && (
+            <div className="mt-2 flex gap-2">
+              <Button
+                size="sm"
+                className="h-7 px-2.5 gap-1 bg-gradient-to-br from-pink-500 to-rose-500 hover:from-pink-500/90 hover:to-rose-500/90"
+                disabled={rowBusy !== null}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  respondToChallengeInviteByNotification(n, challengeId, "accepted");
+                }}
+                data-testid={`button-accept-challenge-${n.id}`}
+              >
+                {rowBusy === "accept"
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Check className="w-3.5 h-3.5" />}
+                Accept
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2.5 gap-1"
+                disabled={rowBusy !== null}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  respondToChallengeInviteByNotification(n, challengeId, "declined");
+                }}
+                data-testid={`button-decline-challenge-${n.id}`}
+              >
+                {rowBusy === "decline"
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <X className="w-3.5 h-3.5" />}
+                Decline
+              </Button>
+            </div>
+          )}
+          {clubInvId !== null && (
+            <div className="mt-2 flex gap-2">
+              <Button
+                size="sm"
+                className="h-7 px-2.5 gap-1 bg-gradient-to-br from-indigo-500 to-violet-500 hover:from-indigo-500/90 hover:to-violet-500/90"
+                disabled={rowBusy !== null}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  respondToClubInvite(n, clubInvId, "accepted");
+                }}
+                data-testid={`button-accept-club-invite-${n.id}`}
+              >
+                {rowBusy === "accept"
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Check className="w-3.5 h-3.5" />}
+                Accept
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2.5 gap-1"
+                disabled={rowBusy !== null}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  respondToClubInvite(n, clubInvId, "declined");
+                }}
+                data-testid={`button-decline-club-invite-${n.id}`}
+              >
+                {rowBusy === "decline"
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <X className="w-3.5 h-3.5" />}
+                Decline
+              </Button>
+            </div>
+          )}
+          {clubMention && (
+            <div className="mt-2 flex gap-2">
+              {n.link && (
+                <Button
+                  size="sm"
+                  className="h-7 px-2.5 gap-1 bg-gradient-to-br from-indigo-500 to-violet-500 hover:from-indigo-500/90 hover:to-violet-500/90"
+                  disabled={rowBusy !== null}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    open(n);
+                  }}
+                  data-testid={`button-view-club-${n.id}`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  View
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2.5 gap-1"
+                disabled={rowBusy !== null}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  dismissNotification(n);
+                }}
+                data-testid={`button-dismiss-club-${n.id}`}
+              >
+                {rowBusy === "decline"
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <X className="w-3.5 h-3.5" />}
+                Dismiss
+              </Button>
+            </div>
+          )}
+        </div>
+      </>
+    );
+
+    if (hasInlineActions) {
+      return (
+        <motion.div
+          key={n.id}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.18, delay: Math.min(idx * 0.02, 0.2) }}
+          onClick={() => open(n)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              open(n);
+            }
+          }}
+          className={`${rowClass} cursor-pointer`}
+          data-testid={`notification-row-${n.id}`}
+        >
+          {inner}
+        </motion.div>
+      );
+    }
+
+    return (
+      <motion.button
+        key={n.id}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.18, delay: Math.min(idx * 0.02, 0.2) }}
+        onClick={() => open(n)}
+        className={rowClass}
+        data-testid={`notification-row-${n.id}`}
+      >
+        {inner}
+      </motion.button>
+    );
+  };
+
+  const renderChallengeInviteRow = (invite: ChallengeInvite, idx: number) => {
+    const meta = iconFor("challenge_invite");
+    const Icon = meta.icon;
+    const rowBusy = busy?.key === `c-${invite.id}` ? busy.action : null;
+    const challenge = invite.challenge as { title?: string; description?: string } | undefined;
+    const title = (challenge?.title as string | undefined) ?? "Challenge invite";
+    const body = (challenge?.description as string | undefined) ?? "You've been invited to join this challenge.";
+    return (
+      <motion.div
+        key={`invite-challenge-${invite.id}`}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.18, delay: Math.min(idx * 0.02, 0.2) }}
+        onClick={() => navigate(`/challenges/${invite.challengeId}`)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            navigate(`/challenges/${invite.challengeId}`);
+          }
+        }}
+        className="w-full text-left rounded-xl border border-primary/40 bg-card/60 backdrop-blur p-3 flex items-start gap-3 transition-all hover:bg-card hover:border-border shadow-[0_0_12px_-4px_hsl(var(--primary)/0.6)] cursor-pointer"
+        data-testid={`invite-row-challenge-${invite.id}`}
+      >
+        <div className={`shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br ${meta.color} flex items-center justify-center text-white shadow-md`}>
+          <Icon className="w-5 h-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold leading-tight flex-1 truncate">{title}</span>
+            <span className="w-2 h-2 rounded-full bg-primary shrink-0 shadow-[0_0_6px_rgba(var(--primary),0.8)]" />
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{body}</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mt-1">
+            {formatRelative(invite.sentAt)}
+          </p>
+          <div className="mt-2 flex gap-2">
+            <Button
+              size="sm"
+              className="h-7 px-2.5 gap-1 bg-gradient-to-br from-pink-500 to-rose-500 hover:from-pink-500/90 hover:to-rose-500/90"
+              disabled={rowBusy !== null}
+              onClick={(e) => {
+                e.stopPropagation();
+                respondToChallengeInviteRaw(invite, "accepted");
+              }}
+              data-testid={`button-accept-challenge-invite-${invite.id}`}
+            >
+              {rowBusy === "accept"
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Check className="w-3.5 h-3.5" />}
+              Accept
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2.5 gap-1"
+              disabled={rowBusy !== null}
+              onClick={(e) => {
+                e.stopPropagation();
+                respondToChallengeInviteRaw(invite, "declined");
+              }}
+              data-testid={`button-decline-challenge-invite-${invite.id}`}
+            >
+              {rowBusy === "decline"
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <X className="w-3.5 h-3.5" />}
+              Decline
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
 
   return (
     <Layout>
@@ -281,243 +640,88 @@ export default function NotificationsPage() {
           )}
         </div>
 
-        {isLoading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-20 w-full rounded-xl" />
-            ))}
-          </div>
-        ) : items.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="mx-auto w-14 h-14 rounded-full bg-card border border-border/40 flex items-center justify-center mb-3">
-              <Bell className="w-6 h-6 text-muted-foreground" />
-            </div>
-            <p className="text-sm font-bold">Nothing here yet</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Challenge invites, alerts, and results will show up here.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {items.map((n: Notification, idx: number) => {
-              const meta = iconFor(n.type);
-              const Icon = meta.icon;
-              const rematchId = isPendingRematchInvite(n) ? extractRematchId(n.link) : null;
-              const challengeId = challengeInviteId(n);
-              const clubInvId = !n.read ? clubInviteId(n) : null;
-              const clubMention = isClubMention(n) && !n.read ? n : null;
-              const hasInlineActions = Boolean(rematchId || challengeId || clubInvId || clubMention);
-              const busy = busyInvite?.id === n.id ? busyInvite.action : null;
-              const rowClass = `w-full text-left rounded-xl border bg-card/60 backdrop-blur p-3 flex items-start gap-3 transition-all hover:bg-card hover:border-border ${
-                n.read ? "border-border/30 opacity-70" : "border-primary/40 shadow-[0_0_12px_-4px_hsl(var(--primary)/0.6)]"
-              }`;
-
-              const inner = (
-                <>
-                  <div className={`shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br ${meta.color} flex items-center justify-center text-white shadow-md`}>
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold leading-tight flex-1 truncate">{n.title}</span>
-                      {!n.read && (
-                        <span className="w-2 h-2 rounded-full bg-primary shrink-0 shadow-[0_0_6px_rgba(var(--primary),0.8)]" />
-                      )}
-                    </div>
-                    {n.body && (
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>
-                    )}
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mt-1">
-                      {formatRelative(n.createdAt)}
-                    </p>
-                    {rematchId && (
-                      <div className="mt-2 flex gap-2">
-                        <Button
-                          size="sm"
-                          className="h-7 px-2.5 gap-1 bg-gradient-to-br from-red-500 to-pink-600 hover:from-red-500/90 hover:to-pink-600/90"
-                          disabled={busy !== null}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            acceptRematch(n, rematchId);
-                          }}
-                          data-testid={`button-accept-rematch-${n.id}`}
-                        >
-                          {busy === "accept"
-                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            : <Check className="w-3.5 h-3.5" />}
-                          Accept
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2.5 gap-1"
-                          disabled={busy !== null}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            declineRematch(n, rematchId);
-                          }}
-                          data-testid={`button-decline-rematch-${n.id}`}
-                        >
-                          {busy === "decline"
-                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            : <X className="w-3.5 h-3.5" />}
-                          Decline
-                        </Button>
-                      </div>
-                    )}
-                    {challengeId !== null && (
-                      <div className="mt-2 flex gap-2">
-                        <Button
-                          size="sm"
-                          className="h-7 px-2.5 gap-1 bg-gradient-to-br from-pink-500 to-rose-500 hover:from-pink-500/90 hover:to-rose-500/90"
-                          disabled={busy !== null}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            respondToChallengeInvite(n, challengeId, "accepted");
-                          }}
-                          data-testid={`button-accept-challenge-${n.id}`}
-                        >
-                          {busy === "accept"
-                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            : <Check className="w-3.5 h-3.5" />}
-                          Accept
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2.5 gap-1"
-                          disabled={busy !== null}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            respondToChallengeInvite(n, challengeId, "declined");
-                          }}
-                          data-testid={`button-decline-challenge-${n.id}`}
-                        >
-                          {busy === "decline"
-                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            : <X className="w-3.5 h-3.5" />}
-                          Decline
-                        </Button>
-                      </div>
-                    )}
-                    {clubInvId !== null && (
-                      <div className="mt-2 flex gap-2">
-                        <Button
-                          size="sm"
-                          className="h-7 px-2.5 gap-1 bg-gradient-to-br from-indigo-500 to-violet-500 hover:from-indigo-500/90 hover:to-violet-500/90"
-                          disabled={busy !== null}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            respondToClubInvite(n, clubInvId, "accepted");
-                          }}
-                          data-testid={`button-accept-club-invite-${n.id}`}
-                        >
-                          {busy === "accept"
-                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            : <Check className="w-3.5 h-3.5" />}
-                          Accept
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2.5 gap-1"
-                          disabled={busy !== null}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            respondToClubInvite(n, clubInvId, "declined");
-                          }}
-                          data-testid={`button-decline-club-invite-${n.id}`}
-                        >
-                          {busy === "decline"
-                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            : <X className="w-3.5 h-3.5" />}
-                          Decline
-                        </Button>
-                      </div>
-                    )}
-                    {clubMention && (
-                      <div className="mt-2 flex gap-2">
-                        {n.link && (
-                          <Button
-                            size="sm"
-                            className="h-7 px-2.5 gap-1 bg-gradient-to-br from-indigo-500 to-violet-500 hover:from-indigo-500/90 hover:to-violet-500/90"
-                            disabled={busy !== null}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              open(n);
-                            }}
-                            data-testid={`button-view-club-${n.id}`}
-                          >
-                            <Users className="w-3.5 h-3.5" />
-                            View
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 px-2.5 gap-1"
-                          disabled={busy !== null}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            dismissNotification(n);
-                          }}
-                          data-testid={`button-dismiss-club-${n.id}`}
-                        >
-                          {busy === "decline"
-                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            : <X className="w-3.5 h-3.5" />}
-                          Dismiss
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </>
-              );
-
-              // For rows with inline action buttons we render a non-button
-              // container so the nested buttons don't violate button-in-button
-              // semantics. Tapping the body still opens the link.
-              if (hasInlineActions) {
-                return (
-                  <motion.div
-                    key={n.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.18, delay: Math.min(idx * 0.02, 0.2) }}
-                    onClick={() => open(n)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        open(n);
-                      }
-                    }}
-                    className={`${rowClass} cursor-pointer`}
-                    data-testid={`notification-row-${n.id}`}
-                  >
-                    {inner}
-                  </motion.div>
-                );
-              }
-
-              return (
-                <motion.button
-                  key={n.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.18, delay: Math.min(idx * 0.02, 0.2) }}
-                  onClick={() => open(n)}
-                  className={rowClass}
-                  data-testid={`notification-row-${n.id}`}
+        <Tabs value={tab} onValueChange={(v) => setTab(v as "all" | "invites")}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="all" data-testid="tab-all">All</TabsTrigger>
+            <TabsTrigger value="invites" data-testid="tab-invites" className="gap-2">
+              Invites
+              {inviteCount > 0 && (
+                <span
+                  className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold leading-none"
+                  data-testid="invite-tab-badge"
                 >
-                  {inner}
-                </motion.button>
-              );
-            })}
-          </div>
-        )}
+                  {inviteCount}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="all">
+            {isLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full rounded-xl" />
+                ))}
+              </div>
+            ) : items.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="mx-auto w-14 h-14 rounded-full bg-card border border-border/40 flex items-center justify-center mb-3">
+                  <Bell className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-bold">Nothing here yet</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Challenge invites, alerts, and results will show up here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {items.map((n: Notification, idx: number) => renderNotificationRow(n, idx))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="invites">
+            {isLoading || isLoadingInvites ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full rounded-xl" />
+                ))}
+              </div>
+            ) : inviteRows.length === 0 ? (
+              <div className="text-center py-16" data-testid="invites-empty">
+                <div className="mx-auto w-14 h-14 rounded-full bg-card border border-border/40 flex items-center justify-center mb-3">
+                  <Mail className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-bold">No pending invites</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Challenge and rematch invites will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {inviteRows.map((row, idx) =>
+                  row.kind === "challenge"
+                    ? renderChallengeInviteRow(row.invite, idx)
+                    : renderNotificationRow(row.notification, idx),
+                )}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
+}
+
+async function respondToInviteRequest(inviteId: number, status: "accepted" | "declined") {
+  const res = await fetch(`${BASE}/api/challenge-invites/${inviteId}/respond`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error ?? `HTTP ${res.status}`);
+  }
 }
