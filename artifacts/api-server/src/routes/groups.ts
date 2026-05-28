@@ -8,8 +8,8 @@ import {
   groupMessagesTable,
   playersTable,
 } from "@workspace/db";
-import { eq, and, desc, sql, notInArray } from "drizzle-orm";
-import { getHiddenPlayerIds } from "./safety.ts";
+import { eq, and, desc, sql, notInArray, inArray } from "drizzle-orm";
+import { filterDiscoverableCandidates, getHiddenPlayerIds } from "./safety.ts";
 import {
   CreateGroupBody,
   JoinGroupBody,
@@ -123,10 +123,12 @@ router.get("/groups/mine", requireAuth, attachPlayer, async (req, res) => {
     res.status(403).json({ error: "Forbidden" }); return;
   }
 
-  const hiddenIds = await getHiddenPlayerIds(req.playerId!);
+  // Canonical people-discovery filter (see safety.ts): drop groups whose
+  // creator is block-listed (either direction), visibility=hidden, or a minor.
+  const viewerId = req.playerId!;
 
   const memberships = await db.query.groupMembersTable.findMany({
-    where: eq(groupMembersTable.playerId, req.playerId!),
+    where: eq(groupMembersTable.playerId, viewerId),
   });
   const groupIds = memberships.map(m => m.groupId);
   if (groupIds.length === 0) { res.json([]); return; }
@@ -134,10 +136,16 @@ router.get("/groups/mine", requireAuth, attachPlayer, async (req, res) => {
   const allGroups = await db.query.groupsTable.findMany({
     where: sql`${groupsTable.id} = ANY(${sql.raw(`ARRAY[${groupIds.join(",")}]`)})`,
   });
-  // Filter out groups created by blocked users (bi-directional)
-  const groups = hiddenIds.length > 0
-    ? allGroups.filter(g => !hiddenIds.includes(g.creatorPlayerId))
-    : allGroups;
+  const creatorIds = Array.from(new Set(allGroups.map(g => g.creatorPlayerId)));
+  const creatorRows = creatorIds.length
+    ? await db.query.playersTable.findMany({
+        where: inArray(playersTable.id, creatorIds),
+      })
+    : [];
+  const allowedCreators = new Set(
+    (await filterDiscoverableCandidates(viewerId, creatorRows)).map(p => p.id),
+  );
+  const groups = allGroups.filter(g => allowedCreators.has(g.creatorPlayerId));
 
   const result = await Promise.all(groups.map(async (g) => {
     const members = await db.query.groupMembersTable.findMany({ where: eq(groupMembersTable.groupId, g.id) });
@@ -231,11 +239,21 @@ router.get("/groups/:id", requireAuth, attachPlayer, async (req, res) => {
   const isMember = await checkMembership(params.data.id, req.playerId!);
   if (!isMember) { res.status(403).json({ error: "Not a group member" }); return; }
 
-  const hiddenIds = await getHiddenPlayerIds(req.playerId!);
+  // Canonical people-discovery filter (see safety.ts): drop members who are
+  // block-listed (either direction), visibility=hidden, or minor accounts.
   const rawMembers = await db.query.groupMembersTable.findMany({ where: eq(groupMembersTable.groupId, group.id) });
-  const members = hiddenIds.length > 0
-    ? rawMembers.filter(m => !hiddenIds.includes(m.playerId))
-    : rawMembers;
+  const memberIds = Array.from(new Set(rawMembers.map(m => m.playerId)));
+  const memberPlayerRows = memberIds.length
+    ? await db.query.playersTable.findMany({
+        where: inArray(playersTable.id, memberIds),
+      })
+    : [];
+  const allowedMemberIds = new Set(
+    (await filterDiscoverableCandidates(req.playerId!, memberPlayerRows)).map(p => p.id),
+  );
+  // Always keep the viewer themselves in their own group view.
+  allowedMemberIds.add(req.playerId!);
+  const members = rawMembers.filter(m => allowedMemberIds.has(m.playerId));
   const challenges = await db.query.groupChallengesTable.findMany({ where: eq(groupChallengesTable.groupId, group.id) });
   const raid = await db.query.groupRaidsTable.findFirst({ where: eq(groupRaidsTable.groupId, group.id) });
 

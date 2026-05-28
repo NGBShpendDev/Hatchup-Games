@@ -78,7 +78,11 @@ mock.module("../../services/postPurgeJob.ts", {
   namedExports: { hardDeletePosts: async () => 0, RETENTION_DAYS: 30 },
 });
 mock.module("../safety.ts", {
-  namedExports: { getHiddenPlayerIds: async () => [] },
+  namedExports: {
+    getHiddenPlayerIds: async () => [],
+    filterDiscoverableCandidates: async (_v: number, rows: any[]) =>
+      rows.filter((r: any) => r?.locationVisibility !== "hidden" && r?.isMinor !== true),
+  },
 });
 
 const stubSchema = { safeParse: (data: unknown) => ({ success: true, data }) };

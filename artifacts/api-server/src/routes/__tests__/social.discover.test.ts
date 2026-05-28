@@ -262,7 +262,15 @@ mock.module("../../middlewares/suspendedGuard.ts", {
   namedExports: { blockSuspendedSocialWrite: passThrough },
 });
 mock.module("../safety.ts", {
-  namedExports: { getHiddenPlayerIds: async (_viewerId: number) => state.hiddenIds },
+  namedExports: {
+    getHiddenPlayerIds: async (_viewerId: number) => state.hiddenIds,
+    filterDiscoverableCandidates: async (_v: number, rows: any[]) =>
+      rows.filter((r: any) =>
+        r?.locationVisibility !== "hidden"
+        && r?.isMinor !== true
+        && !state.hiddenIds.includes(r?.id),
+      ),
+  },
 });
 mock.module("../../services/subscriptionGuards.ts", {
   namedExports: { attachEntitlement: passThrough, requirePremium: passThrough },

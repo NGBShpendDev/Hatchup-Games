@@ -406,7 +406,11 @@ mock.module("../middlewares/suspendedGuard.ts", {
   namedExports: { blockSuspendedSocialWrite: passThrough },
 });
 mock.module("./safety.ts", {
-  namedExports: { getHiddenPlayerIds: async () => [] },
+  namedExports: {
+    getHiddenPlayerIds: async () => [],
+    filterDiscoverableCandidates: async (_v: number, rows: any[]) =>
+      rows.filter((r: any) => r?.locationVisibility !== "hidden" && r?.isMinor !== true),
+  },
 });
 mock.module("../services/subscriptionGuards.ts", {
   namedExports: {

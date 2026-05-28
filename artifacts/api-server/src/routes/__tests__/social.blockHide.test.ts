@@ -93,6 +93,14 @@ mock.module("../../services/postPurgeJob.ts", {
 // so we route it through state to simulate per-viewer block lists.
 mock.module("../safety.ts", {
   namedExports: {
+    filterDiscoverableCandidates: async (viewerId: number, rows: any[]) => {
+      const hidden = new Set(state.hiddenByViewer.get(viewerId) ?? []);
+      return rows.filter((r: any) =>
+        !hidden.has(r?.id)
+        && r?.locationVisibility !== "hidden"
+        && r?.isMinor !== true,
+      );
+    },
     getHiddenPlayerIds: async (viewerId: number) =>
       state.hiddenByViewer.get(viewerId) ?? [],
   },
@@ -181,6 +189,10 @@ const fakeDb = {
           }
         }
         return undefined;
+      },
+      findMany: async ({ where }: { where?: Pred }) => {
+        const ids = (findPred(where, "inArray", "players", "id")?.val as number[] | undefined) ?? [];
+        return ids.map(id => state.players.get(id)).filter((p): p is PlayerRow => !!p);
       },
     },
     postReactionsTable: {

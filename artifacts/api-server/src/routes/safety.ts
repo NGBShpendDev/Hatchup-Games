@@ -1000,8 +1000,41 @@ router.post("/admin/players/:id/verify", requireAuth, attachPlayer, async (req, 
 // ── Block-aware list helper (exported for other routers) ──────────────────────
 
 /**
+ * Canonical "people-discovery" filter. Any endpoint that fans player ids out
+ * to a viewer — leaderboards, search, discover, mutuals, followers/following,
+ * group member lists, comment author chips — MUST exclude every id that
+ * matches any of these three rules:
+ *
+ *   1. The viewer blocked them, or they blocked the viewer
+ *      (`getHiddenPlayerIds`)
+ *   2. Their `locationVisibility === "hidden"`
+ *   3. Their `isMinor === true`
+ *
+ * The two helpers below implement that policy:
+ *   - {@link getHiddenPlayerIds} — rule (1) only, as an id list.
+ *   - {@link filterDiscoverableCandidates} — all three rules, as an in-memory
+ *     post-filter over hydrated player rows.
+ *
+ * SQL-style call sites that already join `playersTable` can encode (2) and
+ * (3) inline as `ne(playersTable.locationVisibility, "hidden")` +
+ * `ne(playersTable.isMinor, true)` and combine with
+ * `notInArray(playersTable.id, await getHiddenPlayerIds(viewerId))` for (1).
+ *
+ * The coverage net is locked in by:
+ *   - `social.discover.test.ts` (discover + people search)
+ *   - `social.peopleSurfaces.test.ts` (mutuals, followers/following, group
+ *      members, comment author hydration)
+ *   - `players.search.test.ts`, `players.nearby.test.ts`,
+ *     `leaderboards.scoped.test.ts`
+ */
+
+/**
  * Returns the set of playerIds that should be hidden from viewerId's perspective:
  * anyone viewerId has blocked, or who has blocked viewerId.
+ *
+ * NOTE: This covers rule (1) only. People-discovery surfaces must ALSO
+ * apply rules (2) and (3) — prefer {@link filterDiscoverableCandidates}
+ * or the SQL pattern documented above for those surfaces.
  */
 export async function getHiddenPlayerIds(viewerId: number): Promise<number[]> {
   const blocks = await db

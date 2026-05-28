@@ -20,7 +20,7 @@ import { hardDeletePosts, RETENTION_DAYS } from "../services/postPurgeJob.ts";
 import { detectViewAbuse } from "../services/viewAbuseDetection.ts";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
-import { getHiddenPlayerIds } from "./safety.ts";
+import { filterDiscoverableCandidates, getHiddenPlayerIds } from "./safety.ts";
 import { buildPeopleDiscoveryFilter } from "./peopleDiscovery.ts";
 import { attachEntitlement, requirePremium } from "../services/subscriptionGuards.ts";
 import { blockMinorSocialWrite } from "../middlewares/minorGuard.ts";
@@ -45,6 +45,24 @@ import {
 } from "@workspace/api-zod";
 
 const router = Router();
+
+// Comment-author hydration shares the canonical 3-rule discovery filter
+// (see safety.ts): given a list of comments, returns the subset whose author
+// is not block-listed (either direction), not visibility=hidden, and not a
+// minor — so comment chips honor the same surface as mutuals/followers.
+async function filterCommentsByDiscoverableAuthors<T extends { playerId: number }>(
+  viewerId: number | null,
+  comments: T[],
+): Promise<T[]> {
+  if (comments.length === 0 || viewerId == null) return comments;
+  const authorIds = Array.from(new Set(comments.map(c => c.playerId)));
+  const authorRows = await db.query.playersTable.findMany({
+    where: inArray(playersTable.id, authorIds),
+  });
+  const allowed = await filterDiscoverableCandidates(viewerId, authorRows);
+  const allowedIds = new Set(allowed.map(a => a.id));
+  return comments.filter(c => allowedIds.has(c.playerId));
+}
 
 // ── Moderation ─────────────────────────────────────────────────────────────
 
@@ -116,14 +134,17 @@ async function enrichPost(
     ? (reactions.find(r => r.playerId === viewerPlayerId)?.reactionType ?? null)
     : null;
 
-  const hiddenIds = viewerPlayerId ? await getHiddenPlayerIds(viewerPlayerId) : [];
-  const hiddenSet = new Set(hiddenIds);
-
   const allCommentsRaw = await db.query.postCommentsTable.findMany({
     where: eq(postCommentsTable.postId, post.id),
     orderBy: [desc(postCommentsTable.createdAt)],
   });
-  const allComments = allCommentsRaw.filter(c => !hiddenSet.has(c.playerId));
+  // Canonical people-discovery filter on comment author chips (see safety.ts):
+  // block-list (either direction), visibility=hidden, and minor accounts.
+  const allComments = await filterCommentsByDiscoverableAuthors(
+    viewerPlayerId ?? null,
+    allCommentsRaw,
+  );
+  const hadAnyFiltered = allComments.length !== allCommentsRaw.length;
 
   const allCommentIds = allComments.map(c => c.id);
   const commentLikes = allCommentIds.length
@@ -165,13 +186,13 @@ async function enrichPost(
     creatureName = creature?.name ?? null;
   }
 
-  const commentCount = hiddenSet.size === 0
-    ? await db
+  const commentCount = hadAnyFiltered
+    ? allComments.length
+    : await db
         .select({ count: sql<number>`count(*)::int` })
         .from(postCommentsTable)
         .where(eq(postCommentsTable.postId, post.id))
-        .then(r => r[0]?.count ?? 0)
-    : allComments.length;
+        .then(r => r[0]?.count ?? 0);
 
   const repostCount = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -895,14 +916,14 @@ router.get("/social/posts/:id/comments", requireAuth, attachPlayer, async (req, 
   const parent = await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) });
   if (!parent || parent.deletedAt != null) { res.json([]); return; }
   const viewerId = req.playerId ?? null;
-  const hiddenIds = viewerId ? await getHiddenPlayerIds(viewerId) : [];
-  const hiddenSet = new Set(hiddenIds);
 
   const allComments = await db.query.postCommentsTable.findMany({
     where: eq(postCommentsTable.postId, postId),
     orderBy: [desc(postCommentsTable.createdAt)],
   });
-  const comments = allComments.filter(c => !hiddenSet.has(c.playerId));
+  // Canonical people-discovery filter on comment author chips (see safety.ts):
+  // block-list (either direction), visibility=hidden, and minor accounts.
+  const comments = await filterCommentsByDiscoverableAuthors(viewerId, allComments);
 
   const commentIds = comments.map(c => c.id);
   const commentLikes = commentIds.length
@@ -1287,8 +1308,29 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
   let mutualFollowing: PlayerStub[] = [];
   let mutualFollowingTotal = 0;
   if (viewerId !== id) {
+    // Canonical people-discovery filter (see safety.ts): drop block-list (either
+    // direction), visibility=hidden, and minor accounts before surfacing ids.
+    const profileBlockedIds = await getHiddenPlayerIds(viewerId);
+
     const pfProfile = alias(playerFollowsTable, "pf_profile_prev");
     const pfViewer = alias(playerFollowsTable, "pf_viewer_prev");
+
+    const followersWhere = and(
+      eq(pfProfile.followeeId, id),
+      ne(pfProfile.followerId, viewerId),
+      ne(pfProfile.followerId, id),
+      ne(playersTable.locationVisibility, "hidden"),
+      ne(playersTable.isMinor, true),
+      profileBlockedIds.length ? notInArray(playersTable.id, profileBlockedIds) : undefined,
+    );
+    const followingWhere = and(
+      eq(pfProfile.followerId, id),
+      ne(pfProfile.followeeId, viewerId),
+      ne(pfProfile.followeeId, id),
+      ne(playersTable.locationVisibility, "hidden"),
+      ne(playersTable.isMinor, true),
+      profileBlockedIds.length ? notInArray(playersTable.id, profileBlockedIds) : undefined,
+    );
 
     const [
       mutualFollowersCountRow,
@@ -1307,11 +1349,8 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
             eq(pfViewer.followeeId, pfProfile.followerId),
           ),
         )
-        .where(and(
-          eq(pfProfile.followeeId, id),
-          ne(pfProfile.followerId, viewerId),
-          ne(pfProfile.followerId, id),
-        )),
+        .innerJoin(playersTable, eq(playersTable.id, pfProfile.followerId))
+        .where(followersWhere),
       // Preview (3 rows) of mutual followers.
       db
         .select({
@@ -1330,11 +1369,7 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
           ),
         )
         .innerJoin(playersTable, eq(playersTable.id, pfProfile.followerId))
-        .where(and(
-          eq(pfProfile.followeeId, id),
-          ne(pfProfile.followerId, viewerId),
-          ne(pfProfile.followerId, id),
-        ))
+        .where(followersWhere)
         .orderBy(playersTable.id)
         .limit(3),
       // Mutual following count: accounts both viewer and profile follow.
@@ -1348,11 +1383,8 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
             eq(pfViewer.followeeId, pfProfile.followeeId),
           ),
         )
-        .where(and(
-          eq(pfProfile.followerId, id),
-          ne(pfProfile.followeeId, viewerId),
-          ne(pfProfile.followeeId, id),
-        )),
+        .innerJoin(playersTable, eq(playersTable.id, pfProfile.followeeId))
+        .where(followingWhere),
       // Preview (3 rows) of mutual following.
       db
         .select({
@@ -1371,11 +1403,7 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
           ),
         )
         .innerJoin(playersTable, eq(playersTable.id, pfProfile.followeeId))
-        .where(and(
-          eq(pfProfile.followerId, id),
-          ne(pfProfile.followeeId, viewerId),
-          ne(pfProfile.followeeId, id),
-        ))
+        .where(followingWhere)
         .orderBy(playersTable.id)
         .limit(3),
     ]);
@@ -1468,8 +1496,21 @@ router.get("/social/players/:id/mutual-followers", requireAuth, attachPlayer, as
     return;
   }
 
+  // Canonical people-discovery filter (see safety.ts): drop block-list (either
+  // direction), visibility=hidden, and minor accounts before surfacing ids.
+  const blockedIds = await getHiddenPlayerIds(viewerId);
+
   const pfProfile = alias(playerFollowsTable, "pf_profile");
   const pfViewer = alias(playerFollowsTable, "pf_viewer");
+
+  const baseWhere = and(
+    eq(pfProfile.followeeId, id),
+    ne(pfProfile.followerId, viewerId),
+    ne(pfProfile.followerId, id),
+    ne(playersTable.locationVisibility, "hidden"),
+    ne(playersTable.isMinor, true),
+    blockedIds.length ? notInArray(playersTable.id, blockedIds) : undefined,
+  );
 
   const [countRow] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -1481,11 +1522,8 @@ router.get("/social/players/:id/mutual-followers", requireAuth, attachPlayer, as
         eq(pfViewer.followeeId, pfProfile.followerId),
       ),
     )
-    .where(and(
-      eq(pfProfile.followeeId, id),
-      ne(pfProfile.followerId, viewerId),
-      ne(pfProfile.followerId, id),
-    ));
+    .innerJoin(playersTable, eq(playersTable.id, pfProfile.followerId))
+    .where(baseWhere);
 
   const total = countRow?.count ?? 0;
 
@@ -1506,11 +1544,7 @@ router.get("/social/players/:id/mutual-followers", requireAuth, attachPlayer, as
       ),
     )
     .innerJoin(playersTable, eq(playersTable.id, pfProfile.followerId))
-    .where(and(
-      eq(pfProfile.followeeId, id),
-      ne(pfProfile.followerId, viewerId),
-      ne(pfProfile.followerId, id),
-    ))
+    .where(baseWhere)
     .orderBy(playersTable.id)
     .limit(limit)
     .offset(cursor);
@@ -1547,6 +1581,10 @@ router.get("/social/players/:id/mutual-following", requireAuth, attachPlayer, as
     return;
   }
 
+  // Canonical people-discovery filter (see safety.ts): drop block-list (either
+  // direction), visibility=hidden, and minor accounts before surfacing ids.
+  const blockedIds = await getHiddenPlayerIds(viewerId);
+
   const pfProfile = alias(playerFollowsTable, "pf_profile");
   const pfViewer = alias(playerFollowsTable, "pf_viewer");
 
@@ -1554,6 +1592,15 @@ router.get("/social/players/:id/mutual-following", requireAuth, attachPlayer, as
   // a pathological profile self-follow (`pf_profile.followee_id = id`) must
   // never leak the profile back into their own mutual-following list, and the
   // viewer is never their own "mutual" of anything.
+  const baseWhere = and(
+    eq(pfProfile.followerId, id),
+    ne(pfProfile.followeeId, viewerId),
+    ne(pfProfile.followeeId, id),
+    ne(playersTable.locationVisibility, "hidden"),
+    ne(playersTable.isMinor, true),
+    blockedIds.length ? notInArray(playersTable.id, blockedIds) : undefined,
+  );
+
   const [countRow, rows] = await Promise.all([
     db
       .select({ count: sql<number>`count(*)::int` })
@@ -1565,11 +1612,8 @@ router.get("/social/players/:id/mutual-following", requireAuth, attachPlayer, as
           eq(pfViewer.followeeId, pfProfile.followeeId),
         ),
       )
-      .where(and(
-        eq(pfProfile.followerId, id),
-        ne(pfProfile.followeeId, viewerId),
-        ne(pfProfile.followeeId, id),
-      )),
+      .innerJoin(playersTable, eq(playersTable.id, pfProfile.followeeId))
+      .where(baseWhere),
     db
       .select({
         id: playersTable.id,
@@ -1587,11 +1631,7 @@ router.get("/social/players/:id/mutual-following", requireAuth, attachPlayer, as
         ),
       )
       .innerJoin(playersTable, eq(playersTable.id, pfProfile.followeeId))
-      .where(and(
-        eq(pfProfile.followerId, id),
-        ne(pfProfile.followeeId, viewerId),
-        ne(pfProfile.followeeId, id),
-      ))
+      .where(baseWhere)
       .orderBy(playersTable.id)
       .limit(limit)
       .offset(cursor),
@@ -1620,10 +1660,21 @@ router.get("/social/players/:id/followers", requireAuth, attachPlayer, async (re
   const cursor = Math.max(0, Number(req.query.cursor) || 0);
   const limit = Math.min(Math.max(1, Number(req.query.limit) || 20), 100);
 
+  // Canonical people-discovery filter (see safety.ts): drop block-list (either
+  // direction), visibility=hidden, and minor accounts before surfacing ids.
+  const hiddenIds = await getHiddenPlayerIds(viewerId);
+  const whereClause = and(
+    eq(playerFollowsTable.followeeId, id),
+    ne(playersTable.locationVisibility, "hidden"),
+    ne(playersTable.isMinor, true),
+    hiddenIds.length ? notInArray(playersTable.id, hiddenIds) : undefined,
+  );
+
   const [countRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(playerFollowsTable)
-    .where(eq(playerFollowsTable.followeeId, id));
+    .innerJoin(playersTable, eq(playersTable.id, playerFollowsTable.followerId))
+    .where(whereClause);
   const total = countRow?.count ?? 0;
 
   const rows = await db
@@ -1637,13 +1688,12 @@ router.get("/social/players/:id/followers", requireAuth, attachPlayer, async (re
     })
     .from(playerFollowsTable)
     .innerJoin(playersTable, eq(playersTable.id, playerFollowsTable.followerId))
-    .where(eq(playerFollowsTable.followeeId, id))
+    .where(whereClause)
     .orderBy(desc(playerFollowsTable.id))
     .limit(limit)
     .offset(cursor);
 
   const pageIds = rows.map(r => r.id);
-  const hiddenIds = await getHiddenPlayerIds(viewerId);
   const [sharedGroupsByPlayer, mutualWorkoutPartnersByPlayer] = await Promise.all([
     loadSharedGroupsForViewer(viewerId, pageIds),
     loadMutualWorkoutPartnersForViewer(viewerId, pageIds, hiddenIds),
@@ -1672,10 +1722,21 @@ router.get("/social/players/:id/following", requireAuth, attachPlayer, async (re
   const cursor = Math.max(0, Number(req.query.cursor) || 0);
   const limit = Math.min(Math.max(1, Number(req.query.limit) || 20), 100);
 
+  // Canonical people-discovery filter (see safety.ts): drop block-list (either
+  // direction), visibility=hidden, and minor accounts before surfacing ids.
+  const hiddenIds = await getHiddenPlayerIds(viewerId);
+  const whereClause = and(
+    eq(playerFollowsTable.followerId, id),
+    ne(playersTable.locationVisibility, "hidden"),
+    ne(playersTable.isMinor, true),
+    hiddenIds.length ? notInArray(playersTable.id, hiddenIds) : undefined,
+  );
+
   const [countRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(playerFollowsTable)
-    .where(eq(playerFollowsTable.followerId, id));
+    .innerJoin(playersTable, eq(playersTable.id, playerFollowsTable.followeeId))
+    .where(whereClause);
   const total = countRow?.count ?? 0;
 
   const rows = await db
@@ -1689,13 +1750,12 @@ router.get("/social/players/:id/following", requireAuth, attachPlayer, async (re
     })
     .from(playerFollowsTable)
     .innerJoin(playersTable, eq(playersTable.id, playerFollowsTable.followeeId))
-    .where(eq(playerFollowsTable.followerId, id))
+    .where(whereClause)
     .orderBy(desc(playerFollowsTable.id))
     .limit(limit)
     .offset(cursor);
 
   const pageIds = rows.map(r => r.id);
-  const hiddenIds = await getHiddenPlayerIds(viewerId);
   const [sharedGroupsByPlayer, mutualWorkoutPartnersByPlayer] = await Promise.all([
     loadSharedGroupsForViewer(viewerId, pageIds),
     loadMutualWorkoutPartnersForViewer(viewerId, pageIds, hiddenIds),

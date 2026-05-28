@@ -132,7 +132,11 @@ mock.module("../../services/postPurgeJob.ts", {
 // uses getHiddenPlayerIds — route it through `state.hiddenPlayerIds` so
 // individual tests can simulate per-viewer block lists.
 mock.module("../safety.ts", {
-  namedExports: { getHiddenPlayerIds: async () => state.hiddenPlayerIds },
+  namedExports: {
+    getHiddenPlayerIds: async () => state.hiddenPlayerIds,
+    filterDiscoverableCandidates: async (_v: number, rows: any[]) =>
+      rows.filter((r: any) => r?.locationVisibility !== "hidden" && r?.isMinor !== true),
+  },
 });
 
 mock.module("../../services/subscriptionGuards.ts", {

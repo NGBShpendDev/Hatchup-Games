@@ -112,7 +112,11 @@ mock.module("../../services/postPurgeJob.ts", {
 // test runner. The view route doesn't touch any of safety's helpers, so a
 // trivial stub keeps the import graph quiet.
 mock.module("../safety.ts", {
-  namedExports: { getHiddenPlayerIds: async () => [] },
+  namedExports: {
+    getHiddenPlayerIds: async () => [],
+    filterDiscoverableCandidates: async (_v: number, rows: any[]) =>
+      rows.filter((r: any) => r?.locationVisibility !== "hidden" && r?.isMinor !== true),
+  },
 });
 // social.ts imports Zod body schemas from @workspace/api-zod, but its
 // generated bundle isn't built in the test environment. Stub schemas keep

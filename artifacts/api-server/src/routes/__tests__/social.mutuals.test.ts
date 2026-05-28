@@ -106,6 +106,8 @@ mock.module("../../services/postPurgeJob.ts", {
   mock.module("../safety.ts", {
     namedExports: {
       getHiddenPlayerIds: async () => [] as number[],
+      filterDiscoverableCandidates: async (_viewerId: number, rows: any[]) =>
+        rows.filter((r: any) => r?.locationVisibility !== "hidden" && r?.isMinor !== true),
     },
     defaultExport: expressMod.Router(),
   });
