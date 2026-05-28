@@ -304,13 +304,36 @@ router.get("/social/trending", requireAuth, attachPlayer, async (req, res) => {
   }
 
   const postIds = recentViewRows.map(r => r.postId);
-  const postsForWindow = await db.query.postsTable.findMany({
+  const postsForWindowRaw = await db.query.postsTable.findMany({
     where: and(
       inArray(postsTable.id, postIds),
       eq(postsTable.isFlagged, false),
       isNull(postsTable.deletedAt),
     ),
   });
+
+  // Safety filters: exclude posts from players the viewer has blocked (or who
+  // have blocked the viewer) and posts authored by minor accounts. The latter
+  // is the read-side equivalent of `blockMinorSocialWrite` — minors aren't
+  // supposed to be writing public social posts, so any legacy/bypass content
+  // they may have produced should not be amplified by the trending surface.
+  const hiddenIds = await getHiddenPlayerIds(playerId);
+  const hiddenSet = new Set(hiddenIds);
+
+  const authorIds = [...new Set(postsForWindowRaw.map(p => p.playerId))];
+  const authorRows = authorIds.length
+    ? await db.query.playersTable.findMany({
+        where: inArray(playersTable.id, authorIds),
+        columns: { id: true, isMinor: true },
+      })
+    : [];
+  const minorAuthorSet = new Set(
+    authorRows.filter(a => a.isMinor).map(a => a.id),
+  );
+
+  const postsForWindow = postsForWindowRaw.filter(
+    p => !hiddenSet.has(p.playerId) && !minorAuthorSet.has(p.playerId),
+  );
 
   const viewsById = new Map(recentViewRows.map(r => [r.postId, r.recentViews]));
 

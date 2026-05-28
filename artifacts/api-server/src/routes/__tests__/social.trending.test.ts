@@ -31,6 +31,16 @@ interface PostRow {
 
 interface ViewRow { postId: number; createdAt: Date }
 
+interface AuthorRow {
+  id: number;
+  clerkId?: string;
+  username?: string;
+  displayName?: string;
+  avatarUrl?: string | null;
+  creatorBadge?: string | null;
+  isMinor: boolean;
+}
+
 const state = {
   player: {
     id: 1,
@@ -43,11 +53,18 @@ const state = {
   },
   posts: [] as PostRow[],
   views: [] as ViewRow[],
+  // Authors returned by the inArray(playersTable.id, authorIds) lookup the
+  // trending route uses to filter out posts authored by minors.
+  authors: [] as AuthorRow[],
+  // Per-viewer hidden ids returned by getHiddenPlayerIds.
+  hiddenPlayerIds: [] as number[],
 };
 
 function resetState() {
   state.posts = [];
   state.views = [];
+  state.authors = [];
+  state.hiddenPlayerIds = [];
 }
 
 // ── Table sentinels ──────────────────────────────────────────────────────────
@@ -112,9 +129,10 @@ mock.module("../../services/postPurgeJob.ts", {
 
 // safety.ts transitively pulls in modules whose imports the strict ESM
 // resolver can't satisfy in the test environment. The trending route only
-// uses getHiddenPlayerIds, so a trivial stub keeps the import graph quiet.
+// uses getHiddenPlayerIds — route it through `state.hiddenPlayerIds` so
+// individual tests can simulate per-viewer block lists.
 mock.module("../safety.ts", {
-  namedExports: { getHiddenPlayerIds: async () => [] },
+  namedExports: { getHiddenPlayerIds: async () => state.hiddenPlayerIds },
 });
 
 mock.module("../../services/subscriptionGuards.ts", {
@@ -198,7 +216,12 @@ function liveTrendingViewRows(limit: number) {
 const queryHandlers: Record<string, any> = {
   playersTable: {
     findFirst: async () => state.player,
-    findMany: async () => [state.player],
+    // The trending route looks up author rows via
+    // `findMany({ where: inArray(playersTable.id, authorIds) })` to find
+    // minor authors. Serve `state.authors` so tests can flag posters as
+    // minors; fall back to the viewer player when no authors are seeded.
+    findMany: async () =>
+      state.authors.length > 0 ? state.authors : [state.player],
   },
   postsTable: {
     findFirst: async () => state.posts[0],
@@ -446,6 +469,76 @@ describe("GET /social/trending", () => {
       { postId: 2, createdAt: now },
     ];
     const { res, body } = await getTrending();
+    assert.deepEqual(body.posts.map((p: any) => p.id), [2]);
+  });
+
+  it("excludes posts authored by players the viewer has hidden/blocked", async () => {
+    // Author 42 is on the viewer's blocked list — even though their post is
+    // the runaway view leader, it must never surface in trending.
+    state.posts = [
+      makePost({ id: 1, playerId: 42 }), // blocked author
+      makePost({ id: 2, playerId: 7 }),  // visible author
+    ];
+    const now = new Date();
+    state.views = [
+      { postId: 1, createdAt: now }, { postId: 1, createdAt: now }, { postId: 1, createdAt: now },
+      { postId: 2, createdAt: now },
+    ];
+    state.hiddenPlayerIds = [42];
+    state.authors = [
+      { id: 7, isMinor: false },
+      { id: 42, isMinor: false },
+    ];
+
+    const { res, body } = await getTrending();
+    assert.equal(res.status, 200);
+    assert.deepEqual(body.posts.map((p: any) => p.id), [2]);
+  });
+
+  it("still surfaces non-hidden authors when other authors are hidden", async () => {
+    // Sanity check: hiding one author shouldn't filter unrelated posts.
+    state.posts = [
+      makePost({ id: 1, playerId: 42 }),
+      makePost({ id: 2, playerId: 7 }),
+      makePost({ id: 3, playerId: 9 }),
+    ];
+    const now = new Date();
+    state.views = [
+      { postId: 1, createdAt: now },
+      { postId: 2, createdAt: now }, { postId: 2, createdAt: now },
+      { postId: 3, createdAt: now },
+    ];
+    state.hiddenPlayerIds = [42];
+    state.authors = [
+      { id: 7, isMinor: false },
+      { id: 9, isMinor: false },
+      { id: 42, isMinor: false },
+    ];
+
+    const { body } = await getTrending();
+    assert.deepEqual(body.posts.map((p: any) => p.id), [2, 3]);
+  });
+
+  it("hides posts authored by minor accounts the minor guard would block from writing", async () => {
+    // Author 99 is flagged as a minor — `blockMinorSocialWrite` would have
+    // prevented them from posting in the first place. Any legacy/bypass
+    // content must not be amplified by trending, regardless of viewer.
+    state.posts = [
+      makePost({ id: 1, playerId: 99 }), // minor author — must be hidden
+      makePost({ id: 2, playerId: 7 }),  // adult author — must surface
+    ];
+    const now = new Date();
+    state.views = [
+      { postId: 1, createdAt: now }, { postId: 1, createdAt: now }, { postId: 1, createdAt: now },
+      { postId: 2, createdAt: now },
+    ];
+    state.authors = [
+      { id: 7, isMinor: false },
+      { id: 99, isMinor: true },
+    ];
+
+    const { res, body } = await getTrending();
+    assert.equal(res.status, 200);
     assert.deepEqual(body.posts.map((p: any) => p.id), [2]);
   });
 });
