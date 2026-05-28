@@ -907,14 +907,37 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
 
   const enrichedPosts = await Promise.all(posts.map(p => enrichPost(p, viewerId)));
 
-  const followers = await db.query.playerFollowsTable.findMany({ where: eq(playerFollowsTable.followeeId, id) });
-  const following = await db.query.playerFollowsTable.findMany({ where: eq(playerFollowsTable.followerId, id) });
-
-  const isFollowing = followers.some(f => f.followerId === viewerId);
+  // Counts and isFollowing computed in SQL so we don't load entire follow lists.
+  const [followerCountRow, followingCountRow, isFollowingRow] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(playerFollowsTable)
+      .where(eq(playerFollowsTable.followeeId, id)),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(playerFollowsTable)
+      .where(eq(playerFollowsTable.followerId, id)),
+    viewerId === id
+      ? Promise.resolve([{ exists: 0 }])
+      : db
+          .select({ exists: sql<number>`1` })
+          .from(playerFollowsTable)
+          .where(
+            and(
+              eq(playerFollowsTable.followerId, viewerId),
+              eq(playerFollowsTable.followeeId, id),
+            ),
+          )
+          .limit(1),
+  ]);
+  const followerCount = followerCountRow[0]?.count ?? 0;
+  const followingCount = followingCountRow[0]?.count ?? 0;
+  const isFollowing = (isFollowingRow?.length ?? 0) > 0;
 
   const memory = await getMemoryForPlayer(id, enrichedPosts);
 
-  // Mutual followers: people the viewer follows who also follow this profile.
+  // Mutual followers / following: computed via SQL joins so we don't pull
+  // entire follow lists for the viewer or the profile into Node.
   type PlayerStub = {
     id: number;
     username: string;
@@ -927,51 +950,99 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
   let mutualFollowing: PlayerStub[] = [];
   let mutualFollowingTotal = 0;
   if (viewerId !== id) {
-    const viewerFollowsRows = await db.query.playerFollowsTable.findMany({
-      where: eq(playerFollowsTable.followerId, viewerId),
-    });
-    const viewerFollows = new Set(viewerFollowsRows.map(f => f.followeeId));
-    const mutualFollowerIds = followers
-      .map(f => f.followerId)
-      .filter(fid => fid !== viewerId && viewerFollows.has(fid));
-    mutualFollowersTotal = mutualFollowerIds.length;
+    const pfProfile = alias(playerFollowsTable, "pf_profile_prev");
+    const pfViewer = alias(playerFollowsTable, "pf_viewer_prev");
 
-    // Mutual following: accounts that both the viewer and this player follow.
-    const profileFollows = new Set(following.map(f => f.followeeId));
-    const mutualFollowingIds = Array.from(viewerFollows).filter(
-      fid => fid !== viewerId && fid !== id && profileFollows.has(fid),
-    );
-    mutualFollowingTotal = mutualFollowingIds.length;
+    const [
+      mutualFollowersCountRow,
+      mutualFollowersPreviewRows,
+      mutualFollowingCountRow,
+      mutualFollowingPreviewRows,
+    ] = await Promise.all([
+      // Mutual followers count: people who follow profile AND viewer also follows them.
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(pfProfile)
+        .innerJoin(
+          pfViewer,
+          and(
+            eq(pfViewer.followerId, viewerId),
+            eq(pfViewer.followeeId, pfProfile.followerId),
+          ),
+        )
+        .where(and(eq(pfProfile.followeeId, id), ne(pfProfile.followerId, viewerId))),
+      // Preview (3 rows) of mutual followers.
+      db
+        .select({
+          id: playersTable.id,
+          username: playersTable.username,
+          displayName: playersTable.displayName,
+          avatarUrl: playersTable.avatarUrl,
+          creatorBadge: playersTable.creatorBadge,
+        })
+        .from(pfProfile)
+        .innerJoin(
+          pfViewer,
+          and(
+            eq(pfViewer.followerId, viewerId),
+            eq(pfViewer.followeeId, pfProfile.followerId),
+          ),
+        )
+        .innerJoin(playersTable, eq(playersTable.id, pfProfile.followerId))
+        .where(and(eq(pfProfile.followeeId, id), ne(pfProfile.followerId, viewerId)))
+        .orderBy(playersTable.id)
+        .limit(3),
+      // Mutual following count: accounts both viewer and profile follow.
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(pfProfile)
+        .innerJoin(
+          pfViewer,
+          and(
+            eq(pfViewer.followerId, viewerId),
+            eq(pfViewer.followeeId, pfProfile.followeeId),
+          ),
+        )
+        .where(and(eq(pfProfile.followerId, id), ne(pfProfile.followeeId, viewerId))),
+      // Preview (3 rows) of mutual following.
+      db
+        .select({
+          id: playersTable.id,
+          username: playersTable.username,
+          displayName: playersTable.displayName,
+          avatarUrl: playersTable.avatarUrl,
+          creatorBadge: playersTable.creatorBadge,
+        })
+        .from(pfProfile)
+        .innerJoin(
+          pfViewer,
+          and(
+            eq(pfViewer.followerId, viewerId),
+            eq(pfViewer.followeeId, pfProfile.followeeId),
+          ),
+        )
+        .innerJoin(playersTable, eq(playersTable.id, pfProfile.followeeId))
+        .where(and(eq(pfProfile.followerId, id), ne(pfProfile.followeeId, viewerId)))
+        .orderBy(playersTable.id)
+        .limit(3),
+    ]);
 
-    const previewFollowerIds = mutualFollowerIds.slice(0, 3);
-    const previewFollowingIds = mutualFollowingIds.slice(0, 3);
-    const allPreviewIds = Array.from(new Set([...previewFollowerIds, ...previewFollowingIds]));
-    const previewMap = new Map<number, typeof playersTable.$inferSelect>();
-    if (allPreviewIds.length > 0) {
-      const previewRows = await db.query.playersTable.findMany({
-        where: inArray(playersTable.id, allPreviewIds),
-      });
-      for (const p of previewRows) previewMap.set(p.id, p);
-    }
-    const toStub = (pid: number): PlayerStub | null => {
-      const p = previewMap.get(pid);
-      if (!p) return null;
-      return {
-        id: p.id,
-        username: p.username,
-        displayName: p.displayName ?? null,
-        avatarUrl: p.avatarUrl ?? null,
-        creatorBadge: p.creatorBadge ?? null,
-      };
-    };
-    mutualFollowers = previewFollowerIds.flatMap(pid => {
-      const s = toStub(pid);
-      return s ? [s] : [];
-    });
-    mutualFollowing = previewFollowingIds.flatMap(pid => {
-      const s = toStub(pid);
-      return s ? [s] : [];
-    });
+    mutualFollowersTotal = mutualFollowersCountRow[0]?.count ?? 0;
+    mutualFollowingTotal = mutualFollowingCountRow[0]?.count ?? 0;
+    mutualFollowers = mutualFollowersPreviewRows.map(p => ({
+      id: p.id,
+      username: p.username,
+      displayName: p.displayName ?? null,
+      avatarUrl: p.avatarUrl ?? null,
+      creatorBadge: p.creatorBadge ?? null,
+    }));
+    mutualFollowing = mutualFollowingPreviewRows.map(p => ({
+      id: p.id,
+      username: p.username,
+      displayName: p.displayName ?? null,
+      avatarUrl: p.avatarUrl ?? null,
+      creatorBadge: p.creatorBadge ?? null,
+    }));
   }
 
   // Shared groups: groups where both viewer and profile are members.
@@ -1004,8 +1075,8 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
       creatorBadge: player.creatorBadge ?? null,
     },
     posts: enrichedPosts,
-    followerCount: followers.length,
-    followingCount: following.length,
+    followerCount,
+    followingCount,
     isFollowing,
     memory,
     mutualFollowers,
@@ -1105,45 +1176,55 @@ router.get("/social/players/:id/mutual-following", requireAuth, attachPlayer, as
     return;
   }
 
-  const [profileFollowsRows, viewerFollowsRows] = await Promise.all([
-    db.query.playerFollowsTable.findMany({ where: eq(playerFollowsTable.followerId, id) }),
-    db.query.playerFollowsTable.findMany({ where: eq(playerFollowsTable.followerId, viewerId) }),
+  const pfProfile = alias(playerFollowsTable, "pf_profile");
+  const pfViewer = alias(playerFollowsTable, "pf_viewer");
+
+  const [countRow, rows] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(pfProfile)
+      .innerJoin(
+        pfViewer,
+        and(
+          eq(pfViewer.followerId, viewerId),
+          eq(pfViewer.followeeId, pfProfile.followeeId),
+        ),
+      )
+      .where(and(eq(pfProfile.followerId, id), ne(pfProfile.followeeId, viewerId))),
+    db
+      .select({
+        id: playersTable.id,
+        username: playersTable.username,
+        displayName: playersTable.displayName,
+        avatarUrl: playersTable.avatarUrl,
+        creatorBadge: playersTable.creatorBadge,
+      })
+      .from(pfProfile)
+      .innerJoin(
+        pfViewer,
+        and(
+          eq(pfViewer.followerId, viewerId),
+          eq(pfViewer.followeeId, pfProfile.followeeId),
+        ),
+      )
+      .innerJoin(playersTable, eq(playersTable.id, pfProfile.followeeId))
+      .where(and(eq(pfProfile.followerId, id), ne(pfProfile.followeeId, viewerId)))
+      .orderBy(playersTable.id)
+      .limit(limit)
+      .offset(cursor),
   ]);
 
-  const profileFollows = new Set(profileFollowsRows.map(f => f.followeeId));
-  const mutualIds = viewerFollowsRows
-    .map(f => f.followeeId)
-    .filter(fid => fid !== viewerId && fid !== id && profileFollows.has(fid));
+  const total = countRow[0]?.count ?? 0;
+  const players = rows.map(p => ({
+    id: p.id,
+    username: p.username,
+    displayName: p.displayName ?? null,
+    avatarUrl: p.avatarUrl ?? null,
+    creatorBadge: p.creatorBadge ?? null,
+  }));
 
-  const total = mutualIds.length;
-  const pageIds = mutualIds.slice(cursor, cursor + limit);
-  const nextOffset = cursor + pageIds.length;
+  const nextOffset = cursor + rows.length;
   const nextCursor = nextOffset < total ? nextOffset : null;
-
-  let players: Array<{
-    id: number;
-    username: string;
-    displayName: string | null;
-    avatarUrl: string | null;
-    creatorBadge: string | null;
-  }> = [];
-  if (pageIds.length > 0) {
-    const rows = await db.query.playersTable.findMany({
-      where: inArray(playersTable.id, pageIds),
-    });
-    const map = new Map(rows.map(p => [p.id, p]));
-    players = pageIds.flatMap(pid => {
-      const p = map.get(pid);
-      if (!p) return [];
-      return [{
-        id: p.id,
-        username: p.username,
-        displayName: p.displayName ?? null,
-        avatarUrl: p.avatarUrl ?? null,
-        creatorBadge: p.creatorBadge ?? null,
-      }];
-    });
-  }
 
   res.json({ players, total, nextCursor });
 });
