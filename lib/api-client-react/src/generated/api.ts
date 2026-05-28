@@ -24,6 +24,7 @@ import type {
   AddEggInput,
   Club,
   ClubInput,
+  CoachChatBody,
   Competition,
   CompetitionInput,
   CompetitionResultInput,
@@ -105,6 +106,77 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getCoachChatUrl = () => {
+
+
+
+
+  return `/api/coach/chat`
+}
+
+/**
+ * @summary Send a message to the AI Fitness Coach
+ */
+export const coachChat = async (coachChatBody: CoachChatBody, options?: RequestInit): Promise<string> => {
+
+  return customFetch<string>(getCoachChatUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      coachChatBody,)
+  }
+);}
+
+
+
+
+export const getCoachChatMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof coachChat>>, TError,{data: BodyType<CoachChatBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof coachChat>>, TError,{data: BodyType<CoachChatBody>}, TContext> => {
+
+const mutationKey = ['coachChat'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof coachChat>>, {data: BodyType<CoachChatBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  coachChat(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CoachChatMutationResult = NonNullable<Awaited<ReturnType<typeof coachChat>>>
+    export type CoachChatMutationBody = BodyType<CoachChatBody>
+    export type CoachChatMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Send a message to the AI Fitness Coach
+ */
+export const useCoachChat = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof coachChat>>, TError,{data: BodyType<CoachChatBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof coachChat>>,
+        TError,
+        {data: BodyType<CoachChatBody>},
+        TContext
+      > => {
+      return useMutation(getCoachChatMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 

@@ -7,6 +7,21 @@
  */
 import * as zod from 'zod';
 
+/**
+ * @summary Send a message to the AI Fitness Coach
+ */
+export const coachChatBodyMessageMax = 2000;
+
+
+
+export const CoachChatBody = zod.object({
+  "message": zod.string().min(1).max(coachChatBodyMessageMax),
+  "history": zod.array(zod.object({
+  "role": zod.enum(['user', 'assistant']),
+  "content": zod.string()
+})).optional()
+})
+
 
 /**
  * @summary Health check
@@ -1732,5 +1747,3 @@ export const TriggerHealthSyncResponse = zod.object({
 export const AcknowledgePassiveXpResponse = zod.object({
   "success": zod.boolean()
 })
-
-

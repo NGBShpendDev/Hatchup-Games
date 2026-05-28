@@ -36,8 +36,29 @@ tags:
     description: Health platform connections and passive fitness sync
   - name: groups
     description: Workout groups, team energy, challenges, raids, and chat
+  - name: coach
+    description: AI Fitness Coach chat
 
 paths:
+  /coach/chat:
+    post:
+      operationId: coachChat
+      tags: [coach]
+      summary: Send a message to the AI Fitness Coach
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CoachChatBody"
+      responses:
+        "200":
+          description: SSE stream of coach reply chunks
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
   /healthz:
     get:
       operationId: healthCheck
@@ -2158,3 +2179,20 @@ components:
       properties:
         playerId: { type: integer }
         damage:   { type: integer }
+
+    CoachChatMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:    { type: string, enum: [user, assistant] }
+        content: { type: string }
+
+    CoachChatBody:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string, minLength: 1, maxLength: 2000 }
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/CoachChatMessage"

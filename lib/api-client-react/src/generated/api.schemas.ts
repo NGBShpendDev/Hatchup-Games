@@ -705,6 +705,28 @@ export interface GroupRaidAttackInput {
   damage: number;
 }
 
+export type CoachChatMessageRole = typeof CoachChatMessageRole[keyof typeof CoachChatMessageRole];
+
+
+export const CoachChatMessageRole = {
+  user: 'user',
+  assistant: 'assistant',
+} as const;
+
+export interface CoachChatMessage {
+  role: CoachChatMessageRole;
+  content: string;
+}
+
+export interface CoachChatBody {
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  message: string;
+  history?: CoachChatMessage[];
+}
+
 export type ListHatchlingsParams = {
 playerId?: number;
 limit?: number;

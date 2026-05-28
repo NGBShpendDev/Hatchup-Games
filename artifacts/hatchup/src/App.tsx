@@ -24,6 +24,7 @@ import Rewards from "@/pages/rewards";
 import SettingsPrivacy from "@/pages/settings-privacy";
 import AdminReports from "@/pages/admin-reports";
 import SafetyGuidelines from "@/pages/safety-guidelines";
+import Coach from "@/pages/coach";
 
 const queryClient = new QueryClient();
 
@@ -222,6 +223,7 @@ function AppRoutes() {
         <Route path="/settings/privacy" component={SettingsPrivacy} />
         <Route path="/admin/reports" component={AdminReports} />
         <Route path="/safety/guidelines" component={SafetyGuidelines} />
+        <Route path="/coach" component={Coach} />
         <Route component={NotFound} />
       </Switch>
     </>
