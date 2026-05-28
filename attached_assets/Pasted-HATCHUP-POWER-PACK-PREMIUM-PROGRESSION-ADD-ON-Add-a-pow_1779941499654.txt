@@ -1,0 +1,239 @@
+HATCHUP POWER PACK & PREMIUM PROGRESSION ADD-ON
+
+Add a powerful monetization and premium progression system to HatchUp Fitness Pals that feels rewarding, fair, motivating, and highly valuable without becoming pay-to-win.
+
+The system should encourage users to:
+- stay active
+- level up naturally
+- unlock premium experiences
+- feel excited about progression
+
+====================================
+HATCHUP POWER PACK SUBSCRIPTION
+====================================
+
+Create a premium subscription called:
+
+“HatchUp Power Pack”
+
+Pricing:
+- $8.99 monthly
+- $80 yearly subscription
+
+Integrate payments directly with Stripe.
+
+Stripe integration should support:
+- subscriptions
+- renewals
+- upgrades
+- cancellations
+- promo codes
+- free trials
+- creator payouts
+- secure payments
+
+====================================
+PREMIUM PAYWALL SYSTEM
+====================================
+
+When free users try to access premium features:
+- display cinematic premium upgrade screens
+- preview locked rewards
+- show benefits of upgrading
+- include motivating visuals and creature previews
+
+Premium features should have:
+- lock icons
+- glowing premium labels
+- upgrade prompts
+- countdown events and limited offers
+
+====================================
+POWER PACK BENEFITS
+====================================
+
+Power Pack users instantly receive:
+- automatic Level 20 unlock
+- ability to hatch their first egg immediately
+- exclusive premium cosmetics
+- premium wearables
+- premium avatar items
+- bonus coins
+- creator badges
+- advanced AI coaching
+- premium livestream classes
+- AI meal planning
+- premium nutrition scanner
+- advanced analytics
+- bonus XP boosts
+- premium workout programs
+
+====================================
+LEVEL LOCK SYSTEM
+====================================
+
+Certain features should stay locked until:
+- reaching required levels
+OR
+- unlocking through Power Pack
+
+Examples:
+- advanced arenas
+- rare eggs
+- elite evolutions
+- livestream hosting
+- creator monetization
+- legendary cosmetics
+- advanced AI coaching
+- special mini games
+- ranked competitive mode
+
+====================================
+CORE PROGRESSION RULE
+====================================
+
+IMPORTANT:
+Users CANNOT directly buy fitness levels after Level 20.
+
+The only way to progress:
+- workouts
+- steps
+- healthy habits
+- consistency
+- verified activity
+- challenges
+
+Fitness progression must always reward real effort.
+
+====================================
+COIN & COSMETIC ECONOMY
+====================================
+
+Users CAN purchase:
+- coins
+- cosmetics
+- wearables
+- animations
+- aura effects
+- eggs
+- accessories
+
+Coins CANNOT directly increase fitness level progression after Level 20.
+
+Coins can be used for:
+- avatar customization
+- creature cosmetics
+- convenience items
+- social upgrades
+- emotes
+- creator items
+
+====================================
+AI CALORIE CAMERA SYSTEM
+====================================
+
+Add an advanced AI camera nutrition feature.
+
+Users can:
+- take photos of meals
+- scan food instantly
+- upload restaurant meals
+- track snacks and drinks
+
+The AI should:
+- identify food items
+- estimate calories
+- estimate macros
+- estimate micronutrients
+- estimate portion sizes
+- provide healthy alternatives
+- generate nutrition scores
+
+Examples:
+- “Estimated Calories: 540”
+- “High protein meal detected”
+- “Try grilled chicken instead for better macros”
+
+====================================
+PREMIUM NUTRITION FEATURES
+====================================
+
+Power Pack users unlock:
+- unlimited AI food scans
+- personalized meal plans
+- macro coaching
+- grocery planning
+- recipe generation
+- advanced nutrition analytics
+- hydration optimization
+- fat-loss mode
+- muscle-building mode
+
+====================================
+PREMIUM VISUAL EXPERIENCE
+====================================
+
+Make premium users feel special.
+
+Include:
+- premium profile glow
+- animated borders
+- exclusive aura effects
+- premium hatch animations
+- exclusive eggs
+- creator rank icons
+- premium name colors
+
+====================================
+BALANCED FAIRNESS SYSTEM
+====================================
+
+The app must NEVER become unfair pay-to-win.
+
+Free users should still:
+- progress naturally
+- enjoy the game
+- hatch creatures
+- compete fairly
+- access core fitness systems
+
+Premium users should receive:
+- convenience
+- cosmetics
+- premium tools
+- enhanced experiences
+- faster onboarding
+
+NOT unfair competitive advantages.
+
+====================================
+LONG-TERM RETENTION SYSTEM
+====================================
+
+Encourage users to maintain subscriptions through:
+- seasonal rewards
+- premium battle passes
+- exclusive creatures
+- monthly cosmetic drops
+- creator events
+- AI coaching upgrades
+- evolving premium rewards
+
+====================================
+FINAL GOAL
+====================================
+
+The HatchUp monetization system should feel:
+- exciting
+- premium
+- fair
+- rewarding
+- motivating
+- emotionally engaging
+
+Users should feel proud to:
+- level up naturally
+- improve their health
+- unlock evolutions
+- build their avatars
+- become legendary within the HatchUp universe.

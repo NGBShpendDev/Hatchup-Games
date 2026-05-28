@@ -107,19 +107,19 @@ export default function Nutrition() {
   const feedMode = activeTab === "discover" ? "discover" : "feed";
   const { data: posts = [], isLoading: postsLoading } = useQuery<MealPost[]>({
     queryKey: ["nutrition-posts", pid, feedMode],
-    queryFn: () => fetch(`${BASE}/api/nutrition/posts?playerId=${pid}&limit=30&mode=${feedMode}`, { credentials: "include" }).then(r => r.json()),
+    queryFn: () => fetch(`${BASE}/api/nutrition/posts?limit=30&mode=${feedMode}`, { credentials: "include" }).then(r => r.json()),
     enabled: !!pid && activeTab !== "challenges",
   });
 
   const { data: challenges = [], isLoading: challengesLoading } = useQuery<NutritionChallenge[]>({
     queryKey: ["nutrition-challenges", pid],
-    queryFn: () => fetch(`${BASE}/api/nutrition/challenges?playerId=${pid}`, { credentials: "include" }).then(r => r.json()),
+    queryFn: () => fetch(`${BASE}/api/nutrition/challenges`, { credentials: "include" }).then(r => r.json()),
     enabled: !!pid,
   });
 
   const { data: macroTarget } = useQuery<MacroTarget>({
     queryKey: ["macro-target", pid],
-    queryFn: () => fetch(`${BASE}/api/nutrition/macro-target?playerId=${pid}`, { credentials: "include" }).then(r => r.json()),
+    queryFn: () => fetch(`${BASE}/api/nutrition/macro-target`, { credentials: "include" }).then(r => r.json()),
     enabled: !!pid,
   });
 

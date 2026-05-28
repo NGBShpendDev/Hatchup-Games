@@ -6,12 +6,14 @@ import {
   mealCommentsTable,
   nutritionChallengeProgressTable,
   playersTable,
+  groupMembersTable,
 } from "@workspace/db";
-import { eq, and, desc, sql, asc } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, notInArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { awardBadge } from "../services/badgeService";
+import { getHiddenPlayerIds } from "./safety";
 
 const router = Router();
 
@@ -131,12 +133,37 @@ router.post("/nutrition/posts", requireAuth, attachPlayer, requirePlayerOwnershi
 
 // ── GET /nutrition/posts ──────────────────────────────────────────────────────
 router.get("/nutrition/posts", requireAuth, attachPlayer, async (req, res) => {
-  const playerId = Number(req.query.playerId);
+  const playerId = req.playerId!; // bind to authenticated player, ignore client-supplied query
   const limit = Math.min(Number(req.query.limit ?? 20), 50);
   const mode = (req.query.mode as string) ?? "feed";
 
-  // feed = chronological (most recent first); discover = sorted by most liked
+  // Block filtering: drop posts from anyone the viewer blocked or who blocked viewer
+  const hiddenIds = await getHiddenPlayerIds(playerId);
+
+  // Feed = posts from people in the same groups as the viewer (or own posts);
+  //   Discover = global, sorted by likes.
+  let visiblePlayerIds: number[] | null = null;
+  if (mode === "feed") {
+    const myGroups = await db.select({ gid: groupMembersTable.groupId })
+      .from(groupMembersTable)
+      .where(eq(groupMembersTable.playerId, playerId));
+    if (myGroups.length > 0) {
+      const sameGroupMembers = await db.select({ pid: groupMembersTable.playerId })
+        .from(groupMembersTable)
+        .where(inArray(groupMembersTable.groupId, myGroups.map(g => g.gid)));
+      visiblePlayerIds = [...new Set([playerId, ...sameGroupMembers.map(m => m.pid)])];
+    } else {
+      visiblePlayerIds = [playerId]; // no groups yet → just own posts in feed
+    }
+  }
+
+  const whereClauses = [
+    hiddenIds.length > 0 ? notInArray(mealPostsTable.playerId, hiddenIds) : undefined,
+    visiblePlayerIds      ? inArray(mealPostsTable.playerId, visiblePlayerIds) : undefined,
+  ].filter(Boolean) as any[];
+
   const posts = await db.query.mealPostsTable.findMany({
+    where: whereClauses.length > 0 ? and(...whereClauses) : undefined,
     orderBy: mode === "discover"
       ? [desc(mealPostsTable.likesCount), desc(mealPostsTable.createdAt)]
       : [desc(mealPostsTable.createdAt)],
@@ -144,13 +171,10 @@ router.get("/nutrition/posts", requireAuth, attachPlayer, async (req, res) => {
   });
 
   // Attach liked flag for the requesting player
-  let likedSet: Set<number> = new Set();
-  if (playerId) {
-    const likes = await db.query.mealLikesTable.findMany({
-      where: eq(mealLikesTable.playerId, playerId),
-    });
-    likedSet = new Set(likes.map(l => l.mealPostId));
-  }
+  const likes = await db.query.mealLikesTable.findMany({
+    where: eq(mealLikesTable.playerId, playerId),
+  });
+  const likedSet = new Set(likes.map(l => l.mealPostId));
 
   // Fetch display names for authors
   const playerIds = [...new Set(posts.map(p => p.playerId))];
@@ -198,8 +222,15 @@ router.post("/nutrition/posts/:id/like", requireAuth, attachPlayer, async (req, 
 // ── GET /nutrition/posts/:id/comments ─────────────────────────────────────────
 router.get("/nutrition/posts/:id/comments", requireAuth, attachPlayer, async (req, res) => {
   const postId = Number(req.params.id);
+  const viewerId = req.playerId!;
+  const hiddenIds = await getHiddenPlayerIds(viewerId);
+
+  const where = hiddenIds.length > 0
+    ? and(eq(mealCommentsTable.mealPostId, postId), notInArray(mealCommentsTable.playerId, hiddenIds))
+    : eq(mealCommentsTable.mealPostId, postId);
+
   const comments = await db.query.mealCommentsTable.findMany({
-    where: eq(mealCommentsTable.mealPostId, postId),
+    where,
     orderBy: [desc(mealCommentsTable.createdAt)],
   });
 
@@ -275,13 +306,11 @@ router.post("/nutrition/analyze", requireAuth, attachPlayer, async (req, res) =>
 
 // ── GET /nutrition/challenges ─────────────────────────────────────────────────
 router.get("/nutrition/challenges", requireAuth, attachPlayer, async (req, res) => {
-  const playerId = Number(req.query.playerId);
+  const playerId = req.playerId!; // bind to authenticated player
 
-  const progress = playerId
-    ? await db.query.nutritionChallengeProgressTable.findMany({
-        where: eq(nutritionChallengeProgressTable.playerId, playerId),
-      })
-    : [];
+  const progress = await db.query.nutritionChallengeProgressTable.findMany({
+    where: eq(nutritionChallengeProgressTable.playerId, playerId),
+  });
 
   const progressMap = Object.fromEntries(progress.map(p => [p.challengeKey, p]));
 
@@ -358,17 +387,51 @@ router.post("/nutrition/challenges/:key/progress", requireAuth, attachPlayer, re
 });
 
 // ── GET /nutrition/macro-target ───────────────────────────────────────────────
+// AI-derived macro targets based on physique goal + fitness profile, with static fallback.
 router.get("/nutrition/macro-target", requireAuth, attachPlayer, async (req, res) => {
-  const playerId = Number(req.query.playerId);
-  if (!playerId) { res.status(400).json({ error: "playerId required" }); return; }
+  const playerId = req.playerId!; // bind to authenticated player
 
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
   if (!player) { res.status(404).json({ error: "Player not found" }); return; }
 
   const goal = player.physiqueGoal ?? "lean_athlete";
-  const targets = MACRO_GOAL_TARGETS[goal] ?? MACRO_GOAL_TARGETS["lean_athlete"];
+  const fallback = MACRO_GOAL_TARGETS[goal] ?? MACRO_GOAL_TARGETS["lean_athlete"]!;
 
-  res.json({ goal, ...targets! });
+  // Try AI-personalized macros using available fitness profile signals
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5-mini",
+      max_completion_tokens: 250,
+      messages: [
+        {
+          role: "system",
+          content: `You are a sports nutritionist. Given a player's physique goal and fitness profile, return ONLY valid JSON with keys: calories (number), protein (g, number), carbs (g, number), fat (g, number), tip (short string under 80 chars). No markdown.`,
+        },
+        {
+          role: "user",
+          content: `Goal: ${goal}. Player level ${player.level}, fitness XP ${player.fitnessXp}, total XP ${player.xp}. Provide realistic daily macro targets.`,
+        },
+      ],
+    });
+    const raw = completion.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(raw) as { calories?: number; protein?: number; carbs?: number; fat?: number; tip?: string };
+    if (parsed.calories && parsed.protein && parsed.carbs && parsed.fat) {
+      res.json({
+        goal,
+        calories: parsed.calories,
+        protein: parsed.protein,
+        carbs: parsed.carbs,
+        fat: parsed.fat,
+        tip: parsed.tip ?? fallback.tip,
+        aiPersonalized: true,
+      });
+      return;
+    }
+  } catch (err) {
+    req.log.warn({ err }, "AI macro target failed; using static fallback");
+  }
+
+  res.json({ goal, ...fallback, aiPersonalized: false });
 });
 
 // ── PUT /nutrition/physique-goal ──────────────────────────────────────────────
