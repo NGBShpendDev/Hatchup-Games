@@ -6,12 +6,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/ui/glass-card";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Sparkles, Lock, Star, Zap, Shield, Trophy, ChevronDown, ChevronUp, User, GripVertical } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { useReorderFeaturedArtifacts, useToggleOwnedArtifact } from "@workspace/api-client-react";
-
-const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+import {
+  useReorderFeaturedArtifacts,
+  useToggleOwnedArtifact,
+  useListArtifacts,
+  useGetMyFitnessBars,
+  getListArtifactsQueryKey,
+  getGetMyFitnessBarsQueryKey,
+} from "@workspace/api-client-react";
+import type { ArtifactMuseumEntry } from "@workspace/api-client-react";
 
 const RARITY_ORDER = ["Common", "Rare", "Epic", "Legendary", "Mythic", "Ancient", "Celestial"];
 
@@ -45,30 +51,7 @@ const BAR_COLORS: Record<string, string> = {
   discipline:  "from-teal-400 to-cyan-500",
 };
 
-interface ArtifactEntry {
-  id: number;
-  name: string;
-  lore: string;
-  rarity: string;
-  type: string;
-  imageSlug: string;
-  isHidden: boolean;
-  abilities: Array<{ name: string; description: string; value: number }>;
-  discovered: boolean;
-  isEquipped: boolean;
-  isFeatured: boolean;
-  featuredOrder: number | null;
-  earnedAt: string | null;
-}
-
-interface FitnessBarEntry {
-  barType: string;
-  level: number;
-  xp: number;
-  nextLevelXp: number;
-  xpInCurrentLevel: number;
-  progressPct: number;
-}
+type ArtifactEntry = ArtifactMuseumEntry;
 
 export default function Artifacts() {
   const { playerId } = usePlayer();
@@ -77,10 +60,8 @@ export default function Artifacts() {
   const [expandedRarities, setExpandedRarities] = useState<Set<string>>(new Set(["Legendary", "Mythic", "Ancient", "Celestial", "Epic"]));
   const [expandedArtifact, setExpandedArtifact] = useState<number | null>(null);
 
-  const { data: museum, isLoading: museumLoading } = useQuery<ArtifactEntry[]>({
-    queryKey: ["artifacts-museum", pid],
-    queryFn: () => fetch(`${BASE}/api/artifacts`, { credentials: "include" }).then(r => r.json()),
-    enabled: !!pid,
+  const { data: museum, isLoading: museumLoading } = useListArtifacts({
+    query: { enabled: !!pid, queryKey: getListArtifactsQueryKey() },
   });
 
   const featuredArtifacts = (museum ?? [])
@@ -103,7 +84,7 @@ export default function Artifacts() {
   const reorderFeatured = useReorderFeaturedArtifacts({
     mutation: {
       onSuccess: () => {
-        qc.invalidateQueries({ queryKey: ["artifacts-museum", pid] });
+        qc.invalidateQueries({ queryKey: getListArtifactsQueryKey() });
         qc.invalidateQueries({ queryKey: ["player-profile", pid] });
       },
       onError: (err: Error) => {
@@ -123,7 +104,7 @@ export default function Artifacts() {
   const toggleFeatured = useToggleOwnedArtifact({
     mutation: {
       onSuccess: (_data, vars) => {
-        qc.invalidateQueries({ queryKey: ["artifacts-museum", pid] });
+        qc.invalidateQueries({ queryKey: getListArtifactsQueryKey() });
         qc.invalidateQueries({ queryKey: ["player-profile", pid] });
         toast({
           title: vars.data.isFeatured ? "Featured on profile" : "Removed from showcase",
@@ -148,10 +129,8 @@ export default function Artifacts() {
     toggleFeatured.mutate({ id: artifact.id, data: { isFeatured: !artifact.isFeatured } });
   };
 
-  const { data: fitnessBars, isLoading: barsLoading } = useQuery<FitnessBarEntry[]>({
-    queryKey: ["fitness-bars", pid],
-    queryFn: () => fetch(`${BASE}/api/players/me/fitness-bars`, { credentials: "include" }).then(r => r.json()),
-    enabled: !!pid,
+  const { data: fitnessBars, isLoading: barsLoading } = useGetMyFitnessBars({
+    query: { enabled: !!pid, queryKey: getGetMyFitnessBarsQueryKey() },
   });
 
   const toggleRarity = (rarity: string) => {
