@@ -206,7 +206,19 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     updates.emergencyContactPhone = body.emergencyContactPhone as string | null;
   }
   if (typeof body.isMinor === "boolean") {
-    updates.isMinor = body.isMinor;
+    // Minor status is a one-way self-service toggle: a user can mark
+    // themselves as a minor at any time, but cannot self-clear that flag.
+    // Removing minor status requires an admin (guardian) review path.
+    if (body.isMinor === false && current.isMinor === true && !current.isAdmin) {
+      res.status(403).json({
+        error: "minor_status_immutable",
+        message: "Removing minor status requires a guardian or admin. Please contact support.",
+      });
+      return;
+    }
+    if (body.isMinor === true) {
+      updates.isMinor = true;
+    }
   }
 
   // ── Minor-account safety enforcement ────────────────────────────────────────

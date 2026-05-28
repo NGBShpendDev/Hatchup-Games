@@ -324,7 +324,29 @@ export default function SettingsPrivacy() {
                   </p>
                 </div>
               </div>
-              <Switch checked={isMinor} onCheckedChange={setIsMinor} />
+              <Switch
+                checked={isMinor}
+                onCheckedChange={(v) => {
+                  // One-way toggle: enabling requires confirmation; disabling
+                  // requires guardian/admin review and is blocked client-side.
+                  if (!v && isMinor) {
+                    toast({
+                      title: "Guardian review required",
+                      description: "Removing minor status requires a guardian or admin. Please contact support.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  if (v && !isMinor) {
+                    const ok = window.confirm(
+                      "Mark this account as a minor? This will block social posting, force City-only location, and require workout-partner approval. You will need a guardian or admin to remove this later.",
+                    );
+                    if (!ok) return;
+                  }
+                  setIsMinor(v);
+                }}
+                disabled={isMinor}
+              />
             </div>
           </CardContent>
         </Card>

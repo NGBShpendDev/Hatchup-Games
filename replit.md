@@ -109,6 +109,7 @@ These systems were added in the pre-launch hardening sweep and must stay wired:
 
 ### Minor / parental controls
 - `playersTable.isMinor` toggles safer defaults. When enabled via `PATCH /players/:id/privacy-settings`, the API forces `locationVisibility="city"` and `requireWorkoutApproval=true`.
+- Minor status is a **one-way self-service flag**: any user can mark themselves as a minor, but clearing the flag requires an admin (guardian) account. Non-admin requests that send `isMinor=false` against a currently-minor account get `403 minor_status_immutable`.
 - `blockMinorSocialWrite` middleware (in `artifacts/api-server/src/middlewares/minorGuard.ts`) is applied to social posts/comments/reacts/reposts/follows and group chat messages. Returns `403 minor_account_restricted` for flagged accounts.
 - Settings UI: `/settings/privacy` exposes the minor toggle, MFA portal link (`/user`), location visibility, workout approval, and emergency contact.
 
