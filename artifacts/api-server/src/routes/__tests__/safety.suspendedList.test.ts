@@ -87,8 +87,8 @@ mock.module("drizzle-orm", {
   namedExports: {
     lt: () => ({}),
     gt: () => ({}),
-    ne: () => ({}),
     eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    ne: () => ({}),
     and: (...args: unknown[]) => ({ op: "and", args }),
     or: (...args: unknown[]) => ({ op: "or", args }),
     desc: (col: unknown) => ({ op: "desc", col }),

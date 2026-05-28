@@ -115,13 +115,19 @@ mock.module("@workspace/db", {
     playersTable,
     hatchlingsTable: {},
     rateLimitAttemptsTable,
+    emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
   },
 });
 
 mock.module("drizzle-orm", {
   namedExports: {
     eq: (c: { __col: string }, val: unknown): Predicate => ({ [c.__col]: val }),
+    ne: () => ({} as Predicate),
+    gt: () => ({} as Predicate),
     and: (...parts: Predicate[]) => Object.assign({}, ...parts),
+    or: (...parts: Predicate[]) => Object.assign({}, ...parts),
+    inArray: () => ({} as Predicate),
+    notInArray: () => ({} as Predicate),
     lt: (c: { __col: string }, val: unknown): Predicate =>
       c.__col === "rateLimitAttempts.createdAt" ? { __lt_createdAt: val } : {},
     desc: (c: unknown) => ({ __desc: c }),

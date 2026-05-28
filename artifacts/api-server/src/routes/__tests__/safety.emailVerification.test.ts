@@ -81,6 +81,7 @@ const playersTable = {
 mock.module("drizzle-orm", {
   namedExports: {
     eq: (c: { __col: string }, val: unknown) => ({ [c.__col]: val }),
+    ne: () => ({}),
     and: (...parts: Record<string, unknown>[]) => Object.assign({}, ...parts),
     or: (...parts: Record<string, unknown>[]) => ({ __or: parts }),
     desc: () => ({}),

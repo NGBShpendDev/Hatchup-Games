@@ -148,6 +148,8 @@ mock.module("drizzle-orm", {
   namedExports: {
     eq: (c: { __col: string }, val: unknown) => ({ __eq: { col: c.__col, val } }),
     lt: (c: { __col: string }, val: unknown) => ({ __lt: { col: c.__col, val } }),
+    gt: () => ({}),
+    ne: () => ({}),
     and: (...parts: Record<string, unknown>[]) => mergeAnd(parts),
     or: (...parts: Record<string, unknown>[]) => ({ __or: parts }),
     desc: () => ({}),
@@ -363,7 +365,7 @@ mock.module("@workspace/db", {
     moderationAuditLogTable: { id: {}, actorId: {}, action: {}, targetPlayerId: {}, targetReportId: {}, reason: {}, metadata: {}, createdAt: {} },
     notificationsTable: { id: {}, playerId: {}, type: {}, createdAt: {} },
     bouncedEmailsTable: { id: {}, email: {} },
-    accountAppealsTable: { id: {}, playerId: {}, status: {}, createdAt: {} },
+    accountAppealsTable: { id: {}, playerId: {}, status: {}, reason: {}, createdAt: {}, resolvedAt: {} },
   },
 });
 

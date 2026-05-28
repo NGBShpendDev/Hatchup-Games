@@ -122,7 +122,18 @@ mock.module("../../services/postPurgeJob.ts", {
 });
 
 mock.module("../safety.ts", {
-  namedExports: { getHiddenPlayerIds: async () => state.hiddenPlayerIds },
+  namedExports: {
+    getHiddenPlayerIds: async () => state.hiddenPlayerIds,
+    filterDiscoverableCandidates: async <T extends { id: number; locationVisibility: string | null; isMinor: boolean | null }>(
+      _viewerId: number | null | undefined,
+      players: T[],
+    ) => {
+      const hidden = new Set(state.hiddenPlayerIds);
+      return players.filter(
+        (p) => !hidden.has(p.id) && p.locationVisibility !== "hidden" && !p.isMinor,
+      );
+    },
+  },
 });
 
 mock.module("../../services/subscriptionGuards.ts", {

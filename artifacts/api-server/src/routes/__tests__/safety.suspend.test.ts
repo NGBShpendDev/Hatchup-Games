@@ -86,7 +86,9 @@ mock.module("../../services/moderationNotify.ts", {
 mock.module("drizzle-orm", {
   namedExports: {
     lt: () => ({}),
+    gt: () => ({}),
     eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    ne: () => ({}),
     and: (...args: unknown[]) => ({ op: "and", args }),
     or: (...args: unknown[]) => ({ op: "or", args }),
     desc: () => ({}),

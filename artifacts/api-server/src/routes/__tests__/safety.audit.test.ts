@@ -133,10 +133,14 @@ mock.module("../../middlewares/rateLimiters.ts", {
 mock.module("drizzle-orm", {
   namedExports: {
     eq: (col: unknown, val: unknown) => ({ op: "eq", col, val }),
+    ne: () => ({}),
+    gt: () => ({}),
+    lt: () => ({}),
     and: (...args: unknown[]) => ({ op: "and", args: args.filter(Boolean) }),
     or: (...args: unknown[]) => ({ op: "or", args }),
     desc: (col: unknown) => ({ op: "desc", col }),
     notInArray: () => ({ op: "notIn" }),
+    inArray: () => ({}),
   },
 });
 
@@ -346,6 +350,9 @@ mock.module("@workspace/db", {
     blockedUsersTable,
     moderationAuditLogTable,
     notificationsTable,
+    bouncedEmailsTable: { id: {}, email: {}, bounceType: {}, reason: {}, source: {}, bouncedAt: {}, createdAt: {} },
+    accountAppealsTable: { id: {}, playerId: {}, status: {}, reason: {}, createdAt: {}, resolvedAt: {} },
+    emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
   },
 });
 

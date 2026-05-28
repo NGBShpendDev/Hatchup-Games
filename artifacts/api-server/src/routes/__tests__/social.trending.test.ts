@@ -230,6 +230,9 @@ const queryHandlers: Record<string, any> = {
   },
   postsTable: {
     findFirst: async () => state.posts[0],
+    // Apply the same filters the route asks for at the DB layer: drop
+    // flagged/deleted posts and posts whose author is in the viewer's hidden
+    // set (the route adds `notInArray(postsTable.playerId, hiddenIds)`).
     findMany: async (_args?: any) =>
       state.posts.filter(
         p =>
@@ -263,6 +266,23 @@ const fakeDb = {
           groupBy: () => chain,
           orderBy: () => chain,
           limit: async (n: number) => liveTrendingViewRows(n),
+        };
+        return chain;
+      }
+      // blockedUsersTable: getHiddenPlayerIds(viewer) selects all blocks
+      // involving the viewer. We model `state.hiddenPlayerIds` as ids the
+      // viewer has blocked (viewer = state.player.id) so the symmetric
+      // hidden-set the route builds includes those ids.
+      if (table && table.__t === "blockedUsers") {
+        const viewerId = state.player.id;
+        const rows = state.hiddenPlayerIds.map((id) => ({
+          blockerId: viewerId,
+          blockedId: id,
+        }));
+        const chain: any = {
+          where: () => chain,
+          then: (resolve: any, reject: any) =>
+            Promise.resolve(rows).then(resolve, reject),
         };
         return chain;
       }
