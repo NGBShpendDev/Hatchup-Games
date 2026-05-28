@@ -528,6 +528,27 @@ paths:
                 items:
                   $ref: "#/components/schemas/LeaderboardEntry"
 
+  /leaderboards/speed:
+    get:
+      operationId: getSpeedLeaderboard
+      tags: [leaderboards]
+      summary: Get speed/fitness leaderboard ranked by total steps and reps
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+      responses:
+        "200":
+          description: Speed leaderboard
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SpeedLeaderboardEntry"
+
   /leaderboards/rank-distribution:
     get:
       operationId: getRankDistribution
@@ -2179,6 +2200,55 @@ components:
       properties:
         playerId: { type: integer }
         damage:   { type: integer }
+
+    PersonalRecord:
+      type: object
+      required: [id, playerId, activityType, metric, value, achievedAt]
+      properties:
+        id:           { type: integer }
+        playerId:     { type: integer }
+        activityType: { type: string }
+        metric:       { type: string }
+        value:        { type: integer }
+        achievedAt:   { type: string, format: date-time }
+
+    StrengthTotals:
+      type: object
+      required: [totalReps, lifetimePushups, lifetimeSquats, lifetimeBurpees, lifetimePullups, lifetimePlanks, lifetimeSitups]
+      properties:
+        totalReps:       { type: integer }
+        lifetimePushups: { type: integer }
+        lifetimeSquats:  { type: integer }
+        lifetimeBurpees: { type: integer }
+        lifetimePullups: { type: integer }
+        lifetimePlanks:  { type: integer }
+        lifetimeSitups:  { type: integer }
+
+    PlayerRecordsResult:
+      type: object
+      required: [personalRecords, strengthTotals, monthlyRunMiles]
+      properties:
+        personalRecords:
+          type: array
+          items:
+            $ref: "#/components/schemas/PersonalRecord"
+        strengthTotals:
+          $ref: "#/components/schemas/StrengthTotals"
+        monthlyRunMiles: { type: number }
+
+    SpeedLeaderboardEntry:
+      type: object
+      required: [position, playerId, username, rank, totalSteps, totalReps, currentStreak]
+      properties:
+        position:      { type: integer }
+        playerId:      { type: integer }
+        username:      { type: string }
+        displayName:   { type: string, nullable: true }
+        avatarUrl:     { type: string, nullable: true }
+        rank:          { type: string }
+        totalSteps:    { type: integer }
+        totalReps:     { type: integer }
+        currentStreak: { type: integer }
 
     CoachChatMessage:
       type: object

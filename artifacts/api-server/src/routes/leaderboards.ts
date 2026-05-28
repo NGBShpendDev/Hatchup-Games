@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { playersTable, hatchlingsTable } from "@workspace/db";
-import { desc, eq, notInArray } from "drizzle-orm";
+import { playersTable, hatchlingsTable, fitnessActivitiesTable } from "@workspace/db";
+import { desc, eq, notInArray, gte, and } from "drizzle-orm";
 import { GetGlobalLeaderboardQueryParams, GetModeLeaderboardQueryParams } from "@workspace/api-zod";
 import { getHiddenPlayerIds } from "./safety";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
@@ -94,6 +94,30 @@ router.get("/leaderboards/rank-distribution", async (req, res) => {
     count: rankMap[rank] ?? 0,
     percentage: players.length > 0 ? ((rankMap[rank] ?? 0) / players.length) * 100 : 0,
     color: RANK_COLORS[rank] ?? "#888888",
+  }));
+
+  res.json(result);
+});
+
+// GET /leaderboards/speed — top players by total steps + total reps
+router.get("/leaderboards/speed", requireAuth, attachPlayer, async (req, res) => {
+  const limit = Math.min(50, Number(req.query.limit ?? 25));
+  const hiddenIds = req.playerId ? await getHiddenPlayerIds(req.playerId) : [];
+
+  const players = hiddenIds.length > 0
+    ? await db.select().from(playersTable).where(notInArray(playersTable.id, hiddenIds)).orderBy(desc(playersTable.totalSteps)).limit(limit)
+    : await db.select().from(playersTable).orderBy(desc(playersTable.totalSteps)).limit(limit);
+
+  const result = players.map((p, i) => ({
+    position: i + 1,
+    playerId: p.id,
+    username: p.username,
+    displayName: p.displayName,
+    avatarUrl: p.avatarUrl,
+    rank: p.rank,
+    totalSteps: p.totalSteps,
+    totalReps: p.totalReps ?? 0,
+    currentStreak: p.currentStreak,
   }));
 
   res.json(result);

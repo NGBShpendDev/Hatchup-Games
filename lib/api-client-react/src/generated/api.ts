@@ -43,6 +43,7 @@ import type {
   GetGlobalLeaderboardParams,
   GetMealPlanParams,
   GetModeLeaderboardParams,
+  GetSpeedLeaderboardParams,
   GetWorkoutPlanParams,
   GroupChallengeProgressInput,
   GroupChallengeProgressResult,
@@ -86,6 +87,7 @@ import type {
   RankDistribution,
   RealmInfo,
   SendGroupMessageInput,
+  SpeedLeaderboardEntry,
   SuccessResult,
   SyncResult,
   UseItemInput,
@@ -1927,6 +1929,90 @@ export function useGetModeLeaderboard<TData = Awaited<ReturnType<typeof getModeL
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetModeLeaderboardQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetSpeedLeaderboardUrl = (params?: GetSpeedLeaderboardParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/leaderboards/speed?${stringifiedParams}` : `/api/leaderboards/speed`
+}
+
+/**
+ * @summary Get speed/fitness leaderboard ranked by total steps and reps
+ */
+export const getSpeedLeaderboard = async (params?: GetSpeedLeaderboardParams, options?: RequestInit): Promise<SpeedLeaderboardEntry[]> => {
+
+  return customFetch<SpeedLeaderboardEntry[]>(getGetSpeedLeaderboardUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSpeedLeaderboardQueryKey = (params?: GetSpeedLeaderboardParams,) => {
+    return [
+    `/api/leaderboards/speed`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetSpeedLeaderboardQueryOptions = <TData = Awaited<ReturnType<typeof getSpeedLeaderboard>>, TError = ErrorType<unknown>>(params?: GetSpeedLeaderboardParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSpeedLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSpeedLeaderboardQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSpeedLeaderboard>>> = ({ signal }) => getSpeedLeaderboard(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSpeedLeaderboard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSpeedLeaderboardQueryResult = NonNullable<Awaited<ReturnType<typeof getSpeedLeaderboard>>>
+export type GetSpeedLeaderboardQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get speed/fitness leaderboard ranked by total steps and reps
+ */
+
+export function useGetSpeedLeaderboard<TData = Awaited<ReturnType<typeof getSpeedLeaderboard>>, TError = ErrorType<unknown>>(
+ params?: GetSpeedLeaderboardParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSpeedLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSpeedLeaderboardQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

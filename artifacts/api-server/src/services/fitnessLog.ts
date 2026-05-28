@@ -4,9 +4,12 @@ import {
   fitnessQuestsTable,
   playersTable,
   eggsTable,
+  personalRecordsTable,
 } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { checkAndAwardBadges, type BadgeDefinition } from "./badgeService";
+
+export const STRENGTH_TYPES = new Set(["pushups", "burpees", "squats", "pullups", "planks", "situps"]);
 
 export const ACTIVITY_CONFIG: Record<
   string,
@@ -26,6 +29,13 @@ export const ACTIVITY_CONFIG: Record<
   swimming:      { unit: "minutes", xpPer: 7,    realm: "beast",    stepsEquiv: 120 },
   active_minutes: { unit: "minutes", xpPer: 3,   realm: "cardio",   stepsEquiv: 80 },
   calories:      { unit: "kcal",   xpPer: 0.01, realm: "cardio",   stepsEquiv: 0.1 },
+  // Strength rep challenges — 1 rep = 1 XP
+  pushups:       { unit: "reps",   xpPer: 1,    realm: "strength", stepsEquiv: 2 },
+  burpees:       { unit: "reps",   xpPer: 1,    realm: "beast",    stepsEquiv: 5 },
+  squats:        { unit: "reps",   xpPer: 1,    realm: "strength", stepsEquiv: 2 },
+  pullups:       { unit: "reps",   xpPer: 1,    realm: "strength", stepsEquiv: 3 },
+  planks:        { unit: "reps",   xpPer: 1,    realm: "strength", stepsEquiv: 1 },
+  situps:        { unit: "reps",   xpPer: 1,    realm: "strength", stepsEquiv: 2 },
 };
 
 export type LogActivityParams = {
@@ -37,6 +47,13 @@ export type LogActivityParams = {
   isPassiveSync?: boolean;
 };
 
+export type PrResult = {
+  activityType: string;
+  metric: string;
+  value: number;
+  isNew: boolean;
+};
+
 export type LogActivityResult = {
   fitnessXpEarned: number;
   eggsUpdated: number;
@@ -44,7 +61,38 @@ export type LogActivityResult = {
   updatedPlayer: typeof playersTable.$inferSelect;
   activity: typeof fitnessActivitiesTable.$inferSelect | null;
   newBadges?: import("./badgeService").BadgeDefinition[];
+  prResult?: PrResult;
 };
+
+/** Detect and upsert a personal record. Returns whether it's a new PR. */
+async function detectAndSavePr(
+  playerId: number,
+  activityType: string,
+  metric: string,
+  value: number,
+  higherIsBetter: boolean,
+): Promise<PrResult> {
+  const existing = await db.query.personalRecordsTable.findFirst({
+    where: and(
+      eq(personalRecordsTable.playerId, playerId),
+      eq(personalRecordsTable.activityType, activityType),
+      eq(personalRecordsTable.metric, metric),
+    ),
+  });
+
+  const isNew = !existing || (higherIsBetter ? value > existing.value : value < existing.value);
+
+  if (isNew) {
+    await db.insert(personalRecordsTable)
+      .values({ playerId, activityType, metric, value })
+      .onConflictDoUpdate({
+        target: [personalRecordsTable.playerId, personalRecordsTable.activityType, personalRecordsTable.metric],
+        set: { value, achievedAt: new Date() },
+      });
+  }
+
+  return { activityType, metric, value, isNew };
+}
 
 export async function logFitnessActivity(
   params: LogActivityParams,
@@ -75,6 +123,7 @@ export async function logFitnessActivity(
   const config = ACTIVITY_CONFIG[type] ?? { unit: "reps", xpPer: 1, realm: "strength", stepsEquiv: 0 };
   const fitnessXpEarned = Math.round(value * config.xpPer);
   const stepsEquiv = Math.round(value * config.stepsEquiv);
+  const isStrength = STRENGTH_TYPES.has(type);
 
   const insertedRows = await db.insert(fitnessActivitiesTable).values({
     playerId,
@@ -115,6 +164,17 @@ export async function logFitnessActivity(
     lastActiveDate: today,
   };
 
+  // Update per-exercise lifetime counts
+  if (isStrength) {
+    updateFields.totalReps = (player.totalReps ?? 0) + value;
+    if (type === "pushups")  updateFields.lifetimePushups = (player.lifetimePushups ?? 0) + value;
+    if (type === "squats")   updateFields.lifetimeSquats  = (player.lifetimeSquats  ?? 0) + value;
+    if (type === "burpees")  updateFields.lifetimeBurpees = (player.lifetimeBurpees ?? 0) + value;
+    if (type === "pullups")  updateFields.lifetimePullups = (player.lifetimePullups ?? 0) + value;
+    if (type === "planks")   updateFields.lifetimePlanks  = (player.lifetimePlanks  ?? 0) + value;
+    if (type === "situps")   updateFields.lifetimeSitups  = (player.lifetimeSitups  ?? 0) + value;
+  }
+
   if (isPassiveSync) {
     updateFields.passiveXpSinceLastVisit = (player.passiveXpSinceLastVisit ?? 0) + fitnessXpEarned;
   }
@@ -152,15 +212,27 @@ export async function logFitnessActivity(
       .where(eq(fitnessQuestsTable.id, quest.id));
   }
 
-  // Check and award badges based on updated state
+  // Detect PR for this activity
   const updatedPlayer = updatedRows[0]!;
+  let prResult: PrResult | undefined;
+
+  if (isStrength) {
+    prResult = await detectAndSavePr(playerId, type, "reps", value, true);
+  }
+
+  // Check and award badges based on updated state
   const activityHour = new Date().getHours();
   const newBadges = await checkAndAwardBadges(playerId, {
     totalSteps: updatedPlayer.totalSteps,
     currentStreak: updatedPlayer.currentStreak,
     totalWorkouts: updatedPlayer.totalWorkouts,
     activityHour,
+    totalReps: updatedPlayer.totalReps ?? 0,
+    lifetimePushups: updatedPlayer.lifetimePushups ?? 0,
+    lifetimeSquats: updatedPlayer.lifetimeSquats ?? 0,
+    sessionReps: isStrength ? value : 0,
+    activityType: type,
   });
 
-  return { fitnessXpEarned, eggsUpdated, isNew: true, updatedPlayer, activity: insertedRows[0]!, newBadges };
+  return { fitnessXpEarned, eggsUpdated, isNew: true, updatedPlayer, activity: insertedRows[0]!, newBadges, prResult };
 }

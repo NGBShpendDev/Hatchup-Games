@@ -705,6 +705,43 @@ export interface GroupRaidAttackInput {
   damage: number;
 }
 
+export interface PersonalRecord {
+  id: number;
+  playerId: number;
+  activityType: string;
+  metric: string;
+  value: number;
+  achievedAt: string;
+}
+
+export interface StrengthTotals {
+  totalReps: number;
+  lifetimePushups: number;
+  lifetimeSquats: number;
+  lifetimeBurpees: number;
+  lifetimePullups: number;
+  lifetimePlanks: number;
+  lifetimeSitups: number;
+}
+
+export interface PlayerRecordsResult {
+  personalRecords: PersonalRecord[];
+  strengthTotals: StrengthTotals;
+  monthlyRunMiles: number;
+}
+
+export interface SpeedLeaderboardEntry {
+  position: number;
+  playerId: number;
+  username: string;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  rank: string;
+  totalSteps: number;
+  totalReps: number;
+  currentStreak: number;
+}
+
 export type CoachChatMessageRole = typeof CoachChatMessageRole[keyof typeof CoachChatMessageRole];
 
 
@@ -759,6 +796,10 @@ limit?: number;
 
 export type GetModeLeaderboardParams = {
 mode: string;
+limit?: number;
+};
+
+export type GetSpeedLeaderboardParams = {
 limit?: number;
 };
 

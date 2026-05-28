@@ -27,6 +27,14 @@ export const playersTable = pgTable("players", {
   lastActiveDate: date("last_active_date"),
   dailyStepGoal: integer("daily_step_goal").notNull().default(8000),
   passiveXpSinceLastVisit: integer("passive_xp_since_last_visit").notNull().default(0),
+  // Strength tracking — lifetime rep counts per exercise
+  totalReps: integer("total_reps").notNull().default(0),
+  lifetimePushups: integer("lifetime_pushups").notNull().default(0),
+  lifetimeSquats: integer("lifetime_squats").notNull().default(0),
+  lifetimeBurpees: integer("lifetime_burpees").notNull().default(0),
+  lifetimePullups: integer("lifetime_pullups").notNull().default(0),
+  lifetimePlanks: integer("lifetime_planks").notNull().default(0),
+  lifetimeSitups: integer("lifetime_situps").notNull().default(0),
   // Progression
   prestige: integer("prestige").notNull().default(0),
   title: text("title"),

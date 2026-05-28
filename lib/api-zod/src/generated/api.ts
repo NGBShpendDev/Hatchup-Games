@@ -753,6 +753,29 @@ export const GetModeLeaderboardResponse = zod.array(GetModeLeaderboardResponseIt
 
 
 /**
+ * @summary Get speed/fitness leaderboard ranked by total steps and reps
+ */
+export const getSpeedLeaderboardQueryLimitDefault = 25;
+
+export const GetSpeedLeaderboardQueryParams = zod.object({
+  "limit": zod.coerce.number().default(getSpeedLeaderboardQueryLimitDefault)
+})
+
+export const GetSpeedLeaderboardResponseItem = zod.object({
+  "position": zod.number(),
+  "playerId": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "rank": zod.string(),
+  "totalSteps": zod.number(),
+  "totalReps": zod.number(),
+  "currentStreak": zod.number()
+})
+export const GetSpeedLeaderboardResponse = zod.array(GetSpeedLeaderboardResponseItem)
+
+
+/**
  * @summary Get distribution of players across ranks
  */
 export const GetRankDistributionResponseItem = zod.object({

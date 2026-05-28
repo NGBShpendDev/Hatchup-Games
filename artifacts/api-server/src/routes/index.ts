@@ -17,6 +17,7 @@ import badgesRouter from "./badges";
 import rewardsRouter from "./rewards";
 import safetyRouter from "./safety";
 import coachRouter from "./coach";
+import recordsRouter from "./records";
 
 const router: IRouter = Router();
 
@@ -38,5 +39,6 @@ router.use(badgesRouter);
 router.use(rewardsRouter);
 router.use(safetyRouter);
 router.use(coachRouter);
+router.use(recordsRouter);
 
 export default router;

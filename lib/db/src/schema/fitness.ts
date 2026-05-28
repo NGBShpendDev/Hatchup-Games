@@ -38,3 +38,17 @@ export const fitnessQuestsTable = pgTable("fitness_quests", {
 export const insertFitnessQuestSchema = createInsertSchema(fitnessQuestsTable).omit({ id: true, createdAt: true });
 export type InsertFitnessQuest = z.infer<typeof insertFitnessQuestSchema>;
 export type FitnessQuest = typeof fitnessQuestsTable.$inferSelect;
+
+// Personal Records table — tracks each player's best performance per activity/metric
+export const personalRecordsTable = pgTable("personal_records", {
+  id: serial("id").primaryKey(),
+  playerId: integer("player_id").notNull(),
+  activityType: text("activity_type").notNull(),  // e.g. "running", "pushups"
+  metric: text("metric").notNull(),               // e.g. "reps", "pace_sec_per_mile", "distance_miles"
+  value: integer("value").notNull(),              // integer (reps, seconds, hundredths of miles, etc.)
+  achievedAt: timestamp("achieved_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertPersonalRecordSchema = createInsertSchema(personalRecordsTable).omit({ id: true, achievedAt: true });
+export type InsertPersonalRecord = z.infer<typeof insertPersonalRecordSchema>;
+export type PersonalRecord = typeof personalRecordsTable.$inferSelect;

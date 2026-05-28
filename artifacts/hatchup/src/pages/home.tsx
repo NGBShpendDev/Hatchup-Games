@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot } from "lucide-react";
+import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot, Dumbbell, Minus, Plus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { XpBar } from "@/components/xp-bar";
@@ -23,6 +23,18 @@ const TIER_GLOW: Record<string, string> = {
   Epic:      "shadow-[0_0_10px_rgba(147,51,234,0.7)]",
   Legendary: "shadow-[0_0_12px_rgba(234,179,8,0.8)]",
   Mythic:    "shadow-[0_0_14px_rgba(236,72,153,0.9)]",
+};
+
+const CARDIO_TYPES = ["steps", "running", "weightlifting", "yoga", "cycling"];
+const REP_TYPES = ["pushups", "squats", "burpees", "pullups", "planks", "situps"];
+
+const REP_TYPE_LABELS: Record<string, string> = {
+  pushups: "Pushups",
+  squats:  "Squats",
+  burpees: "Burpees",
+  pullups: "Pull-ups",
+  planks:  "Planks",
+  situps:  "Sit-ups",
 };
 
 export default function Home() {
@@ -39,6 +51,9 @@ export default function Home() {
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [activityType, setActivityType] = useState("steps");
   const [activityValue, setActivityValue] = useState("");
+  const [repMode, setRepMode] = useState(false);
+  const [repType, setRepType] = useState("pushups");
+  const [repCount, setRepCount] = useState(10);
   const [levelUpShow, setLevelUpShow] = useState(false);
   const [levelUpData, setLevelUpData] = useState<{ level: number; newBadges: any[] }>({ level: 1, newBadges: [] });
   const [xpPopups, setXpPopups] = useState<{ id: number; amount: number }[]>([]);
@@ -50,16 +65,34 @@ export default function Home() {
   };
 
   const handleLogActivity = () => {
-    if (!activityValue || isNaN(Number(activityValue))) return;
+    const type = repMode ? repType : activityType;
+    const value = repMode ? repCount : Number(activityValue);
+
+    if (!repMode && (!activityValue || isNaN(value))) return;
+    if (repMode && (repCount < 1)) return;
+
     const prevLevel = (dashboard as any)?.levelProgress?.level ?? 1;
 
     logActivity.mutate(
-      { data: { playerId: pid, type: activityType, value: Number(activityValue) } },
+      { data: { playerId: pid, type, value } },
       {
         onSuccess: (res) => {
-          spawnXpPopup((res as any).xpEarned ?? (res as any).fitnessXpEarned ?? 0);
+          const xpEarned = (res as any).xpEarned ?? (res as any).fitnessXpEarned ?? 0;
+          spawnXpPopup(xpEarned);
           setLogModalOpen(false);
           setActivityValue("");
+          setRepCount(10);
+
+          const prResult = (res as any).prResult;
+          if (prResult?.isNew) {
+            toast({
+              title: "🏆 New Personal Record!",
+              description: `${REP_TYPE_LABELS[prResult.activityType] ?? prResult.activityType}: ${prResult.value} reps`,
+            });
+          } else {
+            toast({ title: "Activity Logged! 🔥", description: "Keep moving, your Pals are thriving!" });
+          }
+
           queryClient.invalidateQueries({ queryKey: getGetPlayerDashboardQueryKey(pid) }).then(() => {
             const newDash = queryClient.getQueryData(getGetPlayerDashboardQueryKey(pid)) as any;
             const newLevel = newDash?.levelProgress?.level ?? prevLevel;
@@ -68,7 +101,6 @@ export default function Home() {
               setLevelUpShow(true);
             }
           });
-          toast({ title: "Activity Logged! 🔥", description: `Keep moving, your Pals are thriving!` });
         }
       }
     );
@@ -256,7 +288,11 @@ export default function Home() {
             </Card>
           </Link>
 
-          <Dialog open={logModalOpen} onOpenChange={setLogModalOpen}>
+          {/* Log Activity Dialog */}
+          <Dialog open={logModalOpen} onOpenChange={(open) => {
+            setLogModalOpen(open);
+            if (!open) { setRepMode(false); setRepCount(10); setActivityValue(""); }
+          }}>
             <DialogTrigger asChild>
               <Card className="bg-card border-2 hover:border-accent/50 transition-colors cursor-pointer group active-elevate h-full">
                 <CardContent className="p-4 flex flex-col items-center text-center gap-2 h-full justify-center">
@@ -274,33 +310,127 @@ export default function Home() {
               <DialogHeader>
                 <DialogTitle className="text-2xl font-black">Log Activity</DialogTitle>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-3 gap-2">
-                  {['steps', 'running', 'weightlifting', 'yoga', 'cycling'].map(type => (
-                    <Button
-                      key={type}
-                      variant={activityType === type ? 'default' : 'outline'}
-                      onClick={() => setActivityType(type)}
-                      className="capitalize font-bold text-xs h-12"
-                    >
-                      {type}
-                    </Button>
-                  ))}
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold uppercase text-muted-foreground">Amount ({activityType === 'steps' ? 'count' : 'minutes'})</label>
-                  <Input
-                    type="number"
-                    value={activityValue}
-                    onChange={e => setActivityValue(e.target.value)}
-                    placeholder="e.g. 5000"
-                    className="h-14 text-xl font-bold font-mono"
-                  />
-                </div>
+
+              {/* Mode Toggle */}
+              <div className="flex gap-1 bg-muted rounded-xl p-1">
+                <button
+                  onClick={() => setRepMode(false)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
+                    !repMode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5" /> Standard
+                </button>
+                <button
+                  onClick={() => setRepMode(true)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
+                    repMode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+                  }`}
+                >
+                  <Dumbbell className="w-3.5 h-3.5" /> Rep Mode
+                </button>
               </div>
+
+              {!repMode ? (
+                /* Standard Mode */
+                <div className="grid gap-4 py-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    {CARDIO_TYPES.map(type => (
+                      <Button
+                        key={type}
+                        variant={activityType === type ? "default" : "outline"}
+                        onClick={() => setActivityType(type)}
+                        className="capitalize font-bold text-xs h-12"
+                      >
+                        {type}
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold uppercase text-muted-foreground">
+                      Amount ({activityType === "steps" ? "count" : "minutes"})
+                    </label>
+                    <Input
+                      type="number"
+                      value={activityValue}
+                      onChange={e => setActivityValue(e.target.value)}
+                      placeholder="e.g. 5000"
+                      className="h-14 text-xl font-bold font-mono"
+                    />
+                  </div>
+                </div>
+              ) : (
+                /* Rep Counter Mode */
+                <div className="grid gap-4 py-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    {REP_TYPES.map(type => (
+                      <Button
+                        key={type}
+                        variant={repType === type ? "default" : "outline"}
+                        onClick={() => setRepType(type)}
+                        className="capitalize font-bold text-xs h-12"
+                      >
+                        {REP_TYPE_LABELS[type]}
+                      </Button>
+                    ))}
+                  </div>
+
+                  {/* Large Rep Counter */}
+                  <div className="flex flex-col items-center gap-3 py-2">
+                    <p className="text-xs font-bold uppercase text-muted-foreground">Rep Count</p>
+                    <div className="flex items-center gap-6">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-14 w-14 rounded-full text-2xl"
+                        onClick={() => setRepCount(Math.max(1, repCount - (repCount >= 25 ? 5 : 1)))}
+                      >
+                        <Minus className="w-6 h-6" />
+                      </Button>
+                      <div className="text-center min-w-[80px]">
+                        <p className="text-5xl font-black text-primary leading-none">{repCount}</p>
+                        <p className="text-xs text-muted-foreground font-medium mt-1">reps</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-14 w-14 rounded-full text-2xl"
+                        onClick={() => setRepCount(repCount + (repCount >= 25 ? 5 : 1))}
+                      >
+                        <Plus className="w-6 h-6" />
+                      </Button>
+                    </div>
+                    <div className="flex gap-2 flex-wrap justify-center">
+                      {[10, 20, 50, 100].map(n => (
+                        <button
+                          key={n}
+                          onClick={() => setRepCount(n)}
+                          className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
+                            repCount === n ? "bg-primary text-white border-primary" : "border-border text-muted-foreground hover:border-primary/50"
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">
+                      1 rep = 1 XP • Each rep helps your Pals evolve!
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <DialogFooter>
-                <Button onClick={handleLogActivity} disabled={logActivity.isPending} className="w-full font-black text-lg h-14 active-elevate">
-                  {logActivity.isPending ? "Logging..." : "Log & Earn XP ⚡"}
+                <Button
+                  onClick={handleLogActivity}
+                  disabled={logActivity.isPending}
+                  className="w-full font-black text-lg h-14 active-elevate"
+                >
+                  {logActivity.isPending
+                    ? "Logging..."
+                    : repMode
+                      ? `Log ${repCount} ${REP_TYPE_LABELS[repType]} ⚡`
+                      : "Log & Earn XP ⚡"}
                 </Button>
               </DialogFooter>
             </DialogContent>
