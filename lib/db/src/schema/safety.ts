@@ -20,7 +20,9 @@ export const blockedUsersTable = pgTable("blocked_users", {
   blockerId: integer("blocker_id").notNull(),
   blockedId: integer("blocked_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  { name: "blocked_users_unique_pair", columns: [t.blockerId, t.blockedId] },
+]);
 
 export const insertUserReportSchema = createInsertSchema(userReportsTable).omit({ id: true, createdAt: true, resolvedAt: true });
 export type InsertUserReport = z.infer<typeof insertUserReportSchema>;

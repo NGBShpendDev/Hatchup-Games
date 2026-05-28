@@ -128,7 +128,7 @@ export default function Social() {
                         <div>
                           <h3 className="text-2xl font-black mb-1">{event.name}</h3>
                           <p className="text-sm font-bold text-muted-foreground uppercase flex items-center gap-2">
-                            <Calendar className="w-4 h-4" /> {new Date(event.startTime).toLocaleDateString()}
+                            <Calendar className="w-4 h-4" /> {new Date((event as unknown as { startsAt: string }).startsAt ?? event.startTime).toLocaleDateString()}
                           </p>
                         </div>
                         {event.status === "active" && (

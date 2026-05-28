@@ -8,7 +8,8 @@ import {
   groupMessagesTable,
   playersTable,
 } from "@workspace/db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, notInArray } from "drizzle-orm";
+import { getHiddenPlayerIds } from "./safety";
 import {
   CreateGroupBody,
   JoinGroupBody,
@@ -222,7 +223,11 @@ router.get("/groups/:id", requireAuth, attachPlayer, async (req, res) => {
   const isMember = await checkMembership(params.data.id, req.playerId!);
   if (!isMember) { res.status(403).json({ error: "Not a group member" }); return; }
 
-  const members = await db.query.groupMembersTable.findMany({ where: eq(groupMembersTable.groupId, group.id) });
+  const hiddenIds = await getHiddenPlayerIds(req.playerId!);
+  const rawMembers = await db.query.groupMembersTable.findMany({ where: eq(groupMembersTable.groupId, group.id) });
+  const members = hiddenIds.length > 0
+    ? rawMembers.filter(m => !hiddenIds.includes(m.playerId))
+    : rawMembers;
   const challenges = await db.query.groupChallengesTable.findMany({ where: eq(groupChallengesTable.groupId, group.id) });
   const raid = await db.query.groupRaidsTable.findFirst({ where: eq(groupRaidsTable.groupId, group.id) });
 
@@ -279,6 +284,13 @@ router.post("/groups/:id/join", requireAuth, attachPlayer, async (req, res) => {
 
   const members = await db.query.groupMembersTable.findMany({ where: eq(groupMembersTable.groupId, params.data.id) });
   if (members.length >= group.maxMembers) { res.status(400).json({ error: "Group is full" }); return; }
+
+  // Enforce workout approval: check if creator requires manual approval
+  const creator = await db.query.playersTable.findFirst({ where: eq(playersTable.id, group.creatorPlayerId) });
+  if (creator?.requireWorkoutApproval) {
+    res.status(403).json({ error: "This group requires the creator's approval before joining. Please contact the group leader directly." });
+    return;
+  }
 
   await db.insert(groupMembersTable).values({ groupId: params.data.id, playerId: req.playerId! });
   res.json({ success: true, memberCount: members.length + 1 });

@@ -210,6 +210,39 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
   });
 });
 
+// ── Admin: approve profile verification ─────────────────────────────────────
+
+// POST /api/admin/players/:id/verify
+// Sets players.isVerified = true. Admin only.
+router.post("/admin/players/:id/verify", requireAuth, attachPlayer, async (req, res) => {
+  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!caller?.isAdmin) {
+    res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+  const targetId = Number(req.params.id);
+  if (isNaN(targetId)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const [updated] = await db
+    .update(playersTable)
+    .set({ isVerified: true })
+    .where(eq(playersTable.id, targetId))
+    .returning({ id: playersTable.id, username: playersTable.username, isVerified: playersTable.isVerified });
+  if (!updated) { res.status(404).json({ error: "Player not found" }); return; }
+
+  // Auto-resolve any pending verification_request reports for this player
+  await db
+    .update(userReportsTable)
+    .set({ status: "resolved", resolvedAt: new Date() })
+    .where(and(
+      eq(userReportsTable.reportedUserId, targetId),
+      eq(userReportsTable.contentType, "verification"),
+      eq(userReportsTable.status, "open"),
+    ));
+
+  res.json({ success: true, player: updated });
+});
+
 // ── Block-aware list helper (exported for other routers) ──────────────────────
 
 /**
