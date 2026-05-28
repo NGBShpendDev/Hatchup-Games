@@ -11,6 +11,8 @@
   "devDependencies": {
     "@playwright/test": "^1.49.1",
     "@types/node": "catalog:",
+    "@types/pg": "^8.20.0",
+    "pg": "^8.20.0",
     "typescript": "~5.9.3"
   }
 }
