@@ -26,6 +26,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import { ReportBlockMenu } from "@/components/report-block-menu";
+import { usePlayer } from "@/lib/playerContext";
 
 export const POST_TYPES = [
   { value: "general", label: "General Update", icon: "💬" },
@@ -373,6 +374,9 @@ export function PostCard({
   const { toast } = useToast();
   const qc = useQueryClient();
   const isAnonymous = playerId == null;
+  const { player } = usePlayer();
+  const isSuspended = !!player?.isSuspended;
+  const suspendedTitle = "Your account is suspended. Contact support to appeal.";
 
   async function handleRepost() {
     if (isAnonymous) { onAnonymousAction?.(); return; }
@@ -415,6 +419,7 @@ export function PostCard({
   async function handleComment(e: React.FormEvent) {
     e.preventDefault();
     if (isAnonymous) { onAnonymousAction?.(); return; }
+    if (isSuspended) return;
     if (!commentText.trim()) return;
     try {
       await addComment.mutateAsync({ id: post.id, data: { playerId: playerId!, content: commentText.trim() } });
@@ -432,6 +437,7 @@ export function PostCard({
 
   function handleReactClick(type: string) {
     if (isAnonymous) { onAnonymousAction?.(); return; }
+    if (isSuspended) return;
     onReact?.(post.id, type);
   }
 
@@ -581,7 +587,11 @@ export function PostCard({
                 <button
                   key={type}
                   onClick={() => handleReactClick(type)}
-                  className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold transition-all ${
+                  disabled={isSuspended}
+                  aria-disabled={isSuspended}
+                  title={isSuspended ? suspendedTitle : cfg.label}
+                  data-testid={`button-react-${type}-${post.id}`}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent ${
                     isActive
                       ? `bg-primary/20 ${cfg.color} scale-105`
                       : "text-muted-foreground hover:bg-muted/50 hover:scale-105"
@@ -658,6 +668,13 @@ export function PostCard({
                   >
                     Sign in to add a comment…
                   </button>
+                ) : isSuspended ? (
+                  <div
+                    data-testid={`comment-suspended-${post.id}`}
+                    className="w-full text-xs text-destructive bg-destructive/15 border border-destructive/30 rounded-2xl py-2 px-3 font-bold"
+                  >
+                    Your account is suspended — you can't comment. Contact support to appeal.
+                  </div>
                 ) : (
                   <form onSubmit={handleComment} className="flex gap-2">
                     <Input

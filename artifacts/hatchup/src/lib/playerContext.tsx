@@ -31,6 +31,7 @@ export type PlayerProfile = {
   streakAtRisk: boolean;
   recoveryMessage: string | null;
   activeHatchlingId: number | null;
+  isSuspended: boolean;
 };
 
 type PlayerContextValue = {

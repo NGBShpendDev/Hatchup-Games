@@ -23,8 +23,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Image, Camera, Sparkles } from "lucide-react";
+import { Image, Camera, Sparkles, ShieldAlert } from "lucide-react";
 import { POST_TYPES } from "@/components/post-card";
+import { usePlayer } from "@/lib/playerContext";
+import { SUSPENDED_COPY } from "@/components/suspended-banner";
 
 export function ComposeSheet({
   open,
@@ -53,6 +55,8 @@ export function ComposeSheet({
     initialCreatureId != null ? String(initialCreatureId) : "none"
   );
   const [arDataUrl, setArDataUrl] = useState<string | null>(null);
+  const { player } = usePlayer();
+  const isSuspended = !!player?.isSuspended;
 
   // Re-apply the initial values each time the sheet opens so the entry
   // context (e.g. opening from a Hatchling's detail page) pre-fills the
@@ -88,6 +92,7 @@ export function ComposeSheet({
     : "🐾";
 
   async function handleSubmit() {
+    if (isSuspended) return;
     if (!content.trim()) return;
     const tagList = tags.split(",").map(t => t.trim()).filter(Boolean);
     const finalContent = tagList.length > 0
@@ -197,7 +202,29 @@ export function ComposeSheet({
           <SheetTitle className="text-xl font-black">{title ?? "Share Your Journey ✨"}</SheetTitle>
         </SheetHeader>
 
-        <div className="space-y-4">
+        {isSuspended && (
+          <div
+            role="status"
+            data-testid="compose-suspended-notice"
+            className="mb-4 flex items-start gap-3 rounded-2xl border border-destructive/40 bg-destructive/15 p-3"
+          >
+            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-destructive" aria-hidden="true" />
+            <div className="flex-1 space-y-1">
+              <p className="text-sm font-black text-destructive">{SUSPENDED_COPY.title}</p>
+              <p className="text-xs font-medium leading-relaxed text-destructive/90">
+                You can't create posts while your account is suspended. {SUSPENDED_COPY.body}
+              </p>
+              <a
+                href={SUSPENDED_COPY.supportHref}
+                className="inline-block text-xs font-black text-destructive underline underline-offset-2 hover:opacity-80"
+              >
+                {SUSPENDED_COPY.cta}
+              </a>
+            </div>
+          </div>
+        )}
+
+        <div className={`space-y-4 ${isSuspended ? "pointer-events-none opacity-50" : ""}`} aria-disabled={isSuspended}>
           {/* Post type selector */}
           <Select value={postType} onValueChange={setPostType}>
             <SelectTrigger className="rounded-xl font-bold" data-testid="select-post-type">
@@ -337,10 +364,13 @@ export function ComposeSheet({
           <Button variant="outline" onClick={onClose} className="rounded-xl font-bold flex-1">Cancel</Button>
           <Button
             onClick={handleSubmit}
-            disabled={!content.trim() || createPost.isPending}
-            className="rounded-xl font-black flex-1"
+            disabled={isSuspended || !content.trim() || createPost.isPending}
+            aria-disabled={isSuspended || !content.trim() || createPost.isPending}
+            title={isSuspended ? "Your account is suspended. You can't create posts." : undefined}
+            data-testid="button-compose-submit"
+            className="rounded-xl font-black flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {createPost.isPending ? "Posting..." : "Post to Community"}
+            {isSuspended ? "Suspended" : createPost.isPending ? "Posting..." : "Post to Community"}
           </Button>
         </SheetFooter>
       </SheetContent>

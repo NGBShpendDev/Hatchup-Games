@@ -3,6 +3,7 @@ import { BottomNav } from "./bottom-nav";
 import { TopBar } from "./top-bar";
 import { UniversePalette } from "./universe-palette";
 import { AIAssistantFab } from "./ai-assistant-fab";
+import { SuspendedBanner } from "./suspended-banner";
 import { useChallengeNotifications } from "@/hooks/use-challenge-notifications";
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -17,6 +18,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
       <main className="flex-1 overflow-y-auto w-full max-w-lg mx-auto relative shadow-2xl bg-background/50 border-x border-border/10">
         <div className="relative z-10 p-4 md:p-6 pt-16 min-h-full">
+          <SuspendedBanner className="mb-4" />
           {children}
         </div>
       </main>

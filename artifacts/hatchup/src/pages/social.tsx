@@ -1382,8 +1382,9 @@ function CreatorAnalyticsSheet({
 }
 
 export default function Social() {
-  const { playerId } = usePlayer();
+  const { playerId, player } = usePlayer();
   const pid = playerId ?? 1;
+  const isSuspended = !!player?.isSuspended;
   const [composeOpen, setComposeOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("feed");
@@ -1444,7 +1445,11 @@ export default function Social() {
             </Button>
             <Button
               onClick={() => setComposeOpen(true)}
-              className="rounded-full h-10 w-10 p-0 shadow-lg shadow-primary/30"
+              disabled={isSuspended}
+              aria-disabled={isSuspended}
+              title={isSuspended ? "Your account is suspended. You can't create posts." : undefined}
+              data-testid="button-compose-post"
+              className="rounded-full h-10 w-10 p-0 shadow-lg shadow-primary/30 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="w-5 h-5" />
             </Button>
@@ -1494,7 +1499,14 @@ export default function Social() {
                 <p className="text-muted-foreground text-sm font-medium max-w-xs mx-auto mb-4">
                   The community feed is empty. Share your first win and inspire others!
                 </p>
-                <Button onClick={() => setComposeOpen(true)} className="rounded-full font-black">
+                <Button
+                  onClick={() => setComposeOpen(true)}
+                  disabled={isSuspended}
+                  aria-disabled={isSuspended}
+                  title={isSuspended ? "Your account is suspended. You can't create posts." : undefined}
+                  data-testid="button-compose-first-post"
+                  className="rounded-full font-black disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   <Plus className="w-4 h-4 mr-2" /> Create First Post
                 </Button>
               </motion.div>
