@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, unique, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -56,7 +56,10 @@ export const playerFollowsTable = pgTable("player_follows", {
   followerId: integer("follower_id").notNull(),
   followeeId: integer("followee_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  index("player_follows_followee_follower_idx").on(t.followeeId, t.followerId),
+  index("player_follows_follower_followee_idx").on(t.followerId, t.followeeId),
+]);
 
 export const playerMemoriesTable = pgTable("player_memories", {
   id: serial("id").primaryKey(),

@@ -961,45 +961,55 @@ router.get("/social/players/:id/mutual-followers", requireAuth, attachPlayer, as
     return;
   }
 
-  const [profileFollowers, viewerFollowsRows] = await Promise.all([
-    db.query.playerFollowsTable.findMany({ where: eq(playerFollowsTable.followeeId, id) }),
-    db.query.playerFollowsTable.findMany({ where: eq(playerFollowsTable.followerId, viewerId) }),
-  ]);
+  const pfProfile = alias(playerFollowsTable, "pf_profile");
+  const pfViewer = alias(playerFollowsTable, "pf_viewer");
 
-  const viewerFollows = new Set(viewerFollowsRows.map(f => f.followeeId));
-  const mutualIds = profileFollowers
-    .map(f => f.followerId)
-    .filter(fid => fid !== viewerId && viewerFollows.has(fid));
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(pfProfile)
+    .innerJoin(
+      pfViewer,
+      and(
+        eq(pfViewer.followerId, viewerId),
+        eq(pfViewer.followeeId, pfProfile.followerId),
+      ),
+    )
+    .where(and(eq(pfProfile.followeeId, id), ne(pfProfile.followerId, viewerId)));
 
-  const total = mutualIds.length;
-  const pageIds = mutualIds.slice(cursor, cursor + limit);
-  const nextOffset = cursor + pageIds.length;
+  const total = countRow?.count ?? 0;
+
+  const rows = await db
+    .select({
+      id: playersTable.id,
+      username: playersTable.username,
+      displayName: playersTable.displayName,
+      avatarUrl: playersTable.avatarUrl,
+      creatorBadge: playersTable.creatorBadge,
+    })
+    .from(pfProfile)
+    .innerJoin(
+      pfViewer,
+      and(
+        eq(pfViewer.followerId, viewerId),
+        eq(pfViewer.followeeId, pfProfile.followerId),
+      ),
+    )
+    .innerJoin(playersTable, eq(playersTable.id, pfProfile.followerId))
+    .where(and(eq(pfProfile.followeeId, id), ne(pfProfile.followerId, viewerId)))
+    .orderBy(playersTable.id)
+    .limit(limit)
+    .offset(cursor);
+
+  const players = rows.map(p => ({
+    id: p.id,
+    username: p.username,
+    displayName: p.displayName ?? null,
+    avatarUrl: p.avatarUrl ?? null,
+    creatorBadge: p.creatorBadge ?? null,
+  }));
+
+  const nextOffset = cursor + rows.length;
   const nextCursor = nextOffset < total ? nextOffset : null;
-
-  let players: Array<{
-    id: number;
-    username: string;
-    displayName: string | null;
-    avatarUrl: string | null;
-    creatorBadge: string | null;
-  }> = [];
-  if (pageIds.length > 0) {
-    const rows = await db.query.playersTable.findMany({
-      where: inArray(playersTable.id, pageIds),
-    });
-    const map = new Map(rows.map(p => [p.id, p]));
-    players = pageIds.flatMap(pid => {
-      const p = map.get(pid);
-      if (!p) return [];
-      return [{
-        id: p.id,
-        username: p.username,
-        displayName: p.displayName ?? null,
-        avatarUrl: p.avatarUrl ?? null,
-        creatorBadge: p.creatorBadge ?? null,
-      }];
-    });
-  }
 
   res.json({ players, total, nextCursor });
 });
