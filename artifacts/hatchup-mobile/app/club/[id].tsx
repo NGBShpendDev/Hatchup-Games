@@ -196,6 +196,14 @@ export default function ClubDetailScreen() {
                   <Feather name="log-out" size={15} color="#fff" />
                   <Text style={styles.membershipButtonText}>Leave Club</Text>
                 </Pressable>
+              ) : club.maxMembers != null && (club.memberCount ?? 0) >= club.maxMembers ? (
+                <View
+                  style={[styles.membershipButton, { backgroundColor: colors.mutedForeground + "55" }]}
+                  testID="label-club-full"
+                >
+                  <Feather name="users" size={15} color={colors.mutedForeground} />
+                  <Text style={[styles.membershipButtonText, { color: colors.mutedForeground }]}>Club Full</Text>
+                </View>
               ) : (
                 <Pressable
                   onPress={handleJoin}
