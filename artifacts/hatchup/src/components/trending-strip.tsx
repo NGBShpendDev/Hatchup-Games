@@ -48,7 +48,8 @@ export function TrendingStrip({ playerId }: { playerId: number }) {
     query: { queryKey: getGetTrendingPostsQueryKey(params) },
   });
   const posts: TrendingPost[] = (data?.posts ?? []).slice(0, 5);
-  const [previewPostId, setPreviewPostId] = useState<number | null>(null);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const postIds = posts.map((p) => p.id);
 
   if (isLoading) {
     return (
@@ -105,7 +106,7 @@ export function TrendingStrip({ playerId }: { playerId: number }) {
               >
                 <button
                   type="button"
-                  onClick={() => setPreviewPostId(post.id)}
+                  onClick={() => setPreviewIndex(idx)}
                   className="text-left w-full h-full"
                   aria-label={`Preview trending post by ${post.authorName}`}
                   data-testid={`button-trending-preview-${post.id}`}
@@ -158,11 +159,12 @@ export function TrendingStrip({ playerId }: { playerId: number }) {
       </div>
 
       <TrendingPostPreviewDialog
-        postId={previewPostId}
+        postIds={postIds}
+        initialIndex={previewIndex ?? 0}
         viewerId={playerId}
-        open={previewPostId != null}
+        open={previewIndex != null}
         onOpenChange={(open) => {
-          if (!open) setPreviewPostId(null);
+          if (!open) setPreviewIndex(null);
         }}
       />
     </section>
