@@ -61,7 +61,7 @@ const {
   playerArtifactsTable,
   notificationsTable,
 } = await import("@workspace/db");
-const { eq, inArray } = await import("drizzle-orm");
+const { eq, and, inArray } = await import("drizzle-orm");
 const { finalizeChallenge } = await import("../../services/challengeFinalize.ts");
 
 // ── Test data tagging for isolation ───────────────────────────────────────
@@ -316,15 +316,20 @@ describe("finalizeChallenge — elimination tournament", () => {
     assert.ok(champBadge, "champion badge row exists");
     assert.equal(champBadge!.badgeKey, "TOURNAMENT_CHAMPION");
 
-    // Crown of the Bracket artifact granted to the champion.
+    // Crown of the Bracket artifact granted to the champion — minted as a
+    // per-tournament catalog row keyed on the challenge id so each champion
+    // collects a distinct crown over time.
     const crown = await db.query.artifactsTable.findFirst({
-      where: eq(artifactsTable.imageSlug, "crown_of_the_bracket"),
+      where: eq(artifactsTable.imageSlug, `crown_of_the_bracket__c${challengeId}`),
     });
-    assert.ok(crown, "crown artifact catalog row exists (lazy-seeded)");
+    assert.ok(crown, "per-tournament crown artifact catalog row exists");
+    assert.match(crown!.name, /^Crown of the Bracket — /, "crown name reflects the tournament");
+    assert.ok(crown!.name.includes(`Tournament ${TAG}`), "crown name embeds the tournament title");
+    assert.match(crown!.lore, /Forged when .* crowned its champion/, "lore reflects the tournament");
     const ownership = await db.query.playerArtifactsTable.findFirst({
       where: eq(playerArtifactsTable.playerId, p1),
     });
-    assert.ok(ownership, "champion owns the Crown of the Bracket");
+    assert.ok(ownership, "champion owns the per-tournament Crown of the Bracket");
     assert.equal(ownership!.artifactId, crown!.id);
 
     // Completion push fan-out: one `challenge-complete-*` push per non-champion
@@ -341,6 +346,65 @@ describe("finalizeChallenge — elimination tournament", () => {
       [...completedPlayerIds].sort((a, b) => a - b),
       [p1, p2, p3, p4].sort((a, b) => a - b),
     );
+  });
+});
+
+// ── Scenario 1b: two tournaments sharing the same title + season ──────────
+// Regression guard: per-tournament crowns must be keyed on the challenge id,
+// not the display name. If two distinct elimination tournaments happen to
+// share an identical title (and thus generate the same season label),
+// both champions still need to receive a distinct crown row.
+describe("finalizeChallenge — repeat title/season crown collisions", () => {
+  it("mints a distinct crown per challenge even when the title and season match", async () => {
+    const champA = await seedPlayer("dup-a");
+    const champB = await seedPlayer("dup-b");
+
+    const past = new Date(Date.now() - 60 * 60 * 1000);
+    const sharedTitle = `Repeat Cup ${TAG}`;
+
+    const chA = await seedChallenge({
+      creatorId: champA,
+      isElimination: true,
+      endAt: past,
+      title: sharedTitle,
+    });
+    const chB = await seedChallenge({
+      creatorId: champB,
+      isElimination: true,
+      endAt: past,
+      title: sharedTitle,
+    });
+
+    await seedParticipant(chA, champA, 100);
+    await seedParticipant(chB, champB, 100);
+
+    await finalizeChallenge(chA);
+    await finalizeChallenge(chB);
+
+    const crownA = await db.query.artifactsTable.findFirst({
+      where: eq(artifactsTable.imageSlug, `crown_of_the_bracket__c${chA}`),
+    });
+    const crownB = await db.query.artifactsTable.findFirst({
+      where: eq(artifactsTable.imageSlug, `crown_of_the_bracket__c${chB}`),
+    });
+    assert.ok(crownA, "champion A got their own crown row");
+    assert.ok(crownB, "champion B got their own crown row");
+    assert.notEqual(crownA!.id, crownB!.id, "crown rows are distinct catalog entries");
+
+    const ownedA = await db.query.playerArtifactsTable.findFirst({
+      where: and(
+        eq(playerArtifactsTable.playerId, champA),
+        eq(playerArtifactsTable.artifactId, crownA!.id),
+      ),
+    });
+    const ownedB = await db.query.playerArtifactsTable.findFirst({
+      where: and(
+        eq(playerArtifactsTable.playerId, champB),
+        eq(playerArtifactsTable.artifactId, crownB!.id),
+      ),
+    });
+    assert.ok(ownedA, "champion A owns their crown");
+    assert.ok(ownedB, "champion B owns their crown");
   });
 });
 

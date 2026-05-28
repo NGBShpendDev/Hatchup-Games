@@ -84,7 +84,7 @@ function makeRewardStore(
     async grantPlayerReward(playerId, xp, coins) {
       state.grants.push({ playerId, xp, coins });
     },
-    async awardChampion(playerId) {
+    async awardChampion(playerId, _challengeId) {
       state.champions.push(playerId);
     },
     async markCompleted() {

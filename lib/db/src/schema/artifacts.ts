@@ -9,7 +9,7 @@ export const artifactsTable = pgTable("artifacts", {
   lore: text("lore").notNull(),
   rarity: text("rarity").notNull(), // Common | Rare | Epic | Legendary | Mythic | Ancient | Celestial
   type: text("type").notNull(),     // fitness_streak | steps_milestone | workout_count | bar_level | special
-  imageSlug: text("image_slug").notNull(),
+  imageSlug: text("image_slug").notNull().unique(),
   isHidden: boolean("is_hidden").notNull().default(false),
   seasonId: integer("season_id"),
   abilities: jsonb("abilities").notNull().default([]),  // [{ name, description, value }]

@@ -74,7 +74,7 @@ export interface RewardStore {
     xp: number,
     coins: number,
   ): Promise<void>;
-  awardChampion(playerId: number): Promise<void>;
+  awardChampion(playerId: number, challengeId: number): Promise<void>;
   markCompleted(challengeId: number): Promise<void>;
 }
 
@@ -128,7 +128,7 @@ export async function distributeChallengeRewards(
       await store.grantPlayerReward(p.playerId, grant.xp, grant.coins);
     }
     if (grant.isChampion) {
-      await store.awardChampion(p.playerId);
+      await store.awardChampion(p.playerId, challengeId);
     }
     rankings.push({ participantId: p.id, playerId: p.playerId, rank, grant });
   }

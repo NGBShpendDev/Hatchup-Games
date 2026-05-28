@@ -187,21 +187,62 @@ export async function sendEndingSoonPushes(): Promise<void> {
 }
 
 // ── Champion cosmetic artifact ─────────────────────────────────────────────
-const CHAMPION_ARTIFACT_SLUG = "crown_of_the_bracket";
-const CHAMPION_ARTIFACT_NAME = "Crown of the Bracket";
+// Each tournament/season win mints its OWN catalog row so champions can
+// collect a row of distinct crowns over time, with the tournament name,
+// season label, and earned date baked into the lore. The `imageSlug` keeps
+// the `crown_of_the_bracket` prefix so frontend emoji/asset lookups still
+// resolve to the crown 👑 icon.
+const CHAMPION_ARTIFACT_SLUG_PREFIX = "crown_of_the_bracket";
 
-async function awardChampionArtifact(playerId: number): Promise<void> {
+function seasonLabel(d: Date): string {
+  // Northern-hemisphere meteorological seasons, keyed to the completion
+  // date. Year ticks over with December rolling into the following winter.
+  const month = d.getUTCMonth(); // 0–11
+  const year = d.getUTCFullYear();
+  if (month === 11) return `Winter ${year + 1}`;
+  if (month <= 1)   return `Winter ${year}`;
+  if (month <= 4)   return `Spring ${year}`;
+  if (month <= 7)   return `Summer ${year}`;
+  return `Fall ${year}`;
+}
+
+function truncateForName(s: string, max: number): string {
+  const trimmed = s.trim();
+  if (trimmed.length <= max) return trimmed;
+  return trimmed.slice(0, max - 1).trimEnd() + "…";
+}
+
+async function awardChampionArtifact(
+  playerId: number,
+  challengeId: number,
+  challengeTitle: string,
+  earnedAt: Date,
+): Promise<void> {
+  const slug = `${CHAMPION_ARTIFACT_SLUG_PREFIX}__c${challengeId}`;
+  const season = seasonLabel(earnedAt);
+  const safeTitle = truncateForName(challengeTitle, 80);
+  // Include the challenge id in the display name so the `name` unique
+  // constraint can never collide between two tournaments that happen to
+  // share a title within the same season. Without this suffix, a repeat
+  // cup would fail to mint its second crown.
+  const name = `Crown of the Bracket — ${safeTitle} (${season} · #${challengeId})`;
+  const earnedDateStr = earnedAt.toISOString().slice(0, 10);
+  const lore =
+    `Forged when ${safeTitle} crowned its champion in ${season}. ` +
+    `Worn by the sole survivor of the bracket on ${earnedDateStr} — ` +
+    `every contender they outlasted is etched into its rim.`;
+
   let artifact = await db.query.artifactsTable.findFirst({
-    where: eq(artifactsTable.imageSlug, CHAMPION_ARTIFACT_SLUG),
+    where: eq(artifactsTable.imageSlug, slug),
   });
 
   if (!artifact) {
     const [inserted] = await db.insert(artifactsTable).values({
-      name: CHAMPION_ARTIFACT_NAME,
-      lore: "Forged from the shattered hopes of every contender you outlasted. Worn only by tournament champions.",
+      name: truncateForName(name, 200),
+      lore,
       rarity: "Legendary",
       type: "special",
-      imageSlug: CHAMPION_ARTIFACT_SLUG,
+      imageSlug: slug,
       isHidden: true,
       abilities: [
         { name: "Champion's Aura", description: "+25% XP from competitive activities", value: 25 },
@@ -209,10 +250,10 @@ async function awardChampionArtifact(playerId: number): Promise<void> {
       ],
       triggerKey: null,
       triggerValue: null,
-    }).onConflictDoNothing({ target: artifactsTable.name }).returning();
+    }).onConflictDoNothing({ target: artifactsTable.imageSlug }).returning();
 
     artifact = inserted ?? await db.query.artifactsTable.findFirst({
-      where: eq(artifactsTable.imageSlug, CHAMPION_ARTIFACT_SLUG),
+      where: eq(artifactsTable.imageSlug, slug),
     });
   }
 
@@ -265,9 +306,18 @@ const dbRewardStore: RewardStore = {
       })
       .where(eq(playersTable.id, playerId));
   },
-  async awardChampion(playerId) {
+  async awardChampion(playerId, challengeId) {
     await awardBadge(playerId, "TOURNAMENT_CHAMPION");
-    await awardChampionArtifact(playerId);
+    const challenge = await db.query.challengesTable.findFirst({
+      where: eq(challengesTable.id, challengeId),
+      columns: { title: true },
+    });
+    await awardChampionArtifact(
+      playerId,
+      challengeId,
+      challenge?.title ?? `Tournament #${challengeId}`,
+      new Date(),
+    );
   },
   async markCompleted(challengeId) {
     await db.update(challengesTable)

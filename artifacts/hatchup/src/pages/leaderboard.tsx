@@ -989,5 +989,8 @@ function ArtifactSlugEmoji({ slug }: { slug: string }) {
     agile_phantom: "🐆", eternal_vigil: "🌙",
     mystery: "❓",
   };
+  // Per-tournament Crown of the Bracket variants share the prefix slug
+  // (`crown_of_the_bracket__c<challengeId>`) so every minted crown renders 👑.
+  if (slug.startsWith("crown_of_the_bracket")) return <span>👑</span>;
   return <span>{SLUG_EMOJIS[slug] ?? "🏺"}</span>;
 }
