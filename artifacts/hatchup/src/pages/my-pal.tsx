@@ -8,6 +8,8 @@ import {
   getGetHatchlingQueryKey,
   useUpdateHatchling,
   useUpdatePlayer,
+  useGetFitnessStats,
+  getGetFitnessStatsQueryKey,
 } from "@workspace/api-client-react";
 import { usePlayer } from "@/lib/playerContext";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -232,6 +234,10 @@ export default function MyPalPage() {
 
   const { data: pal, isLoading: palLoading, isError, refetch } = useGetHatchling(activePalId, {
     query: { enabled: !!activePalId, queryKey: getGetHatchlingQueryKey(activePalId) },
+  });
+
+  const { data: fitnessStats } = useGetFitnessStats(player?.id ?? 0, {
+    query: { enabled: !!player?.id, queryKey: getGetFitnessStatsQueryKey(player?.id ?? 0) },
   });
 
   const updateMutation = useUpdateHatchling();
@@ -515,7 +521,10 @@ export default function MyPalPage() {
   const moodState = (pal.moodState as string | undefined) ?? "happy";
   const comebackStreak = (pal as any).comebackStreak ?? 0;
   const stage = pal.evolutionStage ?? 1;
-  const palDailyStepGoal = (pal as any).dailyStepGoal ?? player?.dailyStepGoal ?? 8000;
+  const palDailyStepGoal = fitnessStats?.dailyStepGoal ?? (pal as any).dailyStepGoal ?? player?.dailyStepGoal ?? 8000;
+  const todaySteps = fitnessStats?.todaySteps ?? 0;
+  const stepProgressPct = Math.min(100, Math.round((todaySteps / palDailyStepGoal) * 100));
+  const goalMet = stepProgressPct >= 100;
   const palDeadlineHour = (pal as any).dailyWorkoutDeadlineHour ?? (player as any)?.dailyWorkoutDeadlineHour ?? 20;
   const deadlinePeriod = palDeadlineHour < 12 ? "AM" : "PM";
   const deadlineDisplay = `${palDeadlineHour === 0 ? 12 : palDeadlineHour > 12 ? palDeadlineHour - 12 : palDeadlineHour}:00 ${deadlinePeriod}`;
@@ -684,10 +693,17 @@ export default function MyPalPage() {
         </motion.div>
 
         {/* Today's Goal indicator */}
-        <GlassCard className="p-4 mb-5">
+        <GlassCard
+          className={`p-4 mb-5 transition-all duration-500 ${goalMet ? "border-green-500/50 shadow-[0_0_18px_0_rgba(34,197,94,0.25)]" : ""}`}
+        >
           <div className="flex items-center gap-2 mb-3">
-            <Target className="w-4 h-4 text-violet-400" />
-            <h3 className="font-black text-sm text-violet-400">Today's Goal</h3>
+            <Target className={`w-4 h-4 ${goalMet ? "text-green-400" : "text-violet-400"}`} />
+            <h3 className={`font-black text-sm ${goalMet ? "text-green-400" : "text-violet-400"}`}>Today's Goal</h3>
+            {goalMet && (
+              <span className="text-[10px] font-black text-green-400 bg-green-500/15 rounded-full px-2 py-0.5">
+                ✓ Done!
+              </span>
+            )}
             <button
               className="ml-auto text-[10px] text-muted-foreground/60 hover:text-muted-foreground underline underline-offset-2 font-bold"
               onClick={() => setLocation("/settings/privacy")}
@@ -695,12 +711,17 @@ export default function MyPalPage() {
               Edit
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2">
-              <Footprints className="w-4 h-4 text-cyan-400 shrink-0" />
-              <div>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className={`flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2 ${goalMet ? "bg-green-500/10" : ""}`}>
+              <Footprints className={`w-4 h-4 shrink-0 ${goalMet ? "text-green-400" : "text-cyan-400"}`} />
+              <div className="min-w-0">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">Steps</p>
-                <p className="text-sm font-black text-cyan-400">{palDailyStepGoal.toLocaleString()}</p>
+                <p className={`text-sm font-black leading-tight ${goalMet ? "text-green-400" : "text-cyan-400"}`}>
+                  {todaySteps.toLocaleString()}
+                  <span className="text-[10px] font-semibold text-muted-foreground ml-1">
+                    / {palDailyStepGoal.toLocaleString()}
+                  </span>
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2">
@@ -711,8 +732,18 @@ export default function MyPalPage() {
               </div>
             </div>
           </div>
-          {moodState === "sad" && (
-            <p className="text-[10px] text-red-400/80 font-medium mt-2 text-center">
+          {/* Progress bar */}
+          <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-700 ${goalMet ? "bg-green-400" : "bg-cyan-400"}`}
+              style={{ width: `${stepProgressPct}%` }}
+            />
+          </div>
+          <p className="text-[10px] text-muted-foreground text-right mt-1 font-semibold">
+            {stepProgressPct}% of goal
+          </p>
+          {moodState === "sad" && !goalMet && (
+            <p className="text-[10px] text-red-400/80 font-medium mt-1 text-center">
               Missed today's goal — train now to cheer your Pal up!
             </p>
           )}
