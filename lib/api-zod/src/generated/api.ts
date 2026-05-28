@@ -4063,6 +4063,387 @@ export const PreviewNutritionRecapResponse = zod.object({
 
 
 /**
+ * Documentation-only endpoint that defines the schema of messages the
+client sends over the live battle WebSocket (`/api/ws/battle`). The
+endpoint itself returns `410 Gone` — clients should send these
+messages over the WebSocket, not via HTTP.
+
+ * @summary [Docs only] Validate a client→server battle WS message
+ */
+export const DocsValidateBattleWsClientMessageBody = zod.union([zod.object({
+  "type": zod.enum(['join_queue']),
+  "hatchlingId": zod.number(),
+  "mode": zod.enum(['casual', 'ranked']),
+  "rematchInviteId": zod.string().optional()
+}),zod.object({
+  "type": zod.enum(['leave_queue'])
+}),zod.object({
+  "type": zod.enum(['player_move']),
+  "battleId": zod.number(),
+  "move": zod.enum(['basic_attack', 'special_move', 'defend', 'use_item'])
+}),zod.object({
+  "type": zod.enum(['reconnect'])
+})])
+
+
+/**
+ * Documentation-only endpoint that defines the schema of messages the
+server pushes to clients over the live battle WebSocket
+(`/api/ws/battle`). The endpoint itself returns `410 Gone`.
+
+ * @summary [Docs only] Validate a server→client battle WS message
+ */
+export const DocsValidateBattleWsServerMessageBody = zod.union([zod.object({
+  "type": zod.enum(['queue_joined']),
+  "position": zod.number(),
+  "mode": zod.enum(['casual', 'ranked']),
+  "rematchInviteId": zod.string().nullable()
+}),zod.object({
+  "type": zod.enum(['queue_left'])
+}),zod.object({
+  "type": zod.enum(['battle_start']),
+  "battleId": zod.number(),
+  "slot1PlayerId": zod.number(),
+  "slot2PlayerId": zod.number().describe('Player id of slot 2, or `0` when slot 2 is a bot.'),
+  "state": zod.object({
+  "battleId": zod.number(),
+  "mode": zod.enum(['casual', 'ranked']),
+  "fighter1": zod.object({
+  "playerId": zod.number().describe('Player id of the fighter\'s owner. `0` indicates a bot opponent with no real player.'),
+  "playerUsername": zod.string().nullable().describe('Username of the fighter\'s owner, used to display opponent identity. `null` for bots.'),
+  "playerDisplayName": zod.string().nullable().describe('Display name of the fighter\'s owner. Falls back to `playerUsername` in the UI when null. `null` for bots.'),
+  "hatchlingId": zod.number(),
+  "hatchlingName": zod.string(),
+  "hatchlingLevel": zod.number(),
+  "realm": zod.string(),
+  "maxHp": zod.number(),
+  "currentHp": zod.number(),
+  "maxEnergy": zod.number(),
+  "energy": zod.number(),
+  "speed": zod.number(),
+  "defenseBonus": zod.number(),
+  "specialCooldown": zod.number(),
+  "itemUsed": zod.boolean(),
+  "isBot": zod.boolean(),
+  "equippedArtifacts": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "rarity": zod.string(),
+  "imageSlug": zod.string(),
+  "slot": zod.enum(['major', 'minor']),
+  "isPowered": zod.boolean(),
+  "evolutionStage": zod.number()
+})),
+  "artifactPowerScore": zod.number()
+}),
+  "fighter2": zod.object({
+  "playerId": zod.number().describe('Player id of the fighter\'s owner. `0` indicates a bot opponent with no real player.'),
+  "playerUsername": zod.string().nullable().describe('Username of the fighter\'s owner, used to display opponent identity. `null` for bots.'),
+  "playerDisplayName": zod.string().nullable().describe('Display name of the fighter\'s owner. Falls back to `playerUsername` in the UI when null. `null` for bots.'),
+  "hatchlingId": zod.number(),
+  "hatchlingName": zod.string(),
+  "hatchlingLevel": zod.number(),
+  "realm": zod.string(),
+  "maxHp": zod.number(),
+  "currentHp": zod.number(),
+  "maxEnergy": zod.number(),
+  "energy": zod.number(),
+  "speed": zod.number(),
+  "defenseBonus": zod.number(),
+  "specialCooldown": zod.number(),
+  "itemUsed": zod.boolean(),
+  "isBot": zod.boolean(),
+  "equippedArtifacts": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "rarity": zod.string(),
+  "imageSlug": zod.string(),
+  "slot": zod.enum(['major', 'minor']),
+  "isPowered": zod.boolean(),
+  "evolutionStage": zod.number()
+})),
+  "artifactPowerScore": zod.number()
+}),
+  "currentSlot": zod.union([zod.literal(1),zod.literal(2)]),
+  "turnNumber": zod.number(),
+  "phase": zod.enum(['lobby', 'active', 'ended']),
+  "winner": zod.union([zod.literal(0),zod.literal(1),zod.literal(2),zod.literal(null)]).nullable().describe('Winning slot (1 or 2), `0` for a draw, `null` while the battle is still ongoing.'),
+  "turns": zod.array(zod.object({
+  "turnNumber": zod.number(),
+  "actingSlot": zod.union([zod.literal(1),zod.literal(2)]),
+  "move": zod.enum(['basic_attack', 'special_move', 'defend', 'use_item']),
+  "damage": zod.number(),
+  "healing": zod.number(),
+  "isCrit": zod.boolean(),
+  "isSuper": zod.boolean(),
+  "p1HpAfter": zod.number(),
+  "p2HpAfter": zod.number(),
+  "p1EnergyAfter": zod.number(),
+  "p2EnergyAfter": zod.number()
+}))
+}),
+  "yourSlot": zod.union([zod.literal(1),zod.literal(2)])
+}),zod.object({
+  "type": zod.enum(['battle_state']),
+  "battleId": zod.number(),
+  "state": zod.object({
+  "battleId": zod.number(),
+  "mode": zod.enum(['casual', 'ranked']),
+  "fighter1": zod.object({
+  "playerId": zod.number().describe('Player id of the fighter\'s owner. `0` indicates a bot opponent with no real player.'),
+  "playerUsername": zod.string().nullable().describe('Username of the fighter\'s owner, used to display opponent identity. `null` for bots.'),
+  "playerDisplayName": zod.string().nullable().describe('Display name of the fighter\'s owner. Falls back to `playerUsername` in the UI when null. `null` for bots.'),
+  "hatchlingId": zod.number(),
+  "hatchlingName": zod.string(),
+  "hatchlingLevel": zod.number(),
+  "realm": zod.string(),
+  "maxHp": zod.number(),
+  "currentHp": zod.number(),
+  "maxEnergy": zod.number(),
+  "energy": zod.number(),
+  "speed": zod.number(),
+  "defenseBonus": zod.number(),
+  "specialCooldown": zod.number(),
+  "itemUsed": zod.boolean(),
+  "isBot": zod.boolean(),
+  "equippedArtifacts": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "rarity": zod.string(),
+  "imageSlug": zod.string(),
+  "slot": zod.enum(['major', 'minor']),
+  "isPowered": zod.boolean(),
+  "evolutionStage": zod.number()
+})),
+  "artifactPowerScore": zod.number()
+}),
+  "fighter2": zod.object({
+  "playerId": zod.number().describe('Player id of the fighter\'s owner. `0` indicates a bot opponent with no real player.'),
+  "playerUsername": zod.string().nullable().describe('Username of the fighter\'s owner, used to display opponent identity. `null` for bots.'),
+  "playerDisplayName": zod.string().nullable().describe('Display name of the fighter\'s owner. Falls back to `playerUsername` in the UI when null. `null` for bots.'),
+  "hatchlingId": zod.number(),
+  "hatchlingName": zod.string(),
+  "hatchlingLevel": zod.number(),
+  "realm": zod.string(),
+  "maxHp": zod.number(),
+  "currentHp": zod.number(),
+  "maxEnergy": zod.number(),
+  "energy": zod.number(),
+  "speed": zod.number(),
+  "defenseBonus": zod.number(),
+  "specialCooldown": zod.number(),
+  "itemUsed": zod.boolean(),
+  "isBot": zod.boolean(),
+  "equippedArtifacts": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "rarity": zod.string(),
+  "imageSlug": zod.string(),
+  "slot": zod.enum(['major', 'minor']),
+  "isPowered": zod.boolean(),
+  "evolutionStage": zod.number()
+})),
+  "artifactPowerScore": zod.number()
+}),
+  "currentSlot": zod.union([zod.literal(1),zod.literal(2)]),
+  "turnNumber": zod.number(),
+  "phase": zod.enum(['lobby', 'active', 'ended']),
+  "winner": zod.union([zod.literal(0),zod.literal(1),zod.literal(2),zod.literal(null)]).nullable().describe('Winning slot (1 or 2), `0` for a draw, `null` while the battle is still ongoing.'),
+  "turns": zod.array(zod.object({
+  "turnNumber": zod.number(),
+  "actingSlot": zod.union([zod.literal(1),zod.literal(2)]),
+  "move": zod.enum(['basic_attack', 'special_move', 'defend', 'use_item']),
+  "damage": zod.number(),
+  "healing": zod.number(),
+  "isCrit": zod.boolean(),
+  "isSuper": zod.boolean(),
+  "p1HpAfter": zod.number(),
+  "p2HpAfter": zod.number(),
+  "p1EnergyAfter": zod.number(),
+  "p2EnergyAfter": zod.number()
+}))
+})
+}),zod.object({
+  "type": zod.enum(['battle_end']),
+  "battleId": zod.number(),
+  "winner": zod.union([zod.literal(0),zod.literal(1),zod.literal(2),zod.literal(null)]).nullable().describe('Winning slot (1 or 2), `0` for a draw, `null` if the battle ended without a resolved winner.'),
+  "rewards": zod.object({
+  "xp": zod.number(),
+  "coins": zod.number()
+}),
+  "eloChange": zod.number(),
+  "artifactXp": zod.array(zod.object({
+  "artifactId": zod.number(),
+  "newStage": zod.number(),
+  "xpGained": zod.number()
+})),
+  "state": zod.object({
+  "battleId": zod.number(),
+  "mode": zod.enum(['casual', 'ranked']),
+  "fighter1": zod.object({
+  "playerId": zod.number().describe('Player id of the fighter\'s owner. `0` indicates a bot opponent with no real player.'),
+  "playerUsername": zod.string().nullable().describe('Username of the fighter\'s owner, used to display opponent identity. `null` for bots.'),
+  "playerDisplayName": zod.string().nullable().describe('Display name of the fighter\'s owner. Falls back to `playerUsername` in the UI when null. `null` for bots.'),
+  "hatchlingId": zod.number(),
+  "hatchlingName": zod.string(),
+  "hatchlingLevel": zod.number(),
+  "realm": zod.string(),
+  "maxHp": zod.number(),
+  "currentHp": zod.number(),
+  "maxEnergy": zod.number(),
+  "energy": zod.number(),
+  "speed": zod.number(),
+  "defenseBonus": zod.number(),
+  "specialCooldown": zod.number(),
+  "itemUsed": zod.boolean(),
+  "isBot": zod.boolean(),
+  "equippedArtifacts": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "rarity": zod.string(),
+  "imageSlug": zod.string(),
+  "slot": zod.enum(['major', 'minor']),
+  "isPowered": zod.boolean(),
+  "evolutionStage": zod.number()
+})),
+  "artifactPowerScore": zod.number()
+}),
+  "fighter2": zod.object({
+  "playerId": zod.number().describe('Player id of the fighter\'s owner. `0` indicates a bot opponent with no real player.'),
+  "playerUsername": zod.string().nullable().describe('Username of the fighter\'s owner, used to display opponent identity. `null` for bots.'),
+  "playerDisplayName": zod.string().nullable().describe('Display name of the fighter\'s owner. Falls back to `playerUsername` in the UI when null. `null` for bots.'),
+  "hatchlingId": zod.number(),
+  "hatchlingName": zod.string(),
+  "hatchlingLevel": zod.number(),
+  "realm": zod.string(),
+  "maxHp": zod.number(),
+  "currentHp": zod.number(),
+  "maxEnergy": zod.number(),
+  "energy": zod.number(),
+  "speed": zod.number(),
+  "defenseBonus": zod.number(),
+  "specialCooldown": zod.number(),
+  "itemUsed": zod.boolean(),
+  "isBot": zod.boolean(),
+  "equippedArtifacts": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "rarity": zod.string(),
+  "imageSlug": zod.string(),
+  "slot": zod.enum(['major', 'minor']),
+  "isPowered": zod.boolean(),
+  "evolutionStage": zod.number()
+})),
+  "artifactPowerScore": zod.number()
+}),
+  "currentSlot": zod.union([zod.literal(1),zod.literal(2)]),
+  "turnNumber": zod.number(),
+  "phase": zod.enum(['lobby', 'active', 'ended']),
+  "winner": zod.union([zod.literal(0),zod.literal(1),zod.literal(2),zod.literal(null)]).nullable().describe('Winning slot (1 or 2), `0` for a draw, `null` while the battle is still ongoing.'),
+  "turns": zod.array(zod.object({
+  "turnNumber": zod.number(),
+  "actingSlot": zod.union([zod.literal(1),zod.literal(2)]),
+  "move": zod.enum(['basic_attack', 'special_move', 'defend', 'use_item']),
+  "damage": zod.number(),
+  "healing": zod.number(),
+  "isCrit": zod.boolean(),
+  "isSuper": zod.boolean(),
+  "p1HpAfter": zod.number(),
+  "p2HpAfter": zod.number(),
+  "p1EnergyAfter": zod.number(),
+  "p2EnergyAfter": zod.number()
+}))
+})
+}),zod.object({
+  "type": zod.enum(['reconnected']),
+  "battleId": zod.number(),
+  "yourSlot": zod.union([zod.literal(1),zod.literal(2)]),
+  "state": zod.object({
+  "battleId": zod.number(),
+  "mode": zod.enum(['casual', 'ranked']),
+  "fighter1": zod.object({
+  "playerId": zod.number().describe('Player id of the fighter\'s owner. `0` indicates a bot opponent with no real player.'),
+  "playerUsername": zod.string().nullable().describe('Username of the fighter\'s owner, used to display opponent identity. `null` for bots.'),
+  "playerDisplayName": zod.string().nullable().describe('Display name of the fighter\'s owner. Falls back to `playerUsername` in the UI when null. `null` for bots.'),
+  "hatchlingId": zod.number(),
+  "hatchlingName": zod.string(),
+  "hatchlingLevel": zod.number(),
+  "realm": zod.string(),
+  "maxHp": zod.number(),
+  "currentHp": zod.number(),
+  "maxEnergy": zod.number(),
+  "energy": zod.number(),
+  "speed": zod.number(),
+  "defenseBonus": zod.number(),
+  "specialCooldown": zod.number(),
+  "itemUsed": zod.boolean(),
+  "isBot": zod.boolean(),
+  "equippedArtifacts": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "rarity": zod.string(),
+  "imageSlug": zod.string(),
+  "slot": zod.enum(['major', 'minor']),
+  "isPowered": zod.boolean(),
+  "evolutionStage": zod.number()
+})),
+  "artifactPowerScore": zod.number()
+}),
+  "fighter2": zod.object({
+  "playerId": zod.number().describe('Player id of the fighter\'s owner. `0` indicates a bot opponent with no real player.'),
+  "playerUsername": zod.string().nullable().describe('Username of the fighter\'s owner, used to display opponent identity. `null` for bots.'),
+  "playerDisplayName": zod.string().nullable().describe('Display name of the fighter\'s owner. Falls back to `playerUsername` in the UI when null. `null` for bots.'),
+  "hatchlingId": zod.number(),
+  "hatchlingName": zod.string(),
+  "hatchlingLevel": zod.number(),
+  "realm": zod.string(),
+  "maxHp": zod.number(),
+  "currentHp": zod.number(),
+  "maxEnergy": zod.number(),
+  "energy": zod.number(),
+  "speed": zod.number(),
+  "defenseBonus": zod.number(),
+  "specialCooldown": zod.number(),
+  "itemUsed": zod.boolean(),
+  "isBot": zod.boolean(),
+  "equippedArtifacts": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "rarity": zod.string(),
+  "imageSlug": zod.string(),
+  "slot": zod.enum(['major', 'minor']),
+  "isPowered": zod.boolean(),
+  "evolutionStage": zod.number()
+})),
+  "artifactPowerScore": zod.number()
+}),
+  "currentSlot": zod.union([zod.literal(1),zod.literal(2)]),
+  "turnNumber": zod.number(),
+  "phase": zod.enum(['lobby', 'active', 'ended']),
+  "winner": zod.union([zod.literal(0),zod.literal(1),zod.literal(2),zod.literal(null)]).nullable().describe('Winning slot (1 or 2), `0` for a draw, `null` while the battle is still ongoing.'),
+  "turns": zod.array(zod.object({
+  "turnNumber": zod.number(),
+  "actingSlot": zod.union([zod.literal(1),zod.literal(2)]),
+  "move": zod.enum(['basic_attack', 'special_move', 'defend', 'use_item']),
+  "damage": zod.number(),
+  "healing": zod.number(),
+  "isCrit": zod.boolean(),
+  "isSuper": zod.boolean(),
+  "p1HpAfter": zod.number(),
+  "p2HpAfter": zod.number(),
+  "p1EnergyAfter": zod.number(),
+  "p2EnergyAfter": zod.number()
+}))
+})
+}),zod.object({
+  "type": zod.enum(['error']),
+  "message": zod.string(),
+  "error": zod.string().optional().describe('Machine-readable error code, e.g. `battle_daily_cap_reached`.'),
+  "cap": zod.number().optional().describe('Free-tier daily cap value, included with `battle_daily_cap_reached` errors.')
+})])
+
+
+/**
  * Updates the physique goal used to derive daily macro targets and
 Hatchling reward tuning. The caller must own `playerId`.
 

@@ -23,6 +23,7 @@ import {
 import { loadActiveLoadoutModifiers, awardArtifactBattleXp } from "./artifactLoadoutService";
 import { checkAndConsumeBattleCap } from "./subscriptionGuards";
 import { logger } from "../lib/logger";
+import { BattleWsClientMessageSchema } from "@workspace/api-zod";
 
 // ── In-memory state ──────────────────────────────────────────────────────────
 interface QueueEntry {
@@ -465,13 +466,24 @@ function scheduleBotFallback(entry: QueueEntry) {
 
 // ── Message handler ──────────────────────────────────────────────────────────
 async function handleMessage(ws: WebSocket, playerId: number, raw: string) {
-  let msg: { type: string; [k: string]: unknown };
+  let parsedJson: unknown;
   try {
-    msg = JSON.parse(raw) as typeof msg;
+    parsedJson = JSON.parse(raw);
   } catch {
     send(ws, { type: "error", message: "Invalid JSON" });
     return;
   }
+
+  // Validate against the shared OpenAPI-derived schema so the on-the-wire
+  // envelope matches the documented `BattleWsClientMessage` discriminated
+  // union exactly. Unknown `type` values and malformed payloads are rejected
+  // here instead of being silently coerced below.
+  const parsed = BattleWsClientMessageSchema.safeParse(parsedJson);
+  if (!parsed.success) {
+    send(ws, { type: "error", message: "Invalid battle WS message" });
+    return;
+  }
+  const msg = parsed.data;
 
   if (msg.type === "join_queue") {
     if (playerInBattle.has(playerId)) {
@@ -482,9 +494,9 @@ async function handleMessage(ws: WebSocket, playerId: number, raw: string) {
       send(ws, { type: "error", message: "Already in queue" });
       return;
     }
-    const hatchlingId = Number(msg.hatchlingId);
-    const rawMode = msg.mode === "ranked" ? "ranked" : "casual";
-    const rematchInviteId = typeof msg.rematchInviteId === "string" ? msg.rematchInviteId : undefined;
+    const hatchlingId = msg.hatchlingId;
+    const rawMode = msg.mode;
+    const rematchInviteId = msg.rematchInviteId;
 
     // Validate rematch invite if supplied: caller must be a participant and
     // status must still be pending/accepted (not consumed/declined/expired).
@@ -558,8 +570,8 @@ async function handleMessage(ws: WebSocket, playerId: number, raw: string) {
   }
 
   if (msg.type === "player_move") {
-    const battleId = Number(msg.battleId);
-    const move = String(msg.move) as MoveType;
+    const battleId = msg.battleId;
+    const move = msg.move as MoveType;
     const battle = activeBattles.get(battleId);
     if (!battle) { send(ws, { type: "error", message: "Battle not found" }); return; }
 

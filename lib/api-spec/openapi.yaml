@@ -3549,6 +3549,49 @@ paths:
               schema:
                 $ref: "#/components/schemas/StorageErrorEnvelope"
 
+  # ── Live battle WebSocket protocol (documentation-only endpoints) ─────────
+  # The real transport for these messages is the WebSocket at `/api/ws/battle`,
+  # not these HTTP endpoints. They exist solely to attach the discriminated
+  # message unions to operations so Orval emits reusable Zod schemas that the
+  # server and frontend can both import for validation.
+  /battles/ws/protocol/client-message:
+    post:
+      summary: "[Docs only] Validate a client→server battle WS message"
+      operationId: docsValidateBattleWsClientMessage
+      description: |
+        Documentation-only endpoint that defines the schema of messages the
+        client sends over the live battle WebSocket (`/api/ws/battle`). The
+        endpoint itself returns `410 Gone` — clients should send these
+        messages over the WebSocket, not via HTTP.
+      tags: [docs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BattleWsClientMessage"
+      responses:
+        "410":
+          description: This endpoint is documentation-only; send the message over the WebSocket instead.
+  /battles/ws/protocol/server-message:
+    post:
+      summary: "[Docs only] Validate a server→client battle WS message"
+      operationId: docsValidateBattleWsServerMessage
+      description: |
+        Documentation-only endpoint that defines the schema of messages the
+        server pushes to clients over the live battle WebSocket
+        (`/api/ws/battle`). The endpoint itself returns `410 Gone`.
+      tags: [docs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BattleWsServerMessage"
+      responses:
+        "410":
+          description: This endpoint is documentation-only; the server sends these messages over the WebSocket.
+
   /nutrition/physique-goal:
     put:
       operationId: updatePhysiqueGoal
@@ -6012,3 +6055,152 @@ components:
         turns:
           type: array
           items: { $ref: "#/components/schemas/BattleTurnResult" }
+
+    # ── Battle live WebSocket message envelopes ─────────────────────────────
+    # These shapes are the messages exchanged over `/api/ws/battle`. The
+    # server validates inbound (client→server) messages with the generated
+    # Zod schema for `BattleWsClientMessage`; the hatchup frontend validates
+    # inbound (server→client) messages with the generated Zod schema for
+    # `BattleWsServerMessage`. Each variant is discriminated by `type`.
+
+    # Client → Server
+    BattleWsJoinQueueMessage:
+      type: object
+      required: [type, hatchlingId, mode]
+      properties:
+        type:            { type: string, enum: [join_queue] }
+        hatchlingId:     { type: integer }
+        mode:            { type: string, enum: [casual, ranked] }
+        rematchInviteId: { type: string }
+    BattleWsLeaveQueueMessage:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [leave_queue] }
+    BattleWsPlayerMoveMessage:
+      type: object
+      required: [type, battleId, move]
+      properties:
+        type:     { type: string, enum: [player_move] }
+        battleId: { type: integer }
+        move:     { type: string, enum: [basic_attack, special_move, defend, use_item] }
+    BattleWsReconnectMessage:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [reconnect] }
+    BattleWsClientMessage:
+      oneOf:
+        - $ref: "#/components/schemas/BattleWsJoinQueueMessage"
+        - $ref: "#/components/schemas/BattleWsLeaveQueueMessage"
+        - $ref: "#/components/schemas/BattleWsPlayerMoveMessage"
+        - $ref: "#/components/schemas/BattleWsReconnectMessage"
+      discriminator:
+        propertyName: type
+        mapping:
+          join_queue:  "#/components/schemas/BattleWsJoinQueueMessage"
+          leave_queue: "#/components/schemas/BattleWsLeaveQueueMessage"
+          player_move: "#/components/schemas/BattleWsPlayerMoveMessage"
+          reconnect:   "#/components/schemas/BattleWsReconnectMessage"
+
+    # Server → Client
+    BattleWsQueueJoinedMessage:
+      type: object
+      required: [type, position, mode, rematchInviteId]
+      properties:
+        type:            { type: string, enum: [queue_joined] }
+        position:        { type: integer }
+        mode:            { type: string, enum: [casual, ranked] }
+        rematchInviteId: { type: ["string", "null"] }
+    BattleWsQueueLeftMessage:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [queue_left] }
+    BattleWsBattleStartMessage:
+      type: object
+      required: [type, battleId, slot1PlayerId, slot2PlayerId, state, yourSlot]
+      properties:
+        type:          { type: string, enum: [battle_start] }
+        battleId:      { type: integer }
+        slot1PlayerId: { type: integer }
+        slot2PlayerId:
+          type: integer
+          description: Player id of slot 2, or `0` when slot 2 is a bot.
+        state:         { $ref: "#/components/schemas/BattleState" }
+        yourSlot:      { type: integer, enum: [1, 2] }
+    BattleWsBattleStateMessage:
+      type: object
+      required: [type, battleId, state]
+      properties:
+        type:     { type: string, enum: [battle_state] }
+        battleId: { type: integer }
+        state:    { $ref: "#/components/schemas/BattleState" }
+    BattleWsRewards:
+      type: object
+      required: [xp, coins]
+      properties:
+        xp:    { type: integer }
+        coins: { type: integer }
+    BattleWsArtifactXpGain:
+      type: object
+      required: [artifactId, newStage, xpGained]
+      properties:
+        artifactId: { type: integer }
+        newStage:   { type: integer }
+        xpGained:   { type: integer }
+    BattleWsBattleEndMessage:
+      type: object
+      required: [type, battleId, winner, rewards, eloChange, artifactXp, state]
+      properties:
+        type:       { type: string, enum: [battle_end] }
+        battleId:   { type: integer }
+        winner:
+          type: ["integer", "null"]
+          enum: [0, 1, 2, null]
+          description: Winning slot (1 or 2), `0` for a draw, `null` if the battle ended without a resolved winner.
+        rewards:    { $ref: "#/components/schemas/BattleWsRewards" }
+        eloChange:  { type: integer }
+        artifactXp:
+          type: array
+          items: { $ref: "#/components/schemas/BattleWsArtifactXpGain" }
+        state:      { $ref: "#/components/schemas/BattleState" }
+    BattleWsReconnectedMessage:
+      type: object
+      required: [type, battleId, yourSlot, state]
+      properties:
+        type:     { type: string, enum: [reconnected] }
+        battleId: { type: integer }
+        yourSlot: { type: integer, enum: [1, 2] }
+        state:    { $ref: "#/components/schemas/BattleState" }
+    BattleWsErrorMessage:
+      type: object
+      required: [type, message]
+      properties:
+        type:    { type: string, enum: [error] }
+        message: { type: string }
+        error:
+          type: string
+          description: Machine-readable error code, e.g. `battle_daily_cap_reached`.
+        cap:
+          type: integer
+          description: Free-tier daily cap value, included with `battle_daily_cap_reached` errors.
+    BattleWsServerMessage:
+      oneOf:
+        - $ref: "#/components/schemas/BattleWsQueueJoinedMessage"
+        - $ref: "#/components/schemas/BattleWsQueueLeftMessage"
+        - $ref: "#/components/schemas/BattleWsBattleStartMessage"
+        - $ref: "#/components/schemas/BattleWsBattleStateMessage"
+        - $ref: "#/components/schemas/BattleWsBattleEndMessage"
+        - $ref: "#/components/schemas/BattleWsReconnectedMessage"
+        - $ref: "#/components/schemas/BattleWsErrorMessage"
+      discriminator:
+        propertyName: type
+        mapping:
+          queue_joined: "#/components/schemas/BattleWsQueueJoinedMessage"
+          queue_left:   "#/components/schemas/BattleWsQueueLeftMessage"
+          battle_start: "#/components/schemas/BattleWsBattleStartMessage"
+          battle_state: "#/components/schemas/BattleWsBattleStateMessage"
+          battle_end:   "#/components/schemas/BattleWsBattleEndMessage"
+          reconnected:  "#/components/schemas/BattleWsReconnectedMessage"
+          error:        "#/components/schemas/BattleWsErrorMessage"

@@ -21,6 +21,7 @@ import type {
   EquippedArtifactSlot,
   FighterState,
 } from "@workspace/api-client-react";
+import { BattleWsServerMessageSchema } from "@workspace/api-zod";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -476,10 +477,15 @@ export default function BattlePage() {
         };
 
         ws.onmessage = (ev) => {
+          let rawJson: unknown;
           try {
-            const msg = JSON.parse(ev.data as string) as { type: string; [k: string]: unknown };
-            handleWsMessage(msg);
-          } catch { /* ignore */ }
+            rawJson = JSON.parse(ev.data as string);
+          } catch { return; }
+          // Validate every inbound message against the shared OpenAPI-derived
+          // Zod schema so the UI never trusts an unknown envelope shape.
+          const parsed = BattleWsServerMessageSchema.safeParse(rawJson);
+          if (!parsed.success) return;
+          handleWsMessage(parsed.data);
         };
 
         ws.onerror = () => {
@@ -497,17 +503,18 @@ export default function BattlePage() {
       });
   }, [pid, selectedHatchling, mode, rematchInviteId]);
 
+  type ServerMsg = ReturnType<typeof BattleWsServerMessageSchema.parse>;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  function handleWsMessage(msg: { type: string; [k: string]: unknown }) {
+  function handleWsMessage(msg: ServerMsg) {
     if (msg.type === "battle_start") {
       if (queueTimerRef.current) clearInterval(queueTimerRef.current);
-      const slot = Number(msg.yourSlot) as 1 | 2;
+      const slot = msg.yourSlot as 1 | 2;
       setYourSlot(slot);
-      setBattleState(msg.state as BattleState);
+      setBattleState(msg.state as unknown as BattleState);
       setPhase("battle");
     }
     if (msg.type === "battle_state") {
-      const newState = msg.state as BattleState;
+      const newState = msg.state as unknown as BattleState;
       setBattleState(prev => {
         const prevTurns = prev?.turns.length ?? 0;
         const newTurns  = newState.turns;
@@ -516,15 +523,19 @@ export default function BattlePage() {
       });
     }
     if (msg.type === "battle_end") {
-      const endState = msg.state as BattleState;
+      const endState = msg.state as unknown as BattleState;
       setBattleState(endState);
       const r = {
-        xp:        (msg.rewards as { xp: number }).xp,
-        coins:     (msg.rewards as { coins: number }).coins,
-        eloChange: Number(msg.eloChange ?? 0),
+        xp:        msg.rewards.xp,
+        coins:     msg.rewards.coins,
+        eloChange: msg.eloChange,
       };
       setRewards(r);
-      const gains = (msg.artifactXp as ArtifactXpGain[] | undefined) ?? [];
+      const gains: ArtifactXpGain[] = msg.artifactXp.map(g => ({
+        artifactId: g.artifactId,
+        xpGained:   g.xpGained,
+        newStage:   g.newStage,
+      }));
       setArtifactXpGains(gains);
       setLastTurn(null);
       setPhase("result");

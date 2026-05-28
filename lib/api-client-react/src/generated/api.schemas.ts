@@ -2270,6 +2270,232 @@ export interface BattleState {
   turns: BattleTurnResult[];
 }
 
+export type BattleWsJoinQueueMessageType = typeof BattleWsJoinQueueMessageType[keyof typeof BattleWsJoinQueueMessageType];
+
+
+export const BattleWsJoinQueueMessageType = {
+  join_queue: 'join_queue',
+} as const;
+
+export type BattleWsJoinQueueMessageMode = typeof BattleWsJoinQueueMessageMode[keyof typeof BattleWsJoinQueueMessageMode];
+
+
+export const BattleWsJoinQueueMessageMode = {
+  casual: 'casual',
+  ranked: 'ranked',
+} as const;
+
+export interface BattleWsJoinQueueMessage {
+  type: BattleWsJoinQueueMessageType;
+  hatchlingId: number;
+  mode: BattleWsJoinQueueMessageMode;
+  rematchInviteId?: string;
+}
+
+export type BattleWsLeaveQueueMessageType = typeof BattleWsLeaveQueueMessageType[keyof typeof BattleWsLeaveQueueMessageType];
+
+
+export const BattleWsLeaveQueueMessageType = {
+  leave_queue: 'leave_queue',
+} as const;
+
+export interface BattleWsLeaveQueueMessage {
+  type: BattleWsLeaveQueueMessageType;
+}
+
+export type BattleWsPlayerMoveMessageType = typeof BattleWsPlayerMoveMessageType[keyof typeof BattleWsPlayerMoveMessageType];
+
+
+export const BattleWsPlayerMoveMessageType = {
+  player_move: 'player_move',
+} as const;
+
+export type BattleWsPlayerMoveMessageMove = typeof BattleWsPlayerMoveMessageMove[keyof typeof BattleWsPlayerMoveMessageMove];
+
+
+export const BattleWsPlayerMoveMessageMove = {
+  basic_attack: 'basic_attack',
+  special_move: 'special_move',
+  defend: 'defend',
+  use_item: 'use_item',
+} as const;
+
+export interface BattleWsPlayerMoveMessage {
+  type: BattleWsPlayerMoveMessageType;
+  battleId: number;
+  move: BattleWsPlayerMoveMessageMove;
+}
+
+export type BattleWsReconnectMessageType = typeof BattleWsReconnectMessageType[keyof typeof BattleWsReconnectMessageType];
+
+
+export const BattleWsReconnectMessageType = {
+  reconnect: 'reconnect',
+} as const;
+
+export interface BattleWsReconnectMessage {
+  type: BattleWsReconnectMessageType;
+}
+
+export type BattleWsClientMessage = BattleWsJoinQueueMessage | BattleWsLeaveQueueMessage | BattleWsPlayerMoveMessage | BattleWsReconnectMessage;
+
+export type BattleWsQueueJoinedMessageType = typeof BattleWsQueueJoinedMessageType[keyof typeof BattleWsQueueJoinedMessageType];
+
+
+export const BattleWsQueueJoinedMessageType = {
+  queue_joined: 'queue_joined',
+} as const;
+
+export type BattleWsQueueJoinedMessageMode = typeof BattleWsQueueJoinedMessageMode[keyof typeof BattleWsQueueJoinedMessageMode];
+
+
+export const BattleWsQueueJoinedMessageMode = {
+  casual: 'casual',
+  ranked: 'ranked',
+} as const;
+
+export interface BattleWsQueueJoinedMessage {
+  type: BattleWsQueueJoinedMessageType;
+  position: number;
+  mode: BattleWsQueueJoinedMessageMode;
+  /** @nullable */
+  rematchInviteId: string | null;
+}
+
+export type BattleWsQueueLeftMessageType = typeof BattleWsQueueLeftMessageType[keyof typeof BattleWsQueueLeftMessageType];
+
+
+export const BattleWsQueueLeftMessageType = {
+  queue_left: 'queue_left',
+} as const;
+
+export interface BattleWsQueueLeftMessage {
+  type: BattleWsQueueLeftMessageType;
+}
+
+export type BattleWsBattleStartMessageType = typeof BattleWsBattleStartMessageType[keyof typeof BattleWsBattleStartMessageType];
+
+
+export const BattleWsBattleStartMessageType = {
+  battle_start: 'battle_start',
+} as const;
+
+export type BattleWsBattleStartMessageYourSlot = typeof BattleWsBattleStartMessageYourSlot[keyof typeof BattleWsBattleStartMessageYourSlot];
+
+
+export const BattleWsBattleStartMessageYourSlot = {
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+} as const;
+
+export interface BattleWsBattleStartMessage {
+  type: BattleWsBattleStartMessageType;
+  battleId: number;
+  slot1PlayerId: number;
+  /** Player id of slot 2, or `0` when slot 2 is a bot. */
+  slot2PlayerId: number;
+  state: BattleState;
+  yourSlot: BattleWsBattleStartMessageYourSlot;
+}
+
+export type BattleWsBattleStateMessageType = typeof BattleWsBattleStateMessageType[keyof typeof BattleWsBattleStateMessageType];
+
+
+export const BattleWsBattleStateMessageType = {
+  battle_state: 'battle_state',
+} as const;
+
+export interface BattleWsBattleStateMessage {
+  type: BattleWsBattleStateMessageType;
+  battleId: number;
+  state: BattleState;
+}
+
+export interface BattleWsRewards {
+  xp: number;
+  coins: number;
+}
+
+export interface BattleWsArtifactXpGain {
+  artifactId: number;
+  newStage: number;
+  xpGained: number;
+}
+
+export type BattleWsBattleEndMessageType = typeof BattleWsBattleEndMessageType[keyof typeof BattleWsBattleEndMessageType];
+
+
+export const BattleWsBattleEndMessageType = {
+  battle_end: 'battle_end',
+} as const;
+
+/**
+ * Winning slot (1 or 2), `0` for a draw, `null` if the battle ended without a resolved winner.
+ * @nullable
+ */
+export type BattleWsBattleEndMessageWinner = typeof BattleWsBattleEndMessageWinner[keyof typeof BattleWsBattleEndMessageWinner] | null;
+
+
+export const BattleWsBattleEndMessageWinner = {
+  NUMBER_0: 0,
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+} as const;
+
+export interface BattleWsBattleEndMessage {
+  type: BattleWsBattleEndMessageType;
+  battleId: number;
+  /**
+     * Winning slot (1 or 2), `0` for a draw, `null` if the battle ended without a resolved winner.
+     * @nullable
+     */
+  winner: BattleWsBattleEndMessageWinner;
+  rewards: BattleWsRewards;
+  eloChange: number;
+  artifactXp: BattleWsArtifactXpGain[];
+  state: BattleState;
+}
+
+export type BattleWsReconnectedMessageType = typeof BattleWsReconnectedMessageType[keyof typeof BattleWsReconnectedMessageType];
+
+
+export const BattleWsReconnectedMessageType = {
+  reconnected: 'reconnected',
+} as const;
+
+export type BattleWsReconnectedMessageYourSlot = typeof BattleWsReconnectedMessageYourSlot[keyof typeof BattleWsReconnectedMessageYourSlot];
+
+
+export const BattleWsReconnectedMessageYourSlot = {
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+} as const;
+
+export interface BattleWsReconnectedMessage {
+  type: BattleWsReconnectedMessageType;
+  battleId: number;
+  yourSlot: BattleWsReconnectedMessageYourSlot;
+  state: BattleState;
+}
+
+export type BattleWsErrorMessageType = typeof BattleWsErrorMessageType[keyof typeof BattleWsErrorMessageType];
+
+
+export const BattleWsErrorMessageType = {
+  error: 'error',
+} as const;
+
+export interface BattleWsErrorMessage {
+  type: BattleWsErrorMessageType;
+  message: string;
+  /** Machine-readable error code, e.g. `battle_daily_cap_reached`. */
+  error?: string;
+  /** Free-tier daily cap value, included with `battle_daily_cap_reached` errors. */
+  cap?: number;
+}
+
+export type BattleWsServerMessage = BattleWsQueueJoinedMessage | BattleWsQueueLeftMessage | BattleWsBattleStartMessage | BattleWsBattleStateMessage | BattleWsBattleEndMessage | BattleWsReconnectedMessage | BattleWsErrorMessage;
+
 export type SearchPlayersParams = {
 /**
  * @minLength 1

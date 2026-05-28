@@ -30,6 +30,8 @@ import type {
   ArtifactLoadout,
   ArtifactMuseumEntry,
   ArtifactWorldNotification,
+  BattleWsClientMessage,
+  BattleWsServerMessage,
   Challenge,
   ChallengeDetail,
   ChallengeInvite,
@@ -12184,6 +12186,157 @@ export const usePreviewNutritionRecap = <TError = ErrorType<StorageErrorEnvelope
         TContext
       > => {
       return useMutation(getPreviewNutritionRecapMutationOptions(options));
+    }
+
+export const getDocsValidateBattleWsClientMessageUrl = () => {
+
+
+
+
+  return `/api/battles/ws/protocol/client-message`
+}
+
+/**
+ * Documentation-only endpoint that defines the schema of messages the
+client sends over the live battle WebSocket (`/api/ws/battle`). The
+endpoint itself returns `410 Gone` — clients should send these
+messages over the WebSocket, not via HTTP.
+
+ * @summary [Docs only] Validate a client→server battle WS message
+ */
+export const docsValidateBattleWsClientMessage = async (battleWsClientMessage: BattleWsClientMessage, options?: RequestInit): Promise<unknown> => {
+
+  return customFetch<unknown>(getDocsValidateBattleWsClientMessageUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      battleWsClientMessage,)
+  }
+);}
+
+
+
+
+export const getDocsValidateBattleWsClientMessageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof docsValidateBattleWsClientMessage>>, TError,{data: BodyType<BattleWsClientMessage>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof docsValidateBattleWsClientMessage>>, TError,{data: BodyType<BattleWsClientMessage>}, TContext> => {
+
+const mutationKey = ['docsValidateBattleWsClientMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof docsValidateBattleWsClientMessage>>, {data: BodyType<BattleWsClientMessage>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  docsValidateBattleWsClientMessage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DocsValidateBattleWsClientMessageMutationResult = NonNullable<Awaited<ReturnType<typeof docsValidateBattleWsClientMessage>>>
+    export type DocsValidateBattleWsClientMessageMutationBody = BodyType<BattleWsClientMessage>
+    export type DocsValidateBattleWsClientMessageMutationError = ErrorType<void>
+
+    /**
+ * @summary [Docs only] Validate a client→server battle WS message
+ */
+export const useDocsValidateBattleWsClientMessage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof docsValidateBattleWsClientMessage>>, TError,{data: BodyType<BattleWsClientMessage>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof docsValidateBattleWsClientMessage>>,
+        TError,
+        {data: BodyType<BattleWsClientMessage>},
+        TContext
+      > => {
+      return useMutation(getDocsValidateBattleWsClientMessageMutationOptions(options));
+    }
+
+export const getDocsValidateBattleWsServerMessageUrl = () => {
+
+
+
+
+  return `/api/battles/ws/protocol/server-message`
+}
+
+/**
+ * Documentation-only endpoint that defines the schema of messages the
+server pushes to clients over the live battle WebSocket
+(`/api/ws/battle`). The endpoint itself returns `410 Gone`.
+
+ * @summary [Docs only] Validate a server→client battle WS message
+ */
+export const docsValidateBattleWsServerMessage = async (battleWsServerMessage: BattleWsServerMessage, options?: RequestInit): Promise<unknown> => {
+
+  return customFetch<unknown>(getDocsValidateBattleWsServerMessageUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      battleWsServerMessage,)
+  }
+);}
+
+
+
+
+export const getDocsValidateBattleWsServerMessageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof docsValidateBattleWsServerMessage>>, TError,{data: BodyType<BattleWsServerMessage>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof docsValidateBattleWsServerMessage>>, TError,{data: BodyType<BattleWsServerMessage>}, TContext> => {
+
+const mutationKey = ['docsValidateBattleWsServerMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof docsValidateBattleWsServerMessage>>, {data: BodyType<BattleWsServerMessage>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  docsValidateBattleWsServerMessage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DocsValidateBattleWsServerMessageMutationResult = NonNullable<Awaited<ReturnType<typeof docsValidateBattleWsServerMessage>>>
+    export type DocsValidateBattleWsServerMessageMutationBody = BodyType<BattleWsServerMessage>
+    export type DocsValidateBattleWsServerMessageMutationError = ErrorType<void>
+
+    /**
+ * @summary [Docs only] Validate a server→client battle WS message
+ */
+export const useDocsValidateBattleWsServerMessage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof docsValidateBattleWsServerMessage>>, TError,{data: BodyType<BattleWsServerMessage>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof docsValidateBattleWsServerMessage>>,
+        TError,
+        {data: BodyType<BattleWsServerMessage>},
+        TContext
+      > => {
+      return useMutation(getDocsValidateBattleWsServerMessageMutationOptions(options));
     }
 
 export const getUpdatePhysiqueGoalUrl = () => {
