@@ -1,8 +1,8 @@
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  useGetGlobalLeaderboard, 
+import {
+  useGetGlobalLeaderboard,
   getGetGlobalLeaderboardQueryKey,
   useListEvents,
   getListEventsQueryKey,
@@ -16,8 +16,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Trophy, Calendar, Users, Swords, Medal } from "lucide-react";
+import { Trophy, Calendar, Users, Swords, MoreVertical } from "lucide-react";
 import { motion } from "framer-motion";
+import { ReportBlockMenu } from "@/components/report-block-menu";
+import { SafetyBanner } from "@/components/safety-banner";
 
 export default function Social() {
   const { playerId } = usePlayer();
@@ -36,6 +38,8 @@ export default function Social() {
     { limit: 10 },
     { query: { queryKey: getListClubsQueryKey({ limit: 10 }) } }
   );
+
+  const hasActiveEvent = events?.some(e => e.status === "active");
 
   return (
     <Layout>
@@ -70,11 +74,11 @@ export default function Social() {
                   {leaderboard?.map((entry, index) => (
                     <div key={entry.playerId} className="flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors">
                       <div className="w-8 text-center font-black text-xl text-muted-foreground">
-                        {entry.position === 1 ? '🥇' : entry.position === 2 ? '🥈' : entry.position === 3 ? '🥉' : `#${entry.position}`}
+                        {entry.position === 1 ? "🥇" : entry.position === 2 ? "🥈" : entry.position === 3 ? "🥉" : `#${entry.position}`}
                       </div>
                       <Avatar className="h-12 w-12 border border-border">
                         <AvatarImage src={entry.avatarUrl || undefined} />
-                        <AvatarFallback className="font-bold">{entry.username.substring(0,2).toUpperCase()}</AvatarFallback>
+                        <AvatarFallback className="font-bold">{entry.username.substring(0, 2).toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
                         <p className="font-bold text-lg leading-tight">{entry.displayName || entry.username}</p>
@@ -84,6 +88,18 @@ export default function Social() {
                         <div className="font-black text-xl">{entry.score}</div>
                         <div className="text-xs text-green-500 font-bold">{entry.wins} Wins</div>
                       </div>
+                      {entry.playerId !== pid && (
+                        <ReportBlockMenu
+                          trigger={
+                            <button className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground">
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+                          }
+                          targetPlayerId={entry.playerId}
+                          targetName={entry.displayName ?? entry.username}
+                          contentType="profile"
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -92,6 +108,7 @@ export default function Social() {
           </TabsContent>
 
           <TabsContent value="events">
+            {hasActiveEvent && <div className="mb-4"><SafetyBanner variant="event" compact /></div>}
             {isLoadingEvents ? (
               <div className="space-y-4">
                 {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-48 w-full rounded-2xl" />)}
@@ -108,13 +125,18 @@ export default function Social() {
                             <Calendar className="w-4 h-4" /> {new Date(event.startsAt).toLocaleDateString()}
                           </p>
                         </div>
-                        {event.status === 'active' && (
+                        {event.status === "active" && (
                           <Badge variant="destructive" className="animate-pulse">LIVE</Badge>
                         )}
                       </div>
-                      <p className="text-muted-foreground font-medium mb-6">{event.description}</p>
-                      <Button className="w-full font-bold active-elevate" variant={event.status === 'active' ? 'default' : 'secondary'}>
-                        {event.status === 'active' ? 'Join Event' : 'Starts Soon'}
+                      <p className="text-muted-foreground font-medium mb-4">{event.description}</p>
+                      {event.status === "active" && (
+                        <p className="text-xs text-amber-400 font-bold mb-4">
+                          🛡️ Meet in public locations only. Use caution when meeting new people.
+                        </p>
+                      )}
+                      <Button className="w-full font-bold active-elevate" variant={event.status === "active" ? "default" : "secondary"}>
+                        {event.status === "active" ? "Join Event" : "Starts Soon"}
                       </Button>
                     </CardContent>
                   </Card>

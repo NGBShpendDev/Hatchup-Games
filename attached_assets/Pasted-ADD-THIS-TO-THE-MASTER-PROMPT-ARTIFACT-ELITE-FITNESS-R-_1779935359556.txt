@@ -1,0 +1,177 @@
+ADD THIS TO THE MASTER PROMPT:
+
+========================================
+
+ARTIFACT + ELITE FITNESS RELIC SYSTEM
+
+Create a legendary Artifact System that rewards players with rare relics, boosts, and collectible items for completing elite fitness achievements and long-term progression goals.
+
+Artifacts should feel:
+- rare
+- powerful
+- prestigious
+- collectible
+- mysterious
+- exciting to unlock
+
+Players should become obsessed with collecting elite artifacts.
+
+========================================
+
+ARTIFACT SYSTEM OVERVIEW
+
+Artifacts are special items earned through:
+- elite fitness milestones
+- legendary streaks
+- tournaments
+- ranked battles
+- world events
+- transformation goals
+- endurance achievements
+- rare discoveries
+- seasonal competitions
+
+Artifacts can:
+- boost HatchUp stats
+- unlock cosmetic effects
+- activate special abilities
+- improve XP gain
+- provide passive buffs
+- unlock exclusive evolutions
+- unlock secret content
+
+========================================
+
+ARTIFACT RARITY TIERS
+
+RARITIES:
+- Common
+- Rare
+- Epic
+- Legendary
+- Mythic
+- Ancient
+- Celestial
+
+Higher rarity artifacts should have:
+- animated effects
+- glowing visuals
+- lore descriptions
+- unique sounds
+- prestige value
+- showcase effects
+
+========================================
+
+FITNESS BAR SYSTEM
+
+Create elite fitness progression bars that level independently.
+
+FITNESS BARS:
+- Strength Bar
+- Speed Bar
+- Cardio Bar
+- Recovery Bar
+- Consistency Bar
+- Endurance Bar
+- Agility Bar
+- Discipline Bar
+
+Fitness bars level up through real-world activity.
+
+Examples:
+- cardio workouts level cardio bar
+- sprinting levels speed bar
+- strength training levels strength bar
+- sleep consistency levels recovery bar
+
+As bars level up players unlock:
+- artifacts
+- special moves
+- rare eggs
+- aura effects
+- stat boosts
+- prestige rewards
+- exclusive cosmetics
+
+========================================
+
+ELITE GOAL REWARDS
+
+Completing difficult goals unlocks legendary rewards.
+
+Examples:
+- 100-day streak
+- 1 million total steps
+- marathon completion
+- 100k pushups
+- elite ranked battles
+- body transformation milestones
+- tournament wins
+
+Rewards include:
+- Mythic Artifacts
+- Ancient Relics
+- Legendary Evolutions
+- Animated Auras
+- Elite Titles
+- Exclusive Arenas
+
+========================================
+
+ARTIFACT ABILITIES
+
+Artifacts should provide unique gameplay effects.
+
+Examples:
+- XP Boost Artifact
+- Speed Enhancement Relic
+- Recovery Crystal
+- Strength Totem
+- Lucky Hatch Charm
+- Evolution Amplifier
+- Critical Hit Rune
+
+Some artifacts should only activate if:
+- fitness streaks stay active
+- workout goals are maintained
+- recovery goals are completed
+
+========================================
+
+VISUAL + SOCIAL FLEX
+
+Artifacts should be:
+- displayed on profiles
+- showcased in battle intros
+- visible in social hubs
+- flexed beside usernames
+
+Create:
+- artifact collections
+- artifact museums
+- rare drop announcements
+- world notifications for ultra-rare finds
+
+Example:
+“Player unlocked the Mythic Phoenix Core Artifact.”
+
+========================================
+
+MYSTERY + DISCOVERY SYSTEM
+
+Some artifacts should be hidden and discovered through:
+- secret challenges
+- rare fitness milestones
+- community events
+- elite rankings
+- mystery encounters
+- seasonal content
+
+Make discovery feel exciting and legendary.
+
+========================================
+
+MAIN GOAL
+
+Create a progression system where fitness achievements feel legendary and rewarding, turning real-world discipline into rare collectible power and prestige inside the HatchUp universe.

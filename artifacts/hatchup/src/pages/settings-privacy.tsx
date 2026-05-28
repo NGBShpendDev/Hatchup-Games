@@ -43,7 +43,7 @@ export default function SettingsPrivacy() {
 
   useEffect(() => {
     if (!playerId || loaded) return;
-    fetch(`/api/players/${playerId}/privacy-settings`, { credentials: "include" })
+    fetch(`/api/players/${playerId}/privacy-settings?callerId=${playerId}`, { credentials: "include" })
       .then(r => r.json())
       .then(data => {
         setLocationVisibility(data.locationVisibility ?? "city");
@@ -64,6 +64,7 @@ export default function SettingsPrivacy() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          callerId: playerId,
           locationVisibility,
           requireWorkoutApproval: requireApproval,
           emergencyContactName: emergencyName || null,

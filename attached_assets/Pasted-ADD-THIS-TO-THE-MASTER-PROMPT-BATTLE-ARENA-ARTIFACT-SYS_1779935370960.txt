@@ -1,0 +1,191 @@
+ADD THIS TO THE MASTER PROMPT:
+
+========================================
+
+BATTLE ARENA ARTIFACT SYSTEM
+
+Allow Artifacts to be equipped and used inside HatchUp battle arenas.
+
+Artifacts should play a major role in:
+- strategy
+- combat builds
+- team composition
+- play styles
+- ranked battles
+- tournaments
+
+Artifacts should feel powerful but balanced.
+
+========================================
+
+ARTIFACT EQUIP SYSTEM
+
+Players can equip artifacts onto their HatchUps before battles.
+
+Each HatchUp can equip:
+- 1 Major Artifact
+- 2 Minor Artifacts
+- cosmetic relic effects
+
+Artifacts modify:
+- stats
+- abilities
+- cooldowns
+- stamina
+- movement speed
+- critical hit chance
+- defense
+- recovery
+- special attacks
+
+========================================
+
+ARTIFACT TYPES
+
+Create multiple artifact categories.
+
+OFFENSIVE ARTIFACTS:
+- increase attack power
+- boost combo damage
+- improve critical hits
+- unlock rage effects
+
+DEFENSIVE ARTIFACTS:
+- shields
+- damage reduction
+- healing boosts
+- recovery speed
+
+SPEED ARTIFACTS:
+- dodge boosts
+- sprint speed
+- cooldown reduction
+- agility boosts
+
+FITNESS ARTIFACTS:
+- stronger buffs from workouts
+- increased streak bonuses
+- temporary boosts after completing goals
+
+UTILITY ARTIFACTS:
+- XP boosts
+- bonus rewards
+- loot drop increases
+- energy regeneration
+
+========================================
+
+FITNESS-POWERED ARTIFACT ACTIVATION
+
+Some artifacts only activate when users maintain real-world fitness consistency.
+
+Examples:
+- cardio streak activates Speed Core
+- hydration streak activates Recovery Crystal
+- strength streak activates Titan Relic
+- sleep streak activates Energy Rune
+
+If players stop maintaining goals:
+- artifact power weakens
+- buffs decrease
+- elite abilities deactivate
+
+This creates strong motivation for real-world consistency.
+
+========================================
+
+LEGENDARY + MYTHIC ARTIFACTS
+
+Rare artifacts should completely change battle strategies.
+
+Examples:
+- Phoenix Core → revive once after knockout
+- Storm Rune → chain lightning attacks
+- Titan Heart → massive strength boost
+- Shadow Relic → temporary invisibility
+- Chrono Crystal → cooldown reset ability
+
+Legendary artifacts should:
+- have cinematic effects
+- feel extremely rare
+- create hype
+- become flex items
+
+========================================
+
+ARTIFACT COMBINATIONS
+
+Allow players to create builds by combining artifacts.
+
+Examples:
+- Speed Build
+- Tank Build
+- Critical Hit Build
+- Recovery Build
+- Rage Build
+- Endurance Build
+
+Players should experiment with:
+- synergy combinations
+- battle strategies
+- team setups
+- counter builds
+
+========================================
+
+ARTIFACT EVOLUTION SYSTEM
+
+Artifacts can level up and evolve through:
+- battles
+- workouts
+- streaks
+- elite achievements
+- tournaments
+
+Evolved artifacts gain:
+- stronger effects
+- visual upgrades
+- animations
+- additional abilities
+
+========================================
+
+ARENA VISUAL EFFECTS
+
+Artifacts should visually appear during combat.
+
+Examples:
+- glowing energy
+- aura trails
+- elemental effects
+- lightning bursts
+- fire explosions
+- shield projections
+- cinematic ultimate activations
+
+Battle arenas should feel intense and visually legendary.
+
+========================================
+
+BALANCED COMPETITIVE SYSTEM
+
+Artifacts should improve strategy without making battles unfair.
+
+Balance rules:
+- no pay-to-win advantages
+- skill still matters most
+- matchmaking balance systems
+- ranked balancing
+- artifact cooldown systems
+
+Competitive gameplay should feel:
+- fair
+- strategic
+- rewarding
+- highly replayable
+
+========================================
+
+MAIN GOAL
+
+Turn artifacts into one of the most exciting parts of HatchUp battles, making players grind fitness goals to unlock legendary battle power, elite strategies, and prestige-worthy collectible relics.

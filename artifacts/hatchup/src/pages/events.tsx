@@ -1,16 +1,26 @@
 import { Layout } from "@/components/layout";
+import { usePlayer } from "@/lib/playerContext";
 import { useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, Gift, Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Calendar, Clock, Gift, Users, Phone } from "lucide-react";
 import { motion } from "framer-motion";
+import { SafetyBanner } from "@/components/safety-banner";
 
 export default function Events() {
+  const { player } = usePlayer();
   const { data: events, isLoading } = useListEvents(
     {},
     { query: { queryKey: getListEventsQueryKey({}) } }
   );
+
+  const hasActiveEvent = events?.some(e => e.status === "active");
+  const hasEmergencyContact =
+    player &&
+    ((player as { emergencyContactName?: string }).emergencyContactName ||
+      (player as { emergencyContactPhone?: string }).emergencyContactPhone);
 
   return (
     <Layout>
@@ -22,6 +32,52 @@ export default function Events() {
           <p className="text-lg text-muted-foreground font-medium">Massive community events with exclusive rewards.</p>
         </div>
 
+        {/* Safety reminder shown when any active live event exists */}
+        {hasActiveEvent && (
+          <SafetyBanner variant="event" dismissible />
+        )}
+
+        {/* Emergency contact reminder for active events */}
+        {hasActiveEvent && !hasEmergencyContact && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex items-start gap-3 rounded-2xl border border-green-500/20 bg-green-950/10 p-4"
+          >
+            <Phone className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-bold text-sm text-green-300">No emergency contact set</p>
+              <p className="text-xs text-green-200/70 font-medium mt-0.5">
+                Before attending live events, add an emergency contact in your{" "}
+                <a href="/settings/privacy" className="underline text-green-400 hover:text-green-300">
+                  Privacy Settings
+                </a>
+                .
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Emergency contact display when set */}
+        {hasActiveEvent && hasEmergencyContact && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex items-center gap-3 rounded-2xl border border-green-500/30 bg-green-950/20 px-4 py-3"
+          >
+            <Phone className="w-4 h-4 text-green-400 shrink-0" />
+            <p className="text-xs text-green-300 font-medium">
+              Emergency contact:{" "}
+              <span className="font-black">
+                {(player as { emergencyContactName?: string }).emergencyContactName ?? ""}{" "}
+                {(player as { emergencyContactPhone?: string }).emergencyContactPhone
+                  ? `(${(player as { emergencyContactPhone?: string }).emergencyContactPhone})`
+                  : ""}
+              </span>
+            </p>
+          </motion.div>
+        )}
+
         {isLoading ? (
           <div className="space-y-6">
             {[...Array(3)].map((_, i) => (
@@ -32,29 +88,35 @@ export default function Events() {
           <div className="space-y-6">
             {events?.map(event => (
               <motion.div key={event.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                <Card className={`overflow-hidden border-2 transition-all ${event.status === 'active' ? 'border-red-500 shadow-xl shadow-red-500/10' : 'border-border opacity-75'}`}>
+                <Card className={`overflow-hidden border-2 transition-all ${event.status === "active" ? "border-red-500 shadow-xl shadow-red-500/10" : "border-border opacity-75"}`}>
                   <div className="flex flex-col md:flex-row">
                     <div className="w-full md:w-1/3 h-48 md:h-auto bg-muted relative">
                       {event.imageUrl && <img src={event.imageUrl} alt={event.name} className="w-full h-full object-cover" />}
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent to-background/90 md:bg-gradient-to-l" />
-                      {event.status === 'active' && (
+                      {event.status === "active" && (
                         <div className="absolute top-4 left-4 bg-red-500 text-white text-xs font-black uppercase px-3 py-1.5 rounded-full animate-pulse shadow-lg">
                           Live Now
                         </div>
                       )}
                     </div>
-                    
+
                     <div className="p-6 md:p-8 flex-1 flex flex-col justify-between">
                       <div>
                         <div className="flex items-center gap-2 mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                          <span className="flex items-center gap-1"><Clock className="w-3 h-3"/> {new Date(event.startsAt).toLocaleDateString()}</span>
+                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(event.startsAt).toLocaleDateString()}</span>
                           <span>•</span>
                           <span className="text-primary">{event.type}</span>
                         </div>
                         <h2 className="text-3xl font-black mb-3">{event.name}</h2>
-                        <p className="text-muted-foreground font-medium mb-6">{event.description}</p>
+                        <p className="text-muted-foreground font-medium mb-4">{event.description}</p>
+
+                        {event.status === "active" && (
+                          <p className="text-xs text-amber-400 font-bold mb-4 flex items-center gap-1">
+                            🛡️ Meet in public locations only. Use caution when meeting new people.
+                          </p>
+                        )}
                       </div>
-                      
+
                       <div className="flex flex-wrap gap-4 items-center justify-between mt-auto">
                         <div className="flex gap-6">
                           <div className="flex items-center gap-2 text-sm font-bold">
@@ -68,13 +130,13 @@ export default function Events() {
                             </div>
                           )}
                         </div>
-                        <Button 
-                          size="lg" 
-                          variant={event.status === 'active' ? 'default' : 'secondary'}
+                        <Button
+                          size="lg"
+                          variant={event.status === "active" ? "default" : "secondary"}
                           className="font-bold w-full md:w-auto active-elevate"
-                          disabled={event.status !== 'active'}
+                          disabled={event.status !== "active"}
                         >
-                          {event.status === 'active' ? 'Join Event' : 'Starts Soon'}
+                          {event.status === "active" ? "Join Event" : "Starts Soon"}
                         </Button>
                       </div>
                     </div>

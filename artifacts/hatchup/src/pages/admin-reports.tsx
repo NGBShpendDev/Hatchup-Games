@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,17 +43,18 @@ export default function AdminReports() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState<"open" | "resolved" | "dismissed" | "all">("open");
 
+  const isAdmin = !!(player as { isAdmin?: boolean } | null)?.isAdmin;
+
   const { data: reports, isLoading } = useQuery<AdminReport[]>({
-    queryKey: ["admin-reports", filter],
+    queryKey: ["admin-reports", filter, playerId],
     queryFn: async () => {
-      const url = filter === "all"
-        ? `/api/admin/reports`
-        : `/api/admin/reports?status=${filter}`;
-      const res = await fetch(url, { credentials: "include" });
+      const params = new URLSearchParams({ adminId: String(playerId) });
+      if (filter !== "all") params.set("status", filter);
+      const res = await fetch(`/api/admin/reports?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("Unauthorized");
       return res.json();
     },
-    enabled: !!(player as { isAdmin?: boolean } | null)?.isAdmin,
+    enabled: isAdmin && !!playerId,
   });
 
   const handleAction = async (reportId: number, action: "resolved" | "dismissed") => {
@@ -61,7 +62,7 @@ export default function AdminReports() {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: action }),
+      body: JSON.stringify({ adminId: playerId, status: action }),
     });
     if (res.ok) {
       toast({ title: action === "resolved" ? "Report resolved" : "Report dismissed" });
@@ -69,7 +70,7 @@ export default function AdminReports() {
     }
   };
 
-  if (!(player as { isAdmin?: boolean } | null)?.isAdmin) {
+  if (!isAdmin) {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center h-64 gap-4">

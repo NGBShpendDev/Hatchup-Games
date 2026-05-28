@@ -1,0 +1,131 @@
+ADD THIS TO THE MASTER PROMPT:
+
+========================================
+
+DYNAMIC GPS LEADERBOARD SYSTEM
+
+Create a location-based leaderboard system that ranks players by:
+- country
+- state
+- county
+- city
+- local area
+- gym
+- school
+- fitness crew
+
+The leaderboard should update based on the user’s current GPS location and residence area.
+
+========================================
+
+LOCATION-BASED RANKINGS
+
+Users should be able to see rankings for:
+- world
+- country
+- state
+- county
+- city
+- neighborhood
+- nearby gyms
+- local events
+
+Examples:
+- #12 in the United States
+- #4 in North Carolina
+- #1 in Wake County
+- #3 in Raleigh
+- #1 at local gym
+- #8 in nearby runners
+
+========================================
+
+DYNAMIC RANK CHANGES
+
+As users travel or move locations, their rankings can change depending on where they are.
+
+Example:
+A player ranked #500 globally may become:
+- #20 in their state
+- #3 in their county
+- #1 in a small town
+- #15 near a local gym
+
+This creates constant motivation, competition, and local pride.
+
+========================================
+
+GPS + PRIVACY SAFETY
+
+Use GPS carefully and securely.
+
+Include:
+- opt-in location permissions
+- approximate location options
+- hidden exact location
+- privacy radius controls
+- public ranking without exposing home address
+- anti-stalking protections
+- parental controls
+- safe mode for minors
+- location spoofing detection
+- encrypted location data
+
+Never show a user’s exact live location to strangers.
+
+========================================
+
+LEADERBOARD CATEGORIES
+
+Create rankings for:
+- steps
+- workouts
+- battles
+- wins
+- streaks
+- running speed
+- cycling speed
+- pushups
+- burpees
+- squats
+- pull-ups
+- HatchUp level
+- artifacts collected
+- badges earned
+- tournament wins
+- transformation progress
+
+========================================
+
+LOCAL CHALLENGES
+
+Create GPS-based local competitions:
+- city step challenge
+- county pushup challenge
+- state battle tournament
+- country leaderboard race
+- local gym war
+- neighborhood streak challenge
+
+Reward winners with:
+- badges
+- XP
+- coins
+- cosmetics
+- artifacts
+- rare eggs
+- title rewards
+
+========================================
+
+MAIN GOAL
+
+Make every user feel like they can compete locally, regionally, nationally, and globally.
+
+The ranking system should create:
+- pride
+- rivalry
+- motivation
+- social flex
+- community competition
+- viral city-versus-city challenges

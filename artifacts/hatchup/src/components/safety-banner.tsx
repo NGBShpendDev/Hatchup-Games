@@ -9,9 +9,9 @@ interface SafetyBannerProps {
   compact?: boolean;
 }
 
-const MESSAGES = {
+const MESSAGES: Record<string, string> = {
   default: "Meet in public locations only. Use caution when meeting new people.",
-  meetup: "Always meet workout partners in public places like gyms, parks, or recreation centers.",
+  meetup: "Meet in public locations only. Use caution when meeting new people.",
   event: "This is a public event. Meet only in the listed public location. Report suspicious behavior immediately.",
 };
 

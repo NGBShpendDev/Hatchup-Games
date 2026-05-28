@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Flag, Ban, ChevronRight, X, AlertTriangle } from "lucide-react";
+import { Flag, Ban, ChevronRight, AlertTriangle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,6 +53,7 @@ export function ReportBlockMenu({ trigger, targetPlayerId, targetName, contentTy
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          reporterId: playerId,
           reportedUserId: targetPlayerId,
           reason: selectedReason,
           contentType,
@@ -79,7 +80,7 @@ export function ReportBlockMenu({ trigger, targetPlayerId, targetName, contentTy
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetId: targetPlayerId }),
+        body: JSON.stringify({ callerId: playerId, targetId: targetPlayerId }),
       });
       if (res.ok) {
         toast({ title: `${targetName} blocked`, description: "They can no longer see your profile or contact you." });

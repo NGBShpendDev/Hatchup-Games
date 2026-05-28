@@ -193,6 +193,13 @@ router.post("/groups/join-by-code", requireAuth, attachPlayer, async (req, res) 
   const members = await db.query.groupMembersTable.findMany({ where: eq(groupMembersTable.groupId, group.id) });
   if (members.length >= group.maxMembers) { res.status(400).json({ error: "Group is full" }); return; }
 
+  // Enforce workout approval: if the group creator requires manual approval, block auto-join
+  const creator = await db.query.playersTable.findFirst({ where: eq(playersTable.id, group.creatorPlayerId) });
+  if (creator?.requireWorkoutApproval) {
+    res.status(403).json({ error: "This group requires the creator's approval before joining. Please contact the group leader directly." });
+    return;
+  }
+
   await db.insert(groupMembersTable).values({ groupId: group.id, playerId: req.playerId! });
 
   const challenges = await db.query.groupChallengesTable.findMany({ where: and(eq(groupChallengesTable.groupId, group.id), eq(groupChallengesTable.isCompleted, false)) });
