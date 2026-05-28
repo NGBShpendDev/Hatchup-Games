@@ -869,6 +869,124 @@ export const GetArtifactWorldNotificationsResponse = zod.array(GetArtifactWorldN
 
 
 /**
+ * @summary Get the active artifact loadout for a hatchling
+ */
+export const GetArtifactLoadoutParams = zod.object({
+  "hatchlingId": zod.coerce.number()
+})
+
+export const GetArtifactLoadoutResponse = zod.object({
+  "id": zod.number().optional(),
+  "playerId": zod.number(),
+  "hatchlingId": zod.number(),
+  "majorArtifactId": zod.number().nullish(),
+  "minorArtifact1Id": zod.number().nullish(),
+  "minorArtifact2Id": zod.number().nullish(),
+  "buildName": zod.string(),
+  "powerScore": zod.number(),
+  "createdAt": zod.string().optional(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Save / update the active artifact loadout for a hatchling
+ */
+export const SaveArtifactLoadoutParams = zod.object({
+  "hatchlingId": zod.coerce.number()
+})
+
+export const SaveArtifactLoadoutBody = zod.object({
+  "majorArtifactId": zod.number().nullish(),
+  "minorArtifact1Id": zod.number().nullish(),
+  "minorArtifact2Id": zod.number().nullish()
+})
+
+export const SaveArtifactLoadoutResponse = zod.object({
+  "id": zod.number().optional(),
+  "playerId": zod.number(),
+  "hatchlingId": zod.number(),
+  "majorArtifactId": zod.number().nullish(),
+  "minorArtifact1Id": zod.number().nullish(),
+  "minorArtifact2Id": zod.number().nullish(),
+  "buildName": zod.string(),
+  "powerScore": zod.number(),
+  "createdAt": zod.string().optional(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary List all saved named artifact builds for the authenticated player
+ */
+export const ListArtifactBuildsResponseItem = zod.object({
+  "id": zod.number().optional(),
+  "playerId": zod.number(),
+  "hatchlingId": zod.number(),
+  "majorArtifactId": zod.number().nullish(),
+  "minorArtifact1Id": zod.number().nullish(),
+  "minorArtifact2Id": zod.number().nullish(),
+  "buildName": zod.string(),
+  "powerScore": zod.number(),
+  "createdAt": zod.string().optional(),
+  "updatedAt": zod.string().optional()
+})
+export const ListArtifactBuildsResponse = zod.array(ListArtifactBuildsResponseItem)
+
+
+/**
+ * @summary Save a named artifact build (preset)
+ */
+export const saveArtifactBuildBodyBuildNameMax = 40;
+
+
+
+export const SaveArtifactBuildBody = zod.object({
+  "hatchlingId": zod.number(),
+  "buildName": zod.string().min(1).max(saveArtifactBuildBodyBuildNameMax),
+  "majorArtifactId": zod.number().nullish(),
+  "minorArtifact1Id": zod.number().nullish(),
+  "minorArtifact2Id": zod.number().nullish()
+})
+
+export const SaveArtifactBuildResponse = zod.object({
+  "id": zod.number().optional(),
+  "playerId": zod.number(),
+  "hatchlingId": zod.number(),
+  "majorArtifactId": zod.number().nullish(),
+  "minorArtifact1Id": zod.number().nullish(),
+  "minorArtifact2Id": zod.number().nullish(),
+  "buildName": zod.string(),
+  "powerScore": zod.number(),
+  "createdAt": zod.string().optional(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Delete a named artifact build
+ */
+export const DeleteArtifactBuildParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Get battle XP and evolution stages for all owned artifacts
+ */
+export const GetArtifactBattleXpResponseItem = zod.object({
+  "playerArtifactId": zod.number(),
+  "artifactId": zod.number(),
+  "artifactName": zod.string(),
+  "rarity": zod.string(),
+  "imageSlug": zod.string(),
+  "battleXp": zod.number(),
+  "evolutionStage": zod.number()
+})
+export const GetArtifactBattleXpResponse = zod.array(GetArtifactBattleXpResponseItem)
+
+
+/**
  * @summary List available items in the shop/catalog
  */
 export const ListItemsQueryParams = zod.object({

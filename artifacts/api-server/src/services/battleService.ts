@@ -42,6 +42,17 @@ export interface TurnResult {
   p2EnergyAfter: number;
 }
 
+// ── Artifact slot info (for display and effects) ──────────────────────────
+export interface EquippedArtifactSlot {
+  id: number;
+  name: string;
+  rarity: string;
+  imageSlug: string;
+  slot: "major" | "minor";
+  isPowered: boolean;   // false = fitness-streak not met (dormant)
+  evolutionStage: number;
+}
+
 // ── Fighter state ─────────────────────────────────────────────────────────
 export interface FighterState {
   playerId: number;  // 0 = bot
@@ -58,6 +69,8 @@ export interface FighterState {
   specialCooldown: number; // turns remaining before special available again
   itemUsed: boolean;
   isBot: boolean;
+  equippedArtifacts: EquippedArtifactSlot[];
+  artifactPowerScore: number;
 }
 
 export interface BattleState {
@@ -73,18 +86,31 @@ export interface BattleState {
 }
 
 // ── Stat derivation ──────────────────────────────────────────────────────
+export interface ArtifactModifiers {
+  hpBonus: number;
+  speedBonus: number;
+  energyBonus: number;
+  powerScore: number;
+  equippedArtifacts: EquippedArtifactSlot[];
+}
+
 export function buildFighter(
   player: Player | null,
   hatchling: Hatchling,
   isBot = false,
+  artifactMods?: ArtifactModifiers,
 ): FighterState {
   const level = hatchling.level ?? 1;
   const fitnessXp = player?.fitnessXp ?? 0;
   const totalSteps = player?.totalSteps ?? 0;
 
-  const maxHp = 100 + level * 5;
-  const maxEnergy = Math.min(120, 60 + Math.floor(fitnessXp / 50));
-  const speed = Math.min(50, 10 + Math.floor(totalSteps / 2000));
+  const baseHp     = 100 + level * 5;
+  const baseEnergy = Math.min(120, 60 + Math.floor(fitnessXp / 50));
+  const baseSpeed  = Math.min(50, 10 + Math.floor(totalSteps / 2000));
+
+  const maxHp     = baseHp     + (artifactMods?.hpBonus     ?? 0);
+  const maxEnergy = baseEnergy + (artifactMods?.energyBonus ?? 0);
+  const speed     = Math.min(70, baseSpeed + (artifactMods?.speedBonus ?? 0));
 
   return {
     playerId: player?.id ?? 0,
@@ -101,6 +127,8 @@ export function buildFighter(
     specialCooldown: 0,
     itemUsed: false,
     isBot,
+    equippedArtifacts: artifactMods?.equippedArtifacts ?? [],
+    artifactPowerScore: artifactMods?.powerScore ?? 0,
   };
 }
 
@@ -124,6 +152,8 @@ export function buildBotFighter(level: number): FighterState {
     specialCooldown: 0,
     itemUsed: false,
     isBot: true,
+    equippedArtifacts: [],
+    artifactPowerScore: 0,
   };
 }
 

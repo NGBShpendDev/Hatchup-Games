@@ -637,6 +637,100 @@ paths:
                 items:
                   $ref: "#/components/schemas/ArtifactWorldNotification"
 
+  # ── Artifact Loadouts ────────────────────────────────────────────────────
+  /artifacts/loadout/{hatchlingId}:
+    get:
+      operationId: getArtifactLoadout
+      tags: [players]
+      summary: Get the active artifact loadout for a hatchling
+      parameters:
+        - name: hatchlingId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Active loadout
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArtifactLoadout" }
+    post:
+      operationId: saveArtifactLoadout
+      tags: [players]
+      summary: Save / update the active artifact loadout for a hatchling
+      parameters:
+        - name: hatchlingId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveArtifactLoadoutBody" }
+      responses:
+        "200":
+          description: Saved loadout
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArtifactLoadout" }
+
+  /artifacts/builds:
+    get:
+      operationId: listArtifactBuilds
+      tags: [players]
+      summary: List all saved named artifact builds for the authenticated player
+      responses:
+        "200":
+          description: Saved builds
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ArtifactLoadout" }
+    post:
+      operationId: saveArtifactBuild
+      tags: [players]
+      summary: Save a named artifact build (preset)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveArtifactBuildBody" }
+      responses:
+        "200":
+          description: Saved build
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArtifactLoadout" }
+
+  /artifacts/builds/{id}:
+    delete:
+      operationId: deleteArtifactBuild
+      tags: [players]
+      summary: Delete a named artifact build
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204": { description: Deleted }
+
+  /artifacts/battle-xp:
+    get:
+      operationId: getArtifactBattleXp
+      tags: [players]
+      summary: Get battle XP and evolution stages for all owned artifacts
+      responses:
+        "200":
+          description: Battle XP entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ArtifactBattleXpEntry" }
+
   # ── Items ─────────────────────────────────────────────────────────────────
   /items:
     get:
@@ -2416,3 +2510,47 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CoachChatMessage"
+
+    ArtifactLoadout:
+      type: object
+      required: [playerId, hatchlingId, buildName, powerScore]
+      properties:
+        id:               { type: integer }
+        playerId:         { type: integer }
+        hatchlingId:      { type: integer }
+        majorArtifactId:  { type: ["integer", "null"] }
+        minorArtifact1Id: { type: ["integer", "null"] }
+        minorArtifact2Id: { type: ["integer", "null"] }
+        buildName:        { type: string }
+        powerScore:       { type: number }
+        createdAt:        { type: string }
+        updatedAt:        { type: string }
+
+    SaveArtifactLoadoutBody:
+      type: object
+      properties:
+        majorArtifactId:  { type: ["integer", "null"] }
+        minorArtifact1Id: { type: ["integer", "null"] }
+        minorArtifact2Id: { type: ["integer", "null"] }
+
+    SaveArtifactBuildBody:
+      type: object
+      required: [hatchlingId, buildName]
+      properties:
+        hatchlingId:      { type: integer }
+        buildName:        { type: string, minLength: 1, maxLength: 40 }
+        majorArtifactId:  { type: ["integer", "null"] }
+        minorArtifact1Id: { type: ["integer", "null"] }
+        minorArtifact2Id: { type: ["integer", "null"] }
+
+    ArtifactBattleXpEntry:
+      type: object
+      required: [playerArtifactId, artifactId, artifactName, rarity, imageSlug, battleXp, evolutionStage]
+      properties:
+        playerArtifactId: { type: integer }
+        artifactId:       { type: integer }
+        artifactName:     { type: string }
+        rarity:           { type: string }
+        imageSlug:        { type: string }
+        battleXp:         { type: integer }
+        evolutionStage:   { type: integer }

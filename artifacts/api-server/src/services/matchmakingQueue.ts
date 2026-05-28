@@ -19,6 +19,7 @@ import {
   type BattleState,
   type MoveType,
 } from "./battleService";
+import { loadActiveLoadoutModifiers, awardArtifactBattleXp } from "./artifactLoadoutService";
 import { logger } from "../lib/logger";
 
 // ── In-memory state ──────────────────────────────────────────────────────────
@@ -29,6 +30,7 @@ interface QueueEntry {
   mode: "casual" | "ranked";
   ws: WebSocket;
   joinedAt: number;
+  artifactPowerScore: number;  // used for matchmaking tier balance
 }
 
 interface ActiveBattle {
@@ -171,6 +173,14 @@ async function finalizeBattle(battleId: number) {
       }).where(eq(playersTable.id, p2.id));
     }
 
+    // Award artifact battle XP to both fighters' equipped artifacts
+    const [artifactXpP1, artifactXpP2] = await Promise.all([
+      awardArtifactBattleXp(state.fighter1.playerId, state.fighter1.hatchlingId, p1Won),
+      state.fighter2.playerId && !state.fighter2.isBot
+        ? awardArtifactBattleXp(state.fighter2.playerId, state.fighter2.hatchlingId, p2Won)
+        : Promise.resolve([]),
+    ]);
+
     // Persist battle record
     await db.update(battlesTable).set({
       winnerId: state.winner === 1 ? state.fighter1.playerId : (state.winner === 2 ? (state.fighter2.playerId || 0) : null),
@@ -187,6 +197,7 @@ async function finalizeBattle(battleId: number) {
       winner: state.winner,
       rewards: r1Final,
       eloChange,
+      artifactXp: artifactXpP1,
       state: sanitizeState(state),
     });
 
@@ -198,6 +209,7 @@ async function finalizeBattle(battleId: number) {
         winner: state.winner,
         rewards: r2,
         eloChange: -eloChange,
+        artifactXp: artifactXpP2,
         state: sanitizeState(state),
       });
     }
@@ -216,9 +228,14 @@ function sanitizeState(state: BattleState) {
   return state; // all fields are safe to share in 1v1
 }
 
+// Power-score tolerance for matchmaking (points). Expands over time (up to 2x after 60s).
+const BASE_POWER_TOLERANCE = 60;
+
 // ── Matchmaking: try to pair two queue entries ────────────────────────────────
 async function tryMatch() {
   if (queue.length < 2) return;
+
+  const now = Date.now();
 
   for (let i = 0; i < queue.length; i++) {
     for (let j = i + 1; j < queue.length; j++) {
@@ -226,6 +243,11 @@ async function tryMatch() {
       const b = queue[j]!;
       if (a.mode !== b.mode) continue;
       if (Math.abs(a.hatchlingLevel - b.hatchlingLevel) > 20) continue;
+
+      // Power-score tier balancing — tolerance expands after 30s in queue
+      const waitedSecs = (now - Math.max(a.joinedAt, b.joinedAt)) / 1000;
+      const tolerance  = BASE_POWER_TOLERANCE * (waitedSecs > 30 ? 2 : 1);
+      if (Math.abs(a.artifactPowerScore - b.artifactPowerScore) > tolerance) continue;
 
       // Found a match
       queue.splice(j, 1);
@@ -252,10 +274,16 @@ async function startBattle(a: QueueEntry, b: QueueEntry, botFight = false) {
       return;
     }
 
-    const f1 = buildFighter(pa, ha);
+    // Load artifact loadouts for both fighters
+    const [modsA, modsB] = await Promise.all([
+      loadActiveLoadoutModifiers(a.playerId, a.hatchlingId),
+      botFight || !hb || !pb ? Promise.resolve(undefined) : loadActiveLoadoutModifiers(b.playerId, b.hatchlingId),
+    ]);
+
+    const f1 = buildFighter(pa, ha, false, modsA);
     const f2 = botFight
       ? buildBotFighter(a.hatchlingLevel)
-      : (hb && pb ? buildFighter(pb, hb) : buildBotFighter(a.hatchlingLevel));
+      : (hb && pb ? buildFighter(pb, hb, false, modsB ?? undefined) : buildBotFighter(a.hatchlingLevel));
 
     // f2 isBot flag already set by buildBotFighter
     const f2IsBot = botFight || !hb || !pb;
@@ -322,6 +350,7 @@ function scheduleBotFallback(entry: QueueEntry) {
         mode: entry.mode,
         ws: entry.ws, // unused for bot
         joinedAt: Date.now(),
+        artifactPowerScore: 0,
       };
       await startBattle(entry, botEntry, true);
     }
@@ -368,7 +397,11 @@ async function handleMessage(ws: WebSocket, playerId: number, raw: string) {
       return;
     }
 
-    const entry: QueueEntry = { playerId, hatchlingId, hatchlingLevel: hatchling.level, mode, ws, joinedAt: Date.now() };
+    // Load artifact power score for matchmaking balancing
+    const loadoutMods = await loadActiveLoadoutModifiers(playerId, hatchlingId).catch(() => null);
+    const artifactPowerScore = loadoutMods?.powerScore ?? 0;
+
+    const entry: QueueEntry = { playerId, hatchlingId, hatchlingLevel: hatchling.level, mode, ws, joinedAt: Date.now(), artifactPowerScore };
     queue.push(entry);
     queuedPlayers.add(playerId);
     send(ws, { type: "queue_joined", position: queue.length, mode });

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp, unique, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, unique, jsonb, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -67,3 +67,37 @@ export const artifactWorldNotificationsTable = pgTable("artifact_world_notificat
 });
 
 export type ArtifactWorldNotification = typeof artifactWorldNotificationsTable.$inferSelect;
+
+// ── Artifact loadouts (pre-battle equip configuration) ────────────────────────
+// One "Active" row per (playerId, hatchlingId) = live loadout.
+// Additional rows with non-"Active" buildName = saved preset builds.
+export const artifactLoadoutsTable = pgTable("artifact_loadouts", {
+  id: serial("id").primaryKey(),
+  playerId: integer("player_id").notNull(),
+  hatchlingId: integer("hatchling_id").notNull(),
+  majorArtifactId: integer("major_artifact_id"),     // nullable = empty slot
+  minorArtifact1Id: integer("minor_artifact1_id"),   // nullable = empty slot
+  minorArtifact2Id: integer("minor_artifact2_id"),   // nullable = empty slot
+  buildName: text("build_name").notNull().default("Active"), // "Active" = live loadout
+  powerScore: real("power_score").notNull().default(0),      // used for matchmaking tier
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  uniq: unique("artifact_loadouts_player_hatchling_build").on(t.playerId, t.hatchlingId, t.buildName),
+}));
+
+export const insertArtifactLoadoutSchema = createInsertSchema(artifactLoadoutsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertArtifactLoadout = z.infer<typeof insertArtifactLoadoutSchema>;
+export type ArtifactLoadout = typeof artifactLoadoutsTable.$inferSelect;
+
+// ── Artifact battle XP (levelling artifacts through combat) ──────────────────
+// One row per playerArtifact. XP thresholds: 50 → stage 1, 150 → stage 2, 300 → stage 3.
+export const artifactBattleXpTable = pgTable("artifact_battle_xp", {
+  id: serial("id").primaryKey(),
+  playerArtifactId: integer("player_artifact_id").notNull().unique(),
+  battleXp: integer("battle_xp").notNull().default(0),
+  evolutionStage: integer("evolution_stage").notNull().default(0), // 0-3
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type ArtifactBattleXp = typeof artifactBattleXpTable.$inferSelect;

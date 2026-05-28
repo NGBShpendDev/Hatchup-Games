@@ -22,6 +22,8 @@ import type {
 import type {
   ActivityLogResult,
   AddEggInput,
+  ArtifactBattleXpEntry,
+  ArtifactLoadout,
   ArtifactMuseumEntry,
   ArtifactWorldNotification,
   Club,
@@ -91,6 +93,8 @@ import type {
   PlayerUpdate,
   RankDistribution,
   RealmInfo,
+  SaveArtifactBuildBody,
+  SaveArtifactLoadoutBody,
   SendGroupMessageInput,
   SpeedLeaderboardEntry,
   SuccessResult,
@@ -2410,6 +2414,450 @@ export function useGetArtifactWorldNotifications<TData = Awaited<ReturnType<type
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetArtifactWorldNotificationsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetArtifactLoadoutUrl = (hatchlingId: number,) => {
+
+
+
+
+  return `/api/artifacts/loadout/${hatchlingId}`
+}
+
+/**
+ * @summary Get the active artifact loadout for a hatchling
+ */
+export const getArtifactLoadout = async (hatchlingId: number, options?: RequestInit): Promise<ArtifactLoadout> => {
+
+  return customFetch<ArtifactLoadout>(getGetArtifactLoadoutUrl(hatchlingId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetArtifactLoadoutQueryKey = (hatchlingId: number,) => {
+    return [
+    `/api/artifacts/loadout/${hatchlingId}`
+    ] as const;
+    }
+
+
+export const getGetArtifactLoadoutQueryOptions = <TData = Awaited<ReturnType<typeof getArtifactLoadout>>, TError = ErrorType<unknown>>(hatchlingId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getArtifactLoadout>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetArtifactLoadoutQueryKey(hatchlingId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getArtifactLoadout>>> = ({ signal }) => getArtifactLoadout(hatchlingId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(hatchlingId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getArtifactLoadout>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetArtifactLoadoutQueryResult = NonNullable<Awaited<ReturnType<typeof getArtifactLoadout>>>
+export type GetArtifactLoadoutQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the active artifact loadout for a hatchling
+ */
+
+export function useGetArtifactLoadout<TData = Awaited<ReturnType<typeof getArtifactLoadout>>, TError = ErrorType<unknown>>(
+ hatchlingId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getArtifactLoadout>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetArtifactLoadoutQueryOptions(hatchlingId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSaveArtifactLoadoutUrl = (hatchlingId: number,) => {
+
+
+
+
+  return `/api/artifacts/loadout/${hatchlingId}`
+}
+
+/**
+ * @summary Save / update the active artifact loadout for a hatchling
+ */
+export const saveArtifactLoadout = async (hatchlingId: number,
+    saveArtifactLoadoutBody: SaveArtifactLoadoutBody, options?: RequestInit): Promise<ArtifactLoadout> => {
+
+  return customFetch<ArtifactLoadout>(getSaveArtifactLoadoutUrl(hatchlingId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      saveArtifactLoadoutBody,)
+  }
+);}
+
+
+
+
+export const getSaveArtifactLoadoutMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveArtifactLoadout>>, TError,{hatchlingId: number;data: BodyType<SaveArtifactLoadoutBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveArtifactLoadout>>, TError,{hatchlingId: number;data: BodyType<SaveArtifactLoadoutBody>}, TContext> => {
+
+const mutationKey = ['saveArtifactLoadout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveArtifactLoadout>>, {hatchlingId: number;data: BodyType<SaveArtifactLoadoutBody>}> = (props) => {
+          const {hatchlingId,data} = props ?? {};
+
+          return  saveArtifactLoadout(hatchlingId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveArtifactLoadoutMutationResult = NonNullable<Awaited<ReturnType<typeof saveArtifactLoadout>>>
+    export type SaveArtifactLoadoutMutationBody = BodyType<SaveArtifactLoadoutBody>
+    export type SaveArtifactLoadoutMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Save / update the active artifact loadout for a hatchling
+ */
+export const useSaveArtifactLoadout = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveArtifactLoadout>>, TError,{hatchlingId: number;data: BodyType<SaveArtifactLoadoutBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveArtifactLoadout>>,
+        TError,
+        {hatchlingId: number;data: BodyType<SaveArtifactLoadoutBody>},
+        TContext
+      > => {
+      return useMutation(getSaveArtifactLoadoutMutationOptions(options));
+    }
+
+export const getListArtifactBuildsUrl = () => {
+
+
+
+
+  return `/api/artifacts/builds`
+}
+
+/**
+ * @summary List all saved named artifact builds for the authenticated player
+ */
+export const listArtifactBuilds = async ( options?: RequestInit): Promise<ArtifactLoadout[]> => {
+
+  return customFetch<ArtifactLoadout[]>(getListArtifactBuildsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListArtifactBuildsQueryKey = () => {
+    return [
+    `/api/artifacts/builds`
+    ] as const;
+    }
+
+
+export const getListArtifactBuildsQueryOptions = <TData = Awaited<ReturnType<typeof listArtifactBuilds>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listArtifactBuilds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListArtifactBuildsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listArtifactBuilds>>> = ({ signal }) => listArtifactBuilds({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listArtifactBuilds>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListArtifactBuildsQueryResult = NonNullable<Awaited<ReturnType<typeof listArtifactBuilds>>>
+export type ListArtifactBuildsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all saved named artifact builds for the authenticated player
+ */
+
+export function useListArtifactBuilds<TData = Awaited<ReturnType<typeof listArtifactBuilds>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listArtifactBuilds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListArtifactBuildsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSaveArtifactBuildUrl = () => {
+
+
+
+
+  return `/api/artifacts/builds`
+}
+
+/**
+ * @summary Save a named artifact build (preset)
+ */
+export const saveArtifactBuild = async (saveArtifactBuildBody: SaveArtifactBuildBody, options?: RequestInit): Promise<ArtifactLoadout> => {
+
+  return customFetch<ArtifactLoadout>(getSaveArtifactBuildUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      saveArtifactBuildBody,)
+  }
+);}
+
+
+
+
+export const getSaveArtifactBuildMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveArtifactBuild>>, TError,{data: BodyType<SaveArtifactBuildBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveArtifactBuild>>, TError,{data: BodyType<SaveArtifactBuildBody>}, TContext> => {
+
+const mutationKey = ['saveArtifactBuild'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveArtifactBuild>>, {data: BodyType<SaveArtifactBuildBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveArtifactBuild(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveArtifactBuildMutationResult = NonNullable<Awaited<ReturnType<typeof saveArtifactBuild>>>
+    export type SaveArtifactBuildMutationBody = BodyType<SaveArtifactBuildBody>
+    export type SaveArtifactBuildMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Save a named artifact build (preset)
+ */
+export const useSaveArtifactBuild = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveArtifactBuild>>, TError,{data: BodyType<SaveArtifactBuildBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveArtifactBuild>>,
+        TError,
+        {data: BodyType<SaveArtifactBuildBody>},
+        TContext
+      > => {
+      return useMutation(getSaveArtifactBuildMutationOptions(options));
+    }
+
+export const getDeleteArtifactBuildUrl = (id: number,) => {
+
+
+
+
+  return `/api/artifacts/builds/${id}`
+}
+
+/**
+ * @summary Delete a named artifact build
+ */
+export const deleteArtifactBuild = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteArtifactBuildUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteArtifactBuildMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArtifactBuild>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteArtifactBuild>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteArtifactBuild'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteArtifactBuild>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteArtifactBuild(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteArtifactBuildMutationResult = NonNullable<Awaited<ReturnType<typeof deleteArtifactBuild>>>
+
+    export type DeleteArtifactBuildMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a named artifact build
+ */
+export const useDeleteArtifactBuild = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArtifactBuild>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteArtifactBuild>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteArtifactBuildMutationOptions(options));
+    }
+
+export const getGetArtifactBattleXpUrl = () => {
+
+
+
+
+  return `/api/artifacts/battle-xp`
+}
+
+/**
+ * @summary Get battle XP and evolution stages for all owned artifacts
+ */
+export const getArtifactBattleXp = async ( options?: RequestInit): Promise<ArtifactBattleXpEntry[]> => {
+
+  return customFetch<ArtifactBattleXpEntry[]>(getGetArtifactBattleXpUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetArtifactBattleXpQueryKey = () => {
+    return [
+    `/api/artifacts/battle-xp`
+    ] as const;
+    }
+
+
+export const getGetArtifactBattleXpQueryOptions = <TData = Awaited<ReturnType<typeof getArtifactBattleXp>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getArtifactBattleXp>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetArtifactBattleXpQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getArtifactBattleXp>>> = ({ signal }) => getArtifactBattleXp({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getArtifactBattleXp>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetArtifactBattleXpQueryResult = NonNullable<Awaited<ReturnType<typeof getArtifactBattleXp>>>
+export type GetArtifactBattleXpQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get battle XP and evolution stages for all owned artifacts
+ */
+
+export function useGetArtifactBattleXp<TData = Awaited<ReturnType<typeof getArtifactBattleXp>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getArtifactBattleXp>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetArtifactBattleXpQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

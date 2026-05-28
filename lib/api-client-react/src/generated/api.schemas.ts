@@ -825,6 +825,56 @@ export interface CoachChatBody {
   history?: CoachChatMessage[];
 }
 
+export interface ArtifactLoadout {
+  id?: number;
+  playerId: number;
+  hatchlingId: number;
+  /** @nullable */
+  majorArtifactId?: number | null;
+  /** @nullable */
+  minorArtifact1Id?: number | null;
+  /** @nullable */
+  minorArtifact2Id?: number | null;
+  buildName: string;
+  powerScore: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SaveArtifactLoadoutBody {
+  /** @nullable */
+  majorArtifactId?: number | null;
+  /** @nullable */
+  minorArtifact1Id?: number | null;
+  /** @nullable */
+  minorArtifact2Id?: number | null;
+}
+
+export interface SaveArtifactBuildBody {
+  hatchlingId: number;
+  /**
+     * @minLength 1
+     * @maxLength 40
+     */
+  buildName: string;
+  /** @nullable */
+  majorArtifactId?: number | null;
+  /** @nullable */
+  minorArtifact1Id?: number | null;
+  /** @nullable */
+  minorArtifact2Id?: number | null;
+}
+
+export interface ArtifactBattleXpEntry {
+  playerArtifactId: number;
+  artifactId: number;
+  artifactName: string;
+  rarity: string;
+  imageSlug: string;
+  battleXp: number;
+  evolutionStage: number;
+}
+
 export type ListHatchlingsParams = {
 playerId?: number;
 limit?: number;
