@@ -22,13 +22,18 @@ interface PlayerRow {
   creatorBadge: string | null;
   isMinor?: boolean;
   isSuspended?: boolean;
+  locationVisibility?: "exact" | "neighborhood" | "city" | "hidden";
 }
 
 interface FollowRow { followerId: number; followeeId: number }
+interface GroupRow { id: number; name: string }
+interface GroupMemberRow { playerId: number; groupId: number; coWorkoutCount: number }
 
 const state = {
   players: [] as PlayerRow[],
   follows: [] as FollowRow[],
+  groups: [] as GroupRow[],
+  groupMembers: [] as GroupMemberRow[],
   // The currently-authenticated player (matched via clerkId by attachPlayer).
   currentClerkId: "u_viewer",
 };
@@ -36,6 +41,8 @@ const state = {
 function resetState() {
   state.players = [];
   state.follows = [];
+  state.groups = [];
+  state.groupMembers = [];
   state.currentClerkId = "u_viewer";
 }
 
@@ -46,6 +53,7 @@ function seedPlayer(p: Partial<PlayerRow> & { id: number; clerkId: string; usern
     creatorBadge: null,
     isMinor: false,
     isSuspended: false,
+    locationVisibility: "city",
     ...p,
   } as PlayerRow;
   state.players.push(row);
@@ -54,6 +62,14 @@ function seedPlayer(p: Partial<PlayerRow> & { id: number; clerkId: string; usern
 
 function seedFollow(followerId: number, followeeId: number) {
   state.follows.push({ followerId, followeeId });
+}
+
+function seedGroup(id: number, name: string) {
+  state.groups.push({ id, name });
+}
+
+function seedGroupMember(playerId: number, groupId: number, coWorkoutCount = 1) {
+  state.groupMembers.push({ playerId, groupId, coWorkoutCount });
 }
 
 // ── Mocks: Clerk passthrough ────────────────────────────────────────────────
@@ -145,9 +161,11 @@ type Col = { __col: true; table: string; col: string };
 type Predicate =
   | { __op: "eq"; a: any; b: any }
   | { __op: "ne"; a: any; b: any }
+  | { __op: "gt"; a: any; b: any }
   | { __op: "and"; args: Predicate[] }
   | { __op: "or"; args: Predicate[] }
   | { __op: "inArray"; col: Col; vals: any[] }
+  | { __op: "notInArray"; col: Col; vals: any[] }
   | { __op: "isNull"; col: Col }
   | undefined;
 
@@ -162,9 +180,9 @@ mock.module("drizzle-orm", {
     notInArray: (col: any, vals: any[]) => ({ __op: "notInArray", col, vals }),
     isNull: (col: any) => ({ __op: "isNull", col }),
     isNotNull: (col: any) => ({ __op: "isNotNull", col }),
-    ilike: () => ({ __op: "ilike" }),
-    gt: () => ({ __op: "gt" }),
-    gte: () => ({ __op: "gte" }),
+    ilike: (col: any, pattern: any) => ({ __op: "ilike", col, pattern }),
+    gt: (a: any, b: any) => ({ __op: "gt", a, b }),
+    gte: (a: any, b: any) => ({ __op: "gte", a, b }),
     sql: Object.assign(
       (_s: TemplateStringsArray, ..._v: unknown[]) => ({ __sql: true }),
       { raw: (_s: string) => ({ __sql: true }) },
@@ -200,8 +218,8 @@ const tablesByName: Record<string, () => any[]> = {
   playersTable: () => state.players,
   playerFollowsTable: () => state.follows,
   postsTable: () => [],
-  groupMembersTable: () => [],
-  groupsTable: () => [],
+  groupMembersTable: () => state.groupMembers,
+  groupsTable: () => state.groups,
   postReactionsTable: () => [],
   postCommentsTable: () => [],
   postRepostsTable: () => [],
@@ -224,7 +242,9 @@ function evalSingle(row: any, pred: Predicate): boolean {
     case "or":  return pred.args.some(p => evalSingle(row, p));
     case "eq":  return resolve(row, pred.a) === resolve(row, pred.b);
     case "ne":  return resolve(row, pred.a) !== resolve(row, pred.b);
+    case "gt":  return (resolve(row, pred.a) as number) > (resolve(row, pred.b) as number);
     case "inArray": return pred.vals.includes(resolve(row, pred.col));
+    case "notInArray": return !pred.vals.includes(resolve(row, pred.col));
     case "isNull":  return resolve(row, pred.col) == null;
     default: return true;
   }
@@ -271,7 +291,9 @@ function evalJoinedPred(combo: Record<string, any>, pred: Predicate): boolean {
     case "or":  return pred.args.some(p => evalJoinedPred(combo, p));
     case "eq":  return evalJoined(combo, pred.a) === evalJoined(combo, pred.b);
     case "ne":  return evalJoined(combo, pred.a) !== evalJoined(combo, pred.b);
+    case "gt":  return (evalJoined(combo, pred.a) as number) > (evalJoined(combo, pred.b) as number);
     case "inArray": return pred.vals.includes(evalJoined(combo, pred.col));
+    case "notInArray": return !pred.vals.includes(evalJoined(combo, pred.col));
     case "isNull":  return evalJoined(combo, pred.col) == null;
     default: return true;
   }
@@ -357,6 +379,13 @@ function makeSelectChain(cols: Record<string, any>) {
     },
     offset(n: number) {
       s.offset = n;
+      return chain;
+    },
+    groupBy(..._cols: any[]) {
+      // No-op for this test surface — the route under test only consumes
+      // grouped count rows via a Map .get with `?? 0` fallback, so leaving the
+      // rows ungrouped (yielding undefined counts) still gives the right
+      // behavior for our wiring assertions.
       return chain;
     },
     then(onFulfilled: any, onRejected: any) {
@@ -687,5 +716,162 @@ describe("GET /social/players/:id/profile mutual previews", () => {
     assert.equal(body.mutualFollowersTotal, 0);
     assert.deepEqual(body.mutualFollowing, []);
     assert.equal(body.mutualFollowingTotal, 0);
+  });
+});
+
+// ── Tests: mutualWorkoutPartners signal across the 3 social endpoints ──────
+//
+// Helpers below exercise the real `loadMutualWorkoutPartnersForViewer` SQL
+// self-join against our in-memory state, so a regression that breaks the
+// `co_workout_count > 0` guard or self-exclusion rules would surface here.
+
+function seedMutualPartnerTriad() {
+  // Viewer (1), candidate (2), and partner (3) all belong to group #100 and
+  // have logged a co-workout (coWorkoutCount=1). That makes partner 3 a
+  // legitimate mutual workout partner of viewer + candidate.
+  seedPlayer({ id: 1, clerkId: "u_viewer", username: "viewer" });
+  seedPlayer({ id: 2, clerkId: "u_candidate", username: "candidate" });
+  seedPlayer({ id: 3, clerkId: "u_partner", username: "partner", displayName: "Partner Pat" });
+  seedGroup(100, "Iron Pals");
+  seedGroupMember(1, 100, 1);
+  seedGroupMember(2, 100, 1);
+  seedGroupMember(3, 100, 1);
+}
+
+describe("mutualWorkoutPartners on GET /social/players/:id/followers", () => {
+  it("surfaces a mutual workout partner for each follower row", async () => {
+    seedMutualPartnerTriad();
+    // Candidate (2) follows the profile being viewed (id=99). Listing 99's
+    // followers must include 2 and report partner 3 as their mutual partner.
+    seedPlayer({ id: 99, clerkId: "u_profile", username: "profile" });
+    seedFollow(2, 99);
+
+    const { res, body } = await getJson("/social/players/99/followers");
+    assert.equal(res.status, 200);
+    assert.equal(body.players.length, 1);
+    assert.equal(body.players[0].id, 2);
+    assert.deepEqual(body.players[0].mutualWorkoutPartners, [
+      { id: 3, displayName: "Partner Pat" },
+    ]);
+  });
+
+  it("returns an empty mutualWorkoutPartners array when the viewer has no group memberships (no crash)", async () => {
+    seedPlayer({ id: 1, clerkId: "u_viewer", username: "viewer" });
+    seedPlayer({ id: 2, clerkId: "u_follower", username: "follower" });
+    seedPlayer({ id: 99, clerkId: "u_profile", username: "profile" });
+    // Viewer is in no groups at all. The follower exists and follows the
+    // profile, but there can't be any mutual workout partners.
+    seedFollow(2, 99);
+
+    const { res, body } = await getJson("/social/players/99/followers");
+    assert.equal(res.status, 200);
+    assert.equal(body.players.length, 1);
+    assert.deepEqual(body.players[0].mutualWorkoutPartners, []);
+  });
+
+  it("never lists the viewer or the candidate as their own mutual partner", async () => {
+    // Viewer (1) and candidate (2) share a workout group with no third
+    // members. The only "mutual partners" the SQL could return would be the
+    // viewer or the candidate themselves — both must be excluded.
+    seedPlayer({ id: 1, clerkId: "u_viewer", username: "viewer" });
+    seedPlayer({ id: 2, clerkId: "u_candidate", username: "candidate" });
+    seedPlayer({ id: 99, clerkId: "u_profile", username: "profile" });
+    seedGroup(100, "Just Us");
+    seedGroupMember(1, 100, 1);
+    seedGroupMember(2, 100, 1);
+    seedFollow(2, 99);
+
+    const { res, body } = await getJson("/social/players/99/followers");
+    assert.equal(res.status, 200);
+    assert.equal(body.players[0].id, 2);
+    const partnerIds = body.players[0].mutualWorkoutPartners.map((p: any) => p.id);
+    assert.ok(!partnerIds.includes(1), "viewer must not appear as their own partner");
+    assert.ok(!partnerIds.includes(2), "candidate must not appear as their own partner");
+    assert.deepEqual(body.players[0].mutualWorkoutPartners, []);
+  });
+
+  it("excludes a third player whose coWorkoutCount is 0 (filter guard intact)", async () => {
+    // The `co_workout_count > 0` guard is the difference between "shared
+    // group" (loadSharedGroupsForViewer) and "workout partner". Drop it and
+    // group-mates who never logged a workout would leak into the picker.
+    seedPlayer({ id: 1, clerkId: "u_viewer", username: "viewer" });
+    seedPlayer({ id: 2, clerkId: "u_candidate", username: "candidate" });
+    seedPlayer({ id: 3, clerkId: "u_lurker", username: "lurker", displayName: "Lurker Lou" });
+    seedPlayer({ id: 99, clerkId: "u_profile", username: "profile" });
+    seedGroup(100, "Iron Pals");
+    seedGroupMember(1, 100, 1);
+    seedGroupMember(2, 100, 1);
+    seedGroupMember(3, 100, 0); // lurker — never logged a workout
+    seedFollow(2, 99);
+
+    const { res, body } = await getJson("/social/players/99/followers");
+    assert.equal(res.status, 200);
+    assert.deepEqual(body.players[0].mutualWorkoutPartners, []);
+  });
+
+  it("caps mutual partners at the preview limit (3) and dedups across groups", async () => {
+    // Viewer + candidate share two groups (100 and 101) with five other
+    // people who've all logged co-workouts in BOTH groups. The grouping
+    // helper must dedup repeats and cap the per-row list at 3.
+    seedPlayer({ id: 1, clerkId: "u_viewer", username: "viewer" });
+    seedPlayer({ id: 2, clerkId: "u_candidate", username: "candidate" });
+    seedPlayer({ id: 99, clerkId: "u_profile", username: "profile" });
+    seedGroup(100, "G1");
+    seedGroup(101, "G2");
+    seedGroupMember(1, 100, 1);
+    seedGroupMember(2, 100, 1);
+    seedGroupMember(1, 101, 1);
+    seedGroupMember(2, 101, 1);
+    for (let i = 10; i < 15; i++) {
+      seedPlayer({ id: i, clerkId: `u_p${i}`, username: `p${i}`, displayName: `P${i}` });
+      seedGroupMember(i, 100, 1);
+      seedGroupMember(i, 101, 1);
+    }
+    seedFollow(2, 99);
+
+    const { res, body } = await getJson("/social/players/99/followers");
+    assert.equal(res.status, 200);
+    const partners = body.players[0].mutualWorkoutPartners as Array<{ id: number; displayName: string }>;
+    assert.equal(partners.length, 3, "list capped at MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT");
+    // Dedup: each id appears at most once even though every partner shows up
+    // through both shared groups.
+    assert.equal(new Set(partners.map(p => p.id)).size, partners.length);
+    for (const p of partners) {
+      assert.ok([10, 11, 12, 13, 14].includes(p.id));
+      assert.equal(p.displayName, `P${p.id}`);
+    }
+  });
+});
+
+describe("mutualWorkoutPartners on GET /social/players/:id/following", () => {
+  it("surfaces a mutual workout partner for each followee row", async () => {
+    seedMutualPartnerTriad();
+    // Profile (id=99) follows candidate (2). GET .../99/following must list
+    // 2 with partner 3 surfaced as a mutual workout partner.
+    seedPlayer({ id: 99, clerkId: "u_profile", username: "profile" });
+    seedFollow(99, 2);
+
+    const { res, body } = await getJson("/social/players/99/following");
+    assert.equal(res.status, 200);
+    assert.equal(body.players.length, 1);
+    assert.equal(body.players[0].id, 2);
+    assert.deepEqual(body.players[0].mutualWorkoutPartners, [
+      { id: 3, displayName: "Partner Pat" },
+    ]);
+  });
+});
+
+describe("mutualWorkoutPartners on GET /social/search", () => {
+  it("surfaces a mutual workout partner on each search result row", async () => {
+    seedMutualPartnerTriad();
+    // The candidate (2) matches a username search; the partner (3) must come
+    // back attached to that row as a mutual workout partner.
+    const { res, body } = await getJson("/social/search?q=candidate");
+    assert.equal(res.status, 200);
+    const candidateRow = (body as any[]).find(r => r.id === 2);
+    assert.ok(candidateRow, "candidate must appear in search results");
+    assert.deepEqual(candidateRow.mutualWorkoutPartners, [
+      { id: 3, displayName: "Partner Pat" },
+    ]);
   });
 });

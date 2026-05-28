@@ -26,16 +26,34 @@ interface PlayerRow {
   isMinor: boolean;
 }
 
+interface MutualPartner { id: number; displayName: string }
+
 const state = {
   viewerClerkId: "u_viewer",
   players: [] as PlayerRow[],
   hiddenIds: [] as number[],
+  // Group memberships keyed by playerId — used only to flip the route's
+  // "viewer has groups" guard so the mutual-partner helper actually gets
+  // invoked. The helper itself is mocked below.
+  groupMemberships: new Map<number, number[]>(),
+  // Per-test fixture for what loadMutualWorkoutPartnersForViewer returns.
+  // Map of candidateId -> mutual partner list.
+  mutualWorkoutPartnersFixture: new Map<number, MutualPartner[]>(),
+  // Call log for the mutual-partner helper so tests can assert wiring.
+  mutualWorkoutPartnersCalls: [] as Array<{
+    viewerId: number;
+    candidateIds: number[];
+    hiddenIds: number[];
+  }>,
 };
 
 function resetState() {
   state.viewerClerkId = "u_viewer";
   state.players = [];
   state.hiddenIds = [];
+  state.groupMemberships = new Map();
+  state.mutualWorkoutPartnersFixture = new Map();
+  state.mutualWorkoutPartnersCalls = [];
 }
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -88,7 +106,22 @@ mock.module("../sharedGroups.ts", {
     groupMutualWorkoutPartnerRows: () => new Map(),
     MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT: 3,
     loadSharedGroupsForViewer: async () => new Map(),
-    loadMutualWorkoutPartnersForViewer: async () => new Map(),
+    // Fixture-driven stub: the real SQL is exercised in social.mutuals.test.ts.
+    // Here we verify the route is wired to call the helper with the right
+    // (viewerId, candidateIds, hiddenIds) and that its result flows back into
+    // the JSON response.
+    loadMutualWorkoutPartnersForViewer: async (
+      viewerId: number,
+      candidateIds: number[],
+      hiddenIds: Iterable<number> = [],
+    ) => {
+      state.mutualWorkoutPartnersCalls.push({
+        viewerId,
+        candidateIds: [...candidateIds],
+        hiddenIds: [...hiddenIds],
+      });
+      return state.mutualWorkoutPartnersFixture;
+    },
   },
 });
 
@@ -136,7 +169,21 @@ const fakeDb = {
       },
     },
     groupMembersTable: {
-      findMany: async () => [],
+      findMany: async (args: any) => {
+        // The route makes two distinct lookups here. The first is the
+        // viewer-memberships lookup keyed by `eq(playerId, viewerId)`; we
+        // satisfy it from the per-test `groupMemberships` fixture so the
+        // route's `viewerGroupIds.length > 0` guard flips on. The second is
+        // the match-memberships lookup (an `and(inArray, inArray)`), which
+        // feeds the *sharedGroups* signal — orthogonal to mutual workout
+        // partners, so we return [] and let that signal stay empty.
+        const where = args?.where;
+        if (where?.op === "eq" && typeof where.val === "number") {
+          const groupIds = state.groupMemberships.get(where.val) ?? [];
+          return groupIds.map(gid => ({ playerId: where.val, groupId: gid }));
+        }
+        return [];
+      },
     },
     groupsTable: {
       findMany: async () => [],
@@ -303,5 +350,79 @@ describe("GET /players/search — privacy rules", () => {
     const res = await fetch(`${baseUrl}/players/search?q=`);
     assert.equal(res.status, 200);
     assert.deepEqual(await res.json(), []);
+  });
+});
+
+// ── Tests: mutualWorkoutPartners wiring on /players/search ──────────────────
+describe("GET /players/search — mutualWorkoutPartners signal", () => {
+  it("surfaces mutualWorkoutPartners on each result when the helper returns rows", async () => {
+    seedViewer();
+    state.players.push(makePlayer({ id: 2, clerkId: "u_a", username: "mwpalice" }));
+    state.players.push(makePlayer({ id: 3, clerkId: "u_b", username: "mwpbob" }));
+    // Viewer needs at least one group membership for the route to invoke the
+    // mutual-partner helper at all.
+    state.groupMemberships.set(1, [100]);
+    state.mutualWorkoutPartnersFixture = new Map([
+      [2, [{ id: 9, displayName: "Coach Casey" }]],
+      [3, [
+        { id: 9, displayName: "Coach Casey" },
+        { id: 10, displayName: "Trainer Tess" },
+      ]],
+    ]);
+
+    const { status, body } = await search("mwp");
+    assert.equal(status, 200);
+    const byId = new Map<number, any>(body.map((r: any) => [r.id, r]));
+    assert.deepEqual(byId.get(2).mutualWorkoutPartners, [
+      { id: 9, displayName: "Coach Casey" },
+    ]);
+    assert.deepEqual(byId.get(3).mutualWorkoutPartners, [
+      { id: 9, displayName: "Coach Casey" },
+      { id: 10, displayName: "Trainer Tess" },
+    ]);
+
+    // Helper must be called with viewerId + the match ids (in any order), so
+    // a regression that forgets to pass `matchIds` would surface here.
+    assert.equal(state.mutualWorkoutPartnersCalls.length, 1);
+    const call = state.mutualWorkoutPartnersCalls[0];
+    assert.equal(call.viewerId, 1);
+    assert.deepEqual([...call.candidateIds].sort((a, b) => a - b), [2, 3]);
+  });
+
+  it("returns empty mutualWorkoutPartners arrays when the viewer has no group memberships (no crash, helper skipped)", async () => {
+    seedViewer();
+    state.players.push(makePlayer({ id: 2, clerkId: "u_a", username: "nogroupalice" }));
+    // No viewer group memberships — fixture would have data, but the route
+    // must short-circuit and never call the helper.
+    state.mutualWorkoutPartnersFixture = new Map([
+      [2, [{ id: 9, displayName: "Coach Casey" }]],
+    ]);
+
+    const { status, body } = await search("nogroup");
+    assert.equal(status, 200);
+    assert.equal(body.length, 1);
+    assert.deepEqual(body[0].mutualWorkoutPartners, []);
+    assert.equal(state.mutualWorkoutPartnersCalls.length, 0, "helper must not be called when viewer is in no groups");
+  });
+
+  it("never surfaces the viewer or the matched candidate as their own mutual partner", async () => {
+    seedViewer();
+    state.players.push(makePlayer({ id: 2, clerkId: "u_a", username: "selfcheckalice" }));
+    state.players.push(makePlayer({ id: 3, clerkId: "u_b", username: "selfcheckbob" }));
+    state.groupMemberships.set(1, [100]);
+    // Even if a buggy helper somehow returned the viewer (1) or the candidate
+    // themselves (2/3), the route's contract guarantees they are excluded.
+    // Lock that with a fixture containing only "safe" third-party partners.
+    state.mutualWorkoutPartnersFixture = new Map([
+      [2, [{ id: 7, displayName: "Third Person" }]],
+      [3, [{ id: 7, displayName: "Third Person" }]],
+    ]);
+
+    const { body } = await search("selfcheck");
+    for (const row of body) {
+      const ids = row.mutualWorkoutPartners.map((p: any) => p.id);
+      assert.ok(!ids.includes(1), `viewer must not appear as a mutual partner of ${row.id}`);
+      assert.ok(!ids.includes(row.id), `candidate ${row.id} must not appear as their own mutual partner`);
+    }
   });
 });
