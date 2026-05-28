@@ -3493,7 +3493,12 @@ export const GetMyChallengeInvitesResponseItem = zod.object({
   "sentAt": zod.string(),
   "challenge": zod.object({
 
-}).passthrough().optional()
+}).passthrough().optional(),
+  "inviter": zod.object({
+  "id": zod.number(),
+  "displayName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish()
+}).nullish()
 })
 export const GetMyChallengeInvitesResponse = zod.array(GetMyChallengeInvitesResponseItem)
 

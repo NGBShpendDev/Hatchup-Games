@@ -399,10 +399,12 @@ router.get("/challenge-invites", requireAuth, attachPlayer, async (req, res) => 
 
   const enriched = await Promise.all(invites.map(async (inv) => {
     const challenge = await db.query.challengesTable.findFirst({ where: eq(challengesTable.id, inv.challengeId) });
+    const inviter = await db.query.playersTable.findFirst({ where: eq(playersTable.id, inv.inviterId) });
     return {
       ...inv,
       sentAt: inv.sentAt.toISOString(),
       challenge: challenge ? { ...challenge, startAt: challenge.startAt.toISOString(), endAt: challenge.endAt.toISOString(), createdAt: challenge.createdAt.toISOString() } : null,
+      inviter: inviter ? { id: inviter.id, displayName: inviter.displayName, avatarUrl: inviter.avatarUrl } : null,
     };
   }));
 

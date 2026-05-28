@@ -1115,6 +1115,12 @@ export interface Notification {
 
 export type ChallengeInviteChallenge = { [key: string]: unknown };
 
+export type ChallengeInviteInviter = {
+  id: number;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+} | null;
+
 export interface ChallengeInvite {
   id: number;
   challengeId: number;
@@ -1123,6 +1129,7 @@ export interface ChallengeInvite {
   status: string;
   sentAt: string;
   challenge?: ChallengeInviteChallenge;
+  inviter?: ChallengeInviteInviter;
 }
 
 export type CreateChallengeBodyType = typeof CreateChallengeBodyType[keyof typeof CreateChallengeBodyType];

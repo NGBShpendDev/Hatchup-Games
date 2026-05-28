@@ -553,8 +553,11 @@ export default function NotificationsPage() {
     const Icon = meta.icon;
     const rowBusy = busy?.key === `c-${invite.id}` ? busy.action : null;
     const challenge = invite.challenge as { title?: string; description?: string } | undefined;
-    const title = (challenge?.title as string | undefined) ?? "Challenge invite";
-    const body = (challenge?.description as string | undefined) ?? "You've been invited to join this challenge.";
+    const challengeTitle = (challenge?.title as string | undefined) ?? "this challenge";
+    const inviter = invite.inviter as { displayName?: string | null; avatarUrl?: string | null } | undefined | null;
+    const inviterName = inviter?.displayName?.trim() || "Someone";
+    const title = `${inviterName} invited you to ${challengeTitle}`;
+    const body = (challenge?.description as string | undefined) ?? "Tap to view this challenge.";
     return (
       <motion.div
         key={`invite-challenge-${invite.id}`}
