@@ -169,20 +169,50 @@ router.post("/club-invites/:id/respond", requireAuth, attachPlayer, async (req, 
       eq(notificationsTable.sourceId, id),
     ));
 
-  if (status === "accepted") {
-    const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
-    const club = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, invite.clubId) });
-    if (!club) { res.status(404).json({ error: "Club no longer exists" }); return; }
+  const invitee = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  const club = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, invite.clubId) });
+  if (!club) { res.status(404).json({ error: "Club no longer exists" }); return; }
 
+  if (status === "accepted") {
     // Only bump memberCount + assign clubId if the player wasn't already a member.
-    if (player && player.clubId !== invite.clubId) {
+    if (invitee && invitee.clubId !== invite.clubId) {
       await db.update(playersTable)
-        .set({ clubId: invite.clubId, clubRole: player.clubRole ?? "member" })
+        .set({ clubId: invite.clubId, clubRole: invitee.clubRole ?? "member" })
         .where(eq(playersTable.id, req.playerId!));
       await db.update(clubsTable)
         .set({ memberCount: club.memberCount + 1 })
         .where(eq(clubsTable.id, invite.clubId));
     }
+  }
+
+  // Close the loop for the inviter: notify them of the invitee's response.
+  const inviteeName = invitee?.displayName ?? invitee?.username ?? "A player";
+  if (status === "accepted") {
+    await db.insert(notificationsTable).values({
+      playerId: invite.inviterId,
+      type: "club_invite_accepted",
+      title: "Invite accepted",
+      body: `${inviteeName} joined ${club.name}.`,
+      link: `/club/${club.id}`,
+      sourceId: invite.id,
+    });
+    void sendPushToPlayer(invite.inviterId, {
+      title: "Invite accepted",
+      body: `${inviteeName} joined ${club.name}.`,
+      link: `/club/${club.id}`,
+      category: "invites",
+      tag: `club-invite-accepted-${invite.id}`,
+    });
+  } else {
+    // Quieter decline: in-app notification only, no push.
+    await db.insert(notificationsTable).values({
+      playerId: invite.inviterId,
+      type: "club_invite_declined",
+      title: "Invite declined",
+      body: `${inviteeName} passed on your invite to ${club.name}.`,
+      link: `/club/${club.id}`,
+      sourceId: invite.id,
+    });
   }
 
   res.json({ success: true, status });

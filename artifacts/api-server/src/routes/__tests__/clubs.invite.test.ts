@@ -489,6 +489,20 @@ describe("POST /club-invites/:id/respond", () => {
     const note = state.notifications.find(n => n.sourceId === inviteId && n.type === "club_invite");
     assert.ok(note, "club_invite notification exists");
     assert.equal(note!.read, true, "notification was marked read on respond");
+
+    // Inviter (LEADER_ID) receives an accepted notification + push.
+    const acceptNote = state.notifications.find(
+      n => n.type === "club_invite_accepted" && n.sourceId === inviteId,
+    );
+    assert.ok(acceptNote, "inviter gets a club_invite_accepted notification");
+    assert.equal(acceptNote!.playerId, LEADER_ID);
+    assert.equal(acceptNote!.link, `/club/${CLUB_ID}`);
+    assert.match(acceptNote!.body, /Invitee/);
+    assert.match(acceptNote!.body, /Dragons/);
+
+    const acceptPush = state.pushes.find(p => p.playerId === LEADER_ID);
+    assert.ok(acceptPush, "inviter gets a push on accept");
+    assert.equal((acceptPush!.payload as { category: string }).category, "invites");
   });
 
   it("decline: no membership change, memberCount unchanged, invite is closed", async () => {
@@ -507,6 +521,19 @@ describe("POST /club-invites/:id/respond", () => {
     // Notification is still marked read on decline as well.
     const note = state.notifications.find(n => n.sourceId === inviteId && n.type === "club_invite");
     assert.equal(note!.read, true);
+
+    // Inviter gets a quieter declined notification — in-app only, no push.
+    const declineNote = state.notifications.find(
+      n => n.type === "club_invite_declined" && n.sourceId === inviteId,
+    );
+    assert.ok(declineNote, "inviter gets a club_invite_declined notification");
+    assert.equal(declineNote!.playerId, LEADER_ID);
+    assert.equal(declineNote!.link, `/club/${CLUB_ID}`);
+    assert.match(declineNote!.body, /passed/i);
+
+    // No push fan-out on decline (only the original invite push to the invitee).
+    const leaderPushes = state.pushes.filter(p => p.playerId === LEADER_ID);
+    assert.equal(leaderPushes.length, 0, "decline must not push the inviter");
   });
 
   it("responding twice returns 409 the second time", async () => {
