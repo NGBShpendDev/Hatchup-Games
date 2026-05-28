@@ -1963,9 +1963,11 @@ paths:
           description: |
             Trend window. `day` returns 24 hourly buckets (default).
             `week` returns 7 daily buckets so creators can see slower-burn momentum.
+            `month` returns 5 weekly buckets (~35 days) for evergreen posts that
+            keep accruing views over weeks.
           schema:
             type: string
-            enum: [day, week]
+            enum: [day, week, month]
             default: day
       responses:
         "200":
@@ -5668,19 +5670,19 @@ components:
       properties:
         window:
           type: string
-          enum: [day, week]
+          enum: [day, week, month]
           description: Which trend window was returned.
-        windowHours: { type: integer, description: Total hours covered by the series (24 for day, 168 for week). }
-        bucketHours: { type: integer, description: Hours per bucket (1 for day, 24 for week). }
+        windowHours: { type: integer, description: Total hours covered by the series (24 for day, 168 for week, 840 for month). }
+        bucketHours: { type: integer, description: Hours per bucket (1 for day, 24 for week, 168 for month). }
         total:       { type: integer, description: Total views across the returned buckets }
         buckets:
           type: array
-          description: Buckets ordered oldest first, zero-filled. 24 entries for `day`, 7 for `week`.
+          description: Buckets ordered oldest first, zero-filled. 24 entries for `day`, 7 for `week`, 5 for `month`.
           items:
             type: object
             required: [hour, views]
             properties:
-              hour:  { type: string, description: ISO timestamp at the start of the bucket (UTC). For `week`, this is the start of the day. }
+              hour:  { type: string, description: ISO timestamp at the start of the bucket (UTC). For `week`, this is the start of the day; for `month`, the start of the week. }
               views: { type: integer }
 
     PostInsight:

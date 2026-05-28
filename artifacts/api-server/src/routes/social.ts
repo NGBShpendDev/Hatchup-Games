@@ -694,6 +694,8 @@ router.post("/social/posts/:id/view", postViewLimiter, async (req, res) => {
 // `?window=week`          → 7 daily buckets covering the last 7 days, useful
 //                           for slower-burn posts (evolutions, tournaments)
 //                           that pick up views over several days.
+// `?window=month`         → 5 weekly buckets (~35 days) for evergreen posts
+//                           that keep accruing views over weeks.
 
 router.get("/social/posts/:id/view-series", requireAuth, attachPlayer, async (req, res) => {
   const id = Number(req.params.id);
@@ -704,23 +706,32 @@ router.get("/social/posts/:id/view-series", requireAuth, attachPlayer, async (re
   if (!post || post.deletedAt != null) { res.status(404).json({ error: "Post not found" }); return; }
   if (post.playerId !== viewerId) { res.status(403).json({ error: "Not your post" }); return; }
 
-  const window = req.query.window === "week" ? "week" : "day";
-  const bucketHours = window === "week" ? 24 : 1;
-  const bucketCount = window === "week" ? 7 : 24;
+  const window: "day" | "week" | "month" =
+    req.query.window === "month" ? "month"
+    : req.query.window === "week" ? "week"
+    : "day";
+  const bucketHours = window === "month" ? 168 : window === "week" ? 24 : 1;
+  const bucketCount = window === "month" ? 5 : window === "week" ? 7 : 24;
   const windowHours = bucketHours * bucketCount;
   const bucketMs = bucketHours * 3600_000;
   const now = Date.now();
-  // Align the current bucket to the top of the hour/day so buckets line up
-  // with `date_trunc` output in Postgres.
+  // Align the current bucket to the top of the hour/day/week so buckets line
+  // up with `date_trunc` output in Postgres.
   const currentBucketStart = new Date(now - (now % bucketMs));
   const cutoff = new Date(currentBucketStart.getTime() - (bucketCount - 1) * bucketMs);
 
   // `date_trunc`'s unit must be a literal — using a bound parameter (`$1`)
-  // makes Postgres complain, so we splice it as a SQL fragment.
+  // makes Postgres complain, so we splice it as a SQL fragment. Postgres'
+  // `date_trunc('week', …)` snaps to Monday 00:00 UTC, which can drift away
+  // from our epoch-aligned bucket boundaries — so for `month` we use a
+  // computed expression that buckets by the same 168-hour grid we're walking
+  // below.
   const truncExpr =
-    window === "week"
-      ? sql`date_trunc('day', ${postViewsTable.createdAt})`
-      : sql`date_trunc('hour', ${postViewsTable.createdAt})`;
+    window === "month"
+      ? sql`to_timestamp(floor(extract(epoch from ${postViewsTable.createdAt}) / 604800) * 604800) at time zone 'UTC'`
+      : window === "week"
+        ? sql`date_trunc('day', ${postViewsTable.createdAt})`
+        : sql`date_trunc('hour', ${postViewsTable.createdAt})`;
 
   const rows = await db
     .select({

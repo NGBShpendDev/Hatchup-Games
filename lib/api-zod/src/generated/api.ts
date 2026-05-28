@@ -2415,18 +2415,18 @@ export const getPostViewSeriesQueryWindowDefault = `day`;
 
 export const GetPostViewSeriesQueryParams = zod.object({
   "playerId": zod.coerce.number().describe('The viewing player — must be the post owner.'),
-  "window": zod.enum(['day', 'week']).default(getPostViewSeriesQueryWindowDefault).describe('Trend window. `day` returns 24 hourly buckets (default).\n`week` returns 7 daily buckets so creators can see slower-burn momentum.\n')
+  "window": zod.enum(['day', 'week', 'month']).default(getPostViewSeriesQueryWindowDefault).describe('Trend window. `day` returns 24 hourly buckets (default).\n`week` returns 7 daily buckets so creators can see slower-burn momentum.\n`month` returns 5 weekly buckets (~35 days) for evergreen posts that\nkeep accruing views over weeks.\n')
 })
 
 export const GetPostViewSeriesResponse = zod.object({
-  "window": zod.enum(['day', 'week']).describe('Which trend window was returned.'),
+  "window": zod.enum(['day', 'week', 'month']).describe('Which trend window was returned.'),
   "windowHours": zod.number().describe('Total hours covered by the series (24 for day'),
   "bucketHours": zod.number().describe('Hours per bucket (1 for day'),
   "total": zod.number().describe('Total views across the returned buckets'),
   "buckets": zod.array(zod.object({
   "hour": zod.string().describe('ISO timestamp at the start of the bucket (UTC). For `week`'),
   "views": zod.number()
-})).describe('Buckets ordered oldest first, zero-filled. 24 entries for `day`, 7 for `week`.')
+})).describe('Buckets ordered oldest first, zero-filled. 24 entries for `day`, 7 for `week`, 5 for `month`.')
 })
 
 

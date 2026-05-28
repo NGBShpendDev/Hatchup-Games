@@ -370,12 +370,17 @@ function ViewSparkline({
   playerId: number;
   postCreatedAt?: string | null;
 }) {
-  // Posts older than 24 hours auto-pick the 7-day window so creators of
-  // slower-burn content (evolutions, transformations, tournament wins) can
-  // see momentum that builds over days. Users can also tap to flip windows.
+  // Auto-pick the widest meaningful window so creators of slower-burn content
+  // (evolutions, transformations, tournament wins, evergreen viral posts) see
+  // momentum without having to fiddle. Posts > 7 days old start on `month`,
+  // > 24h old start on `week`, fresh posts start on `day`. Tapping cycles
+  // day → week → month → day.
   const ageMs = postCreatedAt ? Date.now() - new Date(postCreatedAt).getTime() : 0;
-  const autoWindow: "day" | "week" = ageMs > 24 * 3600_000 ? "week" : "day";
-  const [window, setWindow] = useState<"day" | "week">(autoWindow);
+  const autoWindow: "day" | "week" | "month" =
+    ageMs > 7 * 24 * 3600_000 ? "month"
+    : ageMs > 24 * 3600_000 ? "week"
+    : "day";
+  const [window, setWindow] = useState<"day" | "week" | "month">(autoWindow);
 
   const { data } = useGetPostViewSeries(postId, { playerId, window }, {
     query: {
@@ -398,15 +403,19 @@ function ViewSparkline({
   });
   const line = pts.join(" ");
   const area = `0,${height} ${line} ${width},${height}`;
-  const windowLabel = window === "week" ? "last 7 days" : "last 24 hours";
-  const toggleLabel = window === "week" ? "last 24 hours" : "last 7 days";
+  const labelFor = (w: "day" | "week" | "month") =>
+    w === "month" ? "last 30 days" : w === "week" ? "last 7 days" : "last 24 hours";
+  const nextWindow: "day" | "week" | "month" =
+    window === "day" ? "week" : window === "week" ? "month" : "day";
+  const windowLabel = labelFor(window);
+  const toggleLabel = labelFor(nextWindow);
 
   return (
     <button
       type="button"
       onClick={(e) => {
         e.stopPropagation();
-        setWindow(w => (w === "week" ? "day" : "week"));
+        setWindow(nextWindow);
       }}
       className="inline-flex items-center cursor-pointer bg-transparent border-0 p-0 m-0 leading-none"
       title={`${data?.total ?? 0} views in the ${windowLabel} — tap for ${toggleLabel}`}

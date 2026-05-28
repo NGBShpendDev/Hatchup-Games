@@ -1487,6 +1487,7 @@ export type PostViewSeriesWindow = typeof PostViewSeriesWindow[keyof typeof Post
 export const PostViewSeriesWindow = {
   day: 'day',
   week: 'week',
+  month: 'month',
 } as const;
 
 export type PostViewSeriesBucketsItem = {
@@ -1504,7 +1505,7 @@ export interface PostViewSeries {
   bucketHours: number;
   /** Total views across the returned buckets */
   total: number;
-  /** Buckets ordered oldest first, zero-filled. 24 entries for `day`, 7 for `week`. */
+  /** Buckets ordered oldest first, zero-filled. 24 entries for `day`, 7 for `week`, 5 for `month`. */
   buckets: PostViewSeriesBucketsItem[];
 }
 
@@ -2924,6 +2925,8 @@ playerId: number;
 /**
  * Trend window. `day` returns 24 hourly buckets (default).
 `week` returns 7 daily buckets so creators can see slower-burn momentum.
+`month` returns 5 weekly buckets (~35 days) for evergreen posts that
+keep accruing views over weeks.
 
  */
 window?: GetPostViewSeriesWindow;
@@ -2935,6 +2938,7 @@ export type GetPostViewSeriesWindow = typeof GetPostViewSeriesWindow[keyof typeo
 export const GetPostViewSeriesWindow = {
   day: 'day',
   week: 'week',
+  month: 'month',
 } as const;
 
 export type DeletePostCommentParams = {
