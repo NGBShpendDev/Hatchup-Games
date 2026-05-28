@@ -10,6 +10,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { useToast } from "@/hooks/use-toast";
 import { HatchlingCard } from "@/components/hatchling-card";
 import { ErrorCard } from "@/components/error-card";
+import { HatchlingReaction, type HatchlingReactionData } from "@/components/hatchling-reaction";
 
 export default function Race() {
   const [searchParams] = useState(() => new URLSearchParams(window.location.search));
@@ -20,6 +21,7 @@ export default function Race() {
   const [selectedHatchlingId, setSelectedHatchlingId] = useState<number | null>(null);
   const [gameState, setGameState] = useState<'select' | 'racing' | 'result'>('select');
   const [result, setResult] = useState<{rank: number, xp: number, coins: number} | null>(null);
+  const [reaction, setReaction] = useState<HatchlingReactionData | null>(null);
 
   const { playerId } = usePlayer();
   const pid = playerId ?? 0;
@@ -42,12 +44,23 @@ export default function Race() {
         {
           onSuccess: (comp) => {
             // Assume the backend generated a result for standard types instantly for this demo
+            const rank = comp.rank || Math.floor(Math.random() * 8) + 1;
             setResult({
-              rank: comp.rank || Math.floor(Math.random() * 8) + 1,
+              rank,
               xp: comp.xpEarned || 150,
               coins: comp.coinsEarned || 50
             });
             setGameState('result');
+            const racer = hatchlings?.find((h) => h.id === selectedHatchlingId);
+            if (racer) {
+              const happinessDelta = rank === 1 ? 20 : rank <= 3 ? 10 : -5;
+              const energyDelta = rank <= 3 ? -10 : -15;
+              setReaction({
+                hatchlingName: racer.name,
+                happinessDelta,
+                energyDelta,
+              });
+            }
           },
           onError: () => {
             toast({ title: "Error", description: "Failed to complete race.", variant: "destructive" });
@@ -60,6 +73,7 @@ export default function Race() {
 
   return (
     <Layout>
+      <HatchlingReaction reaction={reaction} onDismiss={() => setReaction(null)} />
       <div className="max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[80vh]">
         <AnimatePresence mode="wait">
           

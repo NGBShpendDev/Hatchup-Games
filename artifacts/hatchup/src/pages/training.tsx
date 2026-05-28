@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
-import { 
-  useGetWorkoutPlan, getGetWorkoutPlanQueryKey, 
-  useGenerateWorkoutPlan, 
+import {
+  useGetWorkoutPlan, getGetWorkoutPlanQueryKey,
+  useGenerateWorkoutPlan,
   useGetActiveQuests, getGetActiveQuestsQueryKey,
   useGetMealPlan, getGetMealPlanQueryKey,
   useGenerateMealPlan,
   useListWorkoutSessions, getListWorkoutSessionsQueryKey,
-  useLogWorkoutSession
+  useLogWorkoutSession,
+  useListHatchlings, getListHatchlingsQueryKey,
 } from "@workspace/api-client-react";
+import { HatchlingReaction, type HatchlingReactionData } from "@/components/hatchling-reaction";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,8 +29,14 @@ import { useToast } from "@/hooks/use-toast";
 export default function Training() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { playerId } = usePlayer();
+  const { playerId, player } = usePlayer();
   const pid = playerId ?? 0;
+  const [reaction, setReaction] = useState<HatchlingReactionData | null>(null);
+
+  const { data: ownedHatchlings } = useListHatchlings(
+    { playerId: pid },
+    { query: { queryKey: getListHatchlingsQueryKey({ playerId: pid }), enabled: !!playerId } }
+  );
 
   const { data: workoutPlan, isLoading: isLoadingWorkout, error: workoutError } = useGetWorkoutPlan(
     { playerId: pid },
@@ -74,10 +82,21 @@ export default function Training() {
   const handleLogSession = (type: string, duration: number) => {
     logSession.mutate(
       { data: { playerId: pid, workoutType: type, durationMinutes: duration, exercisesCompleted: 5 } },
-      { 
+      {
         onSuccess: () => {
           toast({ title: "Workout logged!", description: "XP and coins earned." });
           queryClient.invalidateQueries({ queryKey: getListWorkoutSessionsQueryKey({ playerId: pid, limit: 10 }) });
+          const activeId = player?.activeHatchlingId;
+          const partner =
+            (activeId && ownedHatchlings?.find((h) => h.id === activeId)) ||
+            ownedHatchlings?.[0];
+          if (partner) {
+            setReaction({
+              hatchlingName: partner.name,
+              happinessDelta: 10,
+              energyDelta: -5,
+            });
+          }
         }
       }
     );
@@ -85,6 +104,7 @@ export default function Training() {
 
   return (
     <Layout>
+      <HatchlingReaction reaction={reaction} onDismiss={() => setReaction(null)} />
       <div className="max-w-5xl mx-auto space-y-8 pb-12">
         <div className="text-center max-w-2xl mx-auto py-8">
           <h1 className="text-5xl font-black tracking-tight text-primary mb-4 flex items-center justify-center gap-3">
