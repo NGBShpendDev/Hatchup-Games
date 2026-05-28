@@ -59,11 +59,11 @@ export default function HatchlingDetailScreen() {
   async function handleShare() {
     if (!pal) return;
     const url = buildHatchlingShareUrl(Number(id));
-    if (!url) return;
-    await Share.share({
-      message: `Check out my ${capitalize(pal.rarity)} hatchling ${pal.name} on HatchUp! ${url}`,
-      url,
-    });
+    const rarity = capitalize(pal.rarity);
+    const message = url
+      ? `Check out my ${rarity} hatchling ${pal.name} on HatchUp! ${url}`
+      : `Check out my ${rarity} hatchling ${pal.name} on HatchUp!`;
+    await Share.share({ message, ...(url ? { url } : {}) });
   }
 
   const rarityColor = getRarityColor(pal?.rarity);
