@@ -18,8 +18,24 @@ const router = Router();
 // Only city/state/county/country (from Nominatim reverse geocoding) are returned to clients.
 
 function deriveKey(): Buffer {
-  const secret = process.env.SESSION_SECRET ?? "dev-fallback-secret-not-for-production";
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || secret.length < 16) {
+    throw new Error("SESSION_SECRET is required for location coordinate encryption (min 16 chars). Refusing to encrypt with a weak or missing key.");
+  }
   return createHash("sha256").update(secret).digest(); // 32-byte key → AES-256
+}
+
+// ── Visibility policy (shared between scoped leaderboard + local challenges) ──
+// `hidden`        → world scope only (never appears on any location board/challenge)
+// `city`/`neighborhood` → only city/nearby scope (does NOT appear in country/state/county boards)
+// `exact`         → appears at every scope
+export function canAppearInScope(visibility: string | null | undefined, scope: string): boolean {
+  if (scope === "world") return true;
+  const v = visibility ?? "city";
+  if (v === "hidden") return false;
+  if (v === "exact") return true;
+  // city or neighborhood: only city-grain boards
+  return scope === "city" || scope === "nearby";
 }
 
 function encryptCoordinate(value: number): string {
@@ -234,6 +250,13 @@ router.post("/local-challenges/:id/join", requireAuth, attachPlayer, async (req,
   if (now > challenge.endAt)   { res.status(400).json({ error: "Challenge has ended" }); return; }
   if (now < challenge.startAt) { res.status(400).json({ error: "Challenge has not started yet" }); return; }
 
+  // Hidden-visibility players cannot join location-based challenges at all.
+  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (challenge.scope !== "world" && player?.locationVisibility === "hidden") {
+    res.status(403).json({ error: "Location visibility must not be 'hidden' to join location-based challenges" });
+    return;
+  }
+
   const playerLoc = await db.query.playerLocationTable.findFirst({ where: eq(playerLocationTable.playerId, req.playerId!) });
   if (!isChallengeEligible(challenge, playerLoc)) {
     res.status(403).json({ error: "This challenge is not available in your location" });
@@ -276,11 +299,12 @@ router.get("/local-challenges/:id/leaderboard", requireAuth, attachPlayer, async
     ? await db.query.playersTable.findMany({ where: (t, { inArray }) => inArray(t.id, playerIds) })
     : [];
 
-  // Exclude hidden-visibility players from leaderboard (always include the viewer even if hidden,
-  // so they can see their own position)
+  // Hidden-visibility players are fully excluded from location-based challenge leaderboards
+  // (no viewer exception — they shouldn't be on a location board at all).
+  // For world-scope challenges they remain visible.
   const playerMap = new Map(
     players
-      .filter(p => p.locationVisibility !== "hidden" || p.id === req.playerId)
+      .filter(p => challenge.scope === "world" || p.locationVisibility !== "hidden")
       .map(p => [p.id, p])
   );
 

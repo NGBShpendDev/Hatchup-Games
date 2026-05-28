@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import {
   useGetGlobalLeaderboard, getGetGlobalLeaderboardQueryKey,
@@ -90,14 +90,22 @@ interface ChallengeWinner {
   displayName: string | null;
   currentValue: number;
   isMe: boolean;
+  rewardsAwarded?: boolean;
+  rewardEarned?: { xp: number; coins: number } | null;
 }
 
 interface ChallengeLeaderboard {
-  challenge: LocalChallenge;
+  challenge: LocalChallenge & { isEnded?: boolean };
   entries: ChallengeWinner[];
   myEntry: ChallengeWinner | null;
   winners: ChallengeWinner[];
 }
+
+type MyLocation = {
+  city: string | null;
+  state: string | null;
+  country: string | null;
+} | null;
 
 export default function Leaderboard() {
   const { playerId } = usePlayer();
@@ -109,6 +117,30 @@ export default function Leaderboard() {
   const [metricOpen, setMetricOpen]   = useState(false);
   const [requestingLoc, setRequestingLoc] = useState(false);
   const [expandedChallenge, setExpandedChallenge] = useState<number | null>(null);
+  const [firstVisitDismissed, setFirstVisitDismissed] = useState<boolean>(
+    () => typeof window !== "undefined" && window.localStorage?.getItem("hatchup_loc_prompted") === "1"
+  );
+
+  // ── My location (first-visit detection) ──────────────────────────────────
+  const { data: myLocation, isLoading: myLocLoading } = useQuery<MyLocation>({
+    queryKey: ["my-location"],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/api/players/me/location`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+  const needsFirstVisitPrompt = !myLocLoading && myLocation == null && !firstVisitDismissed;
+
+  const dismissFirstVisit = useCallback(() => {
+    try { window.localStorage?.setItem("hatchup_loc_prompted", "1"); } catch { /* ignore */ }
+    setFirstVisitDismissed(true);
+  }, []);
+
+  useEffect(() => {
+    // When location is saved successfully, ensure first-visit prompt is dismissed
+    if (myLocation && !firstVisitDismissed) dismissFirstVisit();
+  }, [myLocation, firstVisitDismissed, dismissFirstVisit]);
 
   // ── Scoped leaderboard ───────────────────────────────────────────────────
   const { data: scopedBoard, isLoading: scopedLoading } = useQuery<ScopedBoard>({
@@ -197,6 +229,8 @@ export default function Leaderboard() {
           });
           if (res.ok) {
             toast({ title: "Location saved! Local boards are now visible." });
+            dismissFirstVisit();
+            qc.invalidateQueries({ queryKey: ["my-location"] });
             qc.invalidateQueries({ queryKey: ["leaderboard-scoped"] });
             qc.invalidateQueries({ queryKey: ["local-challenges"] });
           } else {
@@ -238,6 +272,41 @@ export default function Leaderboard() {
           <AlertCircle className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
           Your exact location is never shared with other players. Only city-level data is used for local boards.
         </div>
+
+        {/* First-visit location prompt — appears before any scope choice */}
+        {needsFirstVisitPrompt && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-br from-blue-900/40 to-violet-900/30 border border-blue-500/40 rounded-2xl p-5 space-y-3"
+          >
+            <div className="flex items-start gap-3">
+              <Map className="w-6 h-6 text-blue-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-bold text-sm">Enable Local Leaderboards</p>
+                <p className="text-xs text-white/60 mt-1">
+                  Compete with trainers in your city, county, and country. We only store city-level data — your exact GPS is encrypted and never shared.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold flex-1"
+                onClick={requestLocation}
+                disabled={requestingLoc}
+              >
+                {requestingLoc ? "Getting location…" : "Allow Location"}
+              </Button>
+              <Button
+                variant="outline"
+                className="bg-white/5 border-white/10 text-white/60 hover:text-white text-sm"
+                onClick={dismissFirstVisit}
+              >
+                Not now
+              </Button>
+            </div>
+          </motion.div>
+        )}
 
         {/* Tab bar */}
         <div className="flex gap-1.5 bg-white/5 border border-white/10 p-1 rounded-2xl">
@@ -577,7 +646,47 @@ export default function Leaderboard() {
                               className="border-t border-white/10 overflow-hidden"
                             >
                               {challengeBoard?.challenge.id === c.id ? (
-                                <div className="divide-y divide-white/5">
+                                <div>
+                                  {/* Result screen — shown when challenge has ended */}
+                                  {(challengeBoard.challenge.isEnded || isEnded) && challengeBoard.winners.length > 0 && (
+                                    <div className="bg-gradient-to-br from-yellow-900/30 via-amber-900/20 to-orange-900/20 border-b border-yellow-500/20 px-4 py-4 space-y-3">
+                                      <div className="flex items-center gap-2">
+                                        <Trophy className="w-4 h-4 text-yellow-400" />
+                                        <span className="font-black text-xs uppercase tracking-wider text-yellow-400">Final Results</span>
+                                      </div>
+                                      <div className="grid grid-cols-3 gap-2">
+                                        {challengeBoard.winners.map((w, wi) => {
+                                          const medal = wi === 0 ? "🥇" : wi === 1 ? "🥈" : "🥉";
+                                          return (
+                                            <div
+                                              key={w.playerId}
+                                              className={`rounded-xl p-2 text-center space-y-1 ${
+                                                w.isMe ? "bg-pink-600/20 border border-pink-500/40" : "bg-white/5 border border-white/10"
+                                              }`}
+                                            >
+                                              <div className="text-xl">{medal}</div>
+                                              <div className="font-bold text-[11px] truncate">{w.displayName ?? w.username}</div>
+                                              {w.rewardEarned && (
+                                                <div className="text-[9px] space-y-0.5 pt-1 border-t border-white/10">
+                                                  <div className="text-yellow-400 font-bold">⚡ {w.rewardEarned.xp}</div>
+                                                  <div className="text-amber-400 font-bold">🪙 {w.rewardEarned.coins}</div>
+                                                </div>
+                                              )}
+                                              {w.isMe && w.rewardsAwarded && (
+                                                <Badge className="text-[9px] px-1 py-0 bg-pink-600 text-white">Awarded!</Badge>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                      {challengeBoard.myEntry && !challengeBoard.winners.some(w => w.isMe) && (
+                                        <p className="text-[10px] text-center text-white/40">
+                                          You finished #{challengeBoard.myEntry.rank} of {challengeBoard.entries.length}
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+                                  <div className="divide-y divide-white/5">
                                   {challengeBoard.entries.length === 0 ? (
                                     <div className="py-6 text-center text-white/30 text-xs">No participants yet</div>
                                   ) : (
@@ -603,6 +712,7 @@ export default function Leaderboard() {
                                       <span className="font-black text-xs text-pink-400">{challengeBoard.myEntry.currentValue.toLocaleString()}</span>
                                     </div>
                                   )}
+                                  </div>
                                 </div>
                               ) : (
                                 <div className="py-4 text-center text-xs text-white/30">Loading…</div>

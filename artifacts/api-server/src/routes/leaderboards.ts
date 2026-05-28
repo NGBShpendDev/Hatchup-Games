@@ -4,10 +4,11 @@ import {
   playersTable, hatchlingsTable, fitnessActivitiesTable,
   personalRecordsTable, playerLocationTable, playerArtifactsTable,
 } from "@workspace/db";
-import { desc, eq, notInArray, gte, and, ne } from "drizzle-orm";
+import { desc, eq, notInArray, gte, and } from "drizzle-orm";
 import { GetGlobalLeaderboardQueryParams, GetModeLeaderboardQueryParams } from "@workspace/api-zod";
 import { getHiddenPlayerIds } from "./safety";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { canAppearInScope } from "./locations";
 
 const router = Router();
 
@@ -121,14 +122,13 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, async (req, res) =
   }
 
   // ── Privacy filter: use players.locationVisibility as canonical source ────
-  // World scope: all players are visible regardless of locationVisibility (it is a global board, not location-gated).
-  // Non-world scopes: players with locationVisibility="hidden" are excluded.
+  // Visibility policy (canAppearInScope, defined in routes/locations.ts):
+  //   hidden                → world only (excluded from all location boards)
+  //   city / neighborhood   → only city/nearby boards (NOT country/state/county)
+  //   exact                 → every scope
   // This respects whatever the user set in /settings/privacy.
-  const basePlayers = scope === "world"
-    ? await db.query.playersTable.findMany()
-    : await db.query.playersTable.findMany({
-        where: ne(playersTable.locationVisibility, "hidden"),
-      });
+  const allPlayers = await db.query.playersTable.findMany();
+  const basePlayers = allPlayers.filter(p => canAppearInScope(p.locationVisibility, scope));
 
   // Also exclude blocked/hidden users (block list applies to all scopes)
   const hiddenIds = req.playerId ? await getHiddenPlayerIds(req.playerId) : [];
