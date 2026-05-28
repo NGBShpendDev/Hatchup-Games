@@ -128,6 +128,7 @@ import type {
   MemoryPost,
   ModerationError,
   Notification,
+  NutritionWeeklySummary,
   OnboardingInput,
   OwnedArtifact,
   Player,
@@ -10059,6 +10060,89 @@ export function useGetLocalChallengeLeaderboard<TData = Awaited<ReturnType<typeo
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetLocalChallengeLeaderboardQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetNutritionSummaryUrl = () => {
+
+
+
+
+  return `/api/nutrition/summary`
+}
+
+/**
+ * Returns the player's last-7-days nutrition rollup: average daily macros,
+per-macro gaps and ratios vs the daily target derived from their
+physique goal, an overall adherence score, top logged foods, an AI
+(or static fallback) coaching tip, and a derived mood label for the
+active Hatchling that reflects how well targets were hit.
+
+ * @summary Weekly nutrition rollup for the authenticated player
+ */
+export const getNutritionSummary = async ( options?: RequestInit): Promise<NutritionWeeklySummary> => {
+
+  return customFetch<NutritionWeeklySummary>(getGetNutritionSummaryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNutritionSummaryQueryKey = () => {
+    return [
+    `/api/nutrition/summary`
+    ] as const;
+    }
+
+
+export const getGetNutritionSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getNutritionSummary>>, TError = ErrorType<StorageErrorEnvelope>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNutritionSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNutritionSummaryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNutritionSummary>>> = ({ signal }) => getNutritionSummary({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNutritionSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNutritionSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getNutritionSummary>>>
+export type GetNutritionSummaryQueryError = ErrorType<StorageErrorEnvelope>
+
+
+/**
+ * @summary Weekly nutrition rollup for the authenticated player
+ */
+
+export function useGetNutritionSummary<TData = Awaited<ReturnType<typeof getNutritionSummary>>, TError = ErrorType<StorageErrorEnvelope>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNutritionSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNutritionSummaryQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -48,6 +48,8 @@ tags:
     description: Object storage upload and serving endpoints
   - name: notifications
     description: In-app notifications (challenge invites, etc.)
+  - name: nutrition
+    description: Meal logging, macro tracking, and weekly nutrition rollups
 
 paths:
   /storage/uploads/request-url:
@@ -2785,6 +2787,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/LocalChallengeLeaderboardResult"
 
+  # ── Nutrition ────────────────────────────────────────────────────────────
+  /nutrition/summary:
+    get:
+      operationId: getNutritionSummary
+      tags: [nutrition]
+      summary: Weekly nutrition rollup for the authenticated player
+      description: |
+        Returns the player's last-7-days nutrition rollup: average daily macros,
+        per-macro gaps and ratios vs the daily target derived from their
+        physique goal, an overall adherence score, top logged foods, an AI
+        (or static fallback) coaching tip, and a derived mood label for the
+        active Hatchling that reflects how well targets were hit.
+      responses:
+        "200":
+          description: Weekly nutrition summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NutritionWeeklySummary"
+        "404":
+          description: Player not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+
 components:
   schemas:
     UploadUrlRequest:
@@ -4406,3 +4434,59 @@ components:
           oneOf:
             - $ref: "#/components/schemas/LocalChallengeLeaderboardEntry"
             - type: "null"
+
+    # ── Nutrition ──────────────────────────────────────────────────────────
+    NutritionMacroBreakdown:
+      type: object
+      required: [calories, protein, carbs, fat]
+      properties:
+        calories: { type: number }
+        protein:  { type: number }
+        carbs:    { type: number }
+        fat:      { type: number }
+
+    NutritionTopFood:
+      type: object
+      required: [name, emoji, count]
+      properties:
+        name:  { type: string }
+        emoji: { type: string }
+        count: { type: integer }
+
+    NutritionWeeklySummary:
+      type: object
+      required:
+        - weekStart
+        - daysLogged
+        - mealsLogged
+        - averages
+        - targets
+        - gaps
+        - ratios
+        - adherence
+        - topFoods
+        - hatchlingMood
+        - hatchlingEmoji
+        - aiTip
+        - aiSource
+      properties:
+        weekStart:   { type: string, format: date-time }
+        daysLogged:  { type: integer }
+        mealsLogged: { type: integer }
+        averages: { $ref: "#/components/schemas/NutritionMacroBreakdown" }
+        targets:  { $ref: "#/components/schemas/NutritionMacroBreakdown" }
+        gaps:     { $ref: "#/components/schemas/NutritionMacroBreakdown" }
+        ratios:   { $ref: "#/components/schemas/NutritionMacroBreakdown" }
+        adherence: { type: number }
+        topFoods:
+          type: array
+          items:
+            $ref: "#/components/schemas/NutritionTopFood"
+        hatchlingMood:
+          type: string
+          enum: [thriving, happy, okay, hungry, sad]
+        hatchlingEmoji: { type: string }
+        aiTip:          { type: string }
+        aiSource:
+          type: string
+          enum: [ai, fallback]

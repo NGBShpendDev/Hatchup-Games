@@ -3218,3 +3218,53 @@ export const GetLocalChallengeLeaderboardResponse = zod.object({
   "isMe": zod.boolean()
 }),zod.null()]).optional()
 })
+
+
+/**
+ * Returns the player's last-7-days nutrition rollup: average daily macros,
+per-macro gaps and ratios vs the daily target derived from their
+physique goal, an overall adherence score, top logged foods, an AI
+(or static fallback) coaching tip, and a derived mood label for the
+active Hatchling that reflects how well targets were hit.
+
+ * @summary Weekly nutrition rollup for the authenticated player
+ */
+export const GetNutritionSummaryResponse = zod.object({
+  "weekStart": zod.coerce.date(),
+  "daysLogged": zod.number(),
+  "mealsLogged": zod.number(),
+  "averages": zod.object({
+  "calories": zod.number(),
+  "protein": zod.number(),
+  "carbs": zod.number(),
+  "fat": zod.number()
+}),
+  "targets": zod.object({
+  "calories": zod.number(),
+  "protein": zod.number(),
+  "carbs": zod.number(),
+  "fat": zod.number()
+}),
+  "gaps": zod.object({
+  "calories": zod.number(),
+  "protein": zod.number(),
+  "carbs": zod.number(),
+  "fat": zod.number()
+}),
+  "ratios": zod.object({
+  "calories": zod.number(),
+  "protein": zod.number(),
+  "carbs": zod.number(),
+  "fat": zod.number()
+}),
+  "adherence": zod.number(),
+  "topFoods": zod.array(zod.object({
+  "name": zod.string(),
+  "emoji": zod.string(),
+  "count": zod.number()
+})),
+  "hatchlingMood": zod.enum(['thriving', 'happy', 'okay', 'hungry', 'sad']),
+  "hatchlingEmoji": zod.string(),
+  "aiTip": zod.string(),
+  "aiSource": zod.enum(['ai', 'fallback'])
+})

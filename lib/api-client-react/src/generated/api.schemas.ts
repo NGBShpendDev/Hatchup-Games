@@ -1547,6 +1547,54 @@ export interface LocalChallengeLeaderboardResult {
   myEntry?: LocalChallengeLeaderboardEntry | null;
 }
 
+export interface NutritionMacroBreakdown {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+export interface NutritionTopFood {
+  name: string;
+  emoji: string;
+  count: number;
+}
+
+export type NutritionWeeklySummaryHatchlingMood = typeof NutritionWeeklySummaryHatchlingMood[keyof typeof NutritionWeeklySummaryHatchlingMood];
+
+
+export const NutritionWeeklySummaryHatchlingMood = {
+  thriving: 'thriving',
+  happy: 'happy',
+  okay: 'okay',
+  hungry: 'hungry',
+  sad: 'sad',
+} as const;
+
+export type NutritionWeeklySummaryAiSource = typeof NutritionWeeklySummaryAiSource[keyof typeof NutritionWeeklySummaryAiSource];
+
+
+export const NutritionWeeklySummaryAiSource = {
+  ai: 'ai',
+  fallback: 'fallback',
+} as const;
+
+export interface NutritionWeeklySummary {
+  weekStart: string;
+  daysLogged: number;
+  mealsLogged: number;
+  averages: NutritionMacroBreakdown;
+  targets: NutritionMacroBreakdown;
+  gaps: NutritionMacroBreakdown;
+  ratios: NutritionMacroBreakdown;
+  adherence: number;
+  topFoods: NutritionTopFood[];
+  hatchlingMood: NutritionWeeklySummaryHatchlingMood;
+  hatchlingEmoji: string;
+  aiTip: string;
+  aiSource: NutritionWeeklySummaryAiSource;
+}
+
 export type SearchPlayersParams = {
 /**
  * @minLength 1

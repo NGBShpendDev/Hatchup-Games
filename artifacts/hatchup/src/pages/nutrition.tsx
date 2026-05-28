@@ -13,6 +13,11 @@ import { Heart, MessageCircle, Zap, ChefHat, Plus, X, Sparkles, Droplets, Flame,
 import { ReportBlockMenu } from "@/components/report-block-menu";
 import { HatchlingReaction, type HatchlingReactionData } from "@/components/hatchling-reaction";
 import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
+import {
+  useGetNutritionSummary,
+  type NutritionWeeklySummary,
+  type NutritionWeeklySummaryHatchlingMood,
+} from "@workspace/api-client-react";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -84,23 +89,7 @@ interface MacroTarget {
   tip: string;
 }
 
-interface WeeklySummary {
-  weekStart: string;
-  daysLogged: number;
-  mealsLogged: number;
-  averages: { calories: number; protein: number; carbs: number; fat: number };
-  targets:  { calories: number; protein: number; carbs: number; fat: number };
-  gaps:     { calories: number; protein: number; carbs: number; fat: number };
-  ratios:   { calories: number; protein: number; carbs: number; fat: number };
-  adherence: number;
-  topFoods: { name: string; emoji: string; count: number }[];
-  hatchlingMood: "thriving" | "happy" | "okay" | "hungry" | "sad";
-  hatchlingEmoji: string;
-  aiTip: string;
-  aiSource: "ai" | "fallback";
-}
-
-const MOOD_STYLES: Record<WeeklySummary["hatchlingMood"], { ring: string; bg: string; label: string; tint: string }> = {
+const MOOD_STYLES: Record<NutritionWeeklySummaryHatchlingMood, { ring: string; bg: string; label: string; tint: string }> = {
   thriving: { ring: "ring-green-500/60",  bg: "from-green-500/15 to-emerald-500/5",   label: "Thriving",    tint: "text-green-300"  },
   happy:    { ring: "ring-cyan-500/60",   bg: "from-cyan-500/15 to-blue-500/5",       label: "Happy",       tint: "text-cyan-300"   },
   okay:     { ring: "ring-yellow-500/60", bg: "from-yellow-500/15 to-amber-500/5",    label: "Doing okay",  tint: "text-yellow-300" },
@@ -227,10 +216,8 @@ export default function Nutrition() {
     enabled: !!pid,
   });
 
-  const { data: weekly, isLoading: weeklyLoading } = useQuery<WeeklySummary>({
-    queryKey: ["nutrition-summary", pid],
-    queryFn: () => fetch(`${BASE}/api/nutrition/summary`, { credentials: "include" }).then(r => r.json()),
-    enabled: !!pid,
+  const { data: weekly, isLoading: weeklyLoading } = useGetNutritionSummary({
+    query: { enabled: !!pid, queryKey: ["nutrition-summary", pid] },
   });
 
   const { data: streak } = useQuery<NutritionStreak>({
@@ -984,7 +971,7 @@ function TodayProgressStrip({ today }: { today: NutritionStreak["today"] }) {
   );
 }
 
-function WeeklySummaryCard({ summary }: { summary: WeeklySummary }) {
+function WeeklySummaryCard({ summary }: { summary: NutritionWeeklySummary }) {
   const mood = MOOD_STYLES[summary.hatchlingMood];
   const macros = [
     { key: "calories", label: "Cals",    actual: summary.averages.calories, target: summary.targets.calories, color: "from-orange-500 to-red-500",  text: "text-orange-300", suffix: "" },
