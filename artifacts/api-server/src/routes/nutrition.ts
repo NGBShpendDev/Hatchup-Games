@@ -602,6 +602,172 @@ router.get("/nutrition/macro-target", requireAuth, attachPlayer, async (req, res
   res.json({ goal, ...fallback, aiPersonalized: false });
 });
 
+// ── GET /nutrition/summary ────────────────────────────────────────────────────
+// Weekly nutrition rollup: avg daily macros over the last 7 days, gap vs daily
+// targets, top logged foods, an AI-generated coaching tip, and a derived mood
+// for the player's active Hatchling that reflects how well they hit targets.
+router.get("/nutrition/summary", requireAuth, attachPlayer, async (req, res) => {
+  const playerId = req.playerId!;
+
+  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
+  if (!player) { res.status(404).json({ error: "Player not found" }); return; }
+
+  const sinceDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  // Fetch this week's meal posts for the player
+  const posts = await db.query.mealPostsTable.findMany({
+    where: and(
+      eq(mealPostsTable.playerId, playerId),
+      sql`${mealPostsTable.createdAt} >= ${sinceDate.toISOString()}`,
+    ),
+    orderBy: [desc(mealPostsTable.createdAt)],
+  });
+
+  // Aggregate by calendar day (ISO date) so the average is per-day, not per-meal.
+  const byDay = new Map<string, { calories: number; protein: number; carbs: number; fat: number }>();
+  for (const p of posts) {
+    const day = p.createdAt.toISOString().slice(0, 10);
+    const acc = byDay.get(day) ?? { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    acc.calories += p.calories ?? 0;
+    acc.protein  += p.proteinG  ?? 0;
+    acc.carbs    += p.carbsG    ?? 0;
+    acc.fat      += p.fatG      ?? 0;
+    byDay.set(day, acc);
+  }
+
+  const daysLogged = byDay.size;
+  const totals = [...byDay.values()].reduce(
+    (a, b) => ({
+      calories: a.calories + b.calories,
+      protein:  a.protein  + b.protein,
+      carbs:    a.carbs    + b.carbs,
+      fat:      a.fat      + b.fat,
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 },
+  );
+  const denom = Math.max(daysLogged, 1);
+  const averages = {
+    calories: Math.round(totals.calories / denom),
+    protein:  Math.round(totals.protein  / denom),
+    carbs:    Math.round(totals.carbs    / denom),
+    fat:      Math.round(totals.fat      / denom),
+  };
+
+  // Resolve daily targets from the player's physique goal (static — same
+  // fallback table used by /nutrition/macro-target).
+  const goal = player.physiqueGoal ?? "lean_athlete";
+  const target = MACRO_GOAL_TARGETS[goal] ?? MACRO_GOAL_TARGETS["lean_athlete"]!;
+  const targets = { calories: target.calories, protein: target.protein, carbs: target.carbs, fat: target.fat };
+
+  // Top foods this week (by occurrence)
+  const foodCounts = new Map<string, { name: string; emoji: string; count: number }>();
+  for (const p of posts) {
+    const key = p.name.toLowerCase().trim();
+    const entry = foodCounts.get(key) ?? { name: p.name, emoji: p.emoji, count: 0 };
+    entry.count += 1;
+    foodCounts.set(key, entry);
+  }
+  const topFoods = [...foodCounts.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  // Per-macro hit ratio (capped at 1.5 so wildly overshooting one macro doesn't
+  // hide that the player is hitting the rest reasonably). Avg of the four is
+  // a simple "overall adherence" signal between 0 and 1.5.
+  const ratio = (actual: number, want: number) =>
+    want <= 0 ? 0 : Math.min(1.5, actual / want);
+  const ratios = {
+    calories: ratio(averages.calories, targets.calories),
+    protein:  ratio(averages.protein,  targets.protein),
+    carbs:    ratio(averages.carbs,    targets.carbs),
+    fat:      ratio(averages.fat,      targets.fat),
+  };
+  const adherence = daysLogged === 0
+    ? 0
+    : (ratios.calories + ratios.protein + ratios.carbs + ratios.fat) / 4;
+
+  // Derive a Hatchling mood label from adherence + days logged. The frontend
+  // uses this to colour the summary card and surface a creature reaction —
+  // closes the meal-quality → creature health loop at the weekly level.
+  let hatchlingMood: "thriving" | "happy" | "okay" | "hungry" | "sad";
+  let hatchlingEmoji: string;
+  if (daysLogged === 0) {
+    hatchlingMood = "hungry"; hatchlingEmoji = "😟";
+  } else if (adherence >= 0.85 && adherence <= 1.15 && daysLogged >= 5) {
+    hatchlingMood = "thriving"; hatchlingEmoji = "🤩";
+  } else if (adherence >= 0.7 && adherence <= 1.3) {
+    hatchlingMood = "happy"; hatchlingEmoji = "😊";
+  } else if (adherence >= 0.5) {
+    hatchlingMood = "okay"; hatchlingEmoji = "🙂";
+  } else if (adherence > 0) {
+    hatchlingMood = "hungry"; hatchlingEmoji = "🥺";
+  } else {
+    hatchlingMood = "sad"; hatchlingEmoji = "😢";
+  }
+
+  // AI coaching tip based on the gap between actual and target macros. We
+  // ALWAYS provide a static fallback so the card never breaks if the AI call
+  // fails or the player has no logs.
+  const gaps = {
+    calories: averages.calories - targets.calories,
+    protein:  averages.protein  - targets.protein,
+    carbs:    averages.carbs    - targets.carbs,
+    fat:      averages.fat      - targets.fat,
+  };
+
+  let aiTip: string;
+  let aiSource: "ai" | "fallback" = "fallback";
+  if (daysLogged === 0) {
+    aiTip = "Log a meal this week to unlock personalized coaching tips.";
+  } else {
+    const worst = (Object.entries(gaps) as [keyof typeof gaps, number][])
+      .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0]!;
+    aiTip = worst[1] < 0
+      ? `You're averaging ${Math.abs(worst[1])}${worst[0] === "calories" ? "" : "g"} short on ${worst[0]} — add a small portion at one meal.`
+      : `You're ${worst[1]}${worst[0] === "calories" ? "" : "g"} over target on ${worst[0]} — try a lighter swap at one meal.`;
+
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-5-mini",
+        max_completion_tokens: 120,
+        messages: [
+          {
+            role: "system",
+            content: `You are a friendly sports nutrition coach. Given a player's weekly macro averages vs targets, write ONE short coaching tip (max 160 characters, no markdown, no quotes) that highlights the biggest gap and gives one concrete swap or add.`,
+          },
+          {
+            role: "user",
+            content: `Goal: ${goal}. Days logged this week: ${daysLogged}/7. Averages: ${averages.calories} kcal, ${averages.protein}g protein, ${averages.carbs}g carbs, ${averages.fat}g fat. Targets: ${targets.calories} kcal, ${targets.protein}g protein, ${targets.carbs}g carbs, ${targets.fat}g fat.`,
+          },
+        ],
+      });
+      const raw = completion.choices[0]?.message?.content?.trim();
+      if (raw && raw.length > 0) {
+        aiTip = raw.slice(0, 240);
+        aiSource = "ai";
+      }
+    } catch (err) {
+      req.log.warn({ err }, "AI weekly tip failed; using static fallback");
+    }
+  }
+
+  res.json({
+    weekStart: sinceDate.toISOString(),
+    daysLogged,
+    mealsLogged: posts.length,
+    averages,
+    targets,
+    gaps,
+    ratios,
+    adherence: Math.round(adherence * 100) / 100,
+    topFoods,
+    hatchlingMood,
+    hatchlingEmoji,
+    aiTip,
+    aiSource,
+  });
+});
+
 // ── PUT /nutrition/physique-goal ──────────────────────────────────────────────
 const PhysiqueGoalBody = z.object({ playerId: z.number(), physiqueGoal: z.string() });
 

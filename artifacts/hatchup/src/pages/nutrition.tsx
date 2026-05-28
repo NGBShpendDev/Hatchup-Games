@@ -80,6 +80,30 @@ interface MacroTarget {
   tip: string;
 }
 
+interface WeeklySummary {
+  weekStart: string;
+  daysLogged: number;
+  mealsLogged: number;
+  averages: { calories: number; protein: number; carbs: number; fat: number };
+  targets:  { calories: number; protein: number; carbs: number; fat: number };
+  gaps:     { calories: number; protein: number; carbs: number; fat: number };
+  ratios:   { calories: number; protein: number; carbs: number; fat: number };
+  adherence: number;
+  topFoods: { name: string; emoji: string; count: number }[];
+  hatchlingMood: "thriving" | "happy" | "okay" | "hungry" | "sad";
+  hatchlingEmoji: string;
+  aiTip: string;
+  aiSource: "ai" | "fallback";
+}
+
+const MOOD_STYLES: Record<WeeklySummary["hatchlingMood"], { ring: string; bg: string; label: string; tint: string }> = {
+  thriving: { ring: "ring-green-500/60",  bg: "from-green-500/15 to-emerald-500/5",   label: "Thriving",    tint: "text-green-300"  },
+  happy:    { ring: "ring-cyan-500/60",   bg: "from-cyan-500/15 to-blue-500/5",       label: "Happy",       tint: "text-cyan-300"   },
+  okay:     { ring: "ring-yellow-500/60", bg: "from-yellow-500/15 to-amber-500/5",    label: "Doing okay",  tint: "text-yellow-300" },
+  hungry:   { ring: "ring-orange-500/60", bg: "from-orange-500/15 to-red-500/5",      label: "Hungry",      tint: "text-orange-300" },
+  sad:      { ring: "ring-rose-500/60",   bg: "from-rose-500/15 to-pink-500/5",       label: "Underfed",    tint: "text-rose-300"   },
+};
+
 export default function Nutrition() {
   const { playerId, player } = usePlayer();
   const { toast } = useToast();
@@ -184,6 +208,12 @@ export default function Nutrition() {
     enabled: !!pid,
   });
 
+  const { data: weekly, isLoading: weeklyLoading } = useQuery<WeeklySummary>({
+    queryKey: ["nutrition-summary", pid],
+    queryFn: () => fetch(`${BASE}/api/nutrition/summary`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!pid,
+  });
+
   // ── Mutations ────────────────────────────────────────────────────────────────
   const likeMutation = useMutation({
     mutationFn: (postId: number) =>
@@ -252,6 +282,7 @@ export default function Nutrition() {
       }).then(r => r.json()),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["nutrition-posts", pid] });
+      qc.invalidateQueries({ queryKey: ["nutrition-summary", pid] });
       // Refresh hatchling stats since nutrition can buff/debuff the active Hatchling.
       // Generated query keys are arrays starting with "/api/hatchlings" (list) or
       // "/api/hatchlings/:id" (detail) — match either by prefix.
@@ -365,6 +396,13 @@ export default function Nutrition() {
             </div>
           </div>
         )}
+
+        {/* Weekly Summary Card */}
+        {weeklyLoading ? (
+          <Skeleton className="h-40 rounded-2xl mb-4" />
+        ) : weekly ? (
+          <WeeklySummaryCard summary={weekly} />
+        ) : null}
 
         {/* Tabs */}
         <div className="flex gap-1 bg-muted/30 rounded-xl p-1 mb-4">
@@ -710,6 +748,91 @@ export default function Nutrition() {
         )}
       </AnimatePresence>
     </Layout>
+  );
+}
+
+function WeeklySummaryCard({ summary }: { summary: WeeklySummary }) {
+  const mood = MOOD_STYLES[summary.hatchlingMood];
+  const macros = [
+    { key: "calories", label: "Cals",    actual: summary.averages.calories, target: summary.targets.calories, color: "from-orange-500 to-red-500",  text: "text-orange-300", suffix: "" },
+    { key: "protein",  label: "Protein", actual: summary.averages.protein,  target: summary.targets.protein,  color: "from-red-500 to-pink-500",    text: "text-red-300",    suffix: "g" },
+    { key: "carbs",    label: "Carbs",   actual: summary.averages.carbs,    target: summary.targets.carbs,    color: "from-yellow-500 to-amber-500", text: "text-yellow-300", suffix: "g" },
+    { key: "fat",      label: "Fat",     actual: summary.averages.fat,      target: summary.targets.fat,      color: "from-blue-500 to-indigo-500", text: "text-blue-300",   suffix: "g" },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`rounded-2xl border border-border bg-gradient-to-br ${mood.bg} ring-1 ${mood.ring} p-4 mb-4`}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">This Week</p>
+          <p className="font-black text-base">{summary.daysLogged}/7 days logged · {summary.mealsLogged} meals</p>
+        </div>
+        <div className="flex flex-col items-center">
+          <motion.div
+            key={summary.hatchlingEmoji}
+            initial={{ scale: 0.5, rotate: -10 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 300 }}
+            className="text-4xl"
+          >
+            {summary.hatchlingEmoji}
+          </motion.div>
+          <p className={`text-[10px] font-black uppercase mt-0.5 ${mood.tint}`}>{mood.label}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-2 mb-3">
+        {macros.map(m => {
+          const pct = m.target > 0 ? Math.min(100, Math.round((m.actual / m.target) * 100)) : 0;
+          return (
+            <div key={m.key} className="bg-black/20 rounded-xl p-2">
+              <div className="flex items-baseline justify-between">
+                <p className={`font-black text-sm ${m.text}`}>{m.actual}{m.suffix}</p>
+                <p className="text-[9px] text-muted-foreground font-bold">/{m.target}{m.suffix}</p>
+              </div>
+              <div className="h-1.5 bg-muted/40 rounded-full mt-1 overflow-hidden">
+                <motion.div
+                  className={`h-full rounded-full bg-gradient-to-r ${m.color}`}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct}%` }}
+                  transition={{ duration: 0.6 }}
+                />
+              </div>
+              <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">{m.label}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {summary.topFoods.length > 0 && (
+        <div className="mb-3">
+          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1">Top foods</p>
+          <div className="flex gap-1.5 flex-wrap">
+            {summary.topFoods.map(f => (
+              <span key={f.name} className="inline-flex items-center gap-1 text-[11px] font-bold bg-muted/40 rounded-full px-2 py-0.5">
+                <span>{f.emoji}</span>
+                <span className="truncate max-w-[100px]">{f.name}</span>
+                {f.count > 1 && <span className="text-muted-foreground">×{f.count}</span>}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-xl bg-black/30 border border-purple-500/30 px-3 py-2 flex items-start gap-2">
+        <Sparkles className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" />
+        <div className="flex-1">
+          <p className="text-[10px] font-black uppercase tracking-wider text-purple-300">
+            {summary.aiSource === "ai" ? "AI Coach Tip" : "Coach Tip"}
+          </p>
+          <p className="text-xs font-medium text-foreground/90 mt-0.5">{summary.aiTip}</p>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
