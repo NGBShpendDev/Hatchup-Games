@@ -39,6 +39,8 @@ export function TrendingPostPreviewDialog({
   const reactToPost = useReactToPost();
 
   const [index, setIndex] = useState(initialIndex);
+  const [isPaused, setIsPaused] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   // Reset to the initial index whenever the dialog is opened.
   useEffect(() => {
@@ -46,6 +48,7 @@ export function TrendingPostPreviewDialog({
       setIndex(
         initialIndex >= 0 && initialIndex < postIds.length ? initialIndex : 0,
       );
+      setIsPaused(false);
     }
   }, [open, initialIndex, postIds.length]);
 
@@ -91,6 +94,8 @@ export function TrendingPostPreviewDialog({
 
   const canPrev = total > 1 && safeIndex > 0;
   const canNext = total > 1 && safeIndex < total - 1;
+  const autoPlayEnabled = total > 1;
+  const isLastSlide = safeIndex >= total - 1;
 
   function goPrev() {
     if (canPrev) setIndex(safeIndex - 1);
@@ -98,6 +103,42 @@ export function TrendingPostPreviewDialog({
   function goNext() {
     if (canNext) setIndex(safeIndex + 1);
   }
+
+  // Auto-advance: ~5s per slide, with a progress bar at the top.
+  const AUTO_ADVANCE_MS = 5000;
+  const TICK_MS = 50;
+  const progressRef = useRef(0);
+  useEffect(() => {
+    progressRef.current = progress;
+  }, [progress]);
+
+  useEffect(() => {
+    setProgress(0);
+  }, [safeIndex, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!autoPlayEnabled) return;
+    if (isPaused) return;
+    if (isLastSlide) return;
+    if (isLoading || isUnavailable) return;
+    const start = Date.now();
+    const startProgress = progressRef.current;
+    const id = window.setInterval(() => {
+      const elapsed = Date.now() - start;
+      const pct = Math.min(
+        100,
+        startProgress + (elapsed / AUTO_ADVANCE_MS) * 100,
+      );
+      setProgress(pct);
+      if (pct >= 100) {
+        window.clearInterval(id);
+        setIndex((i) => (i < total - 1 ? i + 1 : i));
+      }
+    }, TICK_MS);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, autoPlayEnabled, isPaused, isLastSlide, isLoading, isUnavailable, safeIndex, total]);
 
   // Swipe gesture handling
   const touchStartX = useRef<number | null>(null);
@@ -139,7 +180,34 @@ export function TrendingPostPreviewDialog({
         data-testid="trending-post-preview-dialog"
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
+        onPointerDown={() => {
+          if (autoPlayEnabled) setIsPaused(true);
+        }}
+        onPointerUp={() => {
+          if (autoPlayEnabled) setIsPaused(false);
+        }}
+        onPointerCancel={() => {
+          if (autoPlayEnabled) setIsPaused(false);
+        }}
+        onPointerLeave={() => {
+          if (autoPlayEnabled) setIsPaused(false);
+        }}
       >
+        {autoPlayEnabled ? (
+          <div
+            className="absolute left-3 right-3 top-2 h-1 rounded-full bg-muted-foreground/20 overflow-hidden"
+            aria-hidden="true"
+            data-testid="trending-post-preview-progress"
+          >
+            <div
+              className="h-full bg-primary"
+              style={{
+                width: `${progress}%`,
+                transition: isPaused ? "none" : "width 50ms linear",
+              }}
+            />
+          </div>
+        ) : null}
         <DialogHeader className="space-y-1 pr-8">
           <DialogTitle className="text-xs font-black uppercase tracking-wider text-primary inline-flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5" /> Trending preview
