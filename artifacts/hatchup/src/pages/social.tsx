@@ -86,6 +86,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
 import { ErrorCard } from "@/components/error-card";
+import { MutualWorkoutPartnersLine } from "@/components/mutual-workout-partners";
 
 function ProfileModal({
   playerId: profileId,
@@ -190,13 +191,12 @@ function ProfileModal({
                 </div>
                 <p className="text-xs text-muted-foreground">@{profile.player.username}</p>
                 {profileId !== viewerId && profile.mutualWorkoutPartners && profile.mutualWorkoutPartners.length > 0 && (
-                  <p
+                  <MutualWorkoutPartnersLine
+                    partners={profile.mutualWorkoutPartners}
+                    onViewProfile={handleViewMutualProfile}
+                    testIdPrefix="profile"
                     className="text-[11px] text-emerald-300 font-bold mt-1 flex items-center gap-1 truncate"
-                    data-testid="text-profile-mutual-partners"
-                  >
-                    <Dumbbell className="w-3 h-3 shrink-0" />
-                    <span className="truncate">{formatMutualWorkoutPartners(profile.mutualWorkoutPartners)}</span>
-                  </p>
+                  />
                 )}
                 <div className="flex gap-4 mt-1 text-xs font-bold">
                   <button
@@ -468,18 +468,6 @@ function formatSharedGroups(groups: Array<{ id: number; name: string }>): string
     : `Also in ${preview} with you`;
 }
 
-function formatMutualWorkoutPartners(
-  partners: Array<{ id: number; displayName: string }>,
-): string {
-  const names = partners.map(p => p.displayName);
-  if (names.length === 0) return "";
-  const preview = names.slice(0, 2).join(" & ");
-  const extra = names.length - 2;
-  return extra > 0
-    ? `Workouts with ${preview} +${extra} more`
-    : `Workouts with ${preview}`;
-}
-
 function PlayerListRow({
   player,
   testIdPrefix,
@@ -522,13 +510,12 @@ function PlayerListRow({
           </p>
         )}
         {mutualWorkoutPartners.length > 0 && (
-          <p
+          <MutualWorkoutPartnersLine
+            partners={mutualWorkoutPartners}
+            onViewProfile={onViewProfile}
+            testIdPrefix={`${testIdPrefix}-${player.id}`}
             className="text-[11px] text-emerald-300 font-bold mt-0.5 flex items-center gap-1 truncate"
-            data-testid={`text-${testIdPrefix}-mutual-partners-${player.id}`}
-          >
-            <Dumbbell className="w-3 h-3 shrink-0" />
-            <span className="truncate">{formatMutualWorkoutPartners(mutualWorkoutPartners)}</span>
-          </p>
+          />
         )}
       </div>
       <Button
@@ -1134,15 +1121,12 @@ function PlayerDiscoverCard({
             </p>
           )}
           {(player.mutualWorkoutPartners ?? []).length > 0 && (
-            <p
+            <MutualWorkoutPartnersLine
+              partners={player.mutualWorkoutPartners ?? []}
+              onViewProfile={onViewProfile}
+              testIdPrefix={`discover-${player.id}`}
               className="text-[10px] font-bold mt-0.5 flex items-center gap-1 text-emerald-400 truncate"
-              data-testid={`text-discover-mutual-partners-${player.id}`}
-            >
-              <Dumbbell className="w-3 h-3 shrink-0" />
-              <span className="truncate">
-                {formatMutualWorkoutPartners(player.mutualWorkoutPartners ?? [])}
-              </span>
-            </p>
+            />
           )}
         </div>
         {player.id !== viewerId && (
