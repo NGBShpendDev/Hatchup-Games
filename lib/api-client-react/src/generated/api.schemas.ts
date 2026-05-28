@@ -1433,6 +1433,11 @@ export interface PlayerSocialProfile {
   mutualFollowingTotal: number;
   /** Groups that both the viewer and this player are members of. */
   sharedGroups: SharedGroup[];
+  /** Up to 3 third players who have actually logged a co-workout with
+  BOTH the viewer and this profile. Same trust signal surfaced on
+  follower/following lists, social search, and the invite picker.
+   */
+  mutualWorkoutPartners: MutualWorkoutPartner[];
 }
 
 export interface FollowersPage {

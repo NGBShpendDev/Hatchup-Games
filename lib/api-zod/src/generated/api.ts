@@ -2824,7 +2824,11 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "sharedGroups": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string()
-})).describe('Groups that both the viewer and this player are members of.')
+})).describe('Groups that both the viewer and this player are members of.'),
+  "mutualWorkoutPartners": zod.array(zod.object({
+  "id": zod.number(),
+  "displayName": zod.string()
+})).describe('Up to 3 third players who have actually logged a co-workout with\nBOTH the viewer and this profile. Same trust signal surfaced on\nfollower\/following lists, social search, and the invite picker.\n')
 })
 
 

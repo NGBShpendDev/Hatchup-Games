@@ -1374,21 +1374,30 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
   // Single SQL round-trip via a self-join on group_members + groups (indexed on
   // (player_id, group_id)) so latency stays flat as either user's group count grows.
   let sharedGroups: Array<{ id: number; name: string }> = [];
+  // Mutual workout partners: third players who have actually logged a co-workout
+  // with BOTH the viewer and this profile. Mirrors the same trust signal we
+  // surface on follower/following lists, social search, and invite picker rows.
+  let mutualWorkoutPartners: Array<{ id: number; displayName: string }> = [];
   if (viewerId !== id) {
     const viewerGm = alias(groupMembersTable, "viewer_gm");
-    const sharedRows = await db
-      .select({
-        groupId: groupsTable.id,
-        groupName: groupsTable.name,
-      })
-      .from(groupMembersTable)
-      .innerJoin(
-        viewerGm,
-        and(eq(viewerGm.groupId, groupMembersTable.groupId), eq(viewerGm.playerId, viewerId)),
-      )
-      .innerJoin(groupsTable, eq(groupsTable.id, groupMembersTable.groupId))
-      .where(eq(groupMembersTable.playerId, id));
+    const hiddenIds = await getHiddenPlayerIds(viewerId);
+    const [sharedRows, mutualWorkoutPartnersByPlayer] = await Promise.all([
+      db
+        .select({
+          groupId: groupsTable.id,
+          groupName: groupsTable.name,
+        })
+        .from(groupMembersTable)
+        .innerJoin(
+          viewerGm,
+          and(eq(viewerGm.groupId, groupMembersTable.groupId), eq(viewerGm.playerId, viewerId)),
+        )
+        .innerJoin(groupsTable, eq(groupsTable.id, groupMembersTable.groupId))
+        .where(eq(groupMembersTable.playerId, id)),
+      loadMutualWorkoutPartnersForViewer(viewerId, [id], hiddenIds),
+    ]);
     sharedGroups = sharedRows.map(r => ({ id: r.groupId, name: r.groupName }));
+    mutualWorkoutPartners = mutualWorkoutPartnersByPlayer.get(id) ?? [];
   }
 
   res.json({
@@ -1409,6 +1418,7 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
     mutualFollowing,
     mutualFollowingTotal,
     sharedGroups,
+    mutualWorkoutPartners,
   });
 });
 

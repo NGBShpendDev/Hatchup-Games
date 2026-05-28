@@ -189,6 +189,15 @@ function ProfileModal({
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">@{profile.player.username}</p>
+                {profileId !== viewerId && profile.mutualWorkoutPartners && profile.mutualWorkoutPartners.length > 0 && (
+                  <p
+                    className="text-[11px] text-emerald-300 font-bold mt-1 flex items-center gap-1 truncate"
+                    data-testid="text-profile-mutual-partners"
+                  >
+                    <Dumbbell className="w-3 h-3 shrink-0" />
+                    <span className="truncate">{formatMutualWorkoutPartners(profile.mutualWorkoutPartners)}</span>
+                  </p>
+                )}
                 <div className="flex gap-4 mt-1 text-xs font-bold">
                   <button
                     type="button"

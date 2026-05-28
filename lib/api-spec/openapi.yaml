@@ -5542,6 +5542,7 @@ components:
         - mutualFollowing
         - mutualFollowingTotal
         - sharedGroups
+        - mutualWorkoutPartners
       properties:
         player:
           $ref: "#/components/schemas/PlayerStub"
@@ -5577,6 +5578,14 @@ components:
           description: Groups that both the viewer and this player are members of.
           items:
             $ref: "#/components/schemas/SharedGroup"
+        mutualWorkoutPartners:
+          type: array
+          description: |
+            Up to 3 third players who have actually logged a co-workout with
+            BOTH the viewer and this profile. Same trust signal surfaced on
+            follower/following lists, social search, and the invite picker.
+          items:
+            $ref: "#/components/schemas/MutualWorkoutPartner"
 
     FollowersPage:
       type: object
