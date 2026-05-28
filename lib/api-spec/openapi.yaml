@@ -3754,6 +3754,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/StorageErrorEnvelope"
 
+  /nutrition/suggest-next:
+    get:
+      operationId: getNutritionSuggestNext
+      tags: [nutrition]
+      summary: Suggest the next meal to fill today's macro gaps
+      description: |
+        Compares today's macro totals against the player's daily macro target
+        and recommends a concrete meal idea sized to the most-behind macro.
+        Returns `hasGap=false` with `suggestion=null` when every macro is on
+        or over target. The serving is scaled (0.5x–2x) to fill the primary
+        gap without significantly overshooting macros already at target.
+      responses:
+        "200":
+          description: Next-meal suggestion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NutritionNextMealSuggestion"
+
   /nutrition/streak:
     get:
       operationId: getNutritionStreak
@@ -6769,6 +6788,46 @@ components:
         xp:       { type: integer, description: "Total bonus player XP earned from macro-target hits this week." }
         coins:    { type: integer, description: "Total bonus coins earned from macro-target hits this week." }
         bond:     { type: integer, description: "Total Hatchling bond/friendship gained from macro-target hits this week." }
+
+    NutritionMacroGaps:
+      type: object
+      required: [calories, protein, carbs, fat]
+      properties:
+        calories: { type: number }
+        protein:  { type: number }
+        carbs:    { type: number }
+        fat:      { type: number }
+
+    NutritionMealIdea:
+      type: object
+      required: [name, emoji, description, summary, servings, fillsMacro, calories, proteinG, carbsG, fatG]
+      properties:
+        name:        { type: string }
+        emoji:       { type: string }
+        description: { type: string }
+        summary:     { type: string, description: "Short tag like '~25g protein, low carb'." }
+        servings:    { type: number }
+        fillsMacro:  { type: string, enum: [protein, carbs, fat, calories] }
+        calories:    { type: number }
+        proteinG:    { type: number }
+        carbsG:      { type: number }
+        fatG:        { type: number }
+
+    NutritionNextMealSuggestion:
+      type: object
+      required: [hasGap, primaryMacro, gaps, suggestion, tolerance, goal]
+      properties:
+        hasGap:       { type: boolean }
+        primaryMacro:
+          type: ["string", "null"]
+          enum: [protein, carbs, fat, calories, null]
+        gaps:         { $ref: "#/components/schemas/NutritionMacroGaps" }
+        suggestion:
+          oneOf:
+            - { $ref: "#/components/schemas/NutritionMealIdea" }
+            - { type: "null" }
+        tolerance:    { type: number }
+        goal:         { type: string }
 
     NutritionRecapSendResult:
       type: object

@@ -4280,6 +4280,41 @@ export const GetNutritionMacroTargetResponse = zod.object({
 
 
 /**
+ * Compares today's macro totals against the player's daily macro target
+and recommends a concrete meal idea sized to the most-behind macro.
+Returns `hasGap=false` with `suggestion=null` when every macro is on
+or over target. The serving is scaled (0.5x–2x) to fill the primary
+gap without significantly overshooting macros already at target.
+
+ * @summary Suggest the next meal to fill today's macro gaps
+ */
+export const GetNutritionSuggestNextResponse = zod.object({
+  "hasGap": zod.boolean(),
+  "primaryMacro": zod.union([zod.literal('protein'),zod.literal('carbs'),zod.literal('fat'),zod.literal('calories'),zod.literal(null)]).nullable(),
+  "gaps": zod.object({
+  "calories": zod.number(),
+  "protein": zod.number(),
+  "carbs": zod.number(),
+  "fat": zod.number()
+}),
+  "suggestion": zod.union([zod.object({
+  "name": zod.string(),
+  "emoji": zod.string(),
+  "description": zod.string(),
+  "summary": zod.string().describe('Short tag like \'~25g protein, low carb\'.'),
+  "servings": zod.number(),
+  "fillsMacro": zod.enum(['protein', 'carbs', 'fat', 'calories']),
+  "calories": zod.number(),
+  "proteinG": zod.number(),
+  "carbsG": zod.number(),
+  "fatG": zod.number()
+}),zod.null()]),
+  "tolerance": zod.number(),
+  "goal": zod.string()
+})
+
+
+/**
  * Returns the current and longest daily macro-target streak for the
 authenticated player, plus today's totals and target so the UI can
 render a progress meter without a second request. A streak lapses

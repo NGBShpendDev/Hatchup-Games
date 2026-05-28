@@ -181,6 +181,7 @@ import type {
   NutritionAnalyzeResult,
   NutritionChallenge,
   NutritionMacroTarget,
+  NutritionNextMealSuggestion,
   NutritionRecapPreview,
   NutritionRecapSendResult,
   NutritionStreak,
@@ -12656,6 +12657,89 @@ export function useGetNutritionMacroTarget<TData = Awaited<ReturnType<typeof get
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetNutritionMacroTargetQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetNutritionSuggestNextUrl = () => {
+
+
+
+
+  return `/api/nutrition/suggest-next`
+}
+
+/**
+ * Compares today's macro totals against the player's daily macro target
+and recommends a concrete meal idea sized to the most-behind macro.
+Returns `hasGap=false` with `suggestion=null` when every macro is on
+or over target. The serving is scaled (0.5x–2x) to fill the primary
+gap without significantly overshooting macros already at target.
+
+ * @summary Suggest the next meal to fill today's macro gaps
+ */
+export const getNutritionSuggestNext = async ( options?: RequestInit): Promise<NutritionNextMealSuggestion> => {
+
+  return customFetch<NutritionNextMealSuggestion>(getGetNutritionSuggestNextUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNutritionSuggestNextQueryKey = () => {
+    return [
+    `/api/nutrition/suggest-next`
+    ] as const;
+    }
+
+
+export const getGetNutritionSuggestNextQueryOptions = <TData = Awaited<ReturnType<typeof getNutritionSuggestNext>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNutritionSuggestNext>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNutritionSuggestNextQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNutritionSuggestNext>>> = ({ signal }) => getNutritionSuggestNext({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNutritionSuggestNext>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNutritionSuggestNextQueryResult = NonNullable<Awaited<ReturnType<typeof getNutritionSuggestNext>>>
+export type GetNutritionSuggestNextQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Suggest the next meal to fill today's macro gaps
+ */
+
+export function useGetNutritionSuggestNext<TData = Awaited<ReturnType<typeof getNutritionSuggestNext>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNutritionSuggestNext>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNutritionSuggestNextQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

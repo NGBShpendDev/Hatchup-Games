@@ -54,11 +54,13 @@ import {
   useIncrementNutritionChallengeProgress,
   useGetNutritionMacroTarget,
   useGetNutritionStreak,
+  useGetNutritionSuggestNext,
   useUpdatePhysiqueGoal,
   getListNutritionPostsQueryKey,
   getListNutritionChallengesQueryKey,
   getGetNutritionMacroTargetQueryKey,
   getGetNutritionStreakQueryKey,
+  getGetNutritionSuggestNextQueryKey,
   getGetNutritionSummaryQueryKey,
   getListMealPostCommentsQueryKey,
   type NutritionWeeklySummary,
@@ -67,6 +69,7 @@ import {
   type NutritionChallenge,
   type NutritionMacroTarget,
   type NutritionStreak,
+  type NutritionNextMealSuggestion,
   type NutritionAnalyzeResult,
   type NutritionAnalyzeImageResult,
 } from "@workspace/api-client-react";
@@ -238,6 +241,10 @@ export default function Nutrition() {
     query: { enabled: !!pid, queryKey: getGetNutritionStreakQueryKey() },
   });
 
+  const { data: nextMeal } = useGetNutritionSuggestNext({
+    query: { enabled: !!pid, queryKey: getGetNutritionSuggestNextQueryKey() },
+  });
+
   // ── Mutations ────────────────────────────────────────────────────────────────
   const likeMutation = useToggleMealPostLike({
     mutation: {
@@ -290,6 +297,7 @@ export default function Nutrition() {
         qc.invalidateQueries({ queryKey: getListNutritionPostsQueryKey({ limit: 30, mode: feedMode }) });
         qc.invalidateQueries({ queryKey: getGetNutritionSummaryQueryKey() });
         qc.invalidateQueries({ queryKey: getGetNutritionStreakQueryKey() });
+        qc.invalidateQueries({ queryKey: getGetNutritionSuggestNextQueryKey() });
       // Refresh hatchling stats since nutrition can buff/debuff the active Hatchling.
       // Generated query keys are arrays starting with "/api/hatchlings" (list) or
       // "/api/hatchlings/:id" (detail) — match either by prefix.
@@ -510,6 +518,24 @@ export default function Nutrition() {
           />
         )}
         {streak && <TodayProgressStrip today={streak.today} />}
+
+        {/* What to eat next — only shown when at least one macro is behind target */}
+        {nextMeal && nextMeal.hasGap && nextMeal.suggestion && (
+          <NextMealSuggestion data={nextMeal} onLog={() => {
+            const s = nextMeal.suggestion!;
+            setForm({
+              name: s.name,
+              emoji: s.emoji,
+              tag: "healthy-snack",
+              description: s.description,
+              calories: String(s.calories),
+              proteinG: String(s.proteinG),
+              carbsG:   String(s.carbsG),
+              fatG:     String(s.fatG),
+            });
+            setShowCreateSheet(true);
+          }} />
+        )}
 
         {streak && <WeekStreakCalendar weekly={streak.weekly} />}
 
@@ -966,6 +992,41 @@ export default function Nutrition() {
         )}
       </AnimatePresence>
     </Layout>
+  );
+}
+
+function NextMealSuggestion({ data, onLog }: { data: NutritionNextMealSuggestion; onLog: () => void }) {
+  const s = data.suggestion!;
+  const primary = data.primaryMacro ?? "calories";
+  const primaryLabel: Record<string, string> = {
+    protein: "protein gap", carbs: "carb gap", fat: "fat gap", calories: "calorie gap",
+  };
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/10 to-pink-500/5 p-4 mb-4"
+    >
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[10px] font-black uppercase tracking-wider text-primary">What to eat next</p>
+        <p className="text-[10px] font-bold text-muted-foreground">fills your {primaryLabel[primary]}</p>
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-xl bg-black/30 flex items-center justify-center text-2xl shrink-0">
+          {s.emoji}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-black text-sm leading-tight">{s.name}<span className="text-muted-foreground"> — {s.summary}</span></p>
+          <p className="text-[11px] text-muted-foreground font-medium leading-tight mt-0.5">{s.description}</p>
+        </div>
+        <button
+          onClick={onLog}
+          className="shrink-0 px-3 py-2 rounded-lg bg-primary text-white text-[11px] font-black uppercase tracking-wide shadow"
+        >
+          Log it
+        </button>
+      </div>
+    </motion.div>
   );
 }
 

@@ -423,6 +423,166 @@ router.post("/nutrition/posts", requireAuth, attachPlayer, requirePlayerOwnershi
   });
 });
 
+// ── Next-meal suggestion catalog ──────────────────────────────────────────────
+// Used by /nutrition/suggest-next to recommend a concrete meal sized to the
+// remaining macro gap. Each template is a single serving; the suggestion
+// scales servings (clamped 0.5x–2x, rounded to 0.5) to fill the most-behind
+// macro without significantly overshooting macros that are already at/over
+// target. Keep this list short and ingredient-recognizable.
+type MealTemplate = {
+  name: string;
+  emoji: string;
+  description: string;
+  perServing: { calories: number; protein: number; carbs: number; fat: number };
+  primaryMacro: "protein" | "carbs" | "fat" | "calories";
+};
+
+const NEXT_MEAL_TEMPLATES: MealTemplate[] = [
+  { name: "Greek yogurt + berries",          emoji: "🍓", description: "Plain Greek yogurt topped with mixed berries",     perServing: { calories: 180, protein: 22, carbs: 18, fat: 2  }, primaryMacro: "protein" },
+  { name: "Grilled chicken + quinoa bowl",   emoji: "🍗", description: "Chicken breast over quinoa with greens",            perServing: { calories: 420, protein: 38, carbs: 36, fat: 12 }, primaryMacro: "protein" },
+  { name: "Cottage cheese + pineapple",      emoji: "🍍", description: "Low-fat cottage cheese with pineapple chunks",      perServing: { calories: 160, protein: 20, carbs: 14, fat: 2  }, primaryMacro: "protein" },
+  { name: "Tuna + rice cakes",               emoji: "🐟", description: "Canned tuna on lightly salted rice cakes",          perServing: { calories: 220, protein: 28, carbs: 18, fat: 4  }, primaryMacro: "protein" },
+  { name: "Brown rice + roasted veg",        emoji: "🍚", description: "Brown rice with seasonal roasted vegetables",       perServing: { calories: 280, protein: 7,  carbs: 55, fat: 4  }, primaryMacro: "carbs" },
+  { name: "Banana oatmeal",                  emoji: "🍌", description: "Rolled oats cooked with banana and cinnamon",       perServing: { calories: 260, protein: 8,  carbs: 50, fat: 4  }, primaryMacro: "carbs" },
+  { name: "Sweet potato + black beans",      emoji: "🍠", description: "Baked sweet potato topped with seasoned black beans", perServing: { calories: 300, protein: 11, carbs: 58, fat: 2 }, primaryMacro: "carbs" },
+  { name: "Avocado toast",                   emoji: "🥑", description: "Half avocado on whole-grain toast",                 perServing: { calories: 260, protein: 8,  carbs: 26, fat: 14 }, primaryMacro: "fat" },
+  { name: "Mixed nuts handful",              emoji: "🥜", description: "Roasted almonds, walnuts, and cashews",             perServing: { calories: 200, protein: 6,  carbs: 8,  fat: 17 }, primaryMacro: "fat" },
+  { name: "Peanut butter banana smoothie",   emoji: "🥤", description: "Banana blended with milk and peanut butter",        perServing: { calories: 360, protein: 14, carbs: 42, fat: 14 }, primaryMacro: "calories" },
+];
+
+type MacroKey = "calories" | "protein" | "carbs" | "fat";
+const MACRO_KEYS: MacroKey[] = ["protein", "carbs", "fat", "calories"];
+
+function pickNextMealSuggestion(
+  totals: { calories: number; protein: number; carbs: number; fat: number },
+  target: { calories: number; protein: number; carbs: number; fat: number },
+  tolerance: number,
+) {
+  const gaps = {
+    calories: Math.max(0, target.calories - totals.calories),
+    protein:  Math.max(0, target.protein  - totals.protein),
+    carbs:    Math.max(0, target.carbs    - totals.carbs),
+    fat:      Math.max(0, target.fat      - totals.fat),
+  };
+  const behind: Record<MacroKey, boolean> = {
+    calories: target.calories > 0 && totals.calories < (1 - tolerance) * target.calories,
+    protein:  target.protein  > 0 && totals.protein  < (1 - tolerance) * target.protein,
+    carbs:    target.carbs    > 0 && totals.carbs    < (1 - tolerance) * target.carbs,
+    fat:      target.fat      > 0 && totals.fat      < (1 - tolerance) * target.fat,
+  };
+  const anyBehind = MACRO_KEYS.some(m => behind[m]);
+  if (!anyBehind) return { hasGap: false as const, gaps, primaryMacro: null, suggestion: null };
+
+  // Choose the most-behind macro by relative gap. Slight de-weighting of
+  // calories so we suggest specific macro fixes over a generic calorie top-up
+  // when both signals are present.
+  let primary: MacroKey = "calories";
+  let bestRel = -Infinity;
+  for (const m of MACRO_KEYS) {
+    if (!behind[m]) continue;
+    const rel = gaps[m] / (target[m] || 1);
+    const weighted = m === "calories" ? rel * 0.9 : rel;
+    if (weighted > bestRel) { bestRel = weighted; primary = m; }
+  }
+
+  // Among templates matching the primary macro, pick the (template, serving)
+  // pair that minimizes overshoot of macros already at/over target.
+  const candidates = NEXT_MEAL_TEMPLATES.filter(t => t.primaryMacro === primary);
+  const pool = candidates.length > 0 ? candidates : NEXT_MEAL_TEMPLATES;
+
+  let best: { template: MealTemplate; servings: number; macros: { calories: number; protein: number; carbs: number; fat: number }; overshoot: number } | null = null;
+  for (const t of pool) {
+    const perPrimary = t.perServing[primary];
+    let servings = perPrimary > 0 ? gaps[primary] / perPrimary : 1;
+    servings = Math.max(0.5, Math.min(2, Math.round(servings * 2) / 2));
+    const macros = {
+      calories: Math.round(t.perServing.calories * servings),
+      protein:  Math.round(t.perServing.protein  * servings),
+      carbs:    Math.round(t.perServing.carbs    * servings),
+      fat:      Math.round(t.perServing.fat      * servings),
+    };
+    let overshoot = 0;
+    for (const m of MACRO_KEYS) {
+      if (behind[m]) continue;
+      const ceiling = target[m] * (1 + tolerance);
+      const after = totals[m] + macros[m];
+      if (after > ceiling && target[m] > 0) overshoot += (after - ceiling) / target[m];
+    }
+    if (!best || overshoot < best.overshoot) best = { template: t, servings, macros, overshoot };
+  }
+
+  const sel = best!;
+  // Build a short tag string: "~25g protein, low carb"
+  const primaryVal = sel.macros[primary];
+  const primaryFrag = primary === "calories" ? `~${primaryVal} kcal` : `~${primaryVal}g ${primary}`;
+  const extraTags: string[] = [];
+  for (const m of ["protein", "carbs", "fat"] as const) {
+    if (m === primary) continue;
+    if (!behind[m] && target[m] > 0) {
+      const contribFrac = sel.macros[m] / target[m];
+      if (contribFrac < 0.08) extraTags.push(`low ${m}`);
+    }
+  }
+  const summary = [primaryFrag, ...extraTags].join(", ");
+
+  return {
+    hasGap: true as const,
+    gaps,
+    primaryMacro: primary,
+    suggestion: {
+      name: sel.template.name,
+      emoji: sel.template.emoji,
+      description: sel.template.description,
+      summary,
+      servings: sel.servings,
+      fillsMacro: primary,
+      calories: sel.macros.calories,
+      proteinG: sel.macros.protein,
+      carbsG:   sel.macros.carbs,
+      fatG:     sel.macros.fat,
+    },
+  };
+}
+
+// ── GET /nutrition/suggest-next ───────────────────────────────────────────────
+// Recommends a concrete meal idea sized to fill today's biggest macro gap.
+// Reuses the same daily totals + target logic as /nutrition/streak.
+router.get("/nutrition/suggest-next", requireAuth, attachPlayer, async (req, res) => {
+  const playerId = req.playerId!;
+
+  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
+  const goal = player?.physiqueGoal ?? "lean_athlete";
+  const target = MACRO_GOAL_TARGETS[goal] ?? MACRO_GOAL_TARGETS["lean_athlete"]!;
+
+  const totalsResult = await db.execute(sql`
+    SELECT
+      COALESCE(SUM(calories), 0)::float  AS calories,
+      COALESCE(SUM(protein_g), 0)::float AS protein,
+      COALESCE(SUM(carbs_g), 0)::float   AS carbs,
+      COALESCE(SUM(fat_g), 0)::float     AS fat
+    FROM meal_posts
+    WHERE player_id = ${playerId}
+      AND created_at >= (CURRENT_DATE AT TIME ZONE 'UTC')
+      AND created_at <  (CURRENT_DATE AT TIME ZONE 'UTC') + INTERVAL '1 day'
+  `);
+  const totals = totalsResult.rows[0] as { calories: number; protein: number; carbs: number; fat: number };
+
+  const result = pickNextMealSuggestion(
+    totals,
+    { calories: target.calories, protein: target.protein, carbs: target.carbs, fat: target.fat },
+    MACRO_TOLERANCE,
+  );
+
+  res.json({
+    hasGap: result.hasGap,
+    primaryMacro: result.primaryMacro,
+    gaps: result.gaps,
+    suggestion: result.suggestion,
+    tolerance: MACRO_TOLERANCE,
+    goal,
+  });
+});
+
 // ── GET /nutrition/streak ─────────────────────────────────────────────────────
 // Returns the player's current daily-macro-target streak. Also reports today's
 // totals + target so the UI can render a progress meter without a second call.

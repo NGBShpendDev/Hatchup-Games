@@ -2413,6 +2413,60 @@ export interface NutritionStreak {
   weekly: NutritionWeeklyStreak;
 }
 
+export interface NutritionMacroGaps {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+export type NutritionMealIdeaFillsMacro = typeof NutritionMealIdeaFillsMacro[keyof typeof NutritionMealIdeaFillsMacro];
+
+
+export const NutritionMealIdeaFillsMacro = {
+  protein: 'protein',
+  carbs: 'carbs',
+  fat: 'fat',
+  calories: 'calories',
+} as const;
+
+export interface NutritionMealIdea {
+  name: string;
+  emoji: string;
+  description: string;
+  /** Short tag like '~25g protein, low carb'. */
+  summary: string;
+  servings: number;
+  fillsMacro: NutritionMealIdeaFillsMacro;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+}
+
+/**
+ * @nullable
+ */
+export type NutritionNextMealSuggestionPrimaryMacro = typeof NutritionNextMealSuggestionPrimaryMacro[keyof typeof NutritionNextMealSuggestionPrimaryMacro] | null;
+
+
+export const NutritionNextMealSuggestionPrimaryMacro = {
+  protein: 'protein',
+  carbs: 'carbs',
+  fat: 'fat',
+  calories: 'calories',
+} as const;
+
+export interface NutritionNextMealSuggestion {
+  hasGap: boolean;
+  /** @nullable */
+  primaryMacro: NutritionNextMealSuggestionPrimaryMacro;
+  gaps: NutritionMacroGaps;
+  suggestion: NutritionMealIdea | null;
+  tolerance: number;
+  goal: string;
+}
+
 export interface NutritionRecapSendResult {
   sent: boolean;
 }
