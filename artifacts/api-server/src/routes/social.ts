@@ -25,6 +25,7 @@ import { blockMinorSocialWrite } from "../middlewares/minorGuard.ts";
 import { blockSuspendedSocialWrite } from "../middlewares/suspendedGuard.ts";
 import { socialWriteLimiter, postViewLimiter } from "../middlewares/rateLimiters.ts";
 import { selectTopComments } from "./socialCommentOrdering.ts";
+import { groupSharedGroupRows } from "./sharedGroups.ts";
 import { sendPushToPlayer } from "../services/pushNotifications.ts";
 import { notificationsTable } from "@workspace/db";
 import { createHmac } from "node:crypto";
@@ -1372,12 +1373,7 @@ async function loadSharedGroupsForViewer(
     )
     .innerJoin(groupsTable, eq(groupsTable.id, groupMembersTable.groupId))
     .where(inArray(groupMembersTable.playerId, playerIds));
-  for (const r of rows) {
-    const list = out.get(r.playerId) ?? [];
-    list.push({ id: r.groupId, name: r.groupName });
-    out.set(r.playerId, list);
-  }
-  return out;
+  return groupSharedGroupRows(rows);
 }
 
 // ── GET /social/players/:id/followers ──────────────────────────────────────
