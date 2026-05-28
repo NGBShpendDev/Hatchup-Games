@@ -280,13 +280,14 @@ router.delete("/club-invites/:id", requireAuth, attachPlayer, async (req, res) =
   }
 
   const viewer = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
-  if (!viewer || viewer.clubId !== invite.clubId) {
-    res.status(403).json({ error: "Only club admins can cancel invites" });
-    return;
-  }
-  const role = (viewer.clubRole ?? "").toLowerCase();
-  if (role !== "leader" && role !== "admin" && role !== "officer") {
-    res.status(403).json({ error: "Only club admins can cancel invites" });
+  const isOriginalInviter = !!viewer && invite.inviterId === viewer.id;
+  const role = (viewer?.clubRole ?? "").toLowerCase();
+  const isClubAdmin =
+    !!viewer &&
+    viewer.clubId === invite.clubId &&
+    (role === "leader" || role === "admin" || role === "officer");
+  if (!isOriginalInviter && !isClubAdmin) {
+    res.status(403).json({ error: "Only the original inviter or a club admin can cancel invites" });
     return;
   }
 

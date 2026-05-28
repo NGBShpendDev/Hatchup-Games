@@ -236,6 +236,25 @@ const fakeDb = {
       return chain;
     },
   }),
+  delete: (table: unknown) => ({
+    where: async (cond: Pred) => {
+      if (table === clubInvitesTable) {
+        const id = findPred(cond, "clubInvites", "id")?.val as number | undefined;
+        if (id !== undefined) {
+          state.invites = state.invites.filter(inv => inv.id !== id);
+        }
+      } else if (table === notificationsTable) {
+        const playerId = findPred(cond, "notifications", "playerId")?.val as number | undefined;
+        const type = findPred(cond, "notifications", "type")?.val as string | undefined;
+        const sourceId = findPred(cond, "notifications", "sourceId")?.val as number | undefined;
+        state.notifications = state.notifications.filter(n => !(
+          (playerId === undefined || n.playerId === playerId) &&
+          (type === undefined || n.type === type) &&
+          (sourceId === undefined || n.sourceId === sourceId)
+        ));
+      }
+    },
+  }),
   update: (table: unknown) => ({
     set: (vals: Record<string, unknown>) => ({
       where: async (cond: Pred) => {
@@ -373,6 +392,10 @@ async function respond(inviteId: number, status: "accepted" | "declined") {
 async function listInvites() {
   const res = await fetch(`${baseUrl}/club-invites`);
   return { status: res.status, body: await res.json() as Array<Record<string, unknown>> };
+}
+async function cancelInvite(inviteId: number) {
+  const res = await fetch(`${baseUrl}/club-invites/${inviteId}`, { method: "DELETE" });
+  return { status: res.status, body: await res.json() as Record<string, unknown> };
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -556,6 +579,79 @@ describe("POST /club-invites/:id/respond", () => {
     const inviteId = await seedPendingInvite();
     state.authPlayerId = null;
     const { status } = await respond(inviteId, "accepted");
+    assert.equal(status, 401);
+  });
+});
+
+describe("DELETE /club-invites/:id — cancel pending invite", () => {
+  async function seedPendingInvite() {
+    state.authPlayerId = LEADER_ID;
+    const { body } = await invite(CLUB_ID, INVITEE_ID);
+    return body.id as number;
+  }
+
+  it("original inviter (leader) cancels: invite is removed and the invitee's club_invite notification is dismissed", async () => {
+    const inviteId = await seedPendingInvite();
+    assert.equal(state.invites.length, 1);
+    assert.equal(state.notifications.length, 1);
+
+    state.authPlayerId = LEADER_ID;
+    const { status, body } = await cancelInvite(inviteId);
+    assert.equal(status, 200);
+    assert.equal(body.success, true);
+
+    // Invite row gone.
+    assert.equal(state.invites.length, 0);
+    // Invitee's notification for this invite is dismissed (no lingering inbox entry).
+    const lingering = state.notifications.find(
+      n => n.type === "club_invite" && n.sourceId === inviteId,
+    );
+    assert.equal(lingering, undefined);
+
+    // It also disappears from GET /club-invites for the invitee.
+    state.authPlayerId = INVITEE_ID;
+    const list = await listInvites();
+    assert.equal(list.status, 200);
+    assert.equal(list.body.length, 0);
+  });
+
+  it("non-inviter, non-admin member gets 403 and the invite is preserved", async () => {
+    const inviteId = await seedPendingInvite();
+
+    state.authPlayerId = MEMBER_ID;
+    const { status, body } = await cancelInvite(inviteId);
+    assert.equal(status, 403);
+    assert.match(String(body.error), /inviter|admin/i);
+
+    assert.equal(state.invites.length, 1, "invite must not be deleted by an unauthorized member");
+    assert.equal(state.notifications.length, 1, "invitee notification must remain");
+  });
+
+  it("already-responded invite returns 409", async () => {
+    const inviteId = await seedPendingInvite();
+
+    state.authPlayerId = INVITEE_ID;
+    const responded = await respond(inviteId, "declined");
+    assert.equal(responded.status, 200);
+
+    state.authPlayerId = LEADER_ID;
+    const { status } = await cancelInvite(inviteId);
+    assert.equal(status, 409);
+
+    // Invite row is still present (just not pending) — we don't delete already-responded invites.
+    assert.ok(state.invites.find(i => i.id === inviteId));
+  });
+
+  it("returns 404 when the invite doesn't exist", async () => {
+    state.authPlayerId = LEADER_ID;
+    const { status } = await cancelInvite(9999);
+    assert.equal(status, 404);
+  });
+
+  it("requires authentication", async () => {
+    const inviteId = await seedPendingInvite();
+    state.authPlayerId = null;
+    const { status } = await cancelInvite(inviteId);
     assert.equal(status, 401);
   });
 });
