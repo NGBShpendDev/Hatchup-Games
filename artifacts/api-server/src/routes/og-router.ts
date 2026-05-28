@@ -268,6 +268,9 @@ export function createPlayerOgRouter(loader: OgPlayerLoader): Router {
         ? player.avatarUrl
         : null;
       const accentId = player.accentId ?? "default";
+      const hatchlingKey = player.activeHatchling
+        ? `${player.activeHatchling.name}|${player.activeHatchling.rarity}|${player.activeHatchling.spriteUrl ?? ""}`
+        : "";
       const etag = `W/"${createHash("sha1")
         .update([
           player.id,
@@ -281,6 +284,7 @@ export function createPlayerOgRouter(loader: OgPlayerLoader): Router {
           player.isVerified ? 1 : 0,
           avatarUrl ?? "",
           accentId,
+          hatchlingKey,
         ].join("|"))
         .digest("hex")}"`;
 
@@ -300,6 +304,7 @@ export function createPlayerOgRouter(loader: OgPlayerLoader): Router {
         isVerified: !!player.isVerified,
         avatarHref: avatarUrl,
         accent: player.accent ?? null,
+        activeHatchling: player.activeHatchling ?? null,
       });
       const png = await renderSvgToPng(svg);
 

@@ -14,6 +14,7 @@ import {
   buildClubOgSvg,
   type OgPlayerInput,
   type OgClubInput,
+  type OgHatchlingInput,
 } from "./og-render.ts";
 
 const BASE_URL = "https://hatchup.example.com";
@@ -195,6 +196,112 @@ describe("buildPlayerOgSvg / buildClubOgSvg — branded SVG output", () => {
     assert.ok(svg.includes("#3da6ff"));
     assert.ok(svg.includes("#5cf2d6"));
     assert.ok(!svg.includes("#ff3d8b"));
+  });
+
+  it("renders the active Hatchling panel with name and rarity when activeHatchling is set", () => {
+    const hatchling: OgHatchlingInput = {
+      name: "Sparkle",
+      rarity: "Rare",
+      spriteUrl: null,
+    };
+    const svg = buildPlayerOgSvg({
+      displayName: "DragonMaster",
+      username: "dragon",
+      level: 17,
+      rank: "Gold",
+      title: null,
+      totalSteps: null,
+      currentStreak: 5,
+      isVerified: false,
+      avatarHref: null,
+      activeHatchling: hatchling,
+    });
+    assert.match(svg, /width="1200"\s+height="630"/);
+    assert.ok(svg.includes("HATCHLING"), "should contain HATCHLING label");
+    assert.ok(svg.includes("Sparkle"), "should include hatchling name");
+    assert.ok(svg.includes("RARE"), "should include uppercased rarity");
+  });
+
+  it("omits the Hatchling panel when activeHatchling is null (fallback)", () => {
+    const svg = buildPlayerOgSvg({
+      displayName: "DragonMaster",
+      username: "dragon",
+      level: 17,
+      rank: "Gold",
+      title: null,
+      totalSteps: null,
+      currentStreak: 5,
+      isVerified: false,
+      avatarHref: null,
+      activeHatchling: null,
+    });
+    assert.ok(!svg.includes("HATCHLING"), "should not render HATCHLING label when no hatchling");
+  });
+
+  it("includes a sprite <image> when spriteUrl is an https URL", () => {
+    const svg = buildPlayerOgSvg({
+      displayName: "DragonMaster",
+      username: "dragon",
+      level: 17,
+      rank: null,
+      title: null,
+      totalSteps: null,
+      currentStreak: null,
+      isVerified: false,
+      avatarHref: null,
+      activeHatchling: {
+        name: "Blaze",
+        rarity: "Epic",
+        spriteUrl: "https://cdn.hatchup.app/sprites/blaze.png",
+      },
+    });
+    assert.ok(svg.includes("https://cdn.hatchup.app/sprites/blaze.png"), "sprite href should appear");
+    assert.ok(svg.includes("hatchlingClip"), "sprite clip-path should be present");
+  });
+
+  it("truncates long hatchling names gracefully", () => {
+    const svg = buildPlayerOgSvg({
+      displayName: "DragonMaster",
+      username: "dragon",
+      level: 17,
+      rank: null,
+      title: null,
+      totalSteps: null,
+      currentStreak: null,
+      isVerified: false,
+      avatarHref: null,
+      activeHatchling: {
+        name: "AVeryLongHatchlingNameThatExceedsLimit",
+        rarity: "Legendary",
+        spriteUrl: null,
+      },
+    });
+    assert.ok(!svg.includes("AVeryLongHatchlingNameThatExceedsLimit"), "full name should be truncated");
+    assert.ok(svg.includes("LEGENDARY"));
+  });
+
+  it("busts the ETag when the active Hatchling changes", async () => {
+    delete process.env.REPLIT_DOMAINS;
+    let hatchling: OgHatchlingInput | null = null;
+    const { url, close } = await startServer({
+      player: async () => basicPlayer({ accentId: "default", activeHatchling: hatchling }),
+    });
+    try {
+      const first = await fetch(`${url}/player/dragon/og.png`);
+      const etagNoHatchling = first.headers.get("etag");
+      assert.ok(etagNoHatchling, "should have an ETag");
+
+      hatchling = { name: "Sparkle", rarity: "Rare", spriteUrl: null };
+      const second = await fetch(`${url}/player/dragon/og.png`, {
+        headers: { "if-none-match": etagNoHatchling! },
+      });
+      assert.equal(second.status, 200, "ETag should change when hatchling is added");
+      const etagWithHatchling = second.headers.get("etag");
+      assert.ok(etagWithHatchling);
+      assert.notEqual(etagNoHatchling, etagWithHatchling);
+    } finally {
+      await close();
+    }
   });
 
   it("uses the supplied accent gradient on club share cards", () => {

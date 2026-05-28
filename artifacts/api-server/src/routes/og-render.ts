@@ -392,6 +392,12 @@ export function isOgCrawlerUserAgent(ua: string | null | undefined): boolean {
 // Reuse the same SVG-to-PNG pipeline as post share cards so every HatchUp link
 // (post, player profile, or club page) unfurls with the same on-brand visual.
 
+export interface OgHatchlingInput {
+  name: string;
+  rarity: string;
+  spriteUrl: string | null;
+}
+
 export interface OgPlayerInput {
   id: number;
   displayName?: string | null;
@@ -405,6 +411,7 @@ export interface OgPlayerInput {
   isVerified?: boolean | null;
   accentId?: string | null;
   accent?: { from: string; to: string } | null;
+  activeHatchling?: OgHatchlingInput | null;
 }
 
 export interface OgClubInput {
@@ -592,6 +599,44 @@ export function renderClubOgHtml({ baseUrl, id, club }: RenderClubOgHtmlArgs): s
 
 // ── Branded share-card SVG (player / club) ───────────────────────────────────
 
+// Renders the upper-right creature panel for a player share card.
+// Panel region: x=832–1120, y=168–416 (288×248 px).
+// When the player has no active Hatchling this function is never called and
+// the region stays empty, keeping the card layout identical to before.
+function buildHatchlingPanelSvg(h: OgHatchlingInput): string {
+  const panelX = 832;
+  const panelY = 168;
+  const panelW = 288;
+  const panelH = 248;
+  const cx = panelX + panelW / 2; // 976
+  const spriteR = 56;
+  const spriteCy = panelY + 48 + spriteR; // 272
+
+  const trimmedName = h.name.length > 14
+    ? h.name.slice(0, 13).trimEnd() + "…"
+    : h.name;
+  const rarityLabel = h.rarity.toUpperCase().slice(0, 10);
+  const rarityPillW = Math.min(panelW - 40, 40 + rarityLabel.length * 14);
+  const rarityPillX = cx - rarityPillW / 2;
+
+  const spriteBlock = h.spriteUrl && /^https?:\/\//i.test(h.spriteUrl)
+    ? `<defs>
+    <clipPath id="hatchlingClip"><circle cx="${cx}" cy="${spriteCy}" r="${spriteR}"/></clipPath>
+  </defs>
+  <circle cx="${cx}" cy="${spriteCy}" r="${spriteR + 4}" fill="#ffffff" fill-opacity="0.08"/>
+  <image href="${escapeXml(h.spriteUrl)}" x="${cx - spriteR}" y="${spriteCy - spriteR}" width="${spriteR * 2}" height="${spriteR * 2}" preserveAspectRatio="xMidYMid meet" clip-path="url(#hatchlingClip)"/>`
+    : `<circle cx="${cx}" cy="${spriteCy}" r="${spriteR}" fill="#ffffff" fill-opacity="0.08"/>
+  <text x="${cx}" y="${spriteCy + 20}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="52" fill="#ffffff" opacity="0.4">?</text>`;
+
+  return `<!-- Active Hatchling panel -->
+  <rect x="${panelX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="16" ry="16" fill="#ffffff" fill-opacity="0.05" stroke="url(#accent)" stroke-width="1.5"/>
+  <text x="${cx}" y="${panelY + 24}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="400" font-size="13" fill="#a1a1aa" letter-spacing="3">HATCHLING</text>
+  ${spriteBlock}
+  <text x="${cx}" y="${panelY + panelH - 64}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="22" fill="#f5f5f7">${escapeXml(trimmedName)}</text>
+  <rect x="${rarityPillX}" y="${panelY + panelH - 52}" width="${rarityPillW}" height="30" rx="15" fill="url(#accent)" fill-opacity="0.85"/>
+  <text x="${cx}" y="${panelY + panelH - 31}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="13" fill="#ffffff" letter-spacing="2">${escapeXml(rarityLabel)}</text>`;
+}
+
 export interface BuildPlayerOgSvgArgs {
   displayName: string;
   username: string;
@@ -603,6 +648,7 @@ export interface BuildPlayerOgSvgArgs {
   isVerified: boolean;
   avatarHref: string | null;
   accent?: AccentGradientInput | null;
+  activeHatchling?: OgHatchlingInput | null;
 }
 
 export function buildPlayerOgSvg(opts: BuildPlayerOgSvgArgs): string {
@@ -626,12 +672,17 @@ export function buildPlayerOgSvg(opts: BuildPlayerOgSvgArgs): string {
 
   const verifiedBadge = opts.isVerified
     ? `<circle cx="${avatarCx + avatarR - 18}" cy="${avatarCy + avatarR - 18}" r="26" fill="#3da6ff" stroke="#0a0a0f" stroke-width="6"/>
-  <text x="${avatarCx + avatarR - 18}" y="${avatarCy + avatarR - 10}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="26" fill="#ffffff">✓</text>`
+  <text x="${avatarCx + avatarR - 18}" y="${avatarCy + avatarR - 10}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="26" fill="#ffffff">&#x2713;</text>`
     : "";
 
   const infoX = avatarCx + avatarR + 60;
   const displayName = opts.displayName || opts.username;
-  const trimmedName = displayName.length > 22 ? displayName.slice(0, 21).trimEnd() + "…" : displayName;
+  // When a hatchling panel occupies the upper-right (x≥832), cap the name
+  // at 13 chars so it stays in the x=360–760 zone and avoids overlap.
+  const maxNameChars = opts.activeHatchling ? 13 : 22;
+  const trimmedName = displayName.length > maxNameChars
+    ? displayName.slice(0, maxNameChars - 1).trimEnd() + "…"
+    : displayName;
   const trimmedUser = opts.username.length > 22 ? opts.username.slice(0, 21).trimEnd() + "…" : opts.username;
 
   const statPills: Array<{ label: string; value: string }> = [
@@ -659,6 +710,13 @@ export function buildPlayerOgSvg(opts: BuildPlayerOgSvgArgs): string {
 
   const titleLine = opts.title
     ? `<text x="${infoX}" y="392" font-family="Inter, sans-serif" font-weight="400" font-size="24" fill="#ff3d8b">${escapeXml(opts.title)}</text>`
+    : "";
+
+  // ── Active Hatchling panel (upper-right) ─────────────────────────────────
+  // Rendered when the player has an active Hatchling. Occupies x=832–1120,
+  // y=168–416 so it never overlaps the avatar or stat pills.
+  const hatchlingBlock = opts.activeHatchling
+    ? buildHatchlingPanelSvg(opts.activeHatchling)
     : "";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -693,6 +751,9 @@ export function buildPlayerOgSvg(opts: BuildPlayerOgSvgArgs): string {
   <text x="${infoX}" y="340" font-family="Inter, sans-serif" font-weight="700" font-size="56" fill="#f5f5f7">${escapeXml(trimmedName)}</text>
   <text x="${infoX}" y="362" font-family="Inter, sans-serif" font-weight="400" font-size="22" fill="#a1a1aa">@${escapeXml(trimmedUser)}</text>
   ${titleLine}
+
+  <!-- Active Hatchling panel -->
+  ${hatchlingBlock}
 
   <!-- Stat pills -->
   ${pillBlocks}

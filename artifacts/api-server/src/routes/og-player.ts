@@ -1,8 +1,8 @@
 import { db } from "@workspace/db";
-import { playersTable } from "@workspace/db";
+import { playersTable, hatchlingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { createPlayerOgRouter, type OgPlayerLoader } from "./og-router.ts";
-import type { OgPlayerInput } from "./og-render.ts";
+import type { OgPlayerInput, OgHatchlingInput } from "./og-render.ts";
 import { getEntitlement } from "../services/entitlement.ts";
 import { resolveAccentColor, resolveAccentColorId } from "../services/accentColors.ts";
 
@@ -15,6 +15,22 @@ const playerLoader: OgPlayerLoader = async (username: string): Promise<OgPlayerI
     const tier = getEntitlement(row).tier;
     const accentId = resolveAccentColorId(row.shareAccentColor, tier);
     const accent = resolveAccentColor(row.shareAccentColor, tier);
+
+    let activeHatchling: OgHatchlingInput | null = null;
+    if (row.activeHatchlingId) {
+      const h = await db.query.hatchlingsTable.findFirst({
+        where: eq(hatchlingsTable.id, row.activeHatchlingId),
+        columns: { name: true, rarity: true, imageUrl: true },
+      });
+      if (h) {
+        activeHatchling = {
+          name: h.name,
+          rarity: h.rarity,
+          spriteUrl: h.imageUrl ?? null,
+        };
+      }
+    }
+
     return {
       id: row.id,
       username: row.username,
@@ -28,6 +44,7 @@ const playerLoader: OgPlayerLoader = async (username: string): Promise<OgPlayerI
       isVerified: row.isVerified,
       accentId,
       accent,
+      activeHatchling,
     };
   } catch {
     return null;
