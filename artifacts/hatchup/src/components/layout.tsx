@@ -19,7 +19,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <TopBar />
 
       <main className="flex-1 overflow-y-auto w-full max-w-lg mx-auto relative shadow-2xl bg-background/50 border-x border-border/10">
-        <div className="relative z-10 p-4 md:p-6 pt-16 min-h-full">
+        <div className="relative z-10 p-4 md:p-6 pt-20 min-h-full">
           {children}
         </div>
       </main>
