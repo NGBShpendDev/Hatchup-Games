@@ -6,6 +6,7 @@ import {
   FlatList,
   Platform,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -17,6 +18,12 @@ import { getRarityColor, capitalize } from "@/constants/rarity";
 
 const PLAYER_ID = 1;
 const RARITIES = ["all", "common", "uncommon", "rare", "epic", "legendary", "mythic", "ancient", "celestial"];
+
+function buildHatchlingShareUrl(hatchlingId: number): string {
+  const domain = process.env.EXPO_PUBLIC_DOMAIN;
+  if (!domain) return "";
+  return `https://${domain}/hatchling/${hatchlingId}`;
+}
 
 interface HatchlingCardProps {
   item: {
@@ -35,15 +42,34 @@ function HatchlingCard({ item, onPress }: HatchlingCardProps) {
   const colors = useColors();
   const rarityColor = getRarityColor(item.rarity);
 
+  async function handleShare() {
+    const url = buildHatchlingShareUrl(item.id);
+    if (!url) return;
+    await Share.share({
+      message: `Check out my ${capitalize(item.rarity)} hatchling ${item.name} on HatchUp! ${url}`,
+      url,
+    });
+  }
+
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={handleShare}
+      delayLongPress={400}
       style={[styles.card, { backgroundColor: colors.card, borderColor: rarityColor + "55" }]}
     >
       <View style={[styles.cardAura, { backgroundColor: rarityColor + "14" }]}>
         <Feather name="zap" size={36} color={rarityColor} />
       </View>
       <View style={[styles.rarityDot, { backgroundColor: rarityColor }]} />
+      <Pressable
+        onPress={handleShare}
+        hitSlop={8}
+        style={styles.cardShareBtn}
+        testID={`button-share-hatchling-${item.id}`}
+      >
+        <Feather name="share-2" size={12} color={rarityColor} />
+      </Pressable>
       <Text style={[styles.cardName, { color: colors.foreground }]} numberOfLines={1}>{item.name}</Text>
       <Text style={[styles.cardSpecies, { color: colors.mutedForeground }]} numberOfLines={1}>
         {item.species ?? "Unknown"}
@@ -171,7 +197,8 @@ const styles = StyleSheet.create({
   row: { gap: 10, marginBottom: 10, paddingHorizontal: 4 },
   card: { flex: 1, borderRadius: 16, borderWidth: 1.5, padding: 14, gap: 6, overflow: "hidden" },
   cardAura: { width: 60, height: 60, borderRadius: 30, alignItems: "center", justifyContent: "center", marginBottom: 4 },
-  rarityDot: { position: "absolute", top: 12, right: 12, width: 8, height: 8, borderRadius: 4 },
+  rarityDot: { position: "absolute", top: 12, right: 30, width: 8, height: 8, borderRadius: 4 },
+  cardShareBtn: { position: "absolute", top: 8, right: 8, padding: 4 },
   cardName: { fontSize: 14, fontWeight: "700" },
   cardSpecies: { fontSize: 11 },
   cardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 2 },
