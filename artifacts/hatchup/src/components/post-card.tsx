@@ -6,6 +6,7 @@ import {
   useRepostPost,
   useToggleCommentLike,
   useListCommentRevisions,
+  getListCommentRevisionsQueryKey,
   getGetSocialFeedQueryKey,
   type FeedPost,
   type PostComment,
@@ -77,7 +78,10 @@ function CommentEditedLabel({
 }) {
   const [open, setOpen] = useState(false);
   const { data: revisions, isLoading } = useListCommentRevisions(postId, commentId, {
-    query: { enabled: open },
+    query: {
+      queryKey: getListCommentRevisionsQueryKey(postId, commentId),
+      enabled: open,
+    },
   });
 
   return (
