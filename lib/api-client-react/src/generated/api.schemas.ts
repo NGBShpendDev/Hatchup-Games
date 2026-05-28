@@ -91,6 +91,7 @@ export interface Player {
   fitnessRealm: string;
   waterCups?: number;
   dailyStepGoal?: number;
+  dailyWorkoutDeadlineHour?: number;
   /** @nullable */
   lastActiveDate?: string | null;
   createdAt: string;
@@ -111,6 +112,7 @@ export interface PlayerUpdate {
   avatarUrl?: string;
   fitnessRealm?: string;
   dailyStepGoal?: number;
+  dailyWorkoutDeadlineHour?: number;
   waterCups?: number;
   /** @nullable */
   activeHatchlingId?: number | null;

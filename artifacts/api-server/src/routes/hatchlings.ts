@@ -32,10 +32,14 @@ const router = Router();
 // ── Mood state helpers ─────────────────────────────────────────────────────────
 // Returns "sad" when:
 //   • motivationScore has fallen below 30 (critically demotivated), OR
-//   • no workout has been logged today and the local clock has passed 20:00
-//     (the evening daily-goal deadline).
+//   • no workout has been logged today and the local clock has passed the
+//     player's personal daily-goal deadline (default 20 = 8 pm).
 // "celebrating" wins over everything if the last workout was within 2 h.
-function computeMoodState(lastWorkoutAt: Date | null, motivationScore: number = 50): string {
+function computeMoodState(
+  lastWorkoutAt: Date | null,
+  motivationScore: number = 50,
+  deadlineHour: number = 20,
+): string {
   const now = new Date();
 
   if (lastWorkoutAt) {
@@ -47,11 +51,12 @@ function computeMoodState(lastWorkoutAt: Date | null, motivationScore: number = 
   // Critically low motivation → sad regardless of time
   if (motivationScore < 30) return "sad";
 
-  // Past 20:00 and no workout logged today → missed daily goal
+  // Past the player's personal deadline and no workout logged today → missed daily goal
   const todayMidnight = new Date(now);
   todayMidnight.setHours(0, 0, 0, 0);
   const workedOutToday = lastWorkoutAt !== null && lastWorkoutAt >= todayMidnight;
-  if (!workedOutToday && now.getHours() >= 20) return "sad";
+  const clampedDeadline = Math.max(0, Math.min(23, Math.floor(deadlineHour)));
+  if (!workedOutToday && now.getHours() >= clampedDeadline) return "sad";
 
   if (!lastWorkoutAt) return "happy";
   const hoursTotal = (now.getTime() - lastWorkoutAt.getTime()) / (1000 * 60 * 60);
@@ -258,6 +263,16 @@ async function applyPassiveDecay(h: DecayableHatchling): Promise<DecayableHatchl
 router.get("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const query = ListHatchlingsQueryParams.safeParse({ playerId: req.query.playerId ? Number(req.query.playerId) : undefined, limit: req.query.limit ? Number(req.query.limit) : 20 });
   if (!query.success) { res.status(400).json({ error: "Invalid query" }); return; }
+
+  // Fetch player goals so computeMoodState uses personal thresholds.
+  const playerGoals = req.playerId
+    ? await db.query.playersTable.findFirst({
+        where: eq(playersTable.id, req.playerId),
+        columns: { dailyWorkoutDeadlineHour: true },
+      })
+    : null;
+  const deadlineHour = playerGoals?.dailyWorkoutDeadlineHour ?? 20;
+
   const rawResults = await db.query.hatchlingsTable.findMany({
     where: query.data.playerId ? eq(hatchlingsTable.playerId, query.data.playerId) : undefined,
     limit: query.data.limit ?? 20,
@@ -270,7 +285,7 @@ router.get("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, asy
     const streak = streaks.get(h.id) ?? 0;
     return {
       ...h,
-      moodState: computeMoodState(h.lastWorkoutAt, h.motivationScore),
+      moodState: computeMoodState(h.lastWorkoutAt, h.motivationScore, deadlineHour),
       powerScore: computePowerScore(h.level, h.rarity, h.battleWins),
       stepsToEvolution: computeStepsToEvolution(h.xp, h.evolutionStage),
       streakCount: streak >= 2 ? streak : null,
@@ -413,14 +428,25 @@ router.get("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
   const raw = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, params.data.id) });
   if (!raw) { res.status(404).json({ error: "Hatchling not found" }); return; }
   if (raw.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
-  const hatchling = await applyPassiveDecay(raw);
+  const [hatchling, playerGoals] = await Promise.all([
+    applyPassiveDecay(raw),
+    req.playerId
+      ? db.query.playersTable.findFirst({
+          where: eq(playersTable.id, req.playerId),
+          columns: { dailyWorkoutDeadlineHour: true, dailyStepGoal: true },
+        })
+      : Promise.resolve(null),
+  ]);
+  const deadlineHour = playerGoals?.dailyWorkoutDeadlineHour ?? 20;
   const streak = await computeStreak(hatchling.id);
   res.json({
     ...hatchling,
-    moodState: computeMoodState(hatchling.lastWorkoutAt, hatchling.motivationScore),
+    moodState: computeMoodState(hatchling.lastWorkoutAt, hatchling.motivationScore, deadlineHour),
     powerScore: computePowerScore(hatchling.level, hatchling.rarity, hatchling.battleWins),
     stepsToEvolution: computeStepsToEvolution(hatchling.xp, hatchling.evolutionStage),
     streakCount: streak >= 2 ? streak : null,
+    dailyStepGoal: playerGoals?.dailyStepGoal ?? 8000,
+    dailyWorkoutDeadlineHour: deadlineHour,
     createdAt: hatchling.createdAt.toISOString(),
     lastWorkoutAt: hatchling.lastWorkoutAt?.toISOString() ?? null,
   });
@@ -458,21 +484,32 @@ router.patch("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
     }
   }
 
-  const updated = await db.update(hatchlingsTable)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .set(updateData as any)
-    .where(eq(hatchlingsTable.id, params.data.id))
-    .returning();
-  if (!updated.length) { res.status(404).json({ error: "Hatchling not found" }); return; }
-  const patchStreak = await computeStreak(updated[0].id);
+  const [updatedRows, playerGoalsPatch] = await Promise.all([
+    db.update(hatchlingsTable)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .set(updateData as any)
+      .where(eq(hatchlingsTable.id, params.data.id))
+      .returning(),
+    req.playerId
+      ? db.query.playersTable.findFirst({
+          where: eq(playersTable.id, req.playerId),
+          columns: { dailyWorkoutDeadlineHour: true, dailyStepGoal: true },
+        })
+      : Promise.resolve(null),
+  ]);
+  if (!updatedRows.length) { res.status(404).json({ error: "Hatchling not found" }); return; }
+  const patchDeadlineHour = playerGoalsPatch?.dailyWorkoutDeadlineHour ?? 20;
+  const patchStreak = await computeStreak(updatedRows[0].id);
   res.json({
-    ...updated[0],
-    moodState: computeMoodState(updated[0].lastWorkoutAt, updated[0].motivationScore),
-    powerScore: computePowerScore(updated[0].level, updated[0].rarity, updated[0].battleWins),
-    stepsToEvolution: computeStepsToEvolution(updated[0].xp, updated[0].evolutionStage),
+    ...updatedRows[0],
+    moodState: computeMoodState(updatedRows[0].lastWorkoutAt, updatedRows[0].motivationScore, patchDeadlineHour),
+    powerScore: computePowerScore(updatedRows[0].level, updatedRows[0].rarity, updatedRows[0].battleWins),
+    stepsToEvolution: computeStepsToEvolution(updatedRows[0].xp, updatedRows[0].evolutionStage),
     streakCount: patchStreak >= 2 ? patchStreak : null,
-    createdAt: updated[0].createdAt.toISOString(),
-    lastWorkoutAt: updated[0].lastWorkoutAt?.toISOString() ?? null,
+    dailyStepGoal: playerGoalsPatch?.dailyStepGoal ?? 8000,
+    dailyWorkoutDeadlineHour: patchDeadlineHour,
+    createdAt: updatedRows[0].createdAt.toISOString(),
+    lastWorkoutAt: updatedRows[0].lastWorkoutAt?.toISOString() ?? null,
   });
 });
 

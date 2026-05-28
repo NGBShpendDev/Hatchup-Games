@@ -236,6 +236,7 @@ export const GetCurrentPlayerResponse = zod.object({
   "fitnessRealm": zod.string(),
   "waterCups": zod.number().optional(),
   "dailyStepGoal": zod.number().optional(),
+  "dailyWorkoutDeadlineHour": zod.number().optional(),
   "lastActiveDate": zod.string().nullish(),
   "createdAt": zod.string()
 })
@@ -270,6 +271,7 @@ export const GetPlayerResponse = zod.object({
   "fitnessRealm": zod.string(),
   "waterCups": zod.number().optional(),
   "dailyStepGoal": zod.number().optional(),
+  "dailyWorkoutDeadlineHour": zod.number().optional(),
   "lastActiveDate": zod.string().nullish(),
   "createdAt": zod.string()
 })
@@ -287,6 +289,7 @@ export const UpdatePlayerBody = zod.object({
   "avatarUrl": zod.string().optional(),
   "fitnessRealm": zod.string().optional(),
   "dailyStepGoal": zod.number().optional(),
+  "dailyWorkoutDeadlineHour": zod.number().optional(),
   "waterCups": zod.number().optional(),
   "activeHatchlingId": zod.number().nullish()
 })
@@ -313,6 +316,7 @@ export const UpdatePlayerResponse = zod.object({
   "fitnessRealm": zod.string(),
   "waterCups": zod.number().optional(),
   "dailyStepGoal": zod.number().optional(),
+  "dailyWorkoutDeadlineHour": zod.number().optional(),
   "lastActiveDate": zod.string().nullish(),
   "createdAt": zod.string()
 })
@@ -348,6 +352,7 @@ export const GetPlayerDashboardResponse = zod.object({
   "fitnessRealm": zod.string(),
   "waterCups": zod.number().optional(),
   "dailyStepGoal": zod.number().optional(),
+  "dailyWorkoutDeadlineHour": zod.number().optional(),
   "lastActiveDate": zod.string().nullish(),
   "createdAt": zod.string()
 }),
@@ -2493,6 +2498,7 @@ export const LogGroupWorkoutResponse = zod.object({
   "fitnessRealm": zod.string(),
   "waterCups": zod.number().optional(),
   "dailyStepGoal": zod.number().optional(),
+  "dailyWorkoutDeadlineHour": zod.number().optional(),
   "lastActiveDate": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional()

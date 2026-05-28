@@ -19,7 +19,7 @@ import { GlowBadge } from "@/components/ui/glow-badge";
 import { motion, useAnimation } from "framer-motion";
 import {
   Heart, Zap, Coffee, Star, Shield, TrendingUp, Footprints,
-  Swords, ChevronLeft, ChevronRight, ArrowLeft, AlertTriangle,
+  Swords, ChevronLeft, ChevronRight, ArrowLeft, AlertTriangle, Target, Clock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -499,6 +499,10 @@ export default function MyPalPage() {
   const stepsToEvolution = (pal as any).stepsToEvolution ?? 0;
   const moodState = (pal.moodState as string | undefined) ?? "happy";
   const stage = pal.evolutionStage ?? 1;
+  const palDailyStepGoal = (pal as any).dailyStepGoal ?? player?.dailyStepGoal ?? 8000;
+  const palDeadlineHour = (pal as any).dailyWorkoutDeadlineHour ?? (player as any)?.dailyWorkoutDeadlineHour ?? 20;
+  const deadlinePeriod = palDeadlineHour < 12 ? "AM" : "PM";
+  const deadlineDisplay = `${palDeadlineHour === 0 ? 12 : palDeadlineHour > 12 ? palDeadlineHour - 12 : palDeadlineHour}:00 ${deadlinePeriod}`;
 
   const rarityColor =
     pal.rarity === "Celestial" ? "#22d3ee" :
@@ -652,6 +656,41 @@ export default function MyPalPage() {
             </NeonButton>
           </div>
         </motion.div>
+
+        {/* Today's Goal indicator */}
+        <GlassCard className="p-4 mb-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Target className="w-4 h-4 text-violet-400" />
+            <h3 className="font-black text-sm text-violet-400">Today's Goal</h3>
+            <button
+              className="ml-auto text-[10px] text-muted-foreground/60 hover:text-muted-foreground underline underline-offset-2 font-bold"
+              onClick={() => setLocation("/settings/privacy")}
+            >
+              Edit
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2">
+              <Footprints className="w-4 h-4 text-cyan-400 shrink-0" />
+              <div>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">Steps</p>
+                <p className="text-sm font-black text-cyan-400">{palDailyStepGoal.toLocaleString()}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2">
+              <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+              <div>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">Deadline</p>
+                <p className="text-sm font-black text-amber-400">{deadlineDisplay}</p>
+              </div>
+            </div>
+          </div>
+          {moodState === "sad" && (
+            <p className="text-[10px] text-red-400/80 font-medium mt-2 text-center">
+              Missed today's goal — train now to cheer your Pal up!
+            </p>
+          )}
+        </GlassCard>
 
         {/* Stat rings row — loyalty, motivation, confidence, power */}
         <GlassCard className="p-5 mb-5">

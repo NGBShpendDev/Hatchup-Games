@@ -28,6 +28,7 @@ export const playersTable = pgTable("players", {
   waterCups: integer("water_cups").notNull().default(0),
   lastActiveDate: date("last_active_date"),
   dailyStepGoal: integer("daily_step_goal").notNull().default(8000),
+  dailyWorkoutDeadlineHour: integer("daily_workout_deadline_hour").notNull().default(20),
   passiveXpSinceLastVisit: integer("passive_xp_since_last_visit").notNull().default(0),
   // Strength tracking — lifetime rep counts per exercise
   totalReps: integer("total_reps").notNull().default(0),

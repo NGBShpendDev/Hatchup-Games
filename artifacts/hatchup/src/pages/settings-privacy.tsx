@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { useToast } from "@/hooks/use-toast";
+import { useUpdatePlayer } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -40,6 +41,9 @@ import {
   Mail,
   Palette,
   Crown,
+  Target,
+  Clock,
+  Footprints,
 } from "lucide-react";
 import { usePushSubscription } from "@/hooks/use-push-subscription";
 
@@ -84,12 +88,18 @@ export default function SettingsPrivacy() {
   const { playerId, player } = usePlayer();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const updatePlayerMutation = useUpdatePlayer();
 
   const [locationVisibility, setLocationVisibility] = useState("city");
   const [requireApproval, setRequireApproval] = useState(false);
   const [emergencyName, setEmergencyName] = useState("");
   const [emergencyPhone, setEmergencyPhone] = useState("");
   const [isMinor, setIsMinor] = useState(false);
+
+  // Pal Goals
+  const [dailyStepGoal, setDailyStepGoal] = useState(8000);
+  const [dailyWorkoutDeadlineHour, setDailyWorkoutDeadlineHour] = useState(20);
+  const [goalsSaving, setGoalsSaving] = useState(false);
   const [shareAccentColor, setShareAccentColor] = useState<string | null>(null);
   const [accentOptions, setAccentOptions] = useState<Array<{
     id: string; name: string; from: string; to: string; premium: boolean; available: boolean;
@@ -295,6 +305,33 @@ export default function SettingsPrivacy() {
       })
       .catch(() => setLoaded(true));
   }, [playerId]);
+
+  // Load pal goals from player context (available immediately once player is fetched).
+  useEffect(() => {
+    if (!player) return;
+    const p = player as { dailyStepGoal?: number; dailyWorkoutDeadlineHour?: number };
+    if (typeof p.dailyStepGoal === "number") setDailyStepGoal(p.dailyStepGoal);
+    if (typeof p.dailyWorkoutDeadlineHour === "number") setDailyWorkoutDeadlineHour(p.dailyWorkoutDeadlineHour);
+  }, [player]);
+
+  const handleSaveGoals = () => {
+    if (!playerId) return;
+    const clampedSteps = Math.max(1000, Math.min(100000, Math.round(dailyStepGoal)));
+    const clampedHour = Math.max(0, Math.min(23, Math.round(dailyWorkoutDeadlineHour)));
+    setGoalsSaving(true);
+    updatePlayerMutation.mutate(
+      { id: playerId, data: { dailyStepGoal: clampedSteps, dailyWorkoutDeadlineHour: clampedHour } },
+      {
+        onSuccess: () => {
+          setDailyStepGoal(clampedSteps);
+          setDailyWorkoutDeadlineHour(clampedHour);
+          toast({ title: "Pal goals saved", description: "Your Pal will use these thresholds going forward." });
+        },
+        onError: () => toast({ title: "Couldn't save goals", variant: "destructive" }),
+        onSettled: () => setGoalsSaving(false),
+      },
+    );
+  };
 
   const handleVerifySubmit = async () => {
     if (!playerId) return;
@@ -775,6 +812,82 @@ export default function SettingsPrivacy() {
                 type="tel"
               />
             </div>
+          </div>
+        </GlassCard>
+
+        {/* Pal Goals */}
+        <GlassCard glow="accent" className="p-4">
+          <div className="relative z-10 space-y-4">
+            <div>
+              <div className="text-base font-black flex items-center gap-2">
+                <Target className="w-4 h-4 text-violet-400" />
+                Pal Goals
+              </div>
+              <p className="text-xs text-muted-foreground font-medium mt-1">
+                Set your personal daily targets. Your Pal's mood reflects how well you track to these goals — not unfair hardcoded limits.
+              </p>
+            </div>
+
+            {/* Daily step goal */}
+            <div className="space-y-1.5">
+              <Label htmlFor="step-goal" className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Footprints className="w-3.5 h-3.5" />
+                Daily Step Goal
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="step-goal"
+                  type="number"
+                  min={1000}
+                  max={100000}
+                  step={500}
+                  value={dailyStepGoal}
+                  onChange={e => setDailyStepGoal(Number(e.target.value))}
+                  className="h-10 flex-1"
+                />
+                <span className="text-xs text-muted-foreground font-bold shrink-0">steps/day</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Recommended: 6,000–10,000 steps</p>
+            </div>
+
+            {/* Workout deadline hour */}
+            <div className="space-y-1.5">
+              <Label htmlFor="deadline-hour" className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                Daily Workout Deadline
+              </Label>
+              <div className="flex items-center gap-2">
+                <select
+                  id="deadline-hour"
+                  value={dailyWorkoutDeadlineHour}
+                  onChange={e => setDailyWorkoutDeadlineHour(Number(e.target.value))}
+                  className="h-10 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium"
+                >
+                  {Array.from({ length: 24 }, (_, h) => {
+                    const period = h < 12 ? "AM" : "PM";
+                    const displayH = h === 0 ? 12 : h > 12 ? h - 12 : h;
+                    return (
+                      <option key={h} value={h}>
+                        {displayH}:00 {period}
+                      </option>
+                    );
+                  })}
+                </select>
+                <span className="text-xs text-muted-foreground font-bold shrink-0">local time</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Your Pal will feel sad if you haven't worked out by this time.
+              </p>
+            </div>
+
+            <NeonButton
+              size="sm"
+              className="w-full"
+              onClick={handleSaveGoals}
+              disabled={goalsSaving}
+            >
+              {goalsSaving ? "Saving…" : "Save Pal Goals"}
+            </NeonButton>
           </div>
         </GlassCard>
 
