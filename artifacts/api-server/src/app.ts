@@ -14,6 +14,7 @@ import router from "./routes";
 import ogRouter from "./routes/og";
 import { logger } from "./lib/logger";
 import { startPassiveSyncJob } from "./services/passiveSyncJob";
+import { startWeeklyNutritionRecapJob } from "./services/weeklyNutritionRecapJob";
 import { WebhookHandlers } from "./webhookHandlers";
 
 const app: Express = express();
@@ -135,5 +136,6 @@ app.use("/api", router);
 app.use(ogRouter);
 
 startPassiveSyncJob();
+startWeeklyNutritionRecapJob();
 
 export default app;
