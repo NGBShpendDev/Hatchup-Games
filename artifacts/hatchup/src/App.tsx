@@ -44,6 +44,7 @@ import Onboarding from "@/pages/onboarding";
 import FamilyPage from "@/pages/family";
 import SubscriptionPage from "@/pages/subscription";
 import PlayerProfile from "@/pages/player-profile";
+import FindPlayers from "@/pages/find-players";
 import ClubDetail from "@/pages/club-detail";
 import NotificationsPage from "@/pages/notifications";
 import PostDetail from "@/pages/post-detail";
@@ -257,6 +258,7 @@ function AppRoutes() {
         <Route path="/groups" component={Groups} />
         <Route path="/health-settings" component={HealthSettings} />
         <Route path="/hatchlings/:id" component={HatchlingDetail} />
+        <Route path="/players/search" component={FindPlayers} />
         <Route path="/players/:id" component={PlayerProfile} />
         <Route path="/clubs/:id" component={ClubDetail} />
         <Route path="/compete/battle" component={Battle} />

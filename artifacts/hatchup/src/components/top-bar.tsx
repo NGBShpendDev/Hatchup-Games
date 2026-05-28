@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Bot, Settings, Flame } from "lucide-react";
+import { Bot, Settings, Flame, Search } from "lucide-react";
 import { usePlayer } from "@/lib/playerContext";
 import { UniversePaletteTrigger } from "./universe-palette";
 import { NotificationsBell } from "./notifications-bell";
@@ -69,6 +69,15 @@ export function TopBar() {
               <span className="text-xs font-black">{player.currentStreak}d</span>
             </div>
           )}
+          <Link href="/players/search">
+            <button
+              className="w-9 h-9 rounded-full bg-card/60 backdrop-blur border border-white/10 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Find players"
+              data-testid="button-topbar-find-players"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+          </Link>
           <UniversePaletteTrigger />
           <NotificationsBell />
           <button
