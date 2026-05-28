@@ -17,3 +17,4 @@ export * from "./battles";
 export * from "./artifacts";
 export * from "./challenges";
 export * from "./social";
+export * from "./family-groups";

@@ -1188,6 +1188,110 @@ export interface FollowInput {
   followeeId: number;
 }
 
+export type OnboardingInputAgeRange = typeof OnboardingInputAgeRange[keyof typeof OnboardingInputAgeRange];
+
+
+export const OnboardingInputAgeRange = {
+  under13: 'under13',
+  teen: 'teen',
+  adult: 'adult',
+  senior: 'senior',
+} as const;
+
+export type OnboardingInputFitnessLevel = typeof OnboardingInputFitnessLevel[keyof typeof OnboardingInputFitnessLevel];
+
+
+export const OnboardingInputFitnessLevel = {
+  beginner: 'beginner',
+  intermediate: 'intermediate',
+  advanced: 'advanced',
+  elite: 'elite',
+} as const;
+
+export type OnboardingInputAccessibilityMode = typeof OnboardingInputAccessibilityMode[keyof typeof OnboardingInputAccessibilityMode];
+
+
+export const OnboardingInputAccessibilityMode = {
+  none: 'none',
+  child: 'child',
+  senior: 'senior',
+  low_impact: 'low_impact',
+} as const;
+
+export interface OnboardingInput {
+  ageRange?: OnboardingInputAgeRange;
+  fitnessLevel?: OnboardingInputFitnessLevel;
+  accessibilityMode?: OnboardingInputAccessibilityMode;
+  identityPath?: string;
+}
+
+export interface IdentityPathMeta {
+  label: string;
+  icon: string;
+  description: string;
+  evolutionTheme: string;
+}
+
+export type TodayGoalProgressGoals = {
+  steps?: number;
+  workouts?: number;
+  durationMin?: number;
+};
+
+export type TodayGoalProgressProgress = {
+  steps?: number;
+  workouts?: number;
+  stepsPercent?: number;
+  workoutsPercent?: number;
+};
+
+export interface TodayGoalProgress {
+  goals: TodayGoalProgressGoals;
+  progress: TodayGoalProgressProgress;
+  fitnessLevel: string;
+  accessibilityMode?: string;
+  identityPath?: string | null;
+  identityPathMeta?: IdentityPathMeta | null;
+  suggestedActivities: string[];
+  xpMultiplier: number;
+  streakAtRisk: boolean;
+  recoveryMessage?: string | null;
+  lowImpactFirst: boolean;
+}
+
+export interface FamilyMember {
+  id: number;
+  username: string;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  level: number;
+  currentStreak: number;
+  totalSteps?: number;
+  weeklySteps: number;
+  fitnessLevel?: string;
+  identityPath?: string | null;
+}
+
+export interface FamilyGroup {
+  id: number;
+  name: string;
+  creatorId: number;
+  inviteCode: string;
+  createdAt: string;
+  hasParentalPin: boolean;
+  members: FamilyMember[];
+}
+
+export interface CreateFamilyGroupInput {
+  name: string;
+  parentalPin?: string;
+}
+
+export interface JoinFamilyGroupInput {
+  inviteCode: string;
+  parentalPin?: string;
+}
+
 export type ListHatchlingsParams = {
 playerId?: number;
 limit?: number;
@@ -1335,4 +1439,29 @@ export const ListChallengesTab = {
 } as const;
 
 export type InviteToChallenge201 = { [key: string]: unknown };
+
+export type CompleteOnboarding200Player = { [key: string]: unknown };
+
+export type CompleteOnboarding200 = {
+  player?: CompleteOnboarding200Player;
+  identityPathMeta?: IdentityPathMeta;
+};
+
+export type ListIdentityPaths200 = {[key: string]: IdentityPathMeta};
+
+export type AcknowledgeStreakRecovery200 = {
+  acknowledged?: boolean;
+  streak?: number;
+  xp?: number;
+};
+
+export type JoinFamilyGroup200 = {
+  joined?: boolean;
+  groupId?: number;
+  groupName?: string;
+};
+
+export type LeaveFamilyGroup200 = {
+  left?: boolean;
+};
 

@@ -21,6 +21,15 @@ export type PlayerProfile = {
   dailyStepGoal: number;
   passiveXpSinceLastVisit: number;
   clerkId: string | null;
+  // Accessibility & progression
+  fitnessLevel: string;
+  ageRange: string;
+  identityPath: string | null;
+  accessibilityMode: string;
+  familyGroupId: number | null;
+  onboardingComplete: boolean;
+  streakAtRisk: boolean;
+  recoveryMessage: string | null;
 };
 
 type PlayerContextValue = {
@@ -28,7 +37,9 @@ type PlayerContextValue = {
   playerId: number | null;
   isLoading: boolean;
   needsProfile: boolean;
+  needsOnboarding: boolean;
   createProfile: (username: string, displayName: string) => Promise<void>;
+  completeOnboarding: () => void;
   refetch: () => Promise<void>;
   acknowledgePassiveXp: () => Promise<void>;
 };
@@ -87,6 +98,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setNeedsProfile(false);
   };
 
+  const completeOnboarding = () => {
+    setPlayer(prev => prev ? { ...prev, onboardingComplete: true } : null);
+  };
+
   const acknowledgePassiveXp = async () => {
     if (!player) return;
     await fetch("/api/health/acknowledge-passive-xp", {
@@ -96,6 +111,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setPlayer(prev => prev ? { ...prev, passiveXpSinceLastVisit: 0 } : null);
   };
 
+  const needsOnboarding = !!player && !player.onboardingComplete;
+
   return (
     <PlayerContext.Provider
       value={{
@@ -103,7 +120,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         playerId: player?.id ?? null,
         isLoading,
         needsProfile,
+        needsOnboarding,
         createProfile,
+        completeOnboarding,
         refetch: fetchPlayer,
         acknowledgePassiveXp,
       }}

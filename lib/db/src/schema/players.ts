@@ -57,6 +57,15 @@ export const playersTable = pgTable("players", {
   totalBattleWins: integer("total_battle_wins").notNull().default(0),
   // Social
   creatorBadge: text("creator_badge"),
+  // Accessibility & progression
+  fitnessLevel: text("fitness_level").notNull().default("beginner"),
+  ageRange: text("age_range").notNull().default("adult"),
+  identityPath: text("identity_path"),
+  accessibilityMode: text("accessibility_mode").notNull().default("none"),
+  familyGroupId: integer("family_group_id"),
+  streakAtRisk: boolean("streak_at_risk").notNull().default(false),
+  recoveryMessage: text("recovery_message"),
+  onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

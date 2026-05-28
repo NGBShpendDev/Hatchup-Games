@@ -23,6 +23,7 @@ import battlesRouter from "./battles";
 import artifactsRouter from "./artifacts";
 import challengesRouter from "./challenges";
 import socialRouter from "./social";
+import accessibilityRouter from "./accessibility";
 
 const router: IRouter = Router();
 
@@ -50,5 +51,6 @@ router.use(battlesRouter);
 router.use(artifactsRouter);
 router.use(challengesRouter);
 router.use(socialRouter);
+router.use(accessibilityRouter);
 
 export default router;

@@ -2598,3 +2598,144 @@ export const RespondToChallengeInviteBody = zod.object({
 export const RespondToChallengeInviteResponse = zod.object({
   "success": zod.boolean()
 })
+
+
+/**
+ * @summary Save onboarding answers (fitness level, age range, accessibility mode, identity path)
+ */
+export const CompleteOnboardingBody = zod.object({
+  "ageRange": zod.enum(['under13', 'teen', 'adult', 'senior']).optional(),
+  "fitnessLevel": zod.enum(['beginner', 'intermediate', 'advanced', 'elite']).optional(),
+  "accessibilityMode": zod.enum(['none', 'child', 'senior', 'low_impact']).optional(),
+  "identityPath": zod.string().optional()
+})
+
+export const CompleteOnboardingResponse = zod.object({
+  "player": zod.object({
+
+}).passthrough().optional(),
+  "identityPathMeta": zod.object({
+  "label": zod.string(),
+  "icon": zod.string(),
+  "description": zod.string(),
+  "evolutionTheme": zod.string()
+}).optional()
+})
+
+
+/**
+ * @summary Get personalized adaptive daily goals and progress
+ */
+export const GetTodayGoalsResponse = zod.object({
+  "goals": zod.object({
+  "steps": zod.number().optional(),
+  "workouts": zod.number().optional(),
+  "durationMin": zod.number().optional()
+}),
+  "progress": zod.object({
+  "steps": zod.number().optional(),
+  "workouts": zod.number().optional(),
+  "stepsPercent": zod.number().optional(),
+  "workoutsPercent": zod.number().optional()
+}),
+  "fitnessLevel": zod.string(),
+  "accessibilityMode": zod.string().optional(),
+  "identityPath": zod.string().nullish(),
+  "identityPathMeta": zod.object({
+  "label": zod.string(),
+  "icon": zod.string(),
+  "description": zod.string(),
+  "evolutionTheme": zod.string()
+}).nullish(),
+  "suggestedActivities": zod.array(zod.string()),
+  "xpMultiplier": zod.number(),
+  "streakAtRisk": zod.boolean(),
+  "recoveryMessage": zod.string().nullish(),
+  "lowImpactFirst": zod.boolean()
+})
+
+
+/**
+ * @summary List all available fitness identity paths
+ */
+export const ListIdentityPathsResponse = zod.record(zod.string(), zod.object({
+  "label": zod.string(),
+  "icon": zod.string(),
+  "description": zod.string(),
+  "evolutionTheme": zod.string()
+}))
+
+
+/**
+ * @summary Acknowledge streak recovery message (no-shame reset acknowledgement)
+ */
+export const AcknowledgeStreakRecoveryResponse = zod.object({
+  "acknowledged": zod.boolean().optional(),
+  "streak": zod.number().optional(),
+  "xp": zod.number().optional()
+})
+
+
+/**
+ * @summary Create a new family group
+ */
+export const CreateFamilyGroupBody = zod.object({
+  "name": zod.string(),
+  "parentalPin": zod.string().optional()
+})
+
+
+/**
+ * @summary Join an existing family group via invite code
+ */
+export const JoinFamilyGroupBody = zod.object({
+  "inviteCode": zod.string(),
+  "parentalPin": zod.string().optional()
+})
+
+export const JoinFamilyGroupResponse = zod.object({
+  "joined": zod.boolean().optional(),
+  "groupId": zod.number().optional(),
+  "groupName": zod.string().optional()
+})
+
+
+/**
+ * @summary Get family group details with weekly leaderboard
+ */
+export const GetFamilyGroupParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetFamilyGroupResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "creatorId": zod.number(),
+  "inviteCode": zod.string(),
+  "createdAt": zod.string(),
+  "hasParentalPin": zod.boolean(),
+  "members": zod.array(zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "level": zod.number(),
+  "currentStreak": zod.number(),
+  "totalSteps": zod.number().optional(),
+  "weeklySteps": zod.number(),
+  "fitnessLevel": zod.string().optional(),
+  "identityPath": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Leave a family group
+ */
+export const LeaveFamilyGroupParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const LeaveFamilyGroupResponse = zod.object({
+  "left": zod.boolean().optional()
+})

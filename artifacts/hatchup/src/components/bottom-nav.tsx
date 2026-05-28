@@ -6,14 +6,17 @@ export function BottomNav() {
   const [location] = useLocation();
   const { player } = usePlayer();
   const hasPassiveXp = (player?.passiveXpSinceLastVisit ?? 0) > 0;
+  const isChildMode = player?.accessibilityMode === "child";
 
-  const navItems = [
-    { href: "/", label: "Home", icon: <Home className="w-6 h-6" />, badge: hasPassiveXp },
-    { href: "/social", label: "Feed", icon: <MessageSquare className="w-6 h-6" />, badge: false },
-    { href: "/hatch", label: "Hatch", icon: <Egg className="w-6 h-6" />, badge: false },
-    { href: "/challenges", label: "Compete", icon: <Swords className="w-6 h-6" />, badge: false },
-    { href: "/nutrition", label: "Nutrition", icon: <Salad className="w-6 h-6" />, badge: false },
+  const allNavItems = [
+    { href: "/", label: "Home", icon: <Home className="w-6 h-6" />, badge: hasPassiveXp, showInChild: true },
+    { href: "/social", label: "Feed", icon: <MessageSquare className="w-6 h-6" />, badge: false, showInChild: false },
+    { href: "/hatch", label: "Hatch", icon: <Egg className="w-6 h-6" />, badge: false, showInChild: true },
+    { href: "/challenges", label: "Compete", icon: <Swords className="w-6 h-6" />, badge: false, showInChild: true },
+    { href: "/nutrition", label: "Nutrition", icon: <Salad className="w-6 h-6" />, badge: false, showInChild: true },
   ];
+
+  const navItems = isChildMode ? allNavItems.filter(i => i.showInChild) : allNavItems;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-xl border-t border-border/50 pb-safe">

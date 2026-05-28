@@ -8,6 +8,8 @@ servers:
   - url: /api
     description: Base API path
 tags:
+  - name: accessibility
+    description: Onboarding, adaptive goals, family teams, and accessibility settings
   - name: health
     description: Health operations
   - name: players
@@ -2114,6 +2116,157 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResult"
 
+  # ── Accessibility & Adaptive Goals ───────────────────────────────────────────
+  /onboarding:
+    post:
+      operationId: completeOnboarding
+      tags: [accessibility]
+      summary: Save onboarding answers (fitness level, age range, accessibility mode, identity path)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingInput"
+      responses:
+        "200":
+          description: Onboarding saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  player: { type: object }
+                  identityPathMeta:
+                    $ref: "#/components/schemas/IdentityPathMeta"
+
+  /goals/today:
+    get:
+      operationId: getTodayGoals
+      tags: [accessibility]
+      summary: Get personalized adaptive daily goals and progress
+      responses:
+        "200":
+          description: Today's goals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodayGoalProgress"
+
+  /identity-paths:
+    get:
+      operationId: listIdentityPaths
+      tags: [accessibility]
+      summary: List all available fitness identity paths
+      responses:
+        "200":
+          description: Identity paths map
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: "#/components/schemas/IdentityPathMeta"
+
+  /streak/recover:
+    post:
+      operationId: acknowledgeStreakRecovery
+      tags: [accessibility]
+      summary: Acknowledge streak recovery message (no-shame reset acknowledgement)
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  acknowledged: { type: boolean }
+                  streak:        { type: integer }
+                  xp:            { type: integer }
+
+  /family-groups:
+    post:
+      operationId: createFamilyGroup
+      tags: [accessibility]
+      summary: Create a new family group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFamilyGroupInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FamilyGroup"
+
+  /family-groups/join:
+    post:
+      operationId: joinFamilyGroup
+      tags: [accessibility]
+      summary: Join an existing family group via invite code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinFamilyGroupInput"
+      responses:
+        "200":
+          description: Joined
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  joined:    { type: boolean }
+                  groupId:   { type: integer }
+                  groupName: { type: string }
+
+  /family-groups/{id}:
+    get:
+      operationId: getFamilyGroup
+      tags: [accessibility]
+      summary: Get family group details with weekly leaderboard
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Family group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FamilyGroup"
+
+  /family-groups/{id}/leave:
+    post:
+      operationId: leaveFamilyGroup
+      tags: [accessibility]
+      summary: Leave a family group
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Left
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  left: { type: boolean }
+
 components:
   schemas:
     HealthStatus:
@@ -3411,3 +3564,95 @@ components:
       properties:
         followerId: { type: integer }
         followeeId: { type: integer }
+
+    OnboardingInput:
+      type: object
+      properties:
+        ageRange:          { type: string, enum: [under13, teen, adult, senior] }
+        fitnessLevel:      { type: string, enum: [beginner, intermediate, advanced, elite] }
+        accessibilityMode: { type: string, enum: [none, child, senior, low_impact] }
+        identityPath:      { type: string }
+
+    IdentityPathMeta:
+      type: object
+      required: [label, icon, description, evolutionTheme]
+      properties:
+        label:         { type: string }
+        icon:          { type: string }
+        description:   { type: string }
+        evolutionTheme: { type: string }
+
+    TodayGoalProgress:
+      type: object
+      required: [goals, progress, fitnessLevel, suggestedActivities, xpMultiplier, streakAtRisk, lowImpactFirst]
+      properties:
+        goals:
+          type: object
+          properties:
+            steps:       { type: integer }
+            workouts:    { type: integer }
+            durationMin: { type: integer }
+        progress:
+          type: object
+          properties:
+            steps:           { type: integer }
+            workouts:        { type: integer }
+            stepsPercent:    { type: integer }
+            workoutsPercent: { type: integer }
+        fitnessLevel:      { type: string }
+        accessibilityMode: { type: string }
+        identityPath:      { type: string, nullable: true }
+        identityPathMeta:
+          nullable: true
+          $ref: "#/components/schemas/IdentityPathMeta"
+        suggestedActivities:
+          type: array
+          items: { type: string }
+        xpMultiplier:    { type: number }
+        streakAtRisk:    { type: boolean }
+        recoveryMessage: { type: string, nullable: true }
+        lowImpactFirst:  { type: boolean }
+
+    FamilyMember:
+      type: object
+      required: [id, username, level, currentStreak, weeklySteps]
+      properties:
+        id:           { type: integer }
+        username:     { type: string }
+        displayName:  { type: string, nullable: true }
+        avatarUrl:    { type: string, nullable: true }
+        level:        { type: integer }
+        currentStreak: { type: integer }
+        totalSteps:   { type: integer }
+        weeklySteps:  { type: integer }
+        fitnessLevel: { type: string }
+        identityPath: { type: string, nullable: true }
+
+    FamilyGroup:
+      type: object
+      required: [id, name, creatorId, inviteCode, createdAt, members, hasParentalPin]
+      properties:
+        id:            { type: integer }
+        name:          { type: string }
+        creatorId:     { type: integer }
+        inviteCode:    { type: string }
+        createdAt:     { type: string }
+        hasParentalPin: { type: boolean }
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/FamilyMember"
+
+    CreateFamilyGroupInput:
+      type: object
+      required: [name]
+      properties:
+        name:       { type: string }
+        parentalPin: { type: string }
+
+    JoinFamilyGroupInput:
+      type: object
+      required: [inviteCode]
+      properties:
+        inviteCode:  { type: string }
+        parentalPin: { type: string }

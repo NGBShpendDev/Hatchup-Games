@@ -141,8 +141,36 @@ router.get("/players/:id/dashboard", requireAuth, attachPlayer, async (req, res)
   const params = GetPlayerDashboardParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   if (params.data.id !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
-  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, params.data.id) });
+  let player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, params.data.id) });
   if (!player) { res.status(404).json({ error: "Player not found" }); return; }
+
+  // ── No-shame streak recovery logic ───────────────────────────────────────
+  if (player.lastActiveDate) {
+    const lastActive = new Date(player.lastActiveDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.floor((today.getTime() - lastActive.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1 && !player.streakAtRisk) {
+      // One day missed → mark streak at risk (soft pause, not reset)
+      const [updated] = await db.update(playersTable)
+        .set({ streakAtRisk: true })
+        .where(eq(playersTable.id, params.data.id))
+        .returning();
+      player = updated;
+    } else if (diffDays >= 2 && player.currentStreak > 0) {
+      // Two+ days missed → reset streak but preserve all XP, add encouraging recovery message
+      const [updated] = await db.update(playersTable)
+        .set({
+          currentStreak: 0,
+          streakAtRisk: false,
+          recoveryMessage: "Welcome back! Your XP and progress are safe — let's get moving again. Every step forward counts. 💪",
+        })
+        .where(eq(playersTable.id, params.data.id))
+        .returning();
+      player = updated;
+    }
+  }
 
   const [hatchlings, recentComps, activeEvents, activeEggs, recentActivities, earnedBadges] = await Promise.all([
     db.query.hatchlingsTable.findMany({ where: eq(hatchlingsTable.playerId, params.data.id) }),

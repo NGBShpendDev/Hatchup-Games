@@ -32,6 +32,8 @@ import ArtifactsPage from "@/pages/artifacts";
 import Challenges from "@/pages/challenges";
 import ChallengeDetail from "@/pages/challenge-detail";
 import ChallengeCreate from "@/pages/challenge-create";
+import Onboarding from "@/pages/onboarding";
+import FamilyPage from "@/pages/family";
 
 const queryClient = new QueryClient();
 
@@ -197,7 +199,7 @@ function PassiveXpBanner() {
 }
 
 function AppRoutes() {
-  const { player, isLoading, needsProfile } = usePlayer();
+  const { player, isLoading, needsProfile, needsOnboarding, completeOnboarding } = usePlayer();
 
   if (isLoading) {
     return (
@@ -209,6 +211,10 @@ function AppRoutes() {
 
   if (needsProfile) {
     return <ProfileSetup />;
+  }
+
+  if (needsOnboarding) {
+    return <Onboarding onComplete={completeOnboarding} />;
   }
 
   return (
@@ -238,6 +244,7 @@ function AppRoutes() {
         <Route path="/challenges/create" component={ChallengeCreate} />
         <Route path="/challenges/:id" component={ChallengeDetail} />
         <Route path="/challenges" component={Challenges} />
+        <Route path="/family" component={FamilyPage} />
         <Route component={NotFound} />
       </Switch>
     </>
