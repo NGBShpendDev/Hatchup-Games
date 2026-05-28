@@ -140,6 +140,7 @@ import type {
   JoinGroupByCodeInput,
   JoinGroupInput,
   JoinLocalChallenge200,
+  KickClubMember200,
   LeaderboardEntry,
   LeaveClub200,
   LeaveFamilyGroup200,
@@ -4507,6 +4508,83 @@ export const useTransferClubOwnership = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getTransferClubOwnershipMutationOptions(options));
+    }
+
+export const getKickClubMemberUrl = (id: number,
+    memberId: number,) => {
+
+
+
+
+  return `/api/clubs/${id}/members/${memberId}/kick`
+}
+
+/**
+ * Removes the target member from the club. Clears their clubId and
+clubRole and decrements the club's memberCount. Only the owner or an
+officer can kick. Owners cannot be kicked. Officers can only be kicked
+by the owner.
+
+ * @summary Remove a member from the club (owner/officer only)
+ */
+export const kickClubMember = async (id: number,
+    memberId: number, options?: RequestInit): Promise<KickClubMember200> => {
+
+  return customFetch<KickClubMember200>(getKickClubMemberUrl(id,memberId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getKickClubMemberMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof kickClubMember>>, TError,{id: number;memberId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof kickClubMember>>, TError,{id: number;memberId: number}, TContext> => {
+
+const mutationKey = ['kickClubMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof kickClubMember>>, {id: number;memberId: number}> = (props) => {
+          const {id,memberId} = props ?? {};
+
+          return  kickClubMember(id,memberId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type KickClubMemberMutationResult = NonNullable<Awaited<ReturnType<typeof kickClubMember>>>
+
+    export type KickClubMemberMutationError = ErrorType<void>
+
+    /**
+ * @summary Remove a member from the club (owner/officer only)
+ */
+export const useKickClubMember = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof kickClubMember>>, TError,{id: number;memberId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof kickClubMember>>,
+        TError,
+        {id: number;memberId: number},
+        TContext
+      > => {
+      return useMutation(getKickClubMemberMutationOptions(options));
     }
 
 export const getJoinClubUrl = (id: number,) => {

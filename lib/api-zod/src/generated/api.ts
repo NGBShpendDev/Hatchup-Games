@@ -1471,6 +1471,24 @@ export const TransferClubOwnershipResponse = zod.object({
 
 
 /**
+ * Removes the target member from the club. Clears their clubId and
+clubRole and decrements the club's memberCount. Only the owner or an
+officer can kick. Owners cannot be kicked. Officers can only be kicked
+by the owner.
+
+ * @summary Remove a member from the club (owner/officer only)
+ */
+export const KickClubMemberParams = zod.object({
+  "id": zod.coerce.number(),
+  "memberId": zod.coerce.number()
+})
+
+export const KickClubMemberResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
  * @summary Join a club
  */
 export const JoinClubParams = zod.object({

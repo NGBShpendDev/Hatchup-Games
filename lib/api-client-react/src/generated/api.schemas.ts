@@ -3432,6 +3432,10 @@ export type TransferClubOwnership200 = {
   newOwnerId: number;
 };
 
+export type KickClubMember200 = {
+  success: boolean;
+};
+
 export type LeaveClub200 = {
   success: boolean;
 };

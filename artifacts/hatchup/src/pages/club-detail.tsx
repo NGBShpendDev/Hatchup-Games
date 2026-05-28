@@ -16,6 +16,7 @@ import {
   useUpdateClubMemberRole,
   useLeaveClub,
   useTransferClubOwnership,
+  useKickClubMember,
 } from "@workspace/api-client-react";
 import {
   AlertDialog,
@@ -40,7 +41,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, ArrowDown, ArrowUp, Check, Crown, LogOut, Mail, Search, Shield, ShieldCheck, Trophy, UserPlus, Users, X } from "lucide-react";
+import { ArrowLeft, ArrowDown, ArrowUp, Check, Crown, LogOut, Mail, Search, Shield, ShieldCheck, Trophy, UserMinus, UserPlus, Users, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 
@@ -79,6 +80,7 @@ export default function ClubDetail() {
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferTargetId, setTransferTargetId] = useState<number | null>(null);
   const [confirmTransferId, setConfirmTransferId] = useState<number | null>(null);
+  const [kickTarget, setKickTarget] = useState<{ id: number; name: string } | null>(null);
   const [inviteSearch, setInviteSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [invitedIds, setInvitedIds] = useState<Set<number>>(new Set());
@@ -200,6 +202,26 @@ export default function ClubDetail() {
   const canInvite = myMembership?.clubRole === "owner" || myMembership?.clubRole === "officer";
   const isMember = !!myMembership;
   const isOwner = myMembership?.clubRole === "owner";
+  const isOfficer = myMembership?.clubRole === "officer";
+
+  const kickMember = useKickClubMember({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Member removed", description: "They've been removed from the club." });
+        queryClient.invalidateQueries({ queryKey: getGetClubQueryKey(id) });
+        queryClient.invalidateQueries({ queryKey: getListClubMembersQueryKey(id) });
+        setKickTarget(null);
+      },
+      onError: (err: { response?: { data?: { error?: string } } }) => {
+        toast({
+          title: "Could not remove member",
+          description: err?.response?.data?.error ?? "Try again",
+          variant: "destructive",
+        });
+        setKickTarget(null);
+      },
+    },
+  });
 
   const updateRole = useUpdateClubMemberRole({
     mutation: {
@@ -437,6 +459,31 @@ export default function ClubDetail() {
           </AlertDialogContent>
         </AlertDialog>
 
+        <AlertDialog open={!!kickTarget} onOpenChange={(open) => { if (!open) setKickTarget(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove {kickTarget?.name ?? "this member"}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                They'll lose access to club chat, events, and the club leaderboard. They can be re-invited later.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={kickMember.isPending}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (kickTarget) kickMember.mutate({ id, memberId: kickTarget.id });
+                }}
+                disabled={kickMember.isPending}
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                data-testid="button-confirm-kick-member"
+              >
+                {kickMember.isPending ? "Removing…" : "Remove"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {isAdmin && (
           <div>
             <h2 className="text-2xl font-black tracking-tight mb-4 flex items-center gap-2">
@@ -536,6 +583,12 @@ export default function ClubDetail() {
                 const showRoleControls = isOwner && member.id !== player?.id && memberRole !== "owner";
                 const isMutating =
                   updateRole.isPending && updateRole.variables?.playerId === member.id;
+                const canKick =
+                  member.id !== player?.id &&
+                  memberRole !== "owner" &&
+                  (isOwner || (isOfficer && memberRole === "member"));
+                const isKicking =
+                  kickMember.isPending && kickMember.variables?.memberId === member.id;
                 return (
                   <motion.div
                     key={member.id}
@@ -571,9 +624,9 @@ export default function ClubDetail() {
                             </div>
                           </a>
                         </Link>
-                        {showRoleControls && (
+                        {(showRoleControls || canKick) && (
                           <div className="flex flex-col gap-1 shrink-0">
-                            {memberRole === "member" ? (
+                            {showRoleControls && (memberRole === "member" ? (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -608,6 +661,19 @@ export default function ClubDetail() {
                               >
                                 <ArrowDown className="w-3.5 h-3.5" />
                                 {isMutating ? "…" : "Demote"}
+                              </Button>
+                            ))}
+                            {canKick && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={isKicking}
+                                onClick={() => setKickTarget({ id: member.id, name })}
+                                className="gap-1 font-bold text-destructive hover:text-destructive hover:border-destructive"
+                                data-testid={`button-kick-member-${member.id}`}
+                              >
+                                <UserMinus className="w-3.5 h-3.5" />
+                                {isKicking ? "…" : "Remove"}
                               </Button>
                             )}
                           </div>

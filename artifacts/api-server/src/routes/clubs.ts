@@ -418,6 +418,69 @@ router.post("/clubs/:id/transfer-ownership", requireAuth, attachPlayer, async (r
   res.json({ success: true, newOwnerId: target.id });
 });
 
+// ── Kick a member from the club (owner/officer only) ─────────────────────
+router.post("/clubs/:id/members/:memberId/kick", requireAuth, attachPlayer, async (req, res) => {
+  const clubId = Number(req.params.id);
+  const memberId = Number(req.params.memberId);
+  if (!Number.isFinite(clubId) || clubId <= 0 || !Number.isFinite(memberId) || memberId <= 0) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+
+  const club = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, clubId) });
+  if (!club) { res.status(404).json({ error: "Club not found" }); return; }
+
+  const viewer = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!viewer || viewer.clubId !== clubId) {
+    res.status(403).json({ error: "Only club admins can remove members" });
+    return;
+  }
+  const viewerRole = (viewer.clubRole ?? "").toLowerCase();
+  if (viewerRole !== "owner" && viewerRole !== "officer" && viewerRole !== "leader" && viewerRole !== "admin") {
+    res.status(403).json({ error: "Only club admins can remove members" });
+    return;
+  }
+
+  if (memberId === viewer.id) {
+    res.status(403).json({ error: "Use the leave club action to remove yourself" });
+    return;
+  }
+
+  const target = await db.query.playersTable.findFirst({ where: eq(playersTable.id, memberId) });
+  if (!target || target.clubId !== clubId) {
+    res.status(404).json({ error: "Member not found in this club" });
+    return;
+  }
+
+  const targetRole = (target.clubRole ?? "member").toLowerCase();
+  if (targetRole === "owner") {
+    res.status(403).json({ error: "The club owner cannot be removed" });
+    return;
+  }
+  if (targetRole === "officer" && viewerRole !== "owner") {
+    res.status(403).json({ error: "Only the owner can remove an officer" });
+    return;
+  }
+
+  await db.update(playersTable)
+    .set({ clubId: null, clubRole: null })
+    .where(eq(playersTable.id, memberId));
+  await db.update(clubsTable)
+    .set({ memberCount: Math.max(0, club.memberCount - 1) })
+    .where(eq(clubsTable.id, clubId));
+
+  await db.insert(notificationsTable).values({
+    playerId: memberId,
+    type: "club_removed",
+    title: `Removed from ${club.name}`,
+    body: `You were removed from ${club.name} by a club admin.`,
+    link: `/club`,
+    sourceId: club.id,
+  });
+
+  res.json({ success: true });
+});
+
 // ── Promote / demote / transfer ownership of a club member (owner only) ───
 router.patch("/clubs/:id/members/:playerId", requireAuth, attachPlayer, async (req, res) => {
   const params = UpdateClubMemberRoleParams.safeParse({

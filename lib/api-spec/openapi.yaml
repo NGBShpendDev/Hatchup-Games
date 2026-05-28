@@ -1236,6 +1236,43 @@ paths:
         "404":
           description: Club or member not found
 
+  /clubs/{id}/members/{memberId}/kick:
+    post:
+      operationId: kickClubMember
+      tags: [clubs]
+      summary: Remove a member from the club (owner/officer only)
+      description: |
+        Removes the target member from the club. Clears their clubId and
+        clubRole and decrements the club's memberCount. Only the owner or an
+        officer can kick. Owners cannot be kicked. Officers can only be kicked
+        by the owner.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Member removed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success]
+                properties:
+                  success:
+                    type: boolean
+        "403":
+          description: Caller is not authorized to kick this member
+        "404":
+          description: Club or member not found
+
   /clubs/{id}/join:
     post:
       operationId: joinClub
