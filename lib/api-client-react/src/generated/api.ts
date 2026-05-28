@@ -152,6 +152,7 @@ import type {
   NutritionAnalyzeResult,
   NutritionChallenge,
   NutritionMacroTarget,
+  NutritionRecapPreview,
   NutritionRecapSendResult,
   NutritionStreak,
   NutritionWeeklySummary,
@@ -11837,6 +11838,81 @@ export const useSendNutritionRecap = <TError = ErrorType<StorageErrorEnvelope>,
         TContext
       > => {
       return useMutation(getSendNutritionRecapMutationOptions(options));
+    }
+
+export const getPreviewNutritionRecapUrl = () => {
+
+
+
+
+  return `/api/nutrition/recap/preview`
+}
+
+/**
+ * Computes the player's current weekly recap, inserts a one-off
+"preview" notification (separate from the scheduled weekly recap),
+and returns the rendered title, body, and full recap payload so the
+UI can show an inline sample. Rate-limited to once per hour per IP.
+
+ * @summary Send a sample weekly nutrition recap notification
+ */
+export const previewNutritionRecap = async ( options?: RequestInit): Promise<NutritionRecapPreview> => {
+
+  return customFetch<NutritionRecapPreview>(getPreviewNutritionRecapUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPreviewNutritionRecapMutationOptions = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewNutritionRecap>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewNutritionRecap>>, TError,void, TContext> => {
+
+const mutationKey = ['previewNutritionRecap'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewNutritionRecap>>, void> = () => {
+
+
+          return  previewNutritionRecap(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewNutritionRecapMutationResult = NonNullable<Awaited<ReturnType<typeof previewNutritionRecap>>>
+
+    export type PreviewNutritionRecapMutationError = ErrorType<StorageErrorEnvelope>
+
+    /**
+ * @summary Send a sample weekly nutrition recap notification
+ */
+export const usePreviewNutritionRecap = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewNutritionRecap>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewNutritionRecap>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getPreviewNutritionRecapMutationOptions(options));
     }
 
 export const getUpdatePhysiqueGoalUrl = () => {

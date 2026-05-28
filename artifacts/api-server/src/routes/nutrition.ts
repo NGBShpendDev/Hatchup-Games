@@ -18,7 +18,9 @@ import { awardBadge } from "../services/badgeService";
 import { getHiddenPlayerIds } from "./safety";
 import { verifyUploadToken } from "./storage";
 import { ObjectStorageService } from "../lib/objectStorage";
-import { computeWeeklyRecap, sendWeeklyRecapNotification, MACRO_GOAL_TARGETS } from "../services/nutritionRecap";
+import { computeWeeklyRecap, sendWeeklyRecapNotification, buildRecapMessage, MACRO_GOAL_TARGETS } from "../services/nutritionRecap";
+import { notificationsTable } from "@workspace/db";
+import { recapPreviewLimiter } from "../middlewares/rateLimiters";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -835,6 +837,44 @@ router.post("/nutrition/recap/send", requireAuth, attachPlayer, async (req, res)
   } catch (err) {
     req.log.warn({ err, playerId }, "Manual weekly recap delivery failed");
     res.status(500).json({ error: "Failed to deliver recap" });
+  }
+});
+
+// ── POST /nutrition/recap/preview ─────────────────────────────────────────────
+// Lets a player send themselves a sample recap notification so they can verify
+// the schedule and formatting without waiting up to a week for the next
+// scheduled delivery. Unlike `/recap/send`, this always inserts a fresh
+// notification (using a negative `sourceId` so it never collides with — or
+// suppresses — the real weekly recap), and also returns the rendered payload
+// so the UI can show an inline preview. Rate-limited to 1/hour to keep the
+// AI tip call from being abused.
+router.post("/nutrition/recap/preview", recapPreviewLimiter, requireAuth, attachPlayer, async (req, res) => {
+  const playerId = req.playerId!;
+  try {
+    const recap = await computeWeeklyRecap(playerId);
+    if (!recap) {
+      res.status(404).json({ error: "Player not found" });
+      return;
+    }
+    const { title, body } = buildRecapMessage(recap);
+
+    // Negative sourceId keyed by epoch seconds — guaranteed not to collide
+    // with the positive ISO-week keys used by the real weekly recap, so the
+    // preview never blocks (or is blocked by) a scheduled delivery.
+    const previewSourceId = -Math.floor(Date.now() / 1000);
+    await db.insert(notificationsTable).values({
+      playerId,
+      type: "nutrition_recap_preview",
+      title: `Preview: ${title}`,
+      body,
+      link: "/nutrition",
+      sourceId: previewSourceId,
+    });
+
+    res.json({ title, body, recap });
+  } catch (err) {
+    req.log.warn({ err, playerId }, "Recap preview failed");
+    res.status(500).json({ error: "Failed to build recap preview" });
   }
 });
 

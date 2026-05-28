@@ -2011,6 +2011,14 @@ export interface NutritionRecapSendResult {
   sent: boolean;
 }
 
+export type NutritionRecapPreviewRecap = { [key: string]: unknown };
+
+export interface NutritionRecapPreview {
+  title: string;
+  body: string;
+  recap: NutritionRecapPreviewRecap;
+}
+
 export interface PhysiqueGoalInput {
   playerId: number;
   physiqueGoal: string;

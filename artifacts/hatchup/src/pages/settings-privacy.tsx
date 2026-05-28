@@ -60,6 +60,8 @@ export default function SettingsPrivacy() {
   const [recapHour, setRecapHour] = useState(9);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [recapPreviewSending, setRecapPreviewSending] = useState(false);
+  const [recapPreview, setRecapPreview] = useState<{ title: string; body: string } | null>(null);
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [verifySubmitting, setVerifySubmitting] = useState(false);
   const [verifyPending, setVerifyPending] = useState(false);
@@ -148,6 +150,39 @@ export default function SettingsPrivacy() {
       }
     } finally {
       setVerifySubmitting(false);
+    }
+  };
+
+  const handleSendRecapPreview = async () => {
+    if (!playerId || recapPreviewSending) return;
+    setRecapPreviewSending(true);
+    try {
+      const res = await fetch("/api/nutrition/recap/preview", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.status === 429) {
+        toast({
+          title: "Slow down",
+          description: "You can only send one recap preview per hour. Try again later.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!res.ok) {
+        toast({ title: "Couldn't send preview", description: "Please try again in a moment.", variant: "destructive" });
+        return;
+      }
+      const data = await res.json() as { title: string; body: string };
+      setRecapPreview({ title: data.title, body: data.body });
+      toast({
+        title: "Preview sent",
+        description: "Check your notifications for a sample of your weekly recap.",
+      });
+    } catch {
+      toast({ title: "Couldn't send preview", description: "Please try again in a moment.", variant: "destructive" });
+    } finally {
+      setRecapPreviewSending(false);
     }
   };
 
@@ -518,6 +553,35 @@ export default function SettingsPrivacy() {
                 </p>
               </div>
             )}
+
+            <div className="border-t border-emerald-500/10 pt-3 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-bold text-sm">Send a preview</p>
+                  <p className="text-xs text-muted-foreground font-medium">
+                    See exactly what your weekly recap will look like — no need to wait until {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][recapDay]}.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSendRecapPreview}
+                  disabled={recapPreviewSending}
+                  className="shrink-0 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10"
+                >
+                  {recapPreviewSending ? "Sending..." : "Send a preview"}
+                </Button>
+              </div>
+              {recapPreview && (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-1">
+                  <p className="font-bold text-sm">{recapPreview.title}</p>
+                  <p className="text-xs text-muted-foreground font-medium leading-relaxed">{recapPreview.body}</p>
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground italic">
+                Limited to one preview per hour.
+              </p>
+            </div>
           </CardContent>
         </Card>
 

@@ -56,6 +56,17 @@ export const postViewLimiter = rateLimit({
   message: { error: "Too many view pings, slow down." },
 });
 
+// Weekly recap preview: lets a player send themselves a sample notification
+// after changing the recap day/time. Strictly 1/hour per IP to prevent abuse
+// (each preview computes a full recap + optional AI tip call).
+export const recapPreviewLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 1,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "You can only send one recap preview per hour." },
+});
+
 // Body / meal scan uploads: expensive vision calls.
 export const scanLimiter = rateLimit({
   windowMs: 60 * 1000,

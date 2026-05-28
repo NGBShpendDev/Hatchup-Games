@@ -3410,6 +3410,42 @@ paths:
               schema:
                 $ref: "#/components/schemas/StorageErrorEnvelope"
 
+  /nutrition/recap/preview:
+    post:
+      operationId: previewNutritionRecap
+      tags: [nutrition]
+      summary: Send a sample weekly nutrition recap notification
+      description: |
+        Computes the player's current weekly recap, inserts a one-off
+        "preview" notification (separate from the scheduled weekly recap),
+        and returns the rendered title, body, and full recap payload so the
+        UI can show an inline sample. Rate-limited to once per hour per IP.
+      responses:
+        "200":
+          description: Preview notification inserted and payload returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NutritionRecapPreview"
+        "404":
+          description: Player not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+        "429":
+          description: Too many preview requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+        "500":
+          description: Recap preview failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+
   /nutrition/physique-goal:
     put:
       operationId: updatePhysiqueGoal
@@ -5613,6 +5649,16 @@ components:
       required: [sent]
       properties:
         sent: { type: boolean }
+
+    NutritionRecapPreview:
+      type: object
+      required: [title, body, recap]
+      properties:
+        title: { type: string }
+        body:  { type: string }
+        recap:
+          type: object
+          additionalProperties: true
 
     PhysiqueGoalInput:
       type: object

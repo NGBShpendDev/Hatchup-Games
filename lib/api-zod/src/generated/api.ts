@@ -3907,6 +3907,21 @@ export const SendNutritionRecapResponse = zod.object({
 
 
 /**
+ * Computes the player's current weekly recap, inserts a one-off
+"preview" notification (separate from the scheduled weekly recap),
+and returns the rendered title, body, and full recap payload so the
+UI can show an inline sample. Rate-limited to once per hour per IP.
+
+ * @summary Send a sample weekly nutrition recap notification
+ */
+export const PreviewNutritionRecapResponse = zod.object({
+  "title": zod.string(),
+  "body": zod.string(),
+  "recap": zod.record(zod.string(), zod.unknown())
+})
+
+
+/**
  * Updates the physique goal used to derive daily macro targets and
 Hatchling reward tuning. The caller must own `playerId`.
 
