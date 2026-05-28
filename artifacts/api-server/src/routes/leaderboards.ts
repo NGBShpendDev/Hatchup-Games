@@ -4,7 +4,7 @@ import {
   playersTable, hatchlingsTable, fitnessActivitiesTable,
   personalRecordsTable, playerLocationTable,
 } from "@workspace/db";
-import { desc, eq, notInArray, gte, and, ne, inArray } from "drizzle-orm";
+import { desc, eq, notInArray, gte, and, ne } from "drizzle-orm";
 import { GetGlobalLeaderboardQueryParams, GetModeLeaderboardQueryParams } from "@workspace/api-zod";
 import { getHiddenPlayerIds } from "./safety";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
@@ -21,8 +21,8 @@ const RANK_COLORS: Record<string, string> = {
   Legendary: "#FF6B35",
 };
 
-// Metric column lookup
 type MetricKey = "steps" | "workouts" | "battle_wins" | "streaks" | "xp" | "artifacts";
+type ScopeKey  = "world" | "country" | "state" | "county" | "city" | "nearby";
 
 function getMetricValue(player: typeof playersTable.$inferSelect, metric: MetricKey): number {
   switch (metric) {
@@ -30,7 +30,7 @@ function getMetricValue(player: typeof playersTable.$inferSelect, metric: Metric
     case "workouts":    return player.totalWorkouts;
     case "battle_wins": return player.totalBattleWins;
     case "streaks":     return player.currentStreak;
-    case "artifacts":   return player.xp; // proxied by XP; artifacts count added per-player where needed
+    case "artifacts":   return player.xp; // Proxy: artifact count requires a join; XP correlates well enough for MVP
     default:            return player.xp;
   }
 }
@@ -72,29 +72,32 @@ router.get("/leaderboards/global", requireAuth, attachPlayer, async (req, res) =
       .filter(h => h.playerId === p.id)
       .sort((a, b) => b.level - a.level)[0];
     return {
-      position:         i + 1,
-      playerId:         p.id,
-      username:         p.username,
-      displayName:      p.displayName,
-      avatarUrl:        p.avatarUrl,
-      rank:             p.rank,
-      score:            p.rankScore,
-      wins:             p.totalWins,
-      hatchlingName:    topHatchling?.name ?? "None",
+      position:          i + 1,
+      playerId:          p.id,
+      username:          p.username,
+      displayName:       p.displayName,
+      avatarUrl:         p.avatarUrl,
+      rank:              p.rank,
+      score:             p.rankScore,
+      wins:              p.totalWins,
+      hatchlingName:     topHatchling?.name ?? "None",
       hatchlingCategory: topHatchling?.category ?? null,
-      isMe:             p.id === req.playerId,
+      isMe:              p.id === req.playerId,
     };
   });
 
   res.json(result);
 });
 
-// ── GET /leaderboards/scoped — location-aware multi-scope leaderboard ─────────
+// ── GET /leaderboards/scoped ──────────────────────────────────────────────────
+// Privacy source of truth: players.locationVisibility (updated by /settings/privacy).
+// "nearby" scope is equivalent to city — players within the same city as the requester.
 router.get("/leaderboards/scoped", requireAuth, attachPlayer, async (req, res) => {
-  const scope    = ((req.query.scope  as string) ?? "world") as "world" | "country" | "state" | "county" | "city";
-  const metric   = ((req.query.metric as string) ?? "xp")    as MetricKey;
-  const limit    = Math.min(50, Number(req.query.limit ?? 20));
-  const validScopes  = ["world", "country", "state", "county", "city"];
+  const scope  = ((req.query.scope  as string) ?? "world") as ScopeKey;
+  const metric = ((req.query.metric as string) ?? "xp")    as MetricKey;
+  const limit  = Math.min(50, Number(req.query.limit ?? 20));
+
+  const validScopes  = ["world", "country", "state", "county", "city", "nearby"];
   const validMetrics = ["steps", "workouts", "battle_wins", "streaks", "xp", "artifacts"];
 
   if (!validScopes.includes(scope) || !validMetrics.includes(metric)) {
@@ -107,105 +110,111 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, async (req, res) =
     ? await db.query.playerLocationTable.findFirst({ where: eq(playerLocationTable.playerId, req.playerId) })
     : null;
 
-  // If non-world scope requested but no location set
+  // For non-world scopes, require a location record
   if (scope !== "world" && !myLocation) {
     res.json({ entries: [], myEntry: null, scope, metric, locationRequired: true });
     return;
   }
 
-  // Find players eligible for this scope
-  let eligiblePlayerIds: number[] | null = null;
+  // ── Privacy filter: use players.locationVisibility as canonical source ────
+  // Players with locationVisibility="hidden" are excluded from all location-scoped boards.
+  // This respects whatever the user set in /settings/privacy.
+  const allNonHiddenPlayers = await db.query.playersTable.findMany({
+    where: ne(playersTable.locationVisibility, "hidden"),
+  });
+  const nonHiddenSet = new Set(allNonHiddenPlayers.map(p => p.id));
+
+  // Also exclude blocked users
+  const hiddenIds = req.playerId ? await getHiddenPlayerIds(req.playerId) : [];
+  const blockedSet = new Set(hiddenIds);
+
+  // ── Scope filter: find player IDs within the geographic scope ─────────────
+  let eligiblePlayerIds: Set<number> | null = null;
 
   if (scope !== "world") {
-    // Build scope filter on player_location
-    const conditions: ReturnType<typeof eq>[] = [
-      ne(playerLocationTable.visibility, "hidden") as ReturnType<typeof eq>,
-    ];
+    // "nearby" is treated the same as "city" — players in the same city
+    const effectiveScope = scope === "nearby" ? "city" : scope;
 
-    if (scope === "country" && myLocation?.country)
-      conditions.push(eq(playerLocationTable.country, myLocation.country) as ReturnType<typeof eq>);
-    if (scope === "state" && myLocation?.state)
-      conditions.push(eq(playerLocationTable.state, myLocation.state) as ReturnType<typeof eq>);
-    if (scope === "county" && myLocation?.county)
-      conditions.push(eq(playerLocationTable.county, myLocation.county) as ReturnType<typeof eq>);
-    if (scope === "city" && myLocation?.city)
-      conditions.push(eq(playerLocationTable.city, myLocation.city) as ReturnType<typeof eq>);
+    let locs: (typeof playerLocationTable.$inferSelect)[] = [];
 
-    const locs = await db.query.playerLocationTable.findMany({
-      where: and(...(conditions as [ReturnType<typeof eq>, ...ReturnType<typeof eq>[]]))
-    });
-    eligiblePlayerIds = locs.map(l => l.playerId);
+    if (effectiveScope === "country" && myLocation?.country) {
+      locs = await db.query.playerLocationTable.findMany({
+        where: eq(playerLocationTable.country, myLocation.country),
+      });
+    } else if (effectiveScope === "state" && myLocation?.state) {
+      locs = await db.query.playerLocationTable.findMany({
+        where: and(
+          eq(playerLocationTable.country, myLocation.country ?? ""),
+          eq(playerLocationTable.state, myLocation.state)
+        ),
+      });
+    } else if (effectiveScope === "county" && myLocation?.county) {
+      locs = await db.query.playerLocationTable.findMany({
+        where: and(
+          eq(playerLocationTable.state, myLocation.state ?? ""),
+          eq(playerLocationTable.county, myLocation.county)
+        ),
+      });
+    } else if (effectiveScope === "city" && myLocation?.city) {
+      locs = await db.query.playerLocationTable.findMany({
+        where: and(
+          eq(playerLocationTable.state, myLocation.state ?? ""),
+          eq(playerLocationTable.city, myLocation.city)
+        ),
+      });
+    }
 
-    if (eligiblePlayerIds.length === 0) {
-      res.json({ entries: [], myEntry: null, scope, metric, locationRequired: false });
+    eligiblePlayerIds = new Set(locs.map(l => l.playerId));
+
+    if (eligiblePlayerIds.size === 0) {
+      res.json({ entries: [], myEntry: null, scope, metric, locationRequired: false, totalInScope: 0, locationContext: null });
       return;
     }
   }
 
-  // Sorting is done in-memory below after fetching players
-  const hiddenIds = req.playerId ? await getHiddenPlayerIds(req.playerId) : [];
+  // ── Build final player list ───────────────────────────────────────────────
+  const playerMap = new Map(allNonHiddenPlayers.map(p => [p.id, p]));
 
-  let players: (typeof playersTable.$inferSelect)[];
+  // For world scope, include ALL non-hidden players (with or without location)
+  let filteredPlayers = allNonHiddenPlayers.filter(p => {
+    if (blockedSet.has(p.id)) return false;
+    if (eligiblePlayerIds !== null && !eligiblePlayerIds.has(p.id)) return false;
+    return true;
+  });
 
-  if (eligiblePlayerIds) {
-    players = await db.query.playersTable.findMany({
-      where: (t, { inArray: iA, notInArray: niA }) =>
-        hiddenIds.length > 0
-          ? and(iA(t.id, eligiblePlayerIds!), niA(t.id, hiddenIds))
-          : iA(t.id, eligiblePlayerIds!),
-    });
-  } else {
-    // world scope — all players who haven't hidden location
-    const visibleLocs = await db.query.playerLocationTable.findMany({
-      where: ne(playerLocationTable.visibility, "hidden"),
-    });
-    const visibleIds = visibleLocs.map(l => l.playerId);
+  // Sort by metric descending in memory
+  filteredPlayers.sort((a, b) => getMetricValue(b, metric) - getMetricValue(a, metric));
 
-    // Include players without location (they default to global)
-    players = await db.query.playersTable.findMany({
-      where: hiddenIds.length > 0 ? notInArray(playersTable.id, hiddenIds) : undefined,
-    });
-    // De-duplicate and keep players who have set location as visible or have no location at all
-    const hiddenLocIds = new Set(
-      (await db.query.playerLocationTable.findMany({ where: eq(playerLocationTable.visibility, "hidden") }))
-        .map(l => l.playerId)
-    );
-    players = players.filter(p => !hiddenLocIds.has(p.id));
-  }
-
-  // Sort by metric descending
-  players.sort((a, b) => getMetricValue(b, metric) - getMetricValue(a, metric));
-
-  const top = players.slice(0, limit);
-  const myRankIndex = players.findIndex(p => p.id === req.playerId);
+  const top = filteredPlayers.slice(0, limit);
+  const myRankIndex = filteredPlayers.findIndex(p => p.id === req.playerId);
 
   const entries = top.map((p, i) => ({
-    position:     i + 1,
-    playerId:     p.id,
-    username:     p.username,
-    displayName:  p.displayName,
-    avatarUrl:    p.avatarUrl,
-    rank:         p.rank,
-    metricValue:  getMetricValue(p, metric),
-    metricLabel:  metricLabel(metric, getMetricValue(p, metric)),
-    isMe:         p.id === req.playerId,
+    position:      i + 1,
+    playerId:      p.id,
+    username:      p.username,
+    displayName:   p.displayName,
+    avatarUrl:     p.avatarUrl,
+    rank:          p.rank,
+    metricValue:   getMetricValue(p, metric),
+    metricLabel:   metricLabel(metric, getMetricValue(p, metric)),
+    isMe:          p.id === req.playerId,
     currentStreak: p.currentStreak,
   }));
 
-  // My entry (may be outside top N)
+  // "My entry" pinned when outside top N
   let myEntry = entries.find(e => e.isMe) ?? null;
   if (!myEntry && myRankIndex >= 0) {
-    const mp = players[myRankIndex];
+    const mp = filteredPlayers[myRankIndex];
     myEntry = {
-      position:     myRankIndex + 1,
-      playerId:     mp.id,
-      username:     mp.username,
-      displayName:  mp.displayName,
-      avatarUrl:    mp.avatarUrl,
-      rank:         mp.rank,
-      metricValue:  getMetricValue(mp, metric),
-      metricLabel:  metricLabel(metric, getMetricValue(mp, metric)),
-      isMe:         true,
+      position:      myRankIndex + 1,
+      playerId:      mp.id,
+      username:      mp.username,
+      displayName:   mp.displayName,
+      avatarUrl:     mp.avatarUrl,
+      rank:          mp.rank,
+      metricValue:   getMetricValue(mp, metric),
+      metricLabel:   metricLabel(metric, getMetricValue(mp, metric)),
+      isMe:          true,
       currentStreak: mp.currentStreak,
     };
   }
@@ -215,9 +224,9 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, async (req, res) =
     myEntry,
     scope,
     metric,
-    totalInScope: players.length,
+    totalInScope:     filteredPlayers.length,
     locationRequired: false,
-    locationContext: myLocation
+    locationContext:  myLocation
       ? { city: myLocation.city, state: myLocation.state, country: myLocation.country }
       : null,
   });
@@ -299,15 +308,15 @@ router.get("/leaderboards/battle-elo", requireAuth, attachPlayer, async (req, re
           .limit(limit);
 
   res.json(players.map((p, i) => ({
-    rank:           i + 1,
-    playerId:       p.id,
-    username:       p.username,
-    displayName:    p.displayName,
-    avatarUrl:      p.avatarUrl,
-    battleElo:      p.battleElo,
+    rank:            i + 1,
+    playerId:        p.id,
+    username:        p.username,
+    displayName:     p.displayName,
+    avatarUrl:       p.avatarUrl,
+    battleElo:       p.battleElo,
     totalBattleWins: p.totalBattleWins,
-    level:          p.level,
-    isMe:           p.id === req.playerId,
+    level:           p.level,
+    isMe:            p.id === req.playerId,
   })));
 });
 

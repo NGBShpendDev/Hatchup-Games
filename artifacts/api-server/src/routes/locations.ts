@@ -6,14 +6,15 @@ import {
   localChallengesTable,
   localChallengeParticipantsTable,
 } from "@workspace/db";
-import { eq, and, gte, lte, ne } from "drizzle-orm";
+import { eq, and, gte, lte, or } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
 
 const router = Router();
 
 // ── POST /players/me/location ─────────────────────────────────────────────────
-// Accepts lat/lng (calls Nominatim) OR direct city/state/country fields.
-// Raw coordinates are stored server-side but never returned in responses.
+// Accepts lat/lng (calls Nominatim for reverse geocoding) OR direct city/state/country fields.
+// Raw GPS coordinates are used ONLY for the geocoding call and are NEVER persisted to the database.
+// Privacy source of truth is players.locationVisibility — synced into player_location.visibility here.
 router.post("/players/me/location", requireAuth, attachPlayer, async (req, res) => {
   const { latitude, longitude, city, state, county, country, countryCode, visibility } = req.body as {
     latitude?: number;
@@ -32,9 +33,12 @@ router.post("/players/me/location", requireAuth, attachPlayer, async (req, res) 
     return;
   }
 
-  let derived = { city, state, county, country, countryCode };
+  let derived: { city?: string | null; state?: string | null; county?: string | null; country?: string | null; countryCode?: string | null } = {
+    city, state, county, country, countryCode,
+  };
 
-  // If coordinates provided but no city, attempt Nominatim reverse geocoding
+  // If coordinates provided but no city, attempt Nominatim reverse geocoding.
+  // Coordinates are used only for this HTTP call and never written to the DB.
   if (latitude != null && longitude != null && !city) {
     try {
       const geoRes = await fetch(
@@ -57,16 +61,25 @@ router.post("/players/me/location", requireAuth, attachPlayer, async (req, res) 
     }
   }
 
+  // Fetch the player record to sync locationVisibility as the canonical privacy value
+  const playerRow = await db.query.playersTable.findFirst({
+    where: eq(playersTable.id, req.playerId!),
+  });
+
+  // visibility hierarchy: explicit request param > players.locationVisibility > existing record > default "city"
   const existing = await db.query.playerLocationTable.findFirst({
     where: eq(playerLocationTable.playerId, req.playerId!),
   });
+  const resolvedVisibility = visibility ?? playerRow?.locationVisibility ?? existing?.visibility ?? "city";
 
   const upsertData = {
-    ...derived,
-    latRaw:     latitude ?? null,
-    lngRaw:     longitude ?? null,
-    visibility: visibility ?? existing?.visibility ?? "city",
-    updatedAt:  new Date(),
+    country:     derived.country   ?? null,
+    countryCode: derived.countryCode ?? null,
+    state:       derived.state     ?? null,
+    county:      derived.county    ?? null,
+    city:        derived.city      ?? null,
+    visibility:  resolvedVisibility,
+    updatedAt:   new Date(),
   };
 
   let record;
@@ -85,9 +98,15 @@ router.post("/players/me/location", requireAuth, attachPlayer, async (req, res) 
     record = created;
   }
 
-  // Never expose raw coordinates
-  const { latRaw: _lat, lngRaw: _lng, ...safe } = record;
-  res.json(safe);
+  // Sync visibility back to players table if an explicit value was provided
+  if (visibility && playerRow?.locationVisibility !== visibility) {
+    await db
+      .update(playersTable)
+      .set({ locationVisibility: visibility })
+      .where(eq(playersTable.id, req.playerId!));
+  }
+
+  res.json(record);
 });
 
 // ── GET /players/me/location ──────────────────────────────────────────────────
@@ -95,56 +114,55 @@ router.get("/players/me/location", requireAuth, attachPlayer, async (req, res) =
   const loc = await db.query.playerLocationTable.findFirst({
     where: eq(playerLocationTable.playerId, req.playerId!),
   });
-  if (!loc) { res.json(null); return; }
-  const { latRaw: _lat, lngRaw: _lng, ...safe } = loc;
-  res.json(safe);
+  res.json(loc ?? null);
 });
 
 // ── GET /local-challenges ─────────────────────────────────────────────────────
+// Returns only challenges relevant to the player's actual location scope.
+// World challenges are always included. Scoped challenges require a matching location.
 router.get("/local-challenges", requireAuth, attachPlayer, async (req, res) => {
   const now = new Date();
 
-  // Get the player's location for local filtering
   const playerLoc = await db.query.playerLocationTable.findFirst({
     where: eq(playerLocationTable.playerId, req.playerId!),
   });
 
-  // All active challenges
-  const all = await db.query.localChallengesTable.findMany({
-    where: and(
-      lte(localChallengesTable.startAt, now),
-      gte(localChallengesTable.endAt, now)
-    ),
+  // Build a filter that matches world challenges + any challenge matching the player's location fields
+  // If player has no location, only world challenges are shown
+  const relevantFilter = playerLoc
+    ? or(
+        eq(localChallengesTable.scope, "world"),
+        and(eq(localChallengesTable.scope, "country"), playerLoc.country ? eq(localChallengesTable.scopeValue, playerLoc.country) : undefined),
+        and(eq(localChallengesTable.scope, "state"),   playerLoc.state   ? eq(localChallengesTable.scopeValue, playerLoc.state)   : undefined),
+        and(eq(localChallengesTable.scope, "county"),  playerLoc.county  ? eq(localChallengesTable.scopeValue, playerLoc.county)  : undefined),
+        and(eq(localChallengesTable.scope, "city"),    playerLoc.city    ? eq(localChallengesTable.scopeValue, playerLoc.city)    : undefined),
+      )
+    : eq(localChallengesTable.scope, "world");
+
+  const challenges = await db.query.localChallengesTable.findMany({
+    where: relevantFilter,
   });
 
-  // For each challenge, check if player already joined
+  // Get participation data
   const myParticipations = await db.query.localChallengeParticipantsTable.findMany({
     where: eq(localChallengeParticipantsTable.playerId, req.playerId!),
   });
   const joinedIds = new Set(myParticipations.map(p => p.challengeId));
 
-  // Get participant counts
   const allParticipants = await db.query.localChallengeParticipantsTable.findMany();
   const countMap: Record<number, number> = {};
   for (const p of allParticipants) {
     countMap[p.challengeId] = (countMap[p.challengeId] ?? 0) + 1;
   }
 
-  const result = all.map(c => ({
+  const result = challenges.map(c => ({
     ...c,
-    startAt:           c.startAt.toISOString(),
-    endAt:             c.endAt.toISOString(),
-    createdAt:         c.createdAt.toISOString(),
-    participantCount:  countMap[c.id] ?? 0,
-    isJoined:          joinedIds.has(c.id),
-    isRelevant:        c.scope === "world" || (
-      playerLoc && (
-        (c.scope === "country" && playerLoc.country === c.scopeValue) ||
-        (c.scope === "state"   && playerLoc.state   === c.scopeValue) ||
-        (c.scope === "county"  && playerLoc.county  === c.scopeValue) ||
-        (c.scope === "city"    && playerLoc.city    === c.scopeValue)
-      )
-    ),
+    startAt:          c.startAt.toISOString(),
+    endAt:            c.endAt.toISOString(),
+    createdAt:        c.createdAt.toISOString(),
+    participantCount: countMap[c.id] ?? 0,
+    isJoined:         joinedIds.has(c.id),
+    isRelevant:       true, // All returned challenges are pre-filtered to be relevant
   }));
 
   res.json(result);
@@ -163,6 +181,23 @@ router.post("/local-challenges/:id/join", requireAuth, attachPlayer, async (req,
   const now = new Date();
   if (now > challenge.endAt) {
     res.status(400).json({ error: "Challenge has ended" });
+    return;
+  }
+
+  // Verify the challenge is relevant to this player
+  const playerLoc = await db.query.playerLocationTable.findFirst({
+    where: eq(playerLocationTable.playerId, req.playerId!),
+  });
+
+  const isEligible =
+    challenge.scope === "world" ||
+    (challenge.scope === "country" && playerLoc?.country === challenge.scopeValue) ||
+    (challenge.scope === "state"   && playerLoc?.state   === challenge.scopeValue) ||
+    (challenge.scope === "county"  && playerLoc?.county  === challenge.scopeValue) ||
+    (challenge.scope === "city"    && playerLoc?.city    === challenge.scopeValue);
+
+  if (!isEligible) {
+    res.status(403).json({ error: "This challenge is not available in your location" });
     return;
   }
 
@@ -208,7 +243,6 @@ router.get("/local-challenges/:id/leaderboard", requireAuth, attachPlayer, async
     : [];
   const playerMap = new Map(players.map(p => [p.id, p]));
 
-  // Rank by currentValue descending
   const sorted = [...participants].sort((a, b) => b.currentValue - a.currentValue);
 
   const entries = sorted.map((p, i) => {
@@ -226,15 +260,23 @@ router.get("/local-challenges/:id/leaderboard", requireAuth, attachPlayer, async
     };
   });
 
+  // Build full challenge object with computed fields (matching LocalChallenge schema)
+  const joinedIds = new Set(participants.map(p => p.playerId));
+  const challengeWithMeta = {
+    ...challenge,
+    startAt:          challenge.startAt.toISOString(),
+    endAt:            challenge.endAt.toISOString(),
+    createdAt:        challenge.createdAt.toISOString(),
+    participantCount: participants.length,
+    isJoined:         joinedIds.has(req.playerId!),
+    isRelevant:       true,
+  };
+
   res.json({
-    challenge: {
-      ...challenge,
-      startAt:   challenge.startAt.toISOString(),
-      endAt:     challenge.endAt.toISOString(),
-      createdAt: challenge.createdAt.toISOString(),
-    },
+    challenge: challengeWithMeta,
     entries,
     myEntry: entries.find(e => e.isMe) ?? null,
+    winners: entries.slice(0, 3),
   });
 });
 

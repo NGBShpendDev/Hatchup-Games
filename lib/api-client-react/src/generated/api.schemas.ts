@@ -1345,6 +1345,30 @@ export interface ScopedLeaderboardEntry {
   currentStreak: number;
 }
 
+export type ScopedLeaderboardResultScope = typeof ScopedLeaderboardResultScope[keyof typeof ScopedLeaderboardResultScope];
+
+
+export const ScopedLeaderboardResultScope = {
+  world: 'world',
+  country: 'country',
+  state: 'state',
+  county: 'county',
+  city: 'city',
+  nearby: 'nearby',
+} as const;
+
+export type ScopedLeaderboardResultMetric = typeof ScopedLeaderboardResultMetric[keyof typeof ScopedLeaderboardResultMetric];
+
+
+export const ScopedLeaderboardResultMetric = {
+  xp: 'xp',
+  steps: 'steps',
+  workouts: 'workouts',
+  battle_wins: 'battle_wins',
+  streaks: 'streaks',
+  artifacts: 'artifacts',
+} as const;
+
 export type ScopedLeaderboardResultLocationContext = {
   /** @nullable */
   city?: string | null;
@@ -1357,8 +1381,8 @@ export type ScopedLeaderboardResultLocationContext = {
 export interface ScopedLeaderboardResult {
   entries: ScopedLeaderboardEntry[];
   myEntry?: ScopedLeaderboardEntry | null;
-  scope: string;
-  metric: string;
+  scope: ScopedLeaderboardResultScope;
+  metric: ScopedLeaderboardResultMetric;
   totalInScope?: number;
   locationRequired: boolean;
   locationContext?: ScopedLeaderboardResultLocationContext;
@@ -1593,6 +1617,7 @@ export const GetScopedLeaderboardScope = {
   state: 'state',
   county: 'county',
   city: 'city',
+  nearby: 'nearby',
 } as const;
 
 export type GetScopedLeaderboardMetric = typeof GetScopedLeaderboardMetric[keyof typeof GetScopedLeaderboardMetric];

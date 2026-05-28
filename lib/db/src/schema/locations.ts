@@ -1,7 +1,9 @@
-import { pgTable, serial, text, integer, doublePrecision, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
+// Raw GPS coordinates are NEVER stored — only city/state/county/country derived via reverse geocoding.
+// The exact coords received from the browser are used transiently (for the geocoding call) and discarded.
 export const playerLocationTable = pgTable("player_location", {
   id: serial("id").primaryKey(),
   playerId: integer("player_id").notNull().unique(),
@@ -10,9 +12,7 @@ export const playerLocationTable = pgTable("player_location", {
   state: text("state"),
   county: text("county"),
   city: text("city"),
-  // Stored server-side only — never exposed in API responses
-  latRaw: doublePrecision("lat_raw"),
-  lngRaw: doublePrecision("lng_raw"),
+  // visibility mirrors players.locationVisibility and is kept in sync on every upsert
   visibility: text("visibility").notNull().default("city"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

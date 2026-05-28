@@ -2792,7 +2792,7 @@ export const getScopedLeaderboardQueryMetricDefault = `xp`;
 export const getScopedLeaderboardQueryLimitDefault = 20;
 
 export const GetScopedLeaderboardQueryParams = zod.object({
-  "scope": zod.enum(['world', 'country', 'state', 'county', 'city']).default(getScopedLeaderboardQueryScopeDefault),
+  "scope": zod.enum(['world', 'country', 'state', 'county', 'city', 'nearby']).default(getScopedLeaderboardQueryScopeDefault),
   "metric": zod.enum(['xp', 'steps', 'workouts', 'battle_wins', 'streaks', 'artifacts']).default(getScopedLeaderboardQueryMetricDefault),
   "limit": zod.coerce.number().default(getScopedLeaderboardQueryLimitDefault)
 })
@@ -2822,8 +2822,8 @@ export const GetScopedLeaderboardResponse = zod.object({
   "isMe": zod.boolean(),
   "currentStreak": zod.number()
 }),zod.null()]).optional(),
-  "scope": zod.string(),
-  "metric": zod.string(),
+  "scope": zod.enum(['world', 'country', 'state', 'county', 'city', 'nearby']),
+  "metric": zod.enum(['xp', 'steps', 'workouts', 'battle_wins', 'streaks', 'artifacts']),
   "totalInScope": zod.number().optional(),
   "locationRequired": zod.boolean(),
   "locationContext": zod.object({

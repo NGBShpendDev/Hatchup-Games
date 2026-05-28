@@ -2310,7 +2310,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [world, country, state, county, city]
+            enum: [world, country, state, county, city, nearby]
             default: world
         - name: metric
           in: query
@@ -3833,8 +3833,8 @@ components:
           oneOf:
             - $ref: "#/components/schemas/ScopedLeaderboardEntry"
             - type: "null"
-        scope:            { type: string }
-        metric:           { type: string }
+        scope:            { type: string, enum: [world, country, state, county, city, nearby] }
+        metric:           { type: string, enum: [xp, steps, workouts, battle_wins, streaks, artifacts] }
         totalInScope:     { type: integer }
         locationRequired: { type: boolean }
         locationContext:
