@@ -42,7 +42,17 @@ export const POST_TYPES = [
   { value: "workout_stat", label: "Workout Stat", icon: "📊" },
   { value: "hatch_moment", label: "Hatch Moment", icon: "🥚" },
   { value: "tournament_win", label: "Tournament Win", icon: "👑" },
+  { value: "artifact_unlock", label: "Artifact Unlock", icon: "🏺" },
 ];
+
+// Per-rarity styling for artifact_unlock posts — mirrors the unlock overlay
+// so a shared brag reads as the same trophy across feed + celebration.
+const ARTIFACT_POST_THEME: Record<string, { glow: string; border: string; bg: string; text: string; label: string }> = {
+  Legendary: { glow: "artifact-glow-legendary", border: "border-yellow-400/70", bg: "from-yellow-900/30 via-amber-900/20 to-black/40", text: "text-yellow-300", label: "Legendary" },
+  Mythic:    { glow: "artifact-glow-mythic",    border: "border-pink-400/70",   bg: "from-pink-900/30 via-rose-900/20 to-black/40",   text: "text-pink-300",   label: "Mythic" },
+  Ancient:   { glow: "artifact-glow-ancient",   border: "border-orange-400/70", bg: "from-orange-900/35 via-amber-900/20 to-black/40", text: "text-orange-300", label: "Ancient" },
+  Celestial: { glow: "artifact-glow-celestial", border: "border-cyan-300/70",   bg: "from-cyan-900/30 via-indigo-900/20 to-black/50",  text: "text-cyan-200",   label: "Celestial" },
+};
 
 export const REACTION_ICONS: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
   like: { icon: <Heart className="w-4 h-4" />, label: "Like", color: "text-pink-500" },
@@ -566,6 +576,12 @@ export function PostCard({
   }
 
   const postTypeInfo = POST_TYPES.find(t => t.value === post.postType);
+  const artifactMeta = post.postType === "artifact_unlock"
+    ? (post.metadata as { artifactId?: number; artifactName?: string; artifactRarity?: string; artifactLore?: string | null } | null)
+    : null;
+  const artifactTheme = artifactMeta?.artifactRarity
+    ? ARTIFACT_POST_THEME[artifactMeta.artifactRarity]
+    : undefined;
 
   async function handleNativeShare() {
     const url = buildPostShareUrl(post.id);
@@ -626,7 +642,10 @@ export function PostCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
     >
-      <GlassCard className="p-4 space-y-3 overflow-hidden">
+      <GlassCard
+        className={`p-4 space-y-3 overflow-hidden ${artifactTheme ? `border-2 ${artifactTheme.border} ${artifactTheme.glow}` : ""}`}
+        data-testid={artifactTheme ? `post-artifact-unlock-${post.id}` : undefined}
+      >
           {/* Header */}
           <div className="flex items-start gap-3">
             <button onClick={() => onViewProfile?.(post.playerId)} disabled={!onViewProfile}>
@@ -668,6 +687,35 @@ export function PostCard({
 
           {/* Content */}
           <p className="text-sm leading-relaxed">{post.content}</p>
+
+          {/* Artifact-unlock trophy card — mirrors the celebration overlay */}
+          {artifactMeta && artifactTheme && (
+            <Link href="/artifacts">
+              <div
+                className={`relative overflow-hidden rounded-2xl border-2 ${artifactTheme.border} bg-gradient-to-br ${artifactTheme.bg} p-4 cursor-pointer hover:scale-[1.01] transition-transform`}
+                data-testid={`artifact-unlock-card-${post.id}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`flex items-center justify-center w-14 h-14 rounded-full bg-black/40 border ${artifactTheme.border} ${artifactTheme.glow} text-3xl`}>
+                    {artifactMeta.artifactRarity === "Celestial" ? "✨" : "🏺"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-[10px] font-black uppercase tracking-widest ${artifactTheme.text}`}>
+                      {artifactTheme.label} Artifact
+                    </p>
+                    <p className="text-base font-black text-white truncate drop-shadow-[0_0_10px_rgba(255,255,255,0.25)]">
+                      {artifactMeta.artifactName}
+                    </p>
+                    {artifactMeta.artifactLore && (
+                      <p className="text-[11px] text-white/70 italic line-clamp-2 mt-0.5">
+                        "{artifactMeta.artifactLore}"
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Link>
+          )}
 
           {/* Tournament-win champion card */}
           {post.postType === "tournament_win" && post.metadata && (() => {

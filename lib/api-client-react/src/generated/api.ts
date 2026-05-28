@@ -225,6 +225,8 @@ import type {
   SearchDiscoverablePlayersParams,
   SearchPlayersParams,
   SendGroupMessageInput,
+  ShareArtifactToFriendInput,
+  ShareArtifactToFriendResult,
   SpeedLeaderboardEntry,
   StorageErrorEnvelope,
   SubmitProgressBody,
@@ -8703,6 +8705,77 @@ export function useGetDailyMemory<TData = Awaited<ReturnType<typeof getDailyMemo
 
 
 
+
+export const getShareArtifactToFriendUrl = () => {
+
+
+
+
+  return `/api/social/share-artifact-to-friend`
+}
+
+/**
+ * @summary DM an artifact unlock to a single follower (or someone you follow back)
+ */
+export const shareArtifactToFriend = async (shareArtifactToFriendInput: ShareArtifactToFriendInput, options?: RequestInit): Promise<ShareArtifactToFriendResult> => {
+
+  return customFetch<ShareArtifactToFriendResult>(getShareArtifactToFriendUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      shareArtifactToFriendInput,)
+  }
+);}
+
+
+
+
+export const getShareArtifactToFriendMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof shareArtifactToFriend>>, TError,{data: BodyType<ShareArtifactToFriendInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof shareArtifactToFriend>>, TError,{data: BodyType<ShareArtifactToFriendInput>}, TContext> => {
+
+const mutationKey = ['shareArtifactToFriend'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof shareArtifactToFriend>>, {data: BodyType<ShareArtifactToFriendInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  shareArtifactToFriend(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ShareArtifactToFriendMutationResult = NonNullable<Awaited<ReturnType<typeof shareArtifactToFriend>>>
+    export type ShareArtifactToFriendMutationBody = BodyType<ShareArtifactToFriendInput>
+    export type ShareArtifactToFriendMutationError = ErrorType<void>
+
+    /**
+ * @summary DM an artifact unlock to a single follower (or someone you follow back)
+ */
+export const useShareArtifactToFriend = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof shareArtifactToFriend>>, TError,{data: BodyType<ShareArtifactToFriendInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof shareArtifactToFriend>>,
+        TError,
+        {data: BodyType<ShareArtifactToFriendInput>},
+        TContext
+      > => {
+      return useMutation(getShareArtifactToFriendMutationOptions(options));
+    }
 
 export const getListHealthConnectionsUrl = () => {
 

@@ -33,6 +33,7 @@ import {
   loadMutualWorkoutPartnersForViewer,
 } from "./sharedGroups.ts";
 import { sendPushToPlayer } from "../services/pushNotifications.ts";
+import { pushForNotification } from "../services/notificationFanout.ts";
 import { notificationsTable } from "@workspace/db";
 import { resolveMentionedPlayers } from "../services/mentions.ts";
 import { createHmac } from "node:crypto";
@@ -94,6 +95,7 @@ const POST_REWARDS: Record<string, { xp: number; energy: number }> = {
   workout_stat: { xp: 15, energy: 8 },
   hatch_moment: { xp: 20, energy: 12 },
   tournament_win: { xp: 40, energy: 25 },
+  artifact_unlock: { xp: 15, energy: 10 },
 };
 
 // ── Creator badge threshold ─────────────────────────────────────────────────
@@ -2527,5 +2529,117 @@ router.delete("/admin/social/posts/:id/purge", requireAuth, attachPlayer, requir
   req.log.info({ adminId: req.playerId, postId: id }, "admin_purged_post");
   res.status(204).send();
 });
+
+// ── POST /social/share-artifact-to-friend ──────────────────────────────────
+// DM a Legendary+ artifact unlock to a single follower (or someone who
+// follows the sender back). Surfaces as an `artifact_share` notification in
+// the recipient's inbox (and via push if they've opted in).
+router.post(
+  "/social/share-artifact-to-friend",
+  requireAuth,
+  attachPlayer,
+  socialWriteLimiter,
+  blockSuspendedSocialWrite,
+  blockMinorSocialWrite,
+  async (req, res) => {
+    const senderId = req.playerId!;
+    const body = req.body as {
+      recipientId?: number;
+      artifactId?: number;
+      artifactName?: string;
+      artifactRarity?: string;
+      artifactLore?: string | null;
+      message?: string | null;
+    };
+
+    const recipientId = Number(body.recipientId);
+    const artifactId = Number(body.artifactId);
+    const artifactName = String(body.artifactName ?? "").trim();
+    const artifactRarity = String(body.artifactRarity ?? "").trim();
+    if (
+      !Number.isFinite(recipientId) ||
+      !Number.isFinite(artifactId) ||
+      !artifactName ||
+      !artifactRarity ||
+      recipientId === senderId
+    ) {
+      res.status(400).json({ error: "invalid_input" });
+      return;
+    }
+
+    const recipient = await db.query.playersTable.findFirst({
+      where: eq(playersTable.id, recipientId),
+    });
+    if (!recipient) {
+      res.status(404).json({ error: "recipient_not_found" });
+      return;
+    }
+
+    // Mutual-aware gating: the recipient must follow the sender OR the sender
+    // must follow the recipient. Prevents using DMs as a cold-DM vector.
+    const relationship = await db.query.playerFollowsTable.findFirst({
+      where: or(
+        and(
+          eq(playerFollowsTable.followerId, senderId),
+          eq(playerFollowsTable.followeeId, recipientId),
+        ),
+        and(
+          eq(playerFollowsTable.followerId, recipientId),
+          eq(playerFollowsTable.followeeId, senderId),
+        ),
+      ),
+    });
+    if (!relationship) {
+      res.status(403).json({ error: "not_following" });
+      return;
+    }
+
+    const hiddenForRecipient = await getHiddenPlayerIds(recipientId);
+    if (hiddenForRecipient.includes(senderId)) {
+      res.status(403).json({ error: "blocked" });
+      return;
+    }
+
+    const sender = await db.query.playersTable.findFirst({
+      where: eq(playersTable.id, senderId),
+    });
+    const senderName = sender?.displayName ?? sender?.username ?? "A trainer";
+
+    const rawMessage = typeof body.message === "string" ? body.message.trim().slice(0, 200) : "";
+    let extraNote = "";
+    if (rawMessage) {
+      const mod = moderateContent(rawMessage);
+      if (mod.flagged) {
+        res.status(422).json({ error: "Message contains language that violates community guidelines.", flaggedTerms: mod.matched });
+        return;
+      }
+      extraNote = ` — "${rawMessage}"`;
+    }
+
+    const [row] = await db.insert(notificationsTable).values({
+      playerId: recipientId,
+      type: "artifact_share",
+      title: `${senderName} unlocked ${artifactRarity} ${artifactName}!`,
+      body: `Tap to see this ${artifactRarity.toLowerCase()} artifact${extraNote}`,
+      link: `/artifacts?highlight=${artifactId}`,
+      sourceId: artifactId,
+    }).returning();
+
+    // Best-effort push (artifact_share is mapped to the "invites" category).
+    try {
+      await pushForNotification({
+        playerId: row.playerId,
+        type: row.type,
+        title: row.title,
+        body: row.body,
+        link: row.link,
+      }, { tag: `artifact-share-${artifactId}-${senderId}` });
+    } catch (err) {
+      req.log?.warn({ err }, "artifact_share_push_failed");
+    }
+
+    res.json({ delivered: true, notificationId: row.id });
+  },
+);
 
 export default router;

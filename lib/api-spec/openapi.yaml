@@ -2583,6 +2583,29 @@ paths:
                   - $ref: "#/components/schemas/MemoryPost"
                   - type: "null"
 
+  /social/share-artifact-to-friend:
+    post:
+      operationId: shareArtifactToFriend
+      tags: [social]
+      summary: DM an artifact unlock to a single follower (or someone you follow back)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShareArtifactToFriendInput"
+      responses:
+        "200":
+          description: Notification delivered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareArtifactToFriendResult"
+        "403":
+          description: Recipient is not a mutual / follower
+        "404":
+          description: Recipient not found
+
   # ── Health Sync ───────────────────────────────────────────────────────────
   /health/connections:
     get:
@@ -6131,10 +6154,30 @@ components:
           description: |
             Structured payload that depends on `postType`. See `FeedPost.metadata`
             for the per-type shape (e.g. `tournament_win` carries `challengeId`,
-            `challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`).
+            `challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`;
+            `artifact_unlock` carries `artifactId`, `artifactName`,
+            `artifactRarity`, `artifactLore`).
           nullable: true
           type: object
           additionalProperties: true
+
+    ShareArtifactToFriendInput:
+      type: object
+      required: [recipientId, artifactId, artifactName, artifactRarity]
+      properties:
+        recipientId:    { type: integer, description: "Player id to DM. Must be following the sender or be followed back." }
+        artifactId:     { type: integer }
+        artifactName:   { type: string }
+        artifactRarity: { type: string }
+        artifactLore:   { type: ["string", "null"] }
+        message:        { type: ["string", "null"], description: "Optional short message attached to the share." }
+
+    ShareArtifactToFriendResult:
+      type: object
+      required: [delivered, notificationId]
+      properties:
+        delivered:      { type: boolean }
+        notificationId: { type: integer }
 
     ReactToPostInput:
       type: object

@@ -1665,7 +1665,9 @@ export interface ModerationError {
 /**
  * Structured payload that depends on `postType`. See `FeedPost.metadata`
 for the per-type shape (e.g. `tournament_win` carries `challengeId`,
-`challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`).
+`challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`;
+`artifact_unlock` carries `artifactId`, `artifactName`,
+`artifactRarity`, `artifactLore`).
 
  */
 export type CreatePostInputMetadata = { [key: string]: unknown } | null;
@@ -1682,9 +1684,31 @@ export interface CreatePostInput {
   creatureId?: number;
   /** Structured payload that depends on `postType`. See `FeedPost.metadata`
   for the per-type shape (e.g. `tournament_win` carries `challengeId`,
-  `challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`).
+  `challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`;
+  `artifact_unlock` carries `artifactId`, `artifactName`,
+  `artifactRarity`, `artifactLore`).
    */
   metadata?: CreatePostInputMetadata;
+}
+
+export interface ShareArtifactToFriendInput {
+  /** Player id to DM. Must be following the sender or be followed back. */
+  recipientId: number;
+  artifactId: number;
+  artifactName: string;
+  artifactRarity: string;
+  /** @nullable */
+  artifactLore?: string | null;
+  /**
+     * Optional short message attached to the share.
+     * @nullable
+     */
+  message?: string | null;
+}
+
+export interface ShareArtifactToFriendResult {
+  delivered: boolean;
+  notificationId: number;
 }
 
 export type ReactToPostInputReactionType = typeof ReactToPostInputReactionType[keyof typeof ReactToPostInputReactionType];

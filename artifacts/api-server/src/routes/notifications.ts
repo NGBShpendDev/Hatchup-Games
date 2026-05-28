@@ -13,6 +13,7 @@ const ALLOWED_TYPES = new Set([
   "club_mention",
   "club_invite",
   "artifact_unlock",
+  "artifact_share",
   "rematch_invite",
   "post_reaction",
   "post_comment",

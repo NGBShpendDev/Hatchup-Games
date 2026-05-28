@@ -2368,7 +2368,7 @@ export const CreatePostBody = zod.object({
   "mediaUrl": zod.string().optional(),
   "postType": zod.string().optional(),
   "creatureId": zod.number().optional(),
-  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. See `FeedPost.metadata`\nfor the per-type shape (e.g. `tournament_win` carries `challengeId`,\n`challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`).\n')
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. See `FeedPost.metadata`\nfor the per-type shape (e.g. `tournament_win` carries `challengeId`,\n`challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`;\n`artifact_unlock` carries `artifactId`, `artifactName`,\n`artifactRarity`, `artifactLore`).\n')
 })
 
 
@@ -3121,6 +3121,24 @@ export const GetDailyMemoryResponse = zod.union([zod.object({
   "yearsAgo": zod.number(),
   "label": zod.string()
 }),zod.null()])
+
+
+/**
+ * @summary DM an artifact unlock to a single follower (or someone you follow back)
+ */
+export const ShareArtifactToFriendBody = zod.object({
+  "recipientId": zod.number().describe('Player id to DM. Must be following the sender or be followed back.'),
+  "artifactId": zod.number(),
+  "artifactName": zod.string(),
+  "artifactRarity": zod.string(),
+  "artifactLore": zod.string().nullish(),
+  "message": zod.string().nullish().describe('Optional short message attached to the share.')
+})
+
+export const ShareArtifactToFriendResponse = zod.object({
+  "delivered": zod.boolean(),
+  "notificationId": zod.number()
+})
 
 
 /**

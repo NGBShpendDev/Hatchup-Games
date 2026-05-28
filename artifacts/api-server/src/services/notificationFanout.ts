@@ -31,6 +31,7 @@ export const NOTIFICATION_TYPE_TO_PUSH_CATEGORY: Record<string, PushCategory> = 
   comment_mention: "invites",
   new_follower: "invites",
   artifact_unlock: "invites",
+  artifact_share: "invites",
   generic: "invites",
   // Account / moderation pings reuse the invites opt-in so silencing
   // recap / completed pushes doesn't also silence safety notices.
