@@ -12,21 +12,27 @@
  *      to tests/visual/auth/storageState.json so subsequent
  *      `pnpm --filter @workspace/visual-tests run test` invocations
  *      run authenticated snapshots instead of skipping.
+ *   5. Copies the same storage state to the mobile-specific path
+ *      (tests/visual/auth/mobileStorageState.json by default) so
+ *      hatchling-share.spec.ts also runs without skipping. Clerk
+ *      cookies are scoped to the "localhost" domain, not a specific
+ *      port, so the same state satisfies auth on the Expo dev server.
  *
  * Required env
  *   CLERK_SECRET_KEY  Replit-managed Clerk backend key
  *   DATABASE_URL      Postgres connection string
  *
  * Optional env
- *   HATCHUP_BASE_URL          App URL (default http://localhost:3000)
- *   HATCHUP_STORAGE_STATE     Output path (default tests/visual/auth/storageState.json)
- *   HATCHUP_TEST_EMAIL        Test user email (default visual-tests+clerk_test@hatchup.test)
- *   HATCHUP_TEST_USERNAME     Player username (default visual_tester)
- *   HATCHUP_TEST_DISPLAY_NAME Player display name (default Visual Tester)
+ *   HATCHUP_BASE_URL              App URL (default http://localhost:3000)
+ *   HATCHUP_STORAGE_STATE         Output path (default tests/visual/auth/storageState.json)
+ *   HATCHUP_MOBILE_STORAGE_STATE  Mobile output path (default tests/visual/auth/mobileStorageState.json)
+ *   HATCHUP_TEST_EMAIL            Test user email (default visual-tests+clerk_test@hatchup.test)
+ *   HATCHUP_TEST_USERNAME         Player username (default visual_tester)
+ *   HATCHUP_TEST_DISPLAY_NAME     Player display name (default Visual Tester)
  */
 import { chromium } from "@playwright/test";
 import { Pool } from "pg";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, copyFileSync } from "node:fs";
 import path from "node:path";
 
 const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY;
@@ -38,6 +44,10 @@ const TEST_DISPLAY_NAME = process.env.HATCHUP_TEST_DISPLAY_NAME || "Visual Teste
 const OUT_PATH = path.resolve(
   process.env.HATCHUP_STORAGE_STATE ||
     path.join(import.meta.dirname, "..", "auth", "storageState.json"),
+);
+const MOBILE_OUT_PATH = path.resolve(
+  process.env.HATCHUP_MOBILE_STORAGE_STATE ||
+    path.join(import.meta.dirname, "..", "auth", "mobileStorageState.json"),
 );
 
 if (!CLERK_SECRET_KEY) throw new Error("CLERK_SECRET_KEY is required");
@@ -155,6 +165,15 @@ async function main(): Promise<void> {
     await ensurePlayer(pool, clerkUserId);
     const token = await createSignInToken(clerkUserId);
     await captureStorageState(token);
+
+    // Clerk cookies are scoped to the "localhost" domain (not port-specific),
+    // so the same state satisfies auth on the Expo mobile dev server too.
+    // Copy it to the mobile-specific path so hatchling-share.spec.ts can
+    // find it via HATCHUP_MOBILE_STORAGE_STATE (or the default path) and
+    // will not skip in CI.
+    mkdirSync(path.dirname(MOBILE_OUT_PATH), { recursive: true });
+    copyFileSync(OUT_PATH, MOBILE_OUT_PATH);
+    console.log(`Copied storage state to mobile path: ${MOBILE_OUT_PATH}`);
   } finally {
     await pool.end();
   }

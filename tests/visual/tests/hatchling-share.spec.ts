@@ -11,23 +11,37 @@
 // Auth: the Expo app uses Clerk. Clerk cookies are scoped to the "localhost"
 // domain (not port-specific), so the storageState captured for the main web
 // app at localhost:3000 satisfies the auth check on the Expo server too.
+// Running `pnpm --filter @workspace/visual-tests run capture-auth` writes
+// both the shared state and a mobile-specific copy so this spec does not skip.
 //
-// Like the other tests/visual specs this one is skipped when the shared
-// Clerk storage state is absent — see tests/visual/README.md.
+// Like the other tests/visual specs this one is skipped when no Clerk
+// storage state is found — see tests/visual/README.md.
 
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
+// Prefer a mobile-specific storage state when provided. Falls back to the
+// shared web state (HATCHUP_STORAGE_STATE / storageState.json) because Clerk
+// cookies are scoped to the localhost domain, not to a specific port.
 const storageStatePath = path.resolve(
+  process.env.HATCHUP_MOBILE_STORAGE_STATE ||
+    path.join(import.meta.dirname, "..", "auth", "mobileStorageState.json"),
+);
+const fallbackStorageStatePath = path.resolve(
   process.env.HATCHUP_STORAGE_STATE ||
     path.join(import.meta.dirname, "..", "auth", "storageState.json"),
 );
 
-const hasAuth = existsSync(storageStatePath);
+const resolvedStorageStatePath = existsSync(storageStatePath)
+  ? storageStatePath
+  : fallbackStorageStatePath;
+
+const hasAuth = existsSync(resolvedStorageStatePath);
 const skipReason = !hasAuth
-  ? `No Clerk storage state found at ${storageStatePath}. ` +
-    `See tests/visual/README.md for how to capture it before running this spec.`
+  ? `No Clerk storage state found at ${resolvedStorageStatePath}. ` +
+    `Run capture-auth or set HATCHUP_MOBILE_STORAGE_STATE / HATCHUP_STORAGE_STATE. ` +
+    `See tests/visual/README.md for details.`
   : "";
 
 // The Expo dev server port is pinned in the artifact TOML (PORT = "25366").

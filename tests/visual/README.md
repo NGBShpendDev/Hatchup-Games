@@ -19,6 +19,10 @@ Baselines live next to the spec under
 `tests/neon-look.spec.ts-snapshots/`. The first run creates them; later
 runs compare against them.
 
+The spec at `tests/hatchling-share.spec.ts` exercises the mobile share
+button on the Expo web server (see [Mobile share spec](#mobile-share-spec)
+below).
+
 ## Running
 
 The frontend (`@workspace/hatchup`) must be running and reachable at
@@ -67,8 +71,10 @@ What the script does:
    to obtain the authenticated cookies.
 4. Writes the browser storage state to
    `tests/visual/auth/storageState.json`.
+5. Copies the same state to `tests/visual/auth/mobileStorageState.json`
+   so the mobile share spec also runs without skipping (see below).
 
-The output file is git-ignored. For CI, run the same `capture-auth`
+The output files are git-ignored. For CI, run the same `capture-auth`
 script as a job step (with `CLERK_SECRET_KEY`, `DATABASE_URL`, and a
 running frontend) before `pnpm --filter @workspace/visual-tests run
 test`, or upload the generated `storageState.json` once as a
@@ -77,9 +83,66 @@ secret-mounted file and point `HATCHUP_STORAGE_STATE` at it.
 Override the defaults with any of these env vars:
 
 - `HATCHUP_BASE_URL` — defaults to `http://localhost:3000`
-- `HATCHUP_STORAGE_STATE` — output path
+- `HATCHUP_STORAGE_STATE` — web app output path
+- `HATCHUP_MOBILE_STORAGE_STATE` — mobile app output path (defaults to
+  `tests/visual/auth/mobileStorageState.json`)
 - `HATCHUP_TEST_EMAIL` / `HATCHUP_TEST_USERNAME` /
   `HATCHUP_TEST_DISPLAY_NAME` — identity of the test account
+
+## Mobile share spec
+
+`tests/hatchling-share.spec.ts` exercises the share button on the Expo
+mobile web server (default port `25366`). Override with:
+
+- `HATCHUP_MOBILE_PORT` — Expo dev server port (default `25366`)
+- `HATCHUP_MOBILE_BASE_URL` — full URL override (e.g. `http://localhost:25366`)
+- `HATCHUP_MOBILE_STORAGE_STATE` — path to the mobile Clerk storage state
+
+### Auth for the mobile spec
+
+Clerk cookies are scoped to the **`localhost` domain**, not to a
+specific port. This means the storage state captured for the web app at
+`localhost:3000` also satisfies Clerk's auth check on the Expo dev
+server at `localhost:25366`.
+
+Running `capture-auth` once therefore covers both specs:
+
+```bash
+# Captures web state → tests/visual/auth/storageState.json
+# Copies it         → tests/visual/auth/mobileStorageState.json
+pnpm --filter @workspace/visual-tests run capture-auth
+```
+
+If you need a completely independent mobile storage state (e.g. a
+different test account or a pre-built static export), set
+`HATCHUP_MOBILE_STORAGE_STATE` to point at it:
+
+```bash
+HATCHUP_MOBILE_STORAGE_STATE=/path/to/mobile-auth.json \
+  pnpm --filter @workspace/visual-tests run test
+```
+
+The spec checks `HATCHUP_MOBILE_STORAGE_STATE` first, then falls back
+to `HATCHUP_STORAGE_STATE` / the shared `storageState.json`. The test
+is skipped only when neither file is present.
+
+### CI setup for the mobile spec
+
+Add these steps **before** the test run:
+
+```yaml
+- name: Capture Clerk auth (web + mobile)
+  env:
+    CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+    DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  run: pnpm --filter @workspace/visual-tests run capture-auth
+
+- name: Run visual tests (includes hatchling-share)
+  run: pnpm --filter @workspace/visual-tests run test
+```
+
+`capture-auth` writes both `storageState.json` and
+`mobileStorageState.json`, so `hatchling-share.spec.ts` will not skip.
 
 ## CI
 
