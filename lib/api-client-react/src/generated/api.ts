@@ -69,6 +69,7 @@ import type {
   GetModeLeaderboardParams,
   GetPlayerSocialProfileParams,
   GetPostParams,
+  GetScopedLeaderboardParams,
   GetSocialFeedParams,
   GetSpeedLeaderboardParams,
   GetWorkoutPlanParams,
@@ -93,6 +94,7 @@ import type {
   JoinFamilyGroupInput,
   JoinGroupByCodeInput,
   JoinGroupInput,
+  JoinLocalChallenge200,
   LeaderboardEntry,
   LeaveFamilyGroup200,
   LeaveGroupInput,
@@ -110,6 +112,9 @@ import type {
   ListRealmsParams,
   ListWorkoutSessionsParams,
   LiveEvent,
+  LocalChallenge,
+  LocalChallengeLeaderboardResult,
+  LocationUpdateBody,
   LogActivityInput,
   LogGroupWorkoutInput,
   LogSessionInput,
@@ -121,6 +126,7 @@ import type {
   Player,
   PlayerDashboard,
   PlayerInput,
+  PlayerLocationRecord,
   PlayerSocialProfile,
   PlayerStub,
   PlayerUpdate,
@@ -135,6 +141,7 @@ import type {
   RespondToInviteBody,
   SaveArtifactBuildBody,
   SaveArtifactLoadoutBody,
+  ScopedLeaderboardResult,
   SendGroupMessageInput,
   SpeedLeaderboardEntry,
   SubmitProgressBody,
@@ -8280,4 +8287,460 @@ export const useLeaveFamilyGroup = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getLeaveFamilyGroupMutationOptions(options));
     }
+
+export const getUpdateMyLocationUrl = () => {
+
+
+
+
+  return `/api/players/me/location`
+}
+
+/**
+ * @summary Update the current player's approximate location (derived from GPS or direct fields)
+ */
+export const updateMyLocation = async (locationUpdateBody: LocationUpdateBody, options?: RequestInit): Promise<PlayerLocationRecord> => {
+
+  return customFetch<PlayerLocationRecord>(getUpdateMyLocationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      locationUpdateBody,)
+  }
+);}
+
+
+
+
+export const getUpdateMyLocationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMyLocation>>, TError,{data: BodyType<LocationUpdateBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMyLocation>>, TError,{data: BodyType<LocationUpdateBody>}, TContext> => {
+
+const mutationKey = ['updateMyLocation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMyLocation>>, {data: BodyType<LocationUpdateBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateMyLocation(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMyLocationMutationResult = NonNullable<Awaited<ReturnType<typeof updateMyLocation>>>
+    export type UpdateMyLocationMutationBody = BodyType<LocationUpdateBody>
+    export type UpdateMyLocationMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update the current player's approximate location (derived from GPS or direct fields)
+ */
+export const useUpdateMyLocation = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMyLocation>>, TError,{data: BodyType<LocationUpdateBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMyLocation>>,
+        TError,
+        {data: BodyType<LocationUpdateBody>},
+        TContext
+      > => {
+      return useMutation(getUpdateMyLocationMutationOptions(options));
+    }
+
+export const getGetMyLocationUrl = () => {
+
+
+
+
+  return `/api/players/me/location`
+}
+
+/**
+ * @summary Get the current player's stored location
+ */
+export const getMyLocation = async ( options?: RequestInit): Promise<PlayerLocationRecord | null> => {
+
+  return customFetch<PlayerLocationRecord | null>(getGetMyLocationUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyLocationQueryKey = () => {
+    return [
+    `/api/players/me/location`
+    ] as const;
+    }
+
+
+export const getGetMyLocationQueryOptions = <TData = Awaited<ReturnType<typeof getMyLocation>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyLocation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyLocationQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyLocation>>> = ({ signal }) => getMyLocation({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyLocation>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyLocationQueryResult = NonNullable<Awaited<ReturnType<typeof getMyLocation>>>
+export type GetMyLocationQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the current player's stored location
+ */
+
+export function useGetMyLocation<TData = Awaited<ReturnType<typeof getMyLocation>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyLocation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyLocationQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetScopedLeaderboardUrl = (params?: GetScopedLeaderboardParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/leaderboards/scoped?${stringifiedParams}` : `/api/leaderboards/scoped`
+}
+
+/**
+ * @summary Get location-scoped leaderboard with configurable metric
+ */
+export const getScopedLeaderboard = async (params?: GetScopedLeaderboardParams, options?: RequestInit): Promise<ScopedLeaderboardResult> => {
+
+  return customFetch<ScopedLeaderboardResult>(getGetScopedLeaderboardUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetScopedLeaderboardQueryKey = (params?: GetScopedLeaderboardParams,) => {
+    return [
+    `/api/leaderboards/scoped`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetScopedLeaderboardQueryOptions = <TData = Awaited<ReturnType<typeof getScopedLeaderboard>>, TError = ErrorType<unknown>>(params?: GetScopedLeaderboardParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScopedLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetScopedLeaderboardQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getScopedLeaderboard>>> = ({ signal }) => getScopedLeaderboard(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getScopedLeaderboard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetScopedLeaderboardQueryResult = NonNullable<Awaited<ReturnType<typeof getScopedLeaderboard>>>
+export type GetScopedLeaderboardQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get location-scoped leaderboard with configurable metric
+ */
+
+export function useGetScopedLeaderboard<TData = Awaited<ReturnType<typeof getScopedLeaderboard>>, TError = ErrorType<unknown>>(
+ params?: GetScopedLeaderboardParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getScopedLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetScopedLeaderboardQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListLocalChallengesUrl = () => {
+
+
+
+
+  return `/api/local-challenges`
+}
+
+/**
+ * @summary List active local GPS-based challenges visible to the current player
+ */
+export const listLocalChallenges = async ( options?: RequestInit): Promise<LocalChallenge[]> => {
+
+  return customFetch<LocalChallenge[]>(getListLocalChallengesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListLocalChallengesQueryKey = () => {
+    return [
+    `/api/local-challenges`
+    ] as const;
+    }
+
+
+export const getListLocalChallengesQueryOptions = <TData = Awaited<ReturnType<typeof listLocalChallenges>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLocalChallenges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListLocalChallengesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listLocalChallenges>>> = ({ signal }) => listLocalChallenges({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listLocalChallenges>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListLocalChallengesQueryResult = NonNullable<Awaited<ReturnType<typeof listLocalChallenges>>>
+export type ListLocalChallengesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List active local GPS-based challenges visible to the current player
+ */
+
+export function useListLocalChallenges<TData = Awaited<ReturnType<typeof listLocalChallenges>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLocalChallenges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListLocalChallengesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getJoinLocalChallengeUrl = (id: number,) => {
+
+
+
+
+  return `/api/local-challenges/${id}/join`
+}
+
+/**
+ * @summary Join a local challenge
+ */
+export const joinLocalChallenge = async (id: number, options?: RequestInit): Promise<JoinLocalChallenge200> => {
+
+  return customFetch<JoinLocalChallenge200>(getJoinLocalChallengeUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getJoinLocalChallengeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinLocalChallenge>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof joinLocalChallenge>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['joinLocalChallenge'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof joinLocalChallenge>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  joinLocalChallenge(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type JoinLocalChallengeMutationResult = NonNullable<Awaited<ReturnType<typeof joinLocalChallenge>>>
+
+    export type JoinLocalChallengeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Join a local challenge
+ */
+export const useJoinLocalChallenge = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof joinLocalChallenge>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof joinLocalChallenge>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getJoinLocalChallengeMutationOptions(options));
+    }
+
+export const getGetLocalChallengeLeaderboardUrl = (id: number,) => {
+
+
+
+
+  return `/api/local-challenges/${id}/leaderboard`
+}
+
+/**
+ * @summary Get leaderboard for a specific local challenge
+ */
+export const getLocalChallengeLeaderboard = async (id: number, options?: RequestInit): Promise<LocalChallengeLeaderboardResult> => {
+
+  return customFetch<LocalChallengeLeaderboardResult>(getGetLocalChallengeLeaderboardUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLocalChallengeLeaderboardQueryKey = (id: number,) => {
+    return [
+    `/api/local-challenges/${id}/leaderboard`
+    ] as const;
+    }
+
+
+export const getGetLocalChallengeLeaderboardQueryOptions = <TData = Awaited<ReturnType<typeof getLocalChallengeLeaderboard>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLocalChallengeLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLocalChallengeLeaderboardQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLocalChallengeLeaderboard>>> = ({ signal }) => getLocalChallengeLeaderboard(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLocalChallengeLeaderboard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLocalChallengeLeaderboardQueryResult = NonNullable<Awaited<ReturnType<typeof getLocalChallengeLeaderboard>>>
+export type GetLocalChallengeLeaderboardQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get leaderboard for a specific local challenge
+ */
+
+export function useGetLocalChallengeLeaderboard<TData = Awaited<ReturnType<typeof getLocalChallengeLeaderboard>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLocalChallengeLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLocalChallengeLeaderboardQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 

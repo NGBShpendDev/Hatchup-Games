@@ -24,6 +24,7 @@ import artifactsRouter from "./artifacts";
 import challengesRouter from "./challenges";
 import socialRouter from "./social";
 import accessibilityRouter from "./accessibility";
+import locationsRouter from "./locations";
 
 const router: IRouter = Router();
 
@@ -52,5 +53,6 @@ router.use(artifactsRouter);
 router.use(challengesRouter);
 router.use(socialRouter);
 router.use(accessibilityRouter);
+router.use(locationsRouter);
 
 export default router;

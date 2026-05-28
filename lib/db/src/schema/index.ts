@@ -18,3 +18,4 @@ export * from "./artifacts";
 export * from "./challenges";
 export * from "./social";
 export * from "./family-groups";
+export * from "./locations";

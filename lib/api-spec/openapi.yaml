@@ -2267,6 +2267,126 @@ paths:
                 properties:
                   left: { type: boolean }
 
+  # ── Location & GPS Leaderboard ─────────────────────────────────────────────
+  /players/me/location:
+    post:
+      operationId: updateMyLocation
+      tags: [players]
+      summary: Update the current player's approximate location (derived from GPS or direct fields)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocationUpdateBody"
+      responses:
+        "200":
+          description: Location stored (coordinates never returned)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerLocationRecord"
+    get:
+      operationId: getMyLocation
+      tags: [players]
+      summary: Get the current player's stored location
+      responses:
+        "200":
+          description: Location record or null
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/PlayerLocationRecord"
+                  - type: "null"
+
+  /leaderboards/scoped:
+    get:
+      operationId: getScopedLeaderboard
+      tags: [leaderboards]
+      summary: Get location-scoped leaderboard with configurable metric
+      parameters:
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [world, country, state, county, city]
+            default: world
+        - name: metric
+          in: query
+          schema:
+            type: string
+            enum: [xp, steps, workouts, battle_wins, streaks, artifacts]
+            default: xp
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Scoped leaderboard result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScopedLeaderboardResult"
+
+  /local-challenges:
+    get:
+      operationId: listLocalChallenges
+      tags: [leaderboards]
+      summary: List active local GPS-based challenges visible to the current player
+      responses:
+        "200":
+          description: Active local challenges
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LocalChallenge"
+
+  /local-challenges/{id}/join:
+    post:
+      operationId: joinLocalChallenge
+      tags: [leaderboards]
+      summary: Join a local challenge
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Joined
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  joined:       { type: boolean }
+                  alreadyJoined: { type: boolean }
+
+  /local-challenges/{id}/leaderboard:
+    get:
+      operationId: getLocalChallengeLeaderboard
+      tags: [leaderboards]
+      summary: Get leaderboard for a specific local challenge
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Challenge leaderboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocalChallengeLeaderboardResult"
+
 components:
   schemas:
     HealthStatus:
@@ -3656,3 +3776,120 @@ components:
       properties:
         inviteCode:  { type: string }
         parentalPin: { type: string }
+
+    # ── Location & GPS Leaderboard Schemas ────────────────────────────────────
+    LocationUpdateBody:
+      type: object
+      properties:
+        latitude:     { type: number }
+        longitude:    { type: number }
+        city:         { type: string }
+        state:        { type: string }
+        county:       { type: string }
+        country:      { type: string }
+        countryCode:  { type: string }
+        visibility:
+          type: string
+          enum: [exact, neighborhood, city, hidden]
+
+    PlayerLocationRecord:
+      type: object
+      required: [id, playerId, visibility, updatedAt]
+      properties:
+        id:          { type: integer }
+        playerId:    { type: integer }
+        country:     { type: ["string", "null"] }
+        countryCode: { type: ["string", "null"] }
+        state:       { type: ["string", "null"] }
+        county:      { type: ["string", "null"] }
+        city:        { type: ["string", "null"] }
+        visibility:  { type: string }
+        updatedAt:   { type: string }
+
+    ScopedLeaderboardEntry:
+      type: object
+      required: [position, playerId, username, rank, metricValue, metricLabel, isMe, currentStreak]
+      properties:
+        position:     { type: integer }
+        playerId:     { type: integer }
+        username:     { type: string }
+        displayName:  { type: ["string", "null"] }
+        avatarUrl:    { type: ["string", "null"] }
+        rank:         { type: string }
+        metricValue:  { type: integer }
+        metricLabel:  { type: string }
+        isMe:         { type: boolean }
+        currentStreak: { type: integer }
+
+    ScopedLeaderboardResult:
+      type: object
+      required: [entries, scope, metric, locationRequired]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScopedLeaderboardEntry"
+        myEntry:
+          oneOf:
+            - $ref: "#/components/schemas/ScopedLeaderboardEntry"
+            - type: "null"
+        scope:            { type: string }
+        metric:           { type: string }
+        totalInScope:     { type: integer }
+        locationRequired: { type: boolean }
+        locationContext:
+          type: object
+          nullable: true
+          properties:
+            city:    { type: ["string", "null"] }
+            state:   { type: ["string", "null"] }
+            country: { type: ["string", "null"] }
+
+    LocalChallenge:
+      type: object
+      required: [id, title, scope, scopeValue, metric, targetValue, startAt, endAt, rewardXp, rewardCoins, participantCount, isJoined, isRelevant]
+      properties:
+        id:               { type: integer }
+        title:            { type: string }
+        description:      { type: ["string", "null"] }
+        scope:            { type: string }
+        scopeValue:       { type: string }
+        metric:           { type: string }
+        targetValue:      { type: integer }
+        startAt:          { type: string }
+        endAt:            { type: string }
+        rewardXp:         { type: integer }
+        rewardCoins:      { type: integer }
+        rewardArtifactId: { type: ["integer", "null"] }
+        participantCount: { type: integer }
+        isJoined:         { type: boolean }
+        isRelevant:       { type: boolean }
+
+    LocalChallengeLeaderboardEntry:
+      type: object
+      required: [rank, playerId, username, level, currentValue, isMe]
+      properties:
+        rank:         { type: integer }
+        playerId:     { type: integer }
+        username:     { type: string }
+        displayName:  { type: ["string", "null"] }
+        avatarUrl:    { type: ["string", "null"] }
+        level:        { type: integer }
+        currentValue: { type: integer }
+        completedAt:  { type: ["string", "null"] }
+        isMe:         { type: boolean }
+
+    LocalChallengeLeaderboardResult:
+      type: object
+      required: [challenge, entries]
+      properties:
+        challenge:
+          $ref: "#/components/schemas/LocalChallenge"
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/LocalChallengeLeaderboardEntry"
+        myEntry:
+          oneOf:
+            - $ref: "#/components/schemas/LocalChallengeLeaderboardEntry"
+            - type: "null"

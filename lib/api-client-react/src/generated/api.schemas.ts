@@ -1292,6 +1292,119 @@ export interface JoinFamilyGroupInput {
   parentalPin?: string;
 }
 
+export type LocationUpdateBodyVisibility = typeof LocationUpdateBodyVisibility[keyof typeof LocationUpdateBodyVisibility];
+
+
+export const LocationUpdateBodyVisibility = {
+  exact: 'exact',
+  neighborhood: 'neighborhood',
+  city: 'city',
+  hidden: 'hidden',
+} as const;
+
+export interface LocationUpdateBody {
+  latitude?: number;
+  longitude?: number;
+  city?: string;
+  state?: string;
+  county?: string;
+  country?: string;
+  countryCode?: string;
+  visibility?: LocationUpdateBodyVisibility;
+}
+
+export interface PlayerLocationRecord {
+  id: number;
+  playerId: number;
+  /** @nullable */
+  country?: string | null;
+  /** @nullable */
+  countryCode?: string | null;
+  /** @nullable */
+  state?: string | null;
+  /** @nullable */
+  county?: string | null;
+  /** @nullable */
+  city?: string | null;
+  visibility: string;
+  updatedAt: string;
+}
+
+export interface ScopedLeaderboardEntry {
+  position: number;
+  playerId: number;
+  username: string;
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  avatarUrl?: string | null;
+  rank: string;
+  metricValue: number;
+  metricLabel: string;
+  isMe: boolean;
+  currentStreak: number;
+}
+
+export type ScopedLeaderboardResultLocationContext = {
+  /** @nullable */
+  city?: string | null;
+  /** @nullable */
+  state?: string | null;
+  /** @nullable */
+  country?: string | null;
+} | null;
+
+export interface ScopedLeaderboardResult {
+  entries: ScopedLeaderboardEntry[];
+  myEntry?: ScopedLeaderboardEntry | null;
+  scope: string;
+  metric: string;
+  totalInScope?: number;
+  locationRequired: boolean;
+  locationContext?: ScopedLeaderboardResultLocationContext;
+}
+
+export interface LocalChallenge {
+  id: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  scope: string;
+  scopeValue: string;
+  metric: string;
+  targetValue: number;
+  startAt: string;
+  endAt: string;
+  rewardXp: number;
+  rewardCoins: number;
+  /** @nullable */
+  rewardArtifactId?: number | null;
+  participantCount: number;
+  isJoined: boolean;
+  isRelevant: boolean;
+}
+
+export interface LocalChallengeLeaderboardEntry {
+  rank: number;
+  playerId: number;
+  username: string;
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  avatarUrl?: string | null;
+  level: number;
+  currentValue: number;
+  /** @nullable */
+  completedAt?: string | null;
+  isMe: boolean;
+}
+
+export interface LocalChallengeLeaderboardResult {
+  challenge: LocalChallenge;
+  entries: LocalChallengeLeaderboardEntry[];
+  myEntry?: LocalChallengeLeaderboardEntry | null;
+}
+
 export type ListHatchlingsParams = {
 playerId?: number;
 limit?: number;
@@ -1463,5 +1576,39 @@ export type JoinFamilyGroup200 = {
 
 export type LeaveFamilyGroup200 = {
   left?: boolean;
+};
+
+export type GetScopedLeaderboardParams = {
+scope?: GetScopedLeaderboardScope;
+metric?: GetScopedLeaderboardMetric;
+limit?: number;
+};
+
+export type GetScopedLeaderboardScope = typeof GetScopedLeaderboardScope[keyof typeof GetScopedLeaderboardScope];
+
+
+export const GetScopedLeaderboardScope = {
+  world: 'world',
+  country: 'country',
+  state: 'state',
+  county: 'county',
+  city: 'city',
+} as const;
+
+export type GetScopedLeaderboardMetric = typeof GetScopedLeaderboardMetric[keyof typeof GetScopedLeaderboardMetric];
+
+
+export const GetScopedLeaderboardMetric = {
+  xp: 'xp',
+  steps: 'steps',
+  workouts: 'workouts',
+  battle_wins: 'battle_wins',
+  streaks: 'streaks',
+  artifacts: 'artifacts',
+} as const;
+
+export type JoinLocalChallenge200 = {
+  joined?: boolean;
+  alreadyJoined?: boolean;
 };
 

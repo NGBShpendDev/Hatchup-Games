@@ -2739,3 +2739,182 @@ export const LeaveFamilyGroupParams = zod.object({
 export const LeaveFamilyGroupResponse = zod.object({
   "left": zod.boolean().optional()
 })
+
+
+/**
+ * @summary Update the current player's approximate location (derived from GPS or direct fields)
+ */
+export const UpdateMyLocationBody = zod.object({
+  "latitude": zod.number().optional(),
+  "longitude": zod.number().optional(),
+  "city": zod.string().optional(),
+  "state": zod.string().optional(),
+  "county": zod.string().optional(),
+  "country": zod.string().optional(),
+  "countryCode": zod.string().optional(),
+  "visibility": zod.enum(['exact', 'neighborhood', 'city', 'hidden']).optional()
+})
+
+export const UpdateMyLocationResponse = zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "country": zod.string().nullish(),
+  "countryCode": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "county": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "visibility": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Get the current player's stored location
+ */
+export const GetMyLocationResponse = zod.union([zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "country": zod.string().nullish(),
+  "countryCode": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "county": zod.string().nullish(),
+  "city": zod.string().nullish(),
+  "visibility": zod.string(),
+  "updatedAt": zod.string()
+}),zod.null()])
+
+
+/**
+ * @summary Get location-scoped leaderboard with configurable metric
+ */
+export const getScopedLeaderboardQueryScopeDefault = `world`;
+export const getScopedLeaderboardQueryMetricDefault = `xp`;
+export const getScopedLeaderboardQueryLimitDefault = 20;
+
+export const GetScopedLeaderboardQueryParams = zod.object({
+  "scope": zod.enum(['world', 'country', 'state', 'county', 'city']).default(getScopedLeaderboardQueryScopeDefault),
+  "metric": zod.enum(['xp', 'steps', 'workouts', 'battle_wins', 'streaks', 'artifacts']).default(getScopedLeaderboardQueryMetricDefault),
+  "limit": zod.coerce.number().default(getScopedLeaderboardQueryLimitDefault)
+})
+
+export const GetScopedLeaderboardResponse = zod.object({
+  "entries": zod.array(zod.object({
+  "position": zod.number(),
+  "playerId": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "rank": zod.string(),
+  "metricValue": zod.number(),
+  "metricLabel": zod.string(),
+  "isMe": zod.boolean(),
+  "currentStreak": zod.number()
+})),
+  "myEntry": zod.union([zod.object({
+  "position": zod.number(),
+  "playerId": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "rank": zod.string(),
+  "metricValue": zod.number(),
+  "metricLabel": zod.string(),
+  "isMe": zod.boolean(),
+  "currentStreak": zod.number()
+}),zod.null()]).optional(),
+  "scope": zod.string(),
+  "metric": zod.string(),
+  "totalInScope": zod.number().optional(),
+  "locationRequired": zod.boolean(),
+  "locationContext": zod.object({
+  "city": zod.string().nullish(),
+  "state": zod.string().nullish(),
+  "country": zod.string().nullish()
+}).nullish()
+})
+
+
+/**
+ * @summary List active local GPS-based challenges visible to the current player
+ */
+export const ListLocalChallengesResponseItem = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "scope": zod.string(),
+  "scopeValue": zod.string(),
+  "metric": zod.string(),
+  "targetValue": zod.number(),
+  "startAt": zod.string(),
+  "endAt": zod.string(),
+  "rewardXp": zod.number(),
+  "rewardCoins": zod.number(),
+  "rewardArtifactId": zod.number().nullish(),
+  "participantCount": zod.number(),
+  "isJoined": zod.boolean(),
+  "isRelevant": zod.boolean()
+})
+export const ListLocalChallengesResponse = zod.array(ListLocalChallengesResponseItem)
+
+
+/**
+ * @summary Join a local challenge
+ */
+export const JoinLocalChallengeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const JoinLocalChallengeResponse = zod.object({
+  "joined": zod.boolean().optional(),
+  "alreadyJoined": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Get leaderboard for a specific local challenge
+ */
+export const GetLocalChallengeLeaderboardParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetLocalChallengeLeaderboardResponse = zod.object({
+  "challenge": zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "scope": zod.string(),
+  "scopeValue": zod.string(),
+  "metric": zod.string(),
+  "targetValue": zod.number(),
+  "startAt": zod.string(),
+  "endAt": zod.string(),
+  "rewardXp": zod.number(),
+  "rewardCoins": zod.number(),
+  "rewardArtifactId": zod.number().nullish(),
+  "participantCount": zod.number(),
+  "isJoined": zod.boolean(),
+  "isRelevant": zod.boolean()
+}),
+  "entries": zod.array(zod.object({
+  "rank": zod.number(),
+  "playerId": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "level": zod.number(),
+  "currentValue": zod.number(),
+  "completedAt": zod.string().nullish(),
+  "isMe": zod.boolean()
+})),
+  "myEntry": zod.union([zod.object({
+  "rank": zod.number(),
+  "playerId": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "level": zod.number(),
+  "currentValue": zod.number(),
+  "completedAt": zod.string().nullish(),
+  "isMe": zod.boolean()
+}),zod.null()]).optional()
+})
