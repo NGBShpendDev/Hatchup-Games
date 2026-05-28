@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
-import { useGetPlayerDashboard, getGetPlayerDashboardQueryKey, useLogActivity, useGetSocialFeed, getGetSocialFeedQueryKey, useReactToPost, useAddPostComment } from "@workspace/api-client-react";
+import { useGetPlayerDashboard, getGetPlayerDashboardQueryKey, useLogActivity, useGetSocialFeed, getGetSocialFeedQueryKey, useReactToPost, useAddPostComment, useGetHatchling, getGetHatchlingQueryKey } from "@workspace/api-client-react";
 import type { PostComment, ActivityLogResult, BadgeDefinition, ArtifactUnlock } from "@workspace/api-client-react";
 import { ComposeSheet } from "@/components/compose-sheet";
 import { REACTION_ICONS, CommentRow } from "@/components/post-card";
@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot, Dumbbell, Minus, Plus, Users, MessageCircle, ChevronDown, ChevronUp, Send } from "lucide-react";
+import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot, Dumbbell, Minus, Plus, Users, MessageCircle, ChevronDown, ChevronUp, Send, Heart } from "lucide-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { XpBar } from "@/components/xp-bar";
@@ -30,6 +30,36 @@ import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summar
 import { ErrorCard } from "@/components/error-card";
 import { errorMessage } from "@/lib/errorMessage";
 import { Bot as BotIcon, Salad as SaladIcon, Swords as SwordsIcon, Users as UsersIcon, Trophy as TrophyIcon, Egg as EggLucide } from "lucide-react";
+
+import lavaDragonImg from "@/assets/images/lava-dragon.png";
+import cyberCreatureImg from "@/assets/images/cyber-creature.png";
+import shadowBeastImg from "@/assets/images/shadow-beast.png";
+import candyMonsterImg from "@/assets/images/candy-monster.png";
+import cosmicEntityImg from "@/assets/images/cosmic-entity.png";
+import crystalGuardianImg from "@/assets/images/crystal-guardian.png";
+
+function getPartnerFallbackImage(realm?: string | null, category?: string | null): string {
+  const key = (realm ?? category ?? "").toLowerCase();
+  switch (key) {
+    case "strength": case "dragons": return lavaDragonImg;
+    case "cardio": case "cyber": return cyberCreatureImg;
+    case "beast": case "shadow": return shadowBeastImg;
+    case "candy": return candyMonsterImg;
+    case "mythic": case "cosmic": return cosmicEntityImg;
+    case "balance": case "crystal": return crystalGuardianImg;
+    default: return lavaDragonImg;
+  }
+}
+
+const PARTNER_MOOD_EMOJI: Record<string, string> = {
+  celebrating: "✨",
+  happy: "😊",
+  content: "🙂",
+  hungry: "🍖",
+  tired: "😴",
+  resting: "💤",
+  sad: "😢",
+};
 
 const OVERLAY_RARITIES = new Set(["Legendary", "Mythic", "Ancient", "Celestial"]);
 const FITNESS_BAR_MILESTONES = new Set([10, 25, 50]);
@@ -82,8 +112,15 @@ const REP_TYPE_LABELS: Record<string, string> = {
 export default function Home() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { playerId } = usePlayer();
+  const { playerId, player } = usePlayer();
   const pid = playerId ?? 0;
+  const activeHatchlingId = player?.activeHatchlingId ?? null;
+  const { data: activePartner } = useGetHatchling(activeHatchlingId ?? 0, {
+    query: {
+      queryKey: getGetHatchlingQueryKey(activeHatchlingId ?? 0),
+      enabled: !!activeHatchlingId,
+    },
+  });
 
   const { data: dashboard, isLoading, isError: isDashboardError, refetch: refetchDashboard } = useGetPlayerDashboard(pid, {
     query: { queryKey: getGetPlayerDashboardQueryKey(pid), enabled: !!playerId }
@@ -422,6 +459,93 @@ export default function Home() {
           xpForNextLevel={levelProgress.xpForNextLevel}
           prestige={prestige}
         />
+
+        {/* Active Partner */}
+        {activeHatchlingId && activePartner ? (
+          <Link href={`/hatchlings/${activePartner.id}`}>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileHover={{ scale: 1.01 }}
+              className="flex items-center gap-4 bg-gradient-to-r from-yellow-500/10 via-pink-500/10 to-transparent border-2 border-yellow-400/40 rounded-2xl p-3 cursor-pointer active:scale-[0.98] transition-transform shadow-[0_0_18px_rgba(234,179,8,0.12)]"
+              data-testid="home-active-partner-card"
+            >
+              <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-black/30 border border-yellow-400/30 flex-shrink-0">
+                <motion.img
+                  src={activePartner.imageUrl || getPartnerFallbackImage(activePartner.realm, activePartner.category)}
+                  alt={activePartner.name}
+                  className="w-full h-full object-contain p-1"
+                  animate={{ y: [0, -3, 0] }}
+                  transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                />
+                <div className="absolute bottom-0.5 right-0.5 text-[10px] font-black bg-background/80 backdrop-blur px-1 rounded">
+                  Lv.{activePartner.level}
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                  <span className="text-[9px] font-black uppercase tracking-widest text-yellow-400">Active Partner</span>
+                </div>
+                <h3 className="font-black text-base leading-tight truncate">
+                  {activePartner.name}{" "}
+                  <span className="text-sm">{PARTNER_MOOD_EMOJI[activePartner.moodState ?? activePartner.mood] ?? "🙂"}</span>
+                </h3>
+                <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                  <div className="space-y-0.5">
+                    <div className="flex justify-between text-[9px] font-bold">
+                      <span className="text-green-400 flex items-center gap-0.5"><Heart className="w-2 h-2" />Happy</span>
+                      <span className="text-muted-foreground">{activePartner.happiness}</span>
+                    </div>
+                    <div className="h-1 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-green-500 rounded-full" style={{ width: `${activePartner.happiness}%` }} />
+                    </div>
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="flex justify-between text-[9px] font-bold">
+                      <span className="text-orange-400">Hunger</span>
+                      <span className="text-muted-foreground">{activePartner.hunger}</span>
+                    </div>
+                    <div className="h-1 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-orange-500 rounded-full" style={{ width: `${activePartner.hunger}%` }} />
+                    </div>
+                  </div>
+                  <div className="space-y-0.5">
+                    <div className="flex justify-between text-[9px] font-bold">
+                      <span className="text-blue-400 flex items-center gap-0.5"><Zap className="w-2 h-2" />Energy</span>
+                      <span className="text-muted-foreground">{activePartner.energy}</span>
+                    </div>
+                    <div className="h-1 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full" style={{ width: `${activePartner.energy}%` }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col items-center gap-1 text-yellow-400">
+                <Dumbbell className="w-4 h-4" />
+                <ChevronRight className="w-4 h-4" />
+              </div>
+            </motion.div>
+          </Link>
+        ) : !activeHatchlingId ? (
+          <Link href="/hatchlings">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-3 bg-gradient-to-r from-primary/15 to-purple-600/10 border-2 border-dashed border-primary/40 rounded-2xl p-4 cursor-pointer active:scale-[0.98] transition-transform"
+              data-testid="home-active-partner-cta"
+            >
+              <div className="text-3xl">🥚</div>
+              <div className="flex-1">
+                <p className="font-black text-sm text-primary">Choose your active partner</p>
+                <p className="text-xs text-muted-foreground font-bold">
+                  Bond with a Hatchling to power them up with your workouts.
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-primary" />
+            </motion.div>
+          </Link>
+        ) : null}
 
         {/* Hero Card */}
         <motion.div
