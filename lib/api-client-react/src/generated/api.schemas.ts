@@ -3353,6 +3353,14 @@ q: string;
 limit?: number;
 };
 
+export type ListInviteSuggestionsParams = {
+/**
+ * @minimum 1
+ * @maximum 50
+ */
+limit?: number;
+};
+
 export type ListNearbyPlayersParams = {
 /**
  * @minimum 1

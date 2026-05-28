@@ -136,6 +136,50 @@ export const SearchPlayersResponse = zod.array(SearchPlayersResponseItem)
 
 
 /**
+ * Returns a default list of players the viewer is likely to want to invite
+to a challenge BEFORE they type a search query. Combines (in priority
+order):
+  1. Recent invitees — players the viewer has previously invited to any
+     challenge (most recent first).
+  2. Players the viewer follows.
+  3. Shared-group members (other people in the viewer's groups).
+Applies the canonical people-discovery exclusion rule (blocked /
+hidden-visibility / minor accounts). May return an empty list for
+brand-new accounts with no follows, no past invites, and no groups.
+
+ * @summary Suggested players for the Invite Friends sheet
+ */
+export const listInviteSuggestionsQueryLimitDefault = 20;
+export const listInviteSuggestionsQueryLimitMax = 50;
+
+
+
+export const ListInviteSuggestionsQueryParams = zod.object({
+  "limit": zod.coerce.number().min(1).max(listInviteSuggestionsQueryLimitMax).default(listInviteSuggestionsQueryLimitDefault)
+})
+
+export const ListInviteSuggestionsResponseItem = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable(),
+  "sharedGroups": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string()
+})).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n'),
+  "mutualWorkoutPartners": zod.array(zod.object({
+  "id": zod.number(),
+  "displayName": zod.string(),
+  "username": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
+})).optional().describe('Up to a small number of third players who have actually worked out\n(logged a co-workout in a shared group) with BOTH the viewer and\nthis player. Optional — only populated on people-discovery surfaces\n(invite picker, social search, followers, following). Strengthens\nthe trust signal beyond raw shared-group overlap: \"you\'ve both\nsweated with X\" is a stronger reason to trust an unfamiliar profile.\n')
+})
+export const ListInviteSuggestionsResponse = zod.array(ListInviteSuggestionsResponseItem)
+
+
+/**
  * Returns players in the viewer's city (the "nearby" geographic scope),
 excluding the viewer, blocked users (in either direction), minors, and
 anyone whose locationVisibility is `hidden`. Each entry carries a

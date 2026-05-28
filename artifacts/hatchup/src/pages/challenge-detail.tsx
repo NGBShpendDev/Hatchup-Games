@@ -11,6 +11,8 @@ import {
   useInviteToChallenge,
   useSearchPlayers,
   getSearchPlayersQueryKey,
+  useListInviteSuggestions,
+  getListInviteSuggestionsQueryKey,
   useCreatePost,
   type PlayerStub,
 } from "@workspace/api-client-react";
@@ -118,6 +120,20 @@ export default function ChallengeDetail() {
       query: {
         queryKey: getSearchPlayersQueryKey(searchParams),
         enabled: inviteOpen && debouncedSearch.length > 0,
+      },
+    }
+  );
+
+  // Default list shown before the creator types anything — recent invitees,
+  // people they follow, and shared-group members. Lazy: only fetched once
+  // the sheet is opened.
+  const suggestionsParams = { limit: 20 };
+  const { data: suggestions, isLoading: suggestionsLoading } = useListInviteSuggestions(
+    suggestionsParams,
+    {
+      query: {
+        queryKey: getListInviteSuggestionsQueryKey(suggestionsParams),
+        enabled: inviteOpen,
       },
     }
   );
@@ -304,10 +320,13 @@ export default function ChallengeDetail() {
   const isCompleted = rich.status === "completed";
   const isExpired = new Date(rich.endAt) < new Date();
   const isCreator = !!player && rich.creatorId === player.id;
-  const inviteResults: PlayerStub[] = (searchResults ?? []).filter((p) => p.id !== player?.id);
-  const searchIsLoading = (searchLoading || searchFetching) && debouncedSearch.length > 0;
   const hasTypedQuery = inviteSearch.trim().length > 0;
+  const suggestionList: PlayerStub[] = (suggestions ?? []).filter((p) => p.id !== player?.id);
+  const searchList: PlayerStub[] = (searchResults ?? []).filter((p) => p.id !== player?.id);
+  const inviteResults: PlayerStub[] = hasTypedQuery ? searchList : suggestionList;
+  const searchIsLoading = (searchLoading || searchFetching) && debouncedSearch.length > 0;
   const queryStillDebouncing = hasTypedQuery && debouncedSearch !== inviteSearch.trim();
+  const suggestionsAreLoading = !hasTypedQuery && suggestionsLoading;
   const leaderboard: LeaderboardEntry[] = rich.leaderboard ?? [];
   const myEntry = leaderboard.find(e => e.playerId === player?.id);
   const targetValue = rich.targetValue;
@@ -961,7 +980,9 @@ export default function ChallengeDetail() {
               <UserPlus className="w-5 h-5 text-primary" /> Invite Friends
             </SheetTitle>
             <SheetDescription>
-              Search for anyone to invite to "{challenge.title}".
+              {hasTypedQuery
+                ? `Search results for "${inviteSearch.trim()}".`
+                : `Suggested players to invite to "${challenge.title}".`}
             </SheetDescription>
           </SheetHeader>
 
@@ -976,23 +997,34 @@ export default function ChallengeDetail() {
           </div>
 
           <ScrollArea className="flex-1 mt-3 px-4 pb-4">
-            {!hasTypedQuery ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <Search className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p className="font-bold">Search for players to invite</p>
-                <p className="text-xs mt-1">Type a name or username to get started.</p>
-              </div>
-            ) : searchIsLoading || queryStillDebouncing ? (
+            {suggestionsAreLoading || searchIsLoading || queryStillDebouncing ? (
               <div className="space-y-2 py-2">
                 {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}
               </div>
             ) : inviteResults.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p className="font-bold">No matches</p>
-                <p className="text-xs mt-1">Try a different name or username.</p>
-              </div>
+              hasTypedQuery ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                  <p className="font-bold">No matches</p>
+                  <p className="text-xs mt-1">Try a different name or username.</p>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Search className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                  <p className="font-bold">No suggestions yet</p>
+                  <p className="text-xs mt-1">Type a name or username to find friends to invite.</p>
+                </div>
+              )
             ) : (
+              <>
+                {!hasTypedQuery && (
+                  <p
+                    className="text-[10px] uppercase tracking-wider font-black text-muted-foreground px-1 pt-2"
+                    data-testid="invite-suggestions-header"
+                  >
+                    Suggested for you
+                  </p>
+                )}
               <div className="space-y-2 py-2">
                 {inviteResults.map((p) => {
                   const invited = invitedIds.has(p.id);
@@ -1065,6 +1097,7 @@ export default function ChallengeDetail() {
                   );
                 })}
               </div>
+              </>
             )}
           </ScrollArea>
         </SheetContent>

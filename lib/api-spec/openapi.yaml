@@ -224,6 +224,40 @@ paths:
                 items:
                   $ref: "#/components/schemas/PlayerStub"
 
+  /players/invite-suggestions:
+    get:
+      operationId: listInviteSuggestions
+      tags: [players]
+      summary: Suggested players for the Invite Friends sheet
+      description: |
+        Returns a default list of players the viewer is likely to want to invite
+        to a challenge BEFORE they type a search query. Combines (in priority
+        order):
+          1. Recent invitees — players the viewer has previously invited to any
+             challenge (most recent first).
+          2. Players the viewer follows.
+          3. Shared-group members (other people in the viewer's groups).
+        Applies the canonical people-discovery exclusion rule (blocked /
+        hidden-visibility / minor accounts). May return an empty list for
+        brand-new accounts with no follows, no past invites, and no groups.
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: Suggested players
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlayerStub"
+
   /players/nearby:
     get:
       operationId: listNearbyPlayers

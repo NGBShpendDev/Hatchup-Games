@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { createDecipheriv, createHash } from "crypto";
 import { db } from "@workspace/db";
-import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable, eggsTable, fitnessActivitiesTable, playerBadgesTable, playerArtifactsTable, artifactsTable, playerLocationTable, groupMembersTable, groupsTable } from "@workspace/db";
+import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable, eggsTable, fitnessActivitiesTable, playerBadgesTable, playerArtifactsTable, artifactsTable, playerLocationTable, groupMembersTable, groupsTable, challengeInvitesTable, playerFollowsTable } from "@workspace/db";
 import { eq, desc, and, gte, or, ilike, ne, inArray } from "drizzle-orm";
 import { filterDiscoverableCandidates, getHiddenPlayerIds } from "./safety.ts";
 import {
@@ -166,6 +166,135 @@ router.get("/players/search", requireAuth, attachPlayer, async (req, res) => {
   }
 
   res.json(rows.map(p => ({
+    id: p.id,
+    username: p.username,
+    displayName: p.displayName ?? null,
+    avatarUrl: p.avatarUrl ?? null,
+    creatorBadge: p.creatorBadge ?? null,
+    sharedGroups: sharedGroupsByPlayer.get(p.id) ?? [],
+    mutualWorkoutPartners: mutualWorkoutPartnersByPlayer.get(p.id) ?? [],
+  })));
+});
+
+// GET /players/invite-suggestions — default list for the Invite Friends sheet
+// before the creator types anything. Combines recent invitees, followed
+// players, and shared-group cohort, then enriches with sharedGroups and
+// mutualWorkoutPartners so each row carries the same trust signals as the
+// search results.
+router.get("/players/invite-suggestions", requireAuth, attachPlayer, async (req, res) => {
+  const viewerId = req.playerId!;
+  const rawLimit = Number(req.query.limit);
+  const limit = Math.min(50, Math.max(1, Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : 20));
+
+  // Pull all three source pools in parallel. Each is capped so we still get a
+  // reasonable candidate window after the privacy filter and ranking pass.
+  const [recentInvites, follows, viewerMemberships] = await Promise.all([
+    db.query.challengeInvitesTable.findMany({
+      where: eq(challengeInvitesTable.inviterId, viewerId),
+      orderBy: [desc(challengeInvitesTable.sentAt)],
+      limit: 100,
+    }),
+    db.query.playerFollowsTable.findMany({
+      where: eq(playerFollowsTable.followerId, viewerId),
+      orderBy: [desc(playerFollowsTable.createdAt)],
+      limit: 100,
+    }),
+    db.query.groupMembersTable.findMany({
+      where: eq(groupMembersTable.playerId, viewerId),
+    }),
+  ]);
+
+  type Candidate = { id: number; weight: number; order: number };
+  const candidates = new Map<number, Candidate>();
+  let orderCounter = 0;
+  const consider = (id: number, weight: number) => {
+    if (id === viewerId) return;
+    const existing = candidates.get(id);
+    if (!existing || existing.weight < weight) {
+      candidates.set(id, { id, weight, order: existing?.order ?? orderCounter++ });
+    }
+  };
+
+  // 1. Recent invitees — strongest signal, the creator has actively chosen
+  //    these players before.
+  for (const inv of recentInvites) consider(inv.inviteeId, 100);
+
+  // 2. People the viewer follows.
+  for (const f of follows) consider(f.followeeId, 70);
+
+  // 3. Shared-group cohort.
+  const viewerGroupIds = viewerMemberships.map(m => m.groupId);
+  if (viewerGroupIds.length > 0) {
+    const sharedMembers = await db.query.groupMembersTable.findMany({
+      where: and(
+        inArray(groupMembersTable.groupId, viewerGroupIds),
+        ne(groupMembersTable.playerId, viewerId),
+      ),
+      limit: 200,
+    });
+    for (const m of sharedMembers) consider(m.playerId, 40);
+  }
+
+  if (candidates.size === 0) {
+    res.json([]);
+    return;
+  }
+
+  const candidateIds = Array.from(candidates.keys());
+  const candidatePlayers = await db.query.playersTable.findMany({
+    where: inArray(playersTable.id, candidateIds),
+  });
+
+  // Canonical people-discovery exclusion (blocked / hidden / minor accounts).
+  const allowed = await filterDiscoverableCandidates(viewerId, candidatePlayers);
+
+  // Rank by source priority, then by recency-of-add order within the same
+  // weight tier (recent invites stay newest-first).
+  const ranked = allowed
+    .map(p => ({ player: p, c: candidates.get(p.id)! }))
+    .sort((a, b) => b.c.weight - a.c.weight || a.c.order - b.c.order)
+    .slice(0, limit)
+    .map(r => r.player);
+
+  if (ranked.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  // Enrich with shared groups + mutual workout partners — same trust signals
+  // used by /players/search so the picker rows look identical.
+  const rankedIds = ranked.map(p => p.id);
+  const sharedGroupsByPlayer = new Map<number, Array<{ id: number; name: string }>>();
+  const mutualWorkoutPartnersByPlayer = new Map<number, MutualWorkoutPartner[]>();
+
+  if (viewerGroupIds.length > 0) {
+    const matchMemberships = await db.query.groupMembersTable.findMany({
+      where: and(
+        inArray(groupMembersTable.playerId, rankedIds),
+        inArray(groupMembersTable.groupId, viewerGroupIds),
+      ),
+    });
+    if (matchMemberships.length > 0) {
+      const referencedGroupIds = Array.from(new Set(matchMemberships.map(m => m.groupId)));
+      const groupRows = await db.query.groupsTable.findMany({
+        where: inArray(groupsTable.id, referencedGroupIds),
+      });
+      const groupNameMap = new Map(groupRows.map(g => [g.id, g.name]));
+      for (const m of matchMemberships) {
+        const name = groupNameMap.get(m.groupId);
+        if (!name) continue;
+        const list = sharedGroupsByPlayer.get(m.playerId) ?? [];
+        list.push({ id: m.groupId, name });
+        sharedGroupsByPlayer.set(m.playerId, list);
+      }
+    }
+  }
+
+  const hiddenIds = await getHiddenPlayerIds(viewerId);
+  const grouped = await loadMutualWorkoutPartnersForViewer(viewerId, rankedIds, hiddenIds);
+  for (const [k, v] of grouped) mutualWorkoutPartnersByPlayer.set(k, v);
+
+  res.json(ranked.map(p => ({
     id: p.id,
     username: p.username,
     displayName: p.displayName ?? null,

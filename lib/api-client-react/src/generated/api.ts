@@ -159,6 +159,7 @@ import type {
   ListFollowingParams,
   ListHatchlingsParams,
   ListIdentityPaths200,
+  ListInviteSuggestionsParams,
   ListItemsParams,
   ListMutualFollowersParams,
   ListMutualFollowingParams,
@@ -803,6 +804,101 @@ export function useSearchPlayers<TData = Awaited<ReturnType<typeof searchPlayers
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getSearchPlayersQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListInviteSuggestionsUrl = (params?: ListInviteSuggestionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/players/invite-suggestions?${stringifiedParams}` : `/api/players/invite-suggestions`
+}
+
+/**
+ * Returns a default list of players the viewer is likely to want to invite
+to a challenge BEFORE they type a search query. Combines (in priority
+order):
+  1. Recent invitees — players the viewer has previously invited to any
+     challenge (most recent first).
+  2. Players the viewer follows.
+  3. Shared-group members (other people in the viewer's groups).
+Applies the canonical people-discovery exclusion rule (blocked /
+hidden-visibility / minor accounts). May return an empty list for
+brand-new accounts with no follows, no past invites, and no groups.
+
+ * @summary Suggested players for the Invite Friends sheet
+ */
+export const listInviteSuggestions = async (params?: ListInviteSuggestionsParams, options?: RequestInit): Promise<PlayerStub[]> => {
+
+  return customFetch<PlayerStub[]>(getListInviteSuggestionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListInviteSuggestionsQueryKey = (params?: ListInviteSuggestionsParams,) => {
+    return [
+    `/api/players/invite-suggestions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListInviteSuggestionsQueryOptions = <TData = Awaited<ReturnType<typeof listInviteSuggestions>>, TError = ErrorType<unknown>>(params?: ListInviteSuggestionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInviteSuggestions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListInviteSuggestionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listInviteSuggestions>>> = ({ signal }) => listInviteSuggestions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listInviteSuggestions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListInviteSuggestionsQueryResult = NonNullable<Awaited<ReturnType<typeof listInviteSuggestions>>>
+export type ListInviteSuggestionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Suggested players for the Invite Friends sheet
+ */
+
+export function useListInviteSuggestions<TData = Awaited<ReturnType<typeof listInviteSuggestions>>, TError = ErrorType<unknown>>(
+ params?: ListInviteSuggestionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listInviteSuggestions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListInviteSuggestionsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
