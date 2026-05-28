@@ -7,6 +7,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -69,6 +70,14 @@ export default function ProfileScreen() {
   const { data: player, isLoading } = useGetPlayer(PLAYER_ID);
   const { data: fitnessStats } = useGetFitnessStats(PLAYER_ID);
 
+  async function handleShare() {
+    if (!player?.username) return;
+    const domain = process.env.EXPO_PUBLIC_DOMAIN;
+    if (!domain) return;
+    const url = `https://${domain}/player/${encodeURIComponent(player.username)}`;
+    await Share.share({ message: `Check out ${player.username}'s HatchUp profile! ${url}`, url });
+  }
+
   const rankLabel = player?.rank ?? "Unranked";
   const rankColor = Object.entries(RANK_COLORS).find(([key]) => rankLabel.includes(key))?.[1] ?? colors.mutedForeground;
 
@@ -125,6 +134,18 @@ export default function ProfileScreen() {
             </React.Fragment>
           ))}
         </View>
+
+        {/* Share button — only visible once real player data is available */}
+        {!isLoading && player?.username && (
+          <Pressable
+            onPress={handleShare}
+            style={[styles.shareBtn, { borderColor: colors.primary }]}
+            testID="button-share-profile"
+          >
+            <Feather name="share-2" size={14} color={colors.primary} />
+            <Text style={[styles.shareBtnText, { color: colors.primary }]}>Share Profile</Text>
+          </Pressable>
+        )}
       </View>
 
       {/* Menu */}
@@ -170,4 +191,6 @@ const styles = StyleSheet.create({
   menuIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   menuLabel: { flex: 1, fontSize: 14, fontWeight: "600" },
   joinedAt: { textAlign: "center", fontSize: 12, marginTop: 16 },
+  shareBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 14, paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5 },
+  shareBtnText: { fontSize: 13, fontWeight: "700" },
 });

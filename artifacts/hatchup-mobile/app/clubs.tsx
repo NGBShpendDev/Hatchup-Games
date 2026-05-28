@@ -106,7 +106,10 @@ export default function ClubsScreen() {
                   </Text>
                 )}
               </View>
-              <Pressable style={[styles.viewBtn, { borderColor: colors.primary }]}>
+              <Pressable
+                onPress={() => router.push(`/club/${club.id}` as any)}
+                style={[styles.viewBtn, { borderColor: colors.primary }]}
+              >
                 <Text style={[styles.viewBtnText, { color: colors.primary }]}>View</Text>
               </Pressable>
             </View>
