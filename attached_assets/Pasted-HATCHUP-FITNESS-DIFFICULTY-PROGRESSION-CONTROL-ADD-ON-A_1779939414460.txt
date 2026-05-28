@@ -1,0 +1,177 @@
+HATCHUP FITNESS DIFFICULTY & PROGRESSION CONTROL ADD-ON
+
+Add a customizable progression difficulty system to HatchUp Fitness Pals that allows users to choose their own fitness level and progression speed.
+
+The system should make users feel:
+- in control
+- motivated
+- challenged
+- rewarded
+- never overwhelmed
+
+Users should be able to change difficulty levels as they improve throughout their fitness journey.
+
+====================================
+CHOOSE YOUR FITNESS PATH
+====================================
+
+When starting the app, users choose a fitness difficulty level.
+
+Difficulty affects:
+- how fast eggs hatch
+- XP gain
+- workout requirements
+- challenge intensity
+- evolution speed
+- reward rarity
+
+Users can change difficulty levels anytime as they progress.
+
+====================================
+DIFFICULTY TIERS
+====================================
+
+1. BEGINNER MODE
+Perfect for:
+- new fitness users
+- kids
+- recovery users
+- casual players
+
+Examples:
+- 3,000–5,000 daily steps
+- 20–50 pushups
+- 20–50 squats
+- beginner workouts
+- short wellness sessions
+
+Rewards:
+- faster early progression
+- confidence-building achievements
+- more encouragement
+- easier streak maintenance
+
+2. INTERMEDIATE MODE
+Perfect for:
+- consistent gym users
+- active people
+- moderate athletes
+
+Examples:
+- 7,500–10,000 steps
+- 100 pushups
+- 100 squats
+- cardio goals
+- strength workouts
+
+Rewards:
+- balanced progression
+- higher XP
+- better egg rarity chances
+- stronger evolutions
+
+3. ADVANCED MODE
+Perfect for:
+- experienced athletes
+- hardcore gym users
+- competitive players
+
+Examples:
+- 15,000+ steps
+- 250–500 pushups
+- endurance events
+- elite workout challenges
+- heavy strength training
+
+Rewards:
+- bonus XP multipliers
+- legendary egg chances
+- elite cosmetics
+- prestige rankings
+- exclusive evolutions
+
+4. LEGEND MODE
+Optional ultra-hardcore mode.
+
+Examples:
+- marathon challenges
+- elite streak goals
+- advanced strength targets
+- multi-session workouts
+
+Rewards:
+- mythic creatures
+- global rankings
+- ultra rare cosmetics
+- legendary titles
+- exclusive aura effects
+
+====================================
+SMART AI PROGRESSION SYSTEM
+====================================
+
+The AI should:
+- recommend difficulty levels
+- analyze consistency
+- prevent burnout
+- suggest upgrades when users improve
+- suggest lowering difficulty if struggling
+
+The system should always encourage:
+- consistency
+- healthy progress
+- long-term fitness habits
+
+====================================
+FLEXIBLE LEVEL SWITCHING
+====================================
+
+Users can:
+- upgrade difficulty anytime
+- downgrade temporarily if injured or busy
+- switch based on goals
+- experiment with different challenge paths
+
+Examples:
+- beginner to intermediate
+- strength path to cardio path
+- casual mode during vacations
+- hardcore mode during transformation challenges
+
+====================================
+REWARD BALANCING
+====================================
+
+Higher difficulties should provide:
+- faster leveling
+- rarer rewards
+- bonus XP
+- prestige recognition
+- exclusive evolutions
+
+Lower difficulties should provide:
+- more accessible progression
+- motivation
+- emotional encouragement
+- easier streak protection
+
+The system should NEVER shame users for lower difficulty choices.
+
+====================================
+EMOTIONAL PROGRESSION DESIGN
+====================================
+
+Changing difficulty levels should feel like:
+- leveling up in life
+- becoming stronger
+- entering a new training arc
+- evolving as a person
+
+Include:
+- cinematic transitions
+- new aura effects
+- level-up ceremonies
+- unlock animations
+- mentor-style AI encouragement
+
+The goal is to make every user feel successful regardless of fitness level while still giving elite users deep competitive progression systems.

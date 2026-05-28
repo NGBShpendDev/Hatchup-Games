@@ -2,30 +2,18 @@ import { useState } from "react";
 import { Layout } from "@/components/layout";
 import {
   useGetGlobalLeaderboard, getGetGlobalLeaderboardQueryKey,
+  SpeedLeaderboardEntry,
 } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
-import { Trophy, Zap, Footprints, Dumbbell, Timer } from "lucide-react";
+import { Trophy, Zap, Footprints, Timer } from "lucide-react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { usePlayer } from "@/lib/playerContext";
 
 type TabKey = "global" | "speed";
 type SpeedMode = "steps" | "pace";
-
-interface SpeedEntry {
-  position: number;
-  playerId: number;
-  username: string;
-  displayName: string | null;
-  avatarUrl: string | null;
-  rank: string;
-  metricValue: number;
-  metricLabel: string;
-  currentStreak: number;
-  achievedAt: string;
-}
 
 export default function Leaderboard() {
   const { playerId } = usePlayer();
@@ -39,7 +27,7 @@ export default function Leaderboard() {
 
   const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
-  const { data: speedBoard, isLoading: speedLoading } = useQuery<SpeedEntry[]>({
+  const { data: speedBoard, isLoading: speedLoading } = useQuery<SpeedLeaderboardEntry[]>({
     queryKey: ["leaderboard-speed", speedMode],
     queryFn: async () => {
       const res = await fetch(`${basePath}/api/leaderboards/speed?mode=${speedMode}&limit=25`, { credentials: "include" });

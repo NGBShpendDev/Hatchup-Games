@@ -1630,18 +1630,18 @@ components:
     # ── Leaderboard ──────────────────────────────────────────────────────────
     LeaderboardEntry:
       type: object
-      required: [rank, playerId, username, score, level]
+      required: [position, playerId, username, rank, score]
       properties:
-        rank:        { type: integer }
-        playerId:    { type: integer }
-        username:    { type: string }
-        displayName: { type: ["string", "null"] }
-        score:       { type: integer }
-        level:       { type: integer }
-        wins:        { type: integer }
-        hatchlingCount: { type: integer }
-        topHatchlingName: { type: ["string", "null"] }
-        currentStreak: { type: integer }
+        position:         { type: integer }
+        playerId:         { type: integer }
+        username:         { type: string }
+        displayName:      { type: string, nullable: true }
+        avatarUrl:        { type: string, nullable: true }
+        rank:             { type: string }
+        score:            { type: integer }
+        wins:             { type: integer }
+        hatchlingName:    { type: string, nullable: true }
+        hatchlingCategory: { type: string, nullable: true }
 
     RankDistribution:
       type: object
@@ -2246,7 +2246,7 @@ components:
 
     SpeedLeaderboardEntry:
       type: object
-      required: [position, playerId, username, rank, totalSteps, totalReps, currentStreak]
+      required: [position, playerId, username, rank, metricValue, metricLabel, currentStreak]
       properties:
         position:      { type: integer }
         playerId:      { type: integer }
@@ -2254,9 +2254,10 @@ components:
         displayName:   { type: string, nullable: true }
         avatarUrl:     { type: string, nullable: true }
         rank:          { type: string }
-        totalSteps:    { type: integer }
-        totalReps:     { type: integer }
+        metricValue:   { type: integer }
+        metricLabel:   { type: string }
         currentStreak: { type: integer }
+        achievedAt:    { type: string }
 
     CoachChatMessage:
       type: object

@@ -297,18 +297,16 @@ export interface GameMode {
 }
 
 export interface LeaderboardEntry {
-  rank: number;
+  position: number;
   playerId: number;
   username: string;
-  /** @nullable */
   displayName?: string | null;
+  avatarUrl?: string | null;
+  rank: string;
   score: number;
-  level: number;
   wins?: number;
-  hatchlingCount?: number;
-  /** @nullable */
-  topHatchlingName?: string | null;
-  currentStreak?: number;
+  hatchlingName?: string | null;
+  hatchlingCategory?: string | null;
 }
 
 export interface RankDistribution {
@@ -745,9 +743,10 @@ export interface SpeedLeaderboardEntry {
   displayName?: string | null;
   avatarUrl?: string | null;
   rank: string;
-  totalSteps: number;
-  totalReps: number;
+  metricValue: number;
+  metricLabel: string;
   currentStreak: number;
+  achievedAt?: string;
 }
 
 export type CoachChatMessageRole = typeof CoachChatMessageRole[keyof typeof CoachChatMessageRole];

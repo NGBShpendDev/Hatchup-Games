@@ -713,16 +713,16 @@ export const GetGlobalLeaderboardQueryParams = zod.object({
 })
 
 export const GetGlobalLeaderboardResponseItem = zod.object({
-  "rank": zod.number(),
+  "position": zod.number(),
   "playerId": zod.number(),
   "username": zod.string(),
   "displayName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "rank": zod.string(),
   "score": zod.number(),
-  "level": zod.number(),
   "wins": zod.number().optional(),
-  "hatchlingCount": zod.number().optional(),
-  "topHatchlingName": zod.string().nullish(),
-  "currentStreak": zod.number().optional()
+  "hatchlingName": zod.string().nullish(),
+  "hatchlingCategory": zod.string().nullish()
 })
 export const GetGlobalLeaderboardResponse = zod.array(GetGlobalLeaderboardResponseItem)
 
@@ -738,16 +738,16 @@ export const GetModeLeaderboardQueryParams = zod.object({
 })
 
 export const GetModeLeaderboardResponseItem = zod.object({
-  "rank": zod.number(),
+  "position": zod.number(),
   "playerId": zod.number(),
   "username": zod.string(),
   "displayName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "rank": zod.string(),
   "score": zod.number(),
-  "level": zod.number(),
   "wins": zod.number().optional(),
-  "hatchlingCount": zod.number().optional(),
-  "topHatchlingName": zod.string().nullish(),
-  "currentStreak": zod.number().optional()
+  "hatchlingName": zod.string().nullish(),
+  "hatchlingCategory": zod.string().nullish()
 })
 export const GetModeLeaderboardResponse = zod.array(GetModeLeaderboardResponseItem)
 
@@ -768,9 +768,10 @@ export const GetSpeedLeaderboardResponseItem = zod.object({
   "displayName": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
   "rank": zod.string(),
-  "totalSteps": zod.number(),
-  "totalReps": zod.number(),
-  "currentStreak": zod.number()
+  "metricValue": zod.number(),
+  "metricLabel": zod.string(),
+  "currentStreak": zod.number(),
+  "achievedAt": zod.string().optional()
 })
 export const GetSpeedLeaderboardResponse = zod.array(GetSpeedLeaderboardResponseItem)
 
