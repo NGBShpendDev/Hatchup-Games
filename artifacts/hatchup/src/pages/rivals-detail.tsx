@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ErrorCard } from "@/components/error-card";
-import { ArrowLeft, Swords, Flame, Crown, Trophy, TrendingUp, TrendingDown, Zap, Sparkles } from "lucide-react";
+import { ArrowLeft, Swords, Flame, Crown, Trophy, TrendingUp, TrendingDown, Zap, Sparkles, Star } from "lucide-react";
+import { rankHatchlingsForRematch } from "@/lib/rematchSuggestions";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -465,21 +466,49 @@ export default function RivalsDetail() {
                 You need a Hatchling first.
               </p>
             ) : (
-              myHatchlings.map(h => (
-                <button
-                  key={h.id}
-                  disabled={sending}
-                  onClick={() => sendRematch(h.id)}
-                  className="w-full flex items-center justify-between gap-3 rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left hover:border-primary/50 hover:bg-primary/5 transition disabled:opacity-50"
-                  data-testid={`button-pick-hatchling-${h.id}`}
-                >
-                  <div className="min-w-0">
-                    <p className="font-bold truncate">{h.name}</p>
-                    <p className="text-[11px] text-muted-foreground">Lv. {h.level}</p>
-                  </div>
-                  <Swords className="w-4 h-4 text-primary shrink-0" />
-                </button>
-              ))
+              rankHatchlingsForRematch(myHatchlings, data?.battles ?? []).map(r => {
+                const h = r.hatchling;
+                const subLabel = r.isRecommended
+                  ? r.reason === "last-used"
+                    ? "Last used vs this rival"
+                    : `Most wins vs this rival · ${r.wins}W`
+                  : r.reason === "last-used"
+                    ? "Last used vs this rival"
+                    : r.wins > 0
+                      ? `${r.wins}W vs this rival`
+                      : `Lv. ${h.level}`;
+                return (
+                  <button
+                    key={h.id}
+                    disabled={sending}
+                    onClick={() => sendRematch(h.id)}
+                    className={`w-full flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition disabled:opacity-50 ${
+                      r.isRecommended
+                        ? "border-primary/60 bg-primary/10 hover:bg-primary/15"
+                        : "border-border bg-card/40 hover:border-primary/50 hover:bg-primary/5"
+                    }`}
+                    data-testid={`button-pick-hatchling-${h.id}`}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-bold truncate">{h.name}</p>
+                        {r.isRecommended && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-primary"
+                            data-testid={`badge-recommended-${h.id}`}
+                          >
+                            <Star className="w-2.5 h-2.5" /> Recommended
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Lv. {h.level} · {subLabel}
+                      </p>
+                    </div>
+                    <Swords className="w-4 h-4 text-primary shrink-0" />
+                  </button>
+                );
+              })
             )}
           </div>
           <DialogFooter>

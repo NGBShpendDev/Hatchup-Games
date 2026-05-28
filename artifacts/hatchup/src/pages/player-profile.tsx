@@ -12,7 +12,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { motion, Reorder } from "framer-motion";
 import { usePlayer } from "@/lib/playerContext";
 import { toast } from "@/hooks/use-toast";
-import { BadgeCheck, Flame, Trophy, Sparkles, ArrowLeft, Settings, GripVertical, X, Plus, Lock, BarChart3, Eye, Heart, MessageCircle, Repeat2, Crown, Ban, Swords, ChevronRight } from "lucide-react";
+import { BadgeCheck, Flame, Trophy, Sparkles, ArrowLeft, Settings, GripVertical, X, Plus, Lock, BarChart3, Eye, Heart, MessageCircle, Repeat2, Crown, Ban, Swords, ChevronRight, Star } from "lucide-react";
+import { rankHatchlingsForRematch } from "@/lib/rematchSuggestions";
 import { useGetMyPostInsights, getGetMyPostInsightsQueryKey } from "@workspace/api-client-react";
 import type { PostInsight } from "@workspace/api-client-react";
 import { useSubscription } from "@/lib/subscription";
@@ -305,6 +306,13 @@ function ProfileHeader({ profile, viewerIsAdmin, isOwnProfile }: { profile: Play
   );
 }
 
+interface RivalryBattleLite {
+  id: number;
+  createdAt: string;
+  outcome: "win" | "loss" | "draw" | string;
+  myHatchlingId: number | null;
+}
+
 interface RivalrySummary {
   totalBattles: number;
   wins: number;
@@ -315,6 +323,7 @@ interface RivalrySummary {
   lastBattleId: number | null;
   opponentDisplayName: string | null;
   opponentUsername: string | null;
+  battles?: RivalryBattleLite[];
 }
 
 interface RivalHatchlingLite {
@@ -436,21 +445,45 @@ function RivalryCard({ viewerId, opponentId }: { viewerId: number; opponentId: n
                 You need a Hatchling first.
               </p>
             ) : (
-              myHatchlings.map(h => (
-                <button
-                  key={h.id}
-                  disabled={sending}
-                  onClick={() => sendRematch(h.id)}
-                  className="w-full flex items-center justify-between gap-3 rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left hover:border-primary/50 hover:bg-primary/5 transition disabled:opacity-50"
-                  data-testid={`button-pick-hatchling-rematch-${h.id}`}
-                >
-                  <div className="min-w-0">
-                    <p className="font-bold truncate">{h.name}</p>
-                    <p className="text-[11px] text-muted-foreground">Lv. {h.level}</p>
-                  </div>
-                  <Swords className="w-4 h-4 text-primary shrink-0" />
-                </button>
-              ))
+              rankHatchlingsForRematch(myHatchlings, data?.battles ?? []).map(r => {
+                const h = r.hatchling;
+                const subLabel = r.reason === "last-used"
+                  ? "Last used vs this rival"
+                  : r.wins > 0
+                    ? `${r.wins}W vs this rival`
+                    : `Lv. ${h.level}`;
+                return (
+                  <button
+                    key={h.id}
+                    disabled={sending}
+                    onClick={() => sendRematch(h.id)}
+                    className={`w-full flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition disabled:opacity-50 ${
+                      r.isRecommended
+                        ? "border-primary/60 bg-primary/10 hover:bg-primary/15"
+                        : "border-border bg-card/40 hover:border-primary/50 hover:bg-primary/5"
+                    }`}
+                    data-testid={`button-pick-hatchling-rematch-${h.id}`}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-bold truncate">{h.name}</p>
+                        {r.isRecommended && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-primary"
+                            data-testid={`badge-recommended-rematch-${h.id}`}
+                          >
+                            <Star className="w-2.5 h-2.5" /> Recommended
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Lv. {h.level} · {subLabel}
+                      </p>
+                    </div>
+                    <Swords className="w-4 h-4 text-primary shrink-0" />
+                  </button>
+                );
+              })
             )}
           </div>
           <DialogFooter>
