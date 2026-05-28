@@ -253,6 +253,8 @@ import type {
   ShareArtifactToFriendInput,
   ShareArtifactToFriendResult,
   ShareEventBody,
+  ShieldAutoReplenishBody,
+  ShieldAutoReplenishResult,
   SpeedLeaderboardEntry,
   StorageErrorEnvelope,
   SubmitProgressBody,
@@ -268,6 +270,7 @@ import type {
   UnsubscribePushBody,
   UpdateClubMemberRoleInput,
   UpdateMealPostInput,
+  UpdateShieldAutoReplenish400,
   UploadUrlRequest,
   UploadUrlResponse,
   UpsertNotificationBody,
@@ -3703,6 +3706,77 @@ export const useBuyStreakShield = <TError = ErrorType<BuyStreakShield400>,
         TContext
       > => {
       return useMutation(getBuyStreakShieldMutationOptions(options));
+    }
+
+export const getUpdateShieldAutoReplenishUrl = () => {
+
+
+
+
+  return `/api/players/me/shield-auto-replenish`
+}
+
+/**
+ * @summary Update the player's shield auto-replenish preference
+ */
+export const updateShieldAutoReplenish = async (shieldAutoReplenishBody: ShieldAutoReplenishBody, options?: RequestInit): Promise<ShieldAutoReplenishResult> => {
+
+  return customFetch<ShieldAutoReplenishResult>(getUpdateShieldAutoReplenishUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      shieldAutoReplenishBody,)
+  }
+);}
+
+
+
+
+export const getUpdateShieldAutoReplenishMutationOptions = <TError = ErrorType<UpdateShieldAutoReplenish400>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateShieldAutoReplenish>>, TError,{data: BodyType<ShieldAutoReplenishBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateShieldAutoReplenish>>, TError,{data: BodyType<ShieldAutoReplenishBody>}, TContext> => {
+
+const mutationKey = ['updateShieldAutoReplenish'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateShieldAutoReplenish>>, {data: BodyType<ShieldAutoReplenishBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateShieldAutoReplenish(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateShieldAutoReplenishMutationResult = NonNullable<Awaited<ReturnType<typeof updateShieldAutoReplenish>>>
+    export type UpdateShieldAutoReplenishMutationBody = BodyType<ShieldAutoReplenishBody>
+    export type UpdateShieldAutoReplenishMutationError = ErrorType<UpdateShieldAutoReplenish400>
+
+    /**
+ * @summary Update the player's shield auto-replenish preference
+ */
+export const useUpdateShieldAutoReplenish = <TError = ErrorType<UpdateShieldAutoReplenish400>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateShieldAutoReplenish>>, TError,{data: BodyType<ShieldAutoReplenishBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateShieldAutoReplenish>>,
+        TError,
+        {data: BodyType<ShieldAutoReplenishBody>},
+        TContext
+      > => {
+      return useMutation(getUpdateShieldAutoReplenishMutationOptions(options));
     }
 
 export const getGetArtifactWorldNotificationsUrl = (params?: GetArtifactWorldNotificationsParams,) => {

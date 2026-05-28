@@ -1,8 +1,8 @@
 import { useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
-import { Crown, Check, Sparkles, Trophy, X, ExternalLink, ArrowLeft, Loader2, Palette, Egg, Bot, Swords, MapPin, ShieldCheck, ShoppingCart } from "lucide-react";
+import { Crown, Check, Sparkles, Trophy, X, ExternalLink, ArrowLeft, Loader2, Palette, Egg, Bot, Swords, MapPin, ShieldCheck, ShoppingCart, RefreshCw } from "lucide-react";
 import { useSubscription, useStartCheckout, useOpenPortal } from "@/lib/subscription";
-import { useGetDailyStreak, getGetDailyStreakQueryKey, useBuyStreakShield } from "@workspace/api-client-react";
+import { useGetDailyStreak, getGetDailyStreakQueryKey, useBuyStreakShield, useUpdateShieldAutoReplenish } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
@@ -109,7 +109,21 @@ export default function SubscriptionPage() {
     },
   });
 
+  const updateAutoReplenish = useUpdateShieldAutoReplenish({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetDailyStreakQueryKey() });
+      },
+      onError: (e: unknown) => {
+        const msg = e instanceof Error ? e.message : "Update failed";
+        toast({ title: "Couldn't update setting", description: msg, variant: "destructive" });
+      },
+    },
+  });
+
   const shieldCount = streakData?.streakShields ?? 0;
+  const autoReplenish = streakData?.autoReplenishShields ?? false;
+  const replenishThreshold = streakData?.shieldAutoReplenishThreshold ?? 1;
 
   const upsellSource = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -329,6 +343,78 @@ export default function SubscriptionPage() {
               )}
               {SHIELD_COST}¢
             </button>
+          </div>
+
+          {/* Auto-replenish setting */}
+          <div className="rounded-2xl border border-cyan-500/15 bg-white/[0.03] divide-y divide-white/5" data-testid="section-auto-replenish">
+            <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <RefreshCw className="w-4 h-4 text-cyan-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-black">Auto-replenish shields</p>
+                  <p className="text-xs text-white/50 mt-0.5 leading-snug">
+                    Automatically buy a shield with coins when you run low
+                  </p>
+                </div>
+              </div>
+              <button
+                role="switch"
+                aria-checked={autoReplenish}
+                disabled={updateAutoReplenish.isPending}
+                data-testid="toggle-auto-replenish"
+                onClick={() =>
+                  updateAutoReplenish.mutate({ data: { autoReplenishShields: !autoReplenish } })
+                }
+                className={`relative shrink-0 ml-3 w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${
+                  autoReplenish ? "bg-cyan-500" : "bg-white/15"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                    autoReplenish ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {autoReplenish && (
+              <div className="px-4 py-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold text-white/80">Keep at least</p>
+                  <p className="text-[11px] text-white/40 mt-0.5">
+                    Auto-buy when shields drop below this
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    data-testid="threshold-decrement"
+                    disabled={replenishThreshold <= 1 || updateAutoReplenish.isPending}
+                    onClick={() =>
+                      updateAutoReplenish.mutate({ data: { shieldAutoReplenishThreshold: replenishThreshold - 1 } })
+                    }
+                    className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/15 text-white font-bold flex items-center justify-center disabled:opacity-30 transition"
+                  >
+                    −
+                  </button>
+                  <span
+                    data-testid="threshold-value"
+                    className="w-8 text-center font-black text-cyan-300 text-base"
+                  >
+                    {replenishThreshold}
+                  </span>
+                  <button
+                    data-testid="threshold-increment"
+                    disabled={replenishThreshold >= 10 || updateAutoReplenish.isPending}
+                    onClick={() =>
+                      updateAutoReplenish.mutate({ data: { shieldAutoReplenishThreshold: replenishThreshold + 1 } })
+                    }
+                    className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/15 text-white font-bold flex items-center justify-center disabled:opacity-30 transition"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 

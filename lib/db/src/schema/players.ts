@@ -87,6 +87,9 @@ export const playersTable = pgTable("players", {
   streakAtRisk: boolean("streak_at_risk").notNull().default(false),
   recoveryMessage: text("recovery_message"),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
+  // Shield auto-replenish
+  autoReplenishShields: boolean("auto_replenish_shields").notNull().default(false),
+  shieldAutoReplenishThreshold: integer("shield_auto_replenish_threshold").notNull().default(1),
   // Subscription / monetization
   subscriptionTier: text("subscription_tier").notNull().default("premium"),
   subscriptionSource: text("subscription_source").notNull().default("trial"),

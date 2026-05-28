@@ -1024,6 +1024,34 @@ paths:
                 properties:
                   error: { type: string }
 
+  /players/me/shield-auto-replenish:
+    patch:
+      operationId: updateShieldAutoReplenish
+      tags: [players]
+      summary: Update the player's shield auto-replenish preference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShieldAutoReplenishBody"
+      responses:
+        "200":
+          description: Preference saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShieldAutoReplenishResult"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error: { type: string }
+
   /artifacts/world-notifications:
     get:
       operationId: getArtifactWorldNotifications
@@ -6115,7 +6143,7 @@ components:
 
     DailyStreakState:
       type: object
-      required: [currentDay, streakBroken, alreadyClaimed, lastClaimedAt, schedule, streakShields, shieldActive]
+      required: [currentDay, streakBroken, alreadyClaimed, lastClaimedAt, schedule, streakShields, shieldActive, autoReplenishShields, shieldAutoReplenishThreshold]
       properties:
         currentDay:    { type: integer, description: "Current streak day (1-30), or 1 if streak was just reset" }
         streakBroken:  { type: boolean, description: "True if the streak reset today due to a missed day" }
@@ -6123,6 +6151,8 @@ components:
         lastClaimedAt: { type: ["string", "null"], format: date-time }
         streakShields: { type: integer, description: "Number of Streak Shields the player owns" }
         shieldActive:  { type: boolean, description: "True if a Streak Shield was auto-consumed in the last 48 hours" }
+        autoReplenishShields: { type: boolean, description: "Whether auto-replenish is enabled" }
+        shieldAutoReplenishThreshold: { type: integer, description: "Auto-buy a shield when count drops below this threshold" }
         todayReward:
           $ref: "#/components/schemas/DailyRewardDay"
         schedule:
@@ -6170,6 +6200,20 @@ components:
         streakShields:   { type: integer, description: "Updated shield count" }
         coinsSpent:      { type: integer }
         coinsRemaining:  { type: integer }
+
+    ShieldAutoReplenishBody:
+      type: object
+      properties:
+        autoReplenishShields:        { type: boolean }
+        shieldAutoReplenishThreshold: { type: integer, minimum: 1, maximum: 10 }
+
+    ShieldAutoReplenishResult:
+      type: object
+      required: [ok, autoReplenishShields, shieldAutoReplenishThreshold]
+      properties:
+        ok:                           { type: boolean }
+        autoReplenishShields:         { type: boolean }
+        shieldAutoReplenishThreshold: { type: integer }
 
     FitnessBar:
       type: object

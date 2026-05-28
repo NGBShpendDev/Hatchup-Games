@@ -1274,6 +1274,8 @@ export const GetDailyStreakResponse = zod.object({
   "lastClaimedAt": zod.coerce.date().nullable(),
   "streakShields": zod.number().describe('Number of Streak Shields the player owns'),
   "shieldActive": zod.boolean().describe('True if a Streak Shield was auto-consumed in the last 48 hours'),
+  "autoReplenishShields": zod.boolean().describe('Whether auto-replenish is enabled'),
+  "shieldAutoReplenishThreshold": zod.number().describe('Auto-buy a shield when count drops below this threshold'),
   "todayReward": zod.object({
   "day": zod.number().describe('Day number (1-30)'),
   "coins": zod.number(),
@@ -1330,6 +1332,25 @@ export const BuyStreakShieldResponse = zod.object({
   "streakShields": zod.number().describe('Updated shield count'),
   "coinsSpent": zod.number(),
   "coinsRemaining": zod.number()
+})
+
+
+/**
+ * @summary Update the player's shield auto-replenish preference
+ */
+export const updateShieldAutoReplenishBodyShieldAutoReplenishThresholdMax = 10;
+
+
+
+export const UpdateShieldAutoReplenishBody = zod.object({
+  "autoReplenishShields": zod.boolean().optional(),
+  "shieldAutoReplenishThreshold": zod.number().min(1).max(updateShieldAutoReplenishBodyShieldAutoReplenishThresholdMax).optional()
+})
+
+export const UpdateShieldAutoReplenishResponse = zod.object({
+  "ok": zod.boolean(),
+  "autoReplenishShields": zod.boolean(),
+  "shieldAutoReplenishThreshold": zod.number()
 })
 
 

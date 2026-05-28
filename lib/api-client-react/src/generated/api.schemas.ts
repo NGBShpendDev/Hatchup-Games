@@ -1120,6 +1120,10 @@ export interface DailyStreakState {
   streakShields: number;
   /** True if a Streak Shield was auto-consumed in the last 48 hours */
   shieldActive: boolean;
+  /** Whether auto-replenish is enabled */
+  autoReplenishShields: boolean;
+  /** Auto-buy a shield when count drops below this threshold */
+  shieldAutoReplenishThreshold: number;
   todayReward?: DailyRewardDay;
   schedule: DailyRewardDay[];
 }
@@ -1162,6 +1166,21 @@ export interface BuyStreakShieldResult {
   streakShields: number;
   coinsSpent: number;
   coinsRemaining: number;
+}
+
+export interface ShieldAutoReplenishBody {
+  autoReplenishShields?: boolean;
+  /**
+     * @minimum 1
+     * @maximum 10
+     */
+  shieldAutoReplenishThreshold?: number;
+}
+
+export interface ShieldAutoReplenishResult {
+  ok: boolean;
+  autoReplenishShields: boolean;
+  shieldAutoReplenishThreshold: number;
 }
 
 export interface FitnessBar {
@@ -3678,6 +3697,10 @@ export type ClaimDailyReward400 = {
 };
 
 export type BuyStreakShield400 = {
+  error: string;
+};
+
+export type UpdateShieldAutoReplenish400 = {
   error: string;
 };
 

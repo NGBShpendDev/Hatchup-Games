@@ -487,6 +487,8 @@ router.get("/players/me/daily-streak", requireAuth, attachPlayer, async (req, re
     lastClaimedAt: lastClaimed ? lastClaimed.toISOString() : null,
     streakShields: player.streakShields ?? 0,
     shieldActive,
+    autoReplenishShields: player.autoReplenishShields ?? false,
+    shieldAutoReplenishThreshold: player.shieldAutoReplenishThreshold ?? 1,
     todayReward,
     schedule: DAILY_REWARD_SCHEDULE,
   });
@@ -646,6 +648,33 @@ router.post("/players/me/daily-claim", requireAuth, attachPlayer, async (req, re
     dailyRewardStreak: newStreakDay,
   });
 
+  // Auto-replenish shields if enabled and count dropped below threshold
+  let autoReplenishTriggered = false;
+  let shieldsAutoReplenished = 0;
+  if (shieldConsumed) {
+    const refreshed = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
+    if (
+      refreshed &&
+      refreshed.autoReplenishShields &&
+      (refreshed.streakShields ?? 0) < (refreshed.shieldAutoReplenishThreshold ?? 1)
+    ) {
+      const deficit = (refreshed.shieldAutoReplenishThreshold ?? 1) - (refreshed.streakShields ?? 0);
+      const affordable = Math.floor((refreshed.coins ?? 0) / STREAK_SHIELD_COST);
+      const toBuy = Math.min(deficit, affordable);
+      if (toBuy > 0) {
+        const totalCost = toBuy * STREAK_SHIELD_COST;
+        await db.update(playersTable)
+          .set({
+            coins: sql`${playersTable.coins} - ${totalCost}`,
+            streakShields: sql`${playersTable.streakShields} + ${toBuy}`,
+          })
+          .where(eq(playersTable.id, playerId));
+        autoReplenishTriggered = true;
+        shieldsAutoReplenished = toBuy;
+      }
+    }
+  }
+
   res.json({
     ok: true,
     day: reward.day,
@@ -660,6 +689,8 @@ router.post("/players/me/daily-claim", requireAuth, attachPlayer, async (req, re
     bonus: reward.bonus ?? null,
     streakBroken,
     shieldConsumed,
+    autoReplenishTriggered,
+    shieldsAutoReplenished,
     newBadges: newBadges.map(b => ({ key: b.key, name: b.name, icon: b.icon, tier: b.tier })),
   });
 });
@@ -691,6 +722,44 @@ router.post("/players/me/streak-shield/buy", requireAuth, attachPlayer, async (r
     coinsSpent: STREAK_SHIELD_COST,
     coinsRemaining: row.coins,
   });
+});
+
+// PATCH /players/me/shield-auto-replenish — update auto-replenish preference
+router.patch("/players/me/shield-auto-replenish", requireAuth, attachPlayer, async (req, res) => {
+  const playerId = req.playerId!;
+  const { autoReplenishShields, shieldAutoReplenishThreshold } = req.body as {
+    autoReplenishShields?: boolean;
+    shieldAutoReplenishThreshold?: number;
+  };
+
+  const updates: Partial<{ autoReplenishShields: boolean; shieldAutoReplenishThreshold: number }> = {};
+  if (typeof autoReplenishShields === "boolean") {
+    updates.autoReplenishShields = autoReplenishShields;
+  }
+  if (typeof shieldAutoReplenishThreshold === "number") {
+    if (shieldAutoReplenishThreshold < 1 || shieldAutoReplenishThreshold > 10) {
+      res.status(400).json({ error: "threshold_out_of_range" });
+      return;
+    }
+    updates.shieldAutoReplenishThreshold = shieldAutoReplenishThreshold;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "no_fields_to_update" });
+    return;
+  }
+
+  const updated = await db.update(playersTable)
+    .set(updates)
+    .where(eq(playersTable.id, playerId))
+    .returning({
+      autoReplenishShields: playersTable.autoReplenishShields,
+      shieldAutoReplenishThreshold: playersTable.shieldAutoReplenishThreshold,
+    });
+
+  if (!updated.length) { res.status(404).json({ error: "Player not found" }); return; }
+  const row = updated[0]!;
+  res.json({ ok: true, autoReplenishShields: row.autoReplenishShields, shieldAutoReplenishThreshold: row.shieldAutoReplenishThreshold });
 });
 
 router.get("/players/me", requireAuth, attachPlayer, async (req, res) => {
