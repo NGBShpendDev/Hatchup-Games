@@ -2307,13 +2307,13 @@ export const DiscoverPlayersResponse = zod.array(DiscoverPlayersResponseItem)
 /**
  * @summary Search players by username or display name
  */
-export const SearchPlayersQueryParams = zod.object({
+export const SearchDiscoverablePlayersQueryParams = zod.object({
   "q": zod.coerce.string(),
   "playerId": zod.coerce.number(),
   "limit": zod.coerce.number().optional()
 })
 
-export const SearchPlayersResponseItem = zod.object({
+export const SearchDiscoverablePlayersResponseItem = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "displayName": zod.string().nullable(),
@@ -2324,7 +2324,7 @@ export const SearchPlayersResponseItem = zod.object({
   "reason": zod.string(),
   "reasonDetail": zod.string().nullish()
 })
-export const SearchPlayersResponse = zod.array(SearchPlayersResponseItem)
+export const SearchDiscoverablePlayersResponse = zod.array(SearchDiscoverablePlayersResponseItem)
 
 
 /**

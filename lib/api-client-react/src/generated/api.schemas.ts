@@ -1656,7 +1656,7 @@ playerId: number;
 limit?: number;
 };
 
-export type SearchPlayersParams = {
+export type SearchDiscoverablePlayersParams = {
 q: string;
 playerId: number;
 limit?: number;

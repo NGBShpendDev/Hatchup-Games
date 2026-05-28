@@ -15,8 +15,8 @@ import {
   getGetPlayerSocialProfileQueryKey,
   useDiscoverPlayers,
   getDiscoverPlayersQueryKey,
-  useSearchPlayers,
-  getSearchPlayersQueryKey,
+  useSearchDiscoverablePlayers,
+  getSearchDiscoverablePlayersQueryKey,
   type DiscoverablePlayer,
   useListHatchlings,
   getListHatchlingsQueryKey,
@@ -888,9 +888,9 @@ function DiscoverPanel({
     { query: { queryKey: getDiscoverPlayersQueryKey({ playerId }), enabled: !isSearching && !!playerId } },
   );
 
-  const { data: searchResults, isLoading: loadingSearch } = useSearchPlayers(
+  const { data: searchResults, isLoading: loadingSearch } = useSearchDiscoverablePlayers(
     { q: debouncedQuery, playerId },
-    { query: { queryKey: getSearchPlayersQueryKey({ q: debouncedQuery, playerId }), enabled: isSearching && !!playerId } },
+    { query: { queryKey: getSearchDiscoverablePlayersQueryKey({ q: debouncedQuery, playerId }), enabled: isSearching && !!playerId } },
   );
 
   const list: DiscoverablePlayer[] = (isSearching ? searchResults : suggestions) ?? [];

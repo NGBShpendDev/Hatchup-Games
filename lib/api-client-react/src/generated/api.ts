@@ -149,6 +149,7 @@ import type {
   SaveArtifactBuildBody,
   SaveArtifactLoadoutBody,
   ScopedLeaderboardResult,
+  SearchDiscoverablePlayersParams,
   SearchPlayersParams,
   SendGroupMessageInput,
   SpeedLeaderboardEntry,
@@ -6919,7 +6920,7 @@ export function useDiscoverPlayers<TData = Awaited<ReturnType<typeof discoverPla
 
 
 
-export const getSearchPlayersUrl = (params: SearchPlayersParams,) => {
+export const getSearchDiscoverablePlayersUrl = (params: SearchDiscoverablePlayersParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -6937,9 +6938,9 @@ export const getSearchPlayersUrl = (params: SearchPlayersParams,) => {
 /**
  * @summary Search players by username or display name
  */
-export const searchPlayers = async (params: SearchPlayersParams, options?: RequestInit): Promise<DiscoverablePlayer[]> => {
+export const searchDiscoverablePlayers = async (params: SearchDiscoverablePlayersParams, options?: RequestInit): Promise<DiscoverablePlayer[]> => {
 
-  return customFetch<DiscoverablePlayer[]>(getSearchPlayersUrl(params),
+  return customFetch<DiscoverablePlayer[]>(getSearchDiscoverablePlayersUrl(params),
   {
     ...options,
     method: 'GET'
@@ -6952,45 +6953,45 @@ export const searchPlayers = async (params: SearchPlayersParams, options?: Reque
 
 
 
-export const getSearchPlayersQueryKey = (params?: SearchPlayersParams,) => {
+export const getSearchDiscoverablePlayersQueryKey = (params?: SearchDiscoverablePlayersParams,) => {
     return [
     `/api/social/search`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getSearchPlayersQueryOptions = <TData = Awaited<ReturnType<typeof searchPlayers>>, TError = ErrorType<unknown>>(params: SearchPlayersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchPlayers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getSearchDiscoverablePlayersQueryOptions = <TData = Awaited<ReturnType<typeof searchDiscoverablePlayers>>, TError = ErrorType<unknown>>(params: SearchDiscoverablePlayersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchDiscoverablePlayers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getSearchPlayersQueryKey(params);
+  const queryKey =  queryOptions?.queryKey ?? getSearchDiscoverablePlayersQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchPlayers>>> = ({ signal }) => searchPlayers(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchDiscoverablePlayers>>> = ({ signal }) => searchDiscoverablePlayers(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchPlayers>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchDiscoverablePlayers>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type SearchPlayersQueryResult = NonNullable<Awaited<ReturnType<typeof searchPlayers>>>
-export type SearchPlayersQueryError = ErrorType<unknown>
+export type SearchDiscoverablePlayersQueryResult = NonNullable<Awaited<ReturnType<typeof searchDiscoverablePlayers>>>
+export type SearchDiscoverablePlayersQueryError = ErrorType<unknown>
 
 
 /**
  * @summary Search players by username or display name
  */
 
-export function useSearchPlayers<TData = Awaited<ReturnType<typeof searchPlayers>>, TError = ErrorType<unknown>>(
- params: SearchPlayersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchPlayers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useSearchDiscoverablePlayers<TData = Awaited<ReturnType<typeof searchDiscoverablePlayers>>, TError = ErrorType<unknown>>(
+ params: SearchDiscoverablePlayersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchDiscoverablePlayers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getSearchPlayersQueryOptions(params,options)
+  const queryOptions = getSearchDiscoverablePlayersQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

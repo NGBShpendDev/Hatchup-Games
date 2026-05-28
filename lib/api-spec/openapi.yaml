@@ -1937,7 +1937,7 @@ paths:
 
   /social/search:
     get:
-      operationId: searchPlayers
+      operationId: searchDiscoverablePlayers
       tags: [social]
       summary: Search players by username or display name
       parameters:
