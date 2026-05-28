@@ -17,7 +17,10 @@ export const postsTable = pgTable("posts", {
   metadata: jsonb("metadata"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [
+  index("posts_player_created_idx").on(t.playerId, t.createdAt),
+  index("posts_view_count_idx").on(t.viewCount),
+]);
 
 export const postViewsTable = pgTable("post_views", {
   id: serial("id").primaryKey(),
@@ -25,7 +28,11 @@ export const postViewsTable = pgTable("post_views", {
   viewerKey: text("viewer_key").notNull(),
   viewDate: text("view_date").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [unique("post_views_post_viewer_day_unique").on(t.postId, t.viewerKey, t.viewDate)]);
+}, (t) => [
+  unique("post_views_post_viewer_day_unique").on(t.postId, t.viewerKey, t.viewDate),
+  index("post_views_created_at_idx").on(t.createdAt),
+  index("post_views_post_created_idx").on(t.postId, t.createdAt),
+]);
 
 export const postReactionsTable = pgTable("post_reactions", {
   id: serial("id").primaryKey(),

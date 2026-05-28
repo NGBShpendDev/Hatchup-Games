@@ -10,6 +10,8 @@ import {
   getGetSocialFeedQueryKey,
   useGetTrendingPosts,
   getGetTrendingPostsQueryKey,
+  useGetMyPostInsights,
+  getGetMyPostInsightsQueryKey,
   useReactToPost,
   useDeletePost,
   useFollowPlayer,
@@ -31,8 +33,6 @@ import {
   useCreatePost,
   useListHatchlings,
   getListHatchlingsQueryKey,
-  useGetPlayerSocialProfile,
-  getGetPlayerSocialProfileQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -78,6 +78,9 @@ import {
   X,
   TrendingUp,
   Eye,
+  BarChart3,
+  MessageSquare,
+  Repeat2,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
@@ -1202,10 +1205,176 @@ function TrendingPanel({
   );
 }
 
+function CreatorAnalyticsSheet({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [sort, setSort] = useState<"recent" | "views">("views");
+  const params = { sort, limit: 50 };
+  const { data, isLoading, error } = useGetMyPostInsights(
+    params,
+    { query: { queryKey: getGetMyPostInsightsQueryKey(params), enabled: open } },
+  );
+
+  const premiumRequired =
+    (error as { status?: number } | null)?.status === 402;
+
+  return (
+    <Sheet open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-3xl">
+        <SheetHeader className="pb-2">
+          <SheetTitle className="text-2xl font-black flex items-center gap-2">
+            <BarChart3 className="w-6 h-6 text-primary" />
+            Your Analytics
+          </SheetTitle>
+          <p className="text-xs text-muted-foreground font-medium">
+            Views, reactions, and replies on every post you've shared.
+          </p>
+        </SheetHeader>
+
+        {premiumRequired ? (
+          <div className="py-10 text-center" data-testid="analytics-premium-required">
+            <Sparkles className="w-10 h-10 text-primary mx-auto mb-3" />
+            <h3 className="text-lg font-black mb-1">Premium unlocks your dashboard</h3>
+            <p className="text-sm text-muted-foreground font-medium max-w-xs mx-auto mb-4">
+              Upgrade to see per-post view counts and engagement breakdowns for everything you publish.
+            </p>
+            <Button
+              className="rounded-full font-black"
+              onClick={() => { window.location.href = "/subscription"; }}
+              data-testid="analytics-upgrade-cta"
+            >
+              See Premium
+            </Button>
+          </div>
+        ) : (
+          <>
+            {/* Totals */}
+            <div className="grid grid-cols-4 gap-2 mt-2">
+              {[
+                { label: "Posts", value: data?.totals.postCount ?? 0, icon: Sparkles },
+                { label: "Views", value: data?.totals.viewCount ?? 0, icon: Eye },
+                { label: "Reactions", value: data?.totals.reactionCount ?? 0, icon: Flame },
+                { label: "Replies", value: data?.totals.commentCount ?? 0, icon: MessageSquare },
+              ].map(stat => {
+                const Icon = stat.icon;
+                return (
+                  <GlassCard key={stat.label} className="p-3 text-center">
+                    <Icon className="w-4 h-4 text-primary mx-auto mb-1" />
+                    <div className="text-lg font-black leading-none" data-testid={`analytics-total-${stat.label.toLowerCase()}`}>
+                      {stat.value.toLocaleString()}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mt-0.5">{stat.label}</div>
+                  </GlassCard>
+                );
+              })}
+            </div>
+
+            {/* Sort toggle */}
+            <div className="flex items-center justify-between mt-4 mb-2">
+              <span className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Your posts</span>
+              <div className="inline-flex rounded-full bg-card/60 backdrop-blur p-1 border border-border">
+                <button
+                  type="button"
+                  onClick={() => setSort("views")}
+                  data-testid="analytics-sort-views"
+                  className={`px-3 h-7 text-[11px] font-black rounded-full transition-colors ${
+                    sort === "views"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Most views
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSort("recent")}
+                  data-testid="analytics-sort-recent"
+                  className={`px-3 h-7 text-[11px] font-black rounded-full transition-colors ${
+                    sort === "recent"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Most recent
+                </button>
+              </div>
+            </div>
+
+            {isLoading ? (
+              <div className="space-y-2">
+                {[...Array(4)].map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full rounded-2xl" />
+                ))}
+              </div>
+            ) : !data || data.posts.length === 0 ? (
+              <div className="text-center py-12" data-testid="analytics-empty">
+                <BarChart3 className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-40" />
+                <h3 className="text-lg font-black mb-1">No posts yet</h3>
+                <p className="text-sm text-muted-foreground font-medium">
+                  Share a post and your view stats will show up here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2 pb-4">
+                {data.posts.map(post => (
+                  <GlassCard
+                    key={post.id}
+                    className="p-3"
+                    data-testid={`analytics-post-${post.id}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      {post.mediaUrl ? (
+                        <img
+                          src={post.mediaUrl}
+                          alt=""
+                          className="h-14 w-14 rounded-xl object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="h-14 w-14 rounded-xl bg-card border border-border flex items-center justify-center flex-shrink-0">
+                          <Sparkles className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold line-clamp-2">{post.content || "(no caption)"}</p>
+                        <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                          {timeAgo(post.createdAt)} · {POST_TYPES.find(t => t.value === post.postType)?.label ?? post.postType}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2 text-[11px] font-black">
+                          <span className="flex items-center gap-1 text-primary" data-testid={`analytics-views-${post.id}`}>
+                            <Eye className="w-3 h-3" /> {post.viewCount.toLocaleString()}
+                          </span>
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <Flame className="w-3 h-3" /> {post.reactionCount}
+                          </span>
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <MessageSquare className="w-3 h-3" /> {post.commentCount}
+                          </span>
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <Repeat2 className="w-3 h-3" /> {post.repostCount}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </GlassCard>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 export default function Social() {
   const { playerId } = usePlayer();
   const pid = playerId ?? 1;
   const [composeOpen, setComposeOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("feed");
   const [, setLocation] = useLocation();
   const goToProfile = useCallback((targetId: number) => setLocation(`/players/${targetId}`), [setLocation]);
@@ -1252,12 +1421,23 @@ export default function Social() {
               Your positive fitness universe
             </p>
           </div>
-          <Button
-            onClick={() => setComposeOpen(true)}
-            className="rounded-full h-10 w-10 p-0 shadow-lg shadow-primary/30"
-          >
-            <Plus className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setAnalyticsOpen(true)}
+              className="rounded-full h-10 w-10 p-0 border-border"
+              data-testid="button-analytics"
+              aria-label="View your post analytics"
+            >
+              <BarChart3 className="w-5 h-5" />
+            </Button>
+            <Button
+              onClick={() => setComposeOpen(true)}
+              className="rounded-full h-10 w-10 p-0 shadow-lg shadow-primary/30"
+            >
+              <Plus className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
 
         <ForYouStrip
@@ -1342,6 +1522,12 @@ export default function Social() {
           open={composeOpen}
           onClose={() => setComposeOpen(false)}
           playerId={pid}
+        />
+
+        {/* Creator analytics sheet */}
+        <CreatorAnalyticsSheet
+          open={analyticsOpen}
+          onClose={() => setAnalyticsOpen(false)}
         />
 
       </div>

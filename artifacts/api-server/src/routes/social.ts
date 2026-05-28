@@ -302,13 +302,40 @@ router.get("/social/trending", requireAuth, attachPlayer, async (req, res) => {
   });
 
   const viewsById = new Map(recentViewRows.map(r => [r.postId, r.recentViews]));
+
+  // Pull reaction + comment counts for the candidate post window so we can
+  // break view-count ties with engagement (creators who spark conversation
+  // edge out creators whose views came purely from impressions).
+  const candidateIds = postsForWindow.map(p => p.id);
+  const reactionRows = candidateIds.length
+    ? await db
+        .select({ postId: postReactionsTable.postId, count: sql<number>`count(*)::int` })
+        .from(postReactionsTable)
+        .where(inArray(postReactionsTable.postId, candidateIds))
+        .groupBy(postReactionsTable.postId)
+    : [];
+  const commentRows = candidateIds.length
+    ? await db
+        .select({ postId: postCommentsTable.postId, count: sql<number>`count(*)::int` })
+        .from(postCommentsTable)
+        .where(inArray(postCommentsTable.postId, candidateIds))
+        .groupBy(postCommentsTable.postId)
+    : [];
+  const reactionsById = new Map(reactionRows.map(r => [r.postId, r.count]));
+  const commentsById = new Map(commentRows.map(r => [r.postId, r.count]));
+
   const ranked = postsForWindow
-    .map(p => ({ post: p, recentViewCount: viewsById.get(p.id) ?? 0 }))
+    .map(p => ({
+      post: p,
+      recentViewCount: viewsById.get(p.id) ?? 0,
+      reactionCount: reactionsById.get(p.id) ?? 0,
+      commentCount: commentsById.get(p.id) ?? 0,
+    }))
     .filter(({ recentViewCount }) => recentViewCount > 0)
     .sort((a, b) => {
-      if (b.recentViewCount !== a.recentViewCount) {
-        return b.recentViewCount - a.recentViewCount;
-      }
+      if (b.recentViewCount !== a.recentViewCount) return b.recentViewCount - a.recentViewCount;
+      if (b.reactionCount !== a.reactionCount) return b.reactionCount - a.reactionCount;
+      if (b.commentCount !== a.commentCount) return b.commentCount - a.commentCount;
       return b.post.createdAt.getTime() - a.post.createdAt.getTime();
     })
     .slice(0, limit);
