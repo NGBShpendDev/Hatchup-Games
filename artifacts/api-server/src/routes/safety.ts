@@ -2,8 +2,8 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { userReportsTable, blockedUsersTable, playersTable } from "@workspace/db";
 import { eq, and, desc, or, notInArray } from "drizzle-orm";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
-import { issueEmailVerification } from "../services/emailVerification";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { issueEmailVerification } from "../services/emailVerification.ts";
 
 const router = Router();
 
