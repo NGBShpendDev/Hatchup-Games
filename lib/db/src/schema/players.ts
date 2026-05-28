@@ -53,6 +53,10 @@ export const playersTable = pgTable("players", {
   isVerified: boolean("is_verified").notNull().default(false),
   isMinor: boolean("is_minor").notNull().default(false),
   isSuspended: boolean("is_suspended").notNull().default(false),
+  // Demo / seed account marker — true for NPC accounts inserted to fill out
+  // sparse cold-start surfaces like the "Players Nearby" strip. Lets us
+  // identify and clean them up later without touching real users.
+  isDemo: boolean("is_demo").notNull().default(false),
   // Nutrition / body goal
   physiqueGoal: text("physique_goal"),
   // Battle Arena
