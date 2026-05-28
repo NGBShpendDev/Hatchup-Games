@@ -40,6 +40,7 @@ export default function Explore() {
     { query: { queryKey: getListNearbyPlayersQueryKey(nearbyParams), enabled: !!playerId } }
   );
   const nearbyEntries = nearby?.entries ?? [];
+  const locationRequired = nearby?.locationRequired ?? false;
 
   const [visibility, setVisibility] = useState<string | null>(null);
   const [hiddenSince, setHiddenSince] = useState<string | null>(null);
@@ -151,7 +152,7 @@ export default function Explore() {
           </p>
         </div>
 
-        {(nearbyLoading || nearbyEntries.length > 0 || isHidden) && (
+        {(nearbyLoading || nearbyEntries.length > 0 || isHidden || locationRequired) && (
           <section>
             <div className="flex justify-between items-center mb-2 gap-2">
               <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2">
@@ -219,6 +220,16 @@ export default function Explore() {
                 data-testid="text-nearby-hidden-state"
               >
                 You're hidden from the nearby strip. Tap <span className="font-bold text-foreground">Show me</span> to appear to players in your city again.
+              </div>
+            ) : locationRequired ? (
+              <div
+                className="rounded-2xl border border-dashed border-white/10 bg-card/40 backdrop-blur p-4 text-sm text-muted-foreground flex items-center gap-3"
+                data-testid="text-nearby-location-required"
+              >
+                <Map className="w-4 h-4 shrink-0 text-primary" />
+                <span>
+                  <Link href="/settings/privacy" className="font-bold text-foreground hover:text-primary transition-colors">Set your city</Link> to see players nearby.
+                </span>
               </div>
             ) : (
             <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
