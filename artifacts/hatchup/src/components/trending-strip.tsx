@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { Eye, TrendingUp, ChevronRight, Flame } from "lucide-react";
@@ -15,8 +16,33 @@ const POST_TYPE_ICON: Record<string, string> = {
   streak: "🔥",
 };
 
+const TRENDING_WINDOW_STORAGE_KEY = "hatchup:trending-strip-window";
+
+type TrendingWindow = "day" | "week";
+
+function readStoredWindow(): TrendingWindow {
+  if (typeof window === "undefined") return "day";
+  try {
+    const stored = window.localStorage.getItem(TRENDING_WINDOW_STORAGE_KEY);
+    if (stored === "day" || stored === "week") return stored;
+  } catch {
+    // ignore
+  }
+  return "day";
+}
+
 export function TrendingStrip({ playerId }: { playerId: number }) {
-  const params = { playerId, window: "day" as const, limit: 5 };
+  const [trendingWindow, setTrendingWindow] = useState<TrendingWindow>(readStoredWindow);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(TRENDING_WINDOW_STORAGE_KEY, trendingWindow);
+    } catch {
+      // ignore
+    }
+  }, [trendingWindow]);
+
+  const params = { playerId, window: trendingWindow, limit: 5 };
   const { data, isLoading } = useGetTrendingPosts(params, {
     query: { queryKey: getGetTrendingPostsQueryKey(params) },
   });
@@ -25,7 +51,7 @@ export function TrendingStrip({ playerId }: { playerId: number }) {
   if (isLoading) {
     return (
       <section data-testid="trending-strip-loading">
-        <Header />
+        <Header trendingWindow={trendingWindow} onChangeWindow={setTrendingWindow} />
         <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
           <div className="flex gap-3 pb-2">
             {[0, 1, 2].map((i) => (
@@ -40,13 +66,17 @@ export function TrendingStrip({ playerId }: { playerId: number }) {
   if (posts.length === 0) {
     return (
       <section data-testid="trending-strip-empty">
-        <Header />
+        <Header trendingWindow={trendingWindow} onChangeWindow={setTrendingWindow} />
         <Link href="/social">
           <div className="rounded-2xl border border-dashed border-border bg-card/50 p-5 text-center cursor-pointer hover:border-primary/40 hover:bg-card/70 transition-colors active:scale-[0.99]">
             <TrendingUp className="w-7 h-7 text-muted-foreground mx-auto mb-2 opacity-50" />
-            <p className="text-sm font-black mb-1">Nothing trending yet</p>
+            <p className="text-sm font-black mb-1">
+              {trendingWindow === "day" ? "Nothing trending today" : "Nothing trending this week"}
+            </p>
             <p className="text-[11px] text-muted-foreground font-medium">
-              Be the first spark — post to the feed.
+              {trendingWindow === "day"
+                ? "Quiet last 24 hours — try the 7d view or post to the feed."
+                : "Be the first spark — post to the feed."}
             </p>
           </div>
         </Link>
@@ -56,7 +86,7 @@ export function TrendingStrip({ playerId }: { playerId: number }) {
 
   return (
     <section data-testid="trending-strip">
-      <Header />
+      <Header trendingWindow={trendingWindow} onChangeWindow={setTrendingWindow} />
       <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
         <div className="flex gap-3 pb-2 snap-x snap-mandatory">
           {posts.map((post, idx) => {
@@ -122,18 +152,57 @@ export function TrendingStrip({ playerId }: { playerId: number }) {
   );
 }
 
-function Header() {
+function Header({
+  trendingWindow,
+  onChangeWindow,
+}: {
+  trendingWindow: TrendingWindow;
+  onChangeWindow: (next: TrendingWindow) => void;
+}) {
   return (
-    <div className="flex justify-between items-center mb-2">
+    <div className="flex justify-between items-center mb-2 gap-2">
       <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1.5">
         <TrendingUp className="w-3.5 h-3.5 text-primary" />
         Trending now
       </h2>
-      <Link href="/social">
-        <span className="text-[11px] font-black text-primary uppercase tracking-wider cursor-pointer hover:underline">
-          See all
-        </span>
-      </Link>
+      <div className="flex items-center gap-2">
+        <div
+          className="inline-flex rounded-full bg-card/60 backdrop-blur p-0.5 border border-border"
+          data-testid="trending-strip-window-toggle"
+        >
+          <button
+            type="button"
+            onClick={() => onChangeWindow("day")}
+            data-testid="trending-strip-window-day"
+            aria-pressed={trendingWindow === "day"}
+            className={`px-2.5 h-6 text-[10px] font-black rounded-full transition-colors ${
+              trendingWindow === "day"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            24h
+          </button>
+          <button
+            type="button"
+            onClick={() => onChangeWindow("week")}
+            data-testid="trending-strip-window-week"
+            aria-pressed={trendingWindow === "week"}
+            className={`px-2.5 h-6 text-[10px] font-black rounded-full transition-colors ${
+              trendingWindow === "week"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            7d
+          </button>
+        </div>
+        <Link href="/social">
+          <span className="text-[11px] font-black text-primary uppercase tracking-wider cursor-pointer hover:underline">
+            See all
+          </span>
+        </Link>
+      </div>
     </div>
   );
 }
