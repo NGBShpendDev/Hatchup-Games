@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { Map, Lock, Zap, Egg, Sparkles, Trophy, Users, Eye, EyeOff, X } from "lucide-react";
+import { Map, Lock, Zap, Egg, Sparkles, Trophy, Users, Eye, EyeOff, X, MapPin, ChevronDown } from "lucide-react";
 import { ForYouStrip } from "@/components/for-you-strip";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Link } from "wouter";
@@ -46,6 +46,9 @@ export default function Explore() {
   const [hiddenSince, setHiddenSince] = useState<string | null>(null);
   const [reminderDismissed, setReminderDismissed] = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
+  const [cityInput, setCityInput] = useState("");
+  const [pickerSaving, setPickerSaving] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -133,6 +136,32 @@ export default function Explore() {
       setToggling(false);
     }
   };
+  const handleCityPickerSave = async () => {
+    const city = cityInput.trim();
+    if (!playerId || pickerSaving || !city) return;
+    setPickerSaving(true);
+    try {
+      const res = await fetch("/api/players/me/location", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ city, visibility: "city" }),
+      });
+      if (!res.ok) throw new Error("save failed");
+      setCityPickerOpen(false);
+      setCityInput("");
+      await queryClient.invalidateQueries({ queryKey: getListNearbyPlayersQueryKey(nearbyParams) });
+      toast({
+        title: "City set!",
+        description: `You'll now appear in the Players Nearby strip for ${city}.`,
+      });
+    } catch {
+      toast({ title: "Couldn't save", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setPickerSaving(false);
+    }
+  };
+
   const distanceLabel: Record<string, string> = {
     under_1km: "< 1 km away",
     under_5km: "< 5 km away",
@@ -223,13 +252,71 @@ export default function Explore() {
               </div>
             ) : locationRequired ? (
               <div
-                className="rounded-2xl border border-dashed border-white/10 bg-card/40 backdrop-blur p-4 text-sm text-muted-foreground flex items-center gap-3"
+                className="rounded-2xl border border-dashed border-white/10 bg-card/40 backdrop-blur p-4 text-sm text-muted-foreground"
                 data-testid="text-nearby-location-required"
               >
-                <Map className="w-4 h-4 shrink-0 text-primary" />
-                <span>
-                  <Link href="/settings/privacy" className="font-bold text-foreground hover:text-primary transition-colors">Set your city</Link> to see players nearby.
-                </span>
+                <div className="flex items-center gap-3">
+                  <Map className="w-4 h-4 shrink-0 text-primary" />
+                  <span className="flex-1 min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => setCityPickerOpen(o => !o)}
+                      data-testid="button-set-city"
+                      className="font-bold text-foreground hover:text-primary transition-colors inline-flex items-center gap-1"
+                    >
+                      Set your city
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${cityPickerOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    {" "}to see players nearby.
+                  </span>
+                </div>
+                {cityPickerOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="mt-3 space-y-2"
+                  >
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Your city</p>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                        <input
+                          type="text"
+                          value={cityInput}
+                          onChange={e => setCityInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") handleCityPickerSave(); }}
+                          placeholder="e.g. San Francisco"
+                          data-testid="input-city"
+                          autoFocus
+                          className="w-full rounded-xl border border-border bg-background/80 pl-9 pr-3 py-2 text-sm font-medium text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/40 transition-colors"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCityPickerSave}
+                        disabled={pickerSaving || !cityInput.trim()}
+                        data-testid="button-city-picker-save"
+                        className="rounded-xl bg-primary text-primary-foreground px-4 py-2 text-sm font-black hover:bg-primary/90 transition-colors disabled:opacity-50"
+                      >
+                        {pickerSaving ? "…" : "Save"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setCityPickerOpen(false); setCityInput(""); }}
+                        data-testid="button-city-picker-cancel"
+                        className="rounded-xl border border-white/10 bg-card/70 px-3 py-2 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Only your city name is stored — never your exact address.{" "}
+                      <Link href="/settings/privacy#location-visibility" className="underline hover:text-foreground transition-colors">Privacy settings</Link>.
+                    </p>
+                  </motion.div>
+                )}
               </div>
             ) : (
             <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">

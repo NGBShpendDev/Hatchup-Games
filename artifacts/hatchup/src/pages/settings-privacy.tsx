@@ -614,7 +614,7 @@ export default function SettingsPrivacy() {
         </Dialog>
 
         {/* Location Visibility */}
-        <GlassCard className="p-4">
+        <GlassCard className="p-4" id="location-visibility">
           <div className="relative z-10 space-y-3">
             <div className="text-base font-black flex items-center gap-2">
               <Eye className="w-4 h-4 text-primary" />

@@ -372,10 +372,13 @@ router.get("/players/nearby", requireAuth, attachPlayer, async (req, res) => {
     return;
   }
 
+  // State filter is applied only when the viewer has a state — city-only entries
+  // (e.g. set via the inline Explore prompt) remain discoverable to anyone in
+  // the same city regardless of whether state was recorded.
   const candidates = await db.query.playerLocationTable.findMany({
     where: and(
       eq(playerLocationTable.city, viewerLoc.city),
-      eq(playerLocationTable.state, viewerLoc.state ?? ""),
+      viewerLoc.state ? eq(playerLocationTable.state, viewerLoc.state) : undefined,
       ne(playerLocationTable.playerId, viewerId),
     ),
   });
