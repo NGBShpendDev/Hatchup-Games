@@ -20,7 +20,6 @@ const router = Router();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function tryGetStripe(): Promise<any | null> {
   try {
-    // @ts-expect-error stripeClient is created when the Stripe integration is wired
     const mod = await import("../stripeClient.js");
     return await mod.getUncachableStripeClient();
   } catch {

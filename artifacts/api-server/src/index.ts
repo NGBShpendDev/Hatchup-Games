@@ -2,6 +2,34 @@ import { createServer } from "http";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { attachBattleWss } from "./services/matchmakingQueue";
+import { getStripeSync } from "./stripeClient";
+
+/**
+ * Initialize Stripe sync — migrations, managed webhook, and backfill.
+ * Best-effort: if the Stripe connection isn't available (e.g. local dev
+ * without secrets) we log and continue so the API still boots.
+ */
+async function initStripe(): Promise<void> {
+  try {
+    const { runMigrations } = await import("stripe-replit-sync");
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) throw new Error("DATABASE_URL required for Stripe sync");
+
+    await runMigrations({ databaseUrl });
+
+    const stripeSync = await getStripeSync();
+    const baseDomain = process.env.REPLIT_DOMAINS?.split(",")[0];
+    if (baseDomain) {
+      await stripeSync.findOrCreateManagedWebhook(`https://${baseDomain}/api/stripe/webhook`);
+    }
+    await stripeSync.syncBackfill();
+    logger.info("Stripe sync initialized");
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, "Stripe sync not initialized (continuing without it)");
+  }
+}
+
+void initStripe();
 
 const rawPort = process.env["PORT"];
 

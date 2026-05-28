@@ -117,6 +117,32 @@ export async function enforceBattleDailyCap(req: Request, res: Response, next: N
   next();
 }
 
+/**
+ * Programmatic battle-cap check for non-Express entry points (e.g. WebSocket
+ * `join_queue`). Resolves entitlement directly from the player row and
+ * consumes the daily counter. Returns {ok:true} on success; otherwise an
+ * error code + message suitable for echoing to the caller.
+ */
+export async function checkAndConsumeBattleCap(playerId: number): Promise<
+  { ok: true } | { ok: false; error: string; message: string; cap: number }
+> {
+  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
+  if (!player) return { ok: true };
+  const ent = getEntitlement(player);
+  if (ent.tier === "premium") return { ok: true };
+  const cap = ent.features.dailyBattleEntryCap;
+  const result = await consumeDailyCounter(playerId, cap, "dailyBattleUsedCount", "dailyBattleResetDate");
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: "battle_daily_cap_reached",
+      message: `Free accounts get ${cap} battle entries per day. Upgrade to Premium for unlimited matches.`,
+      cap,
+    };
+  }
+  return { ok: true };
+}
+
 declare global {
   namespace Express {
     interface Request {

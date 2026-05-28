@@ -13,6 +13,7 @@ import {
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { startPassiveSyncJob } from "./services/passiveSyncJob";
+import { WebhookHandlers } from "./webhookHandlers";
 
 const app: Express = express();
 
@@ -87,6 +88,26 @@ app.use(
 );
 
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
+
+// ── Stripe webhook MUST be registered BEFORE express.json() so we get the raw
+// body for signature verification. See stripe skill.
+app.post(
+  "/api/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    const signature = req.headers["stripe-signature"];
+    if (!signature) { res.status(400).json({ error: "Missing signature" }); return; }
+    const sig = Array.isArray(signature) ? signature[0] : signature;
+    try {
+      await WebhookHandlers.processWebhook(req.body as Buffer, sig);
+      res.status(200).json({ received: true });
+    } catch (err) {
+      logger.error({ err }, "stripe_webhook_processing_failed");
+      res.status(400).json({ error: "Webhook processing failed" });
+    }
+  },
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

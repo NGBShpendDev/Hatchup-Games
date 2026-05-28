@@ -117,6 +117,51 @@ These systems were added in the pre-launch hardening sweep and must stay wired:
 - When adding a new fitness ingestion endpoint, call `validateStepDelta` before persisting.
 - When adding a new location ingestion endpoint, call `validateGpsUpdate` against the previous decrypted fix.
 
+## Subscriptions & Entitlement (Task #41)
+
+Smart monetization that **never grants a competitive advantage**. Premium unlocks convenience, customization, analytics, and broader leaderboard scopes — never raw battle/race power.
+
+### Pricing
+- Monthly: $8.99 (`price.unit_amount = 899`)
+- Yearly: $80 (`price.unit_amount = 8000`)
+- Single Stripe product `metadata.app="hatchup"`, `metadata.kind="premium"`.
+- Seed with `pnpm --filter @workspace/scripts exec tsx src/seed-stripe-products.ts`.
+
+### Entitlement resolver (`services/entitlement.ts`)
+Pure function over the player row. Premium precedence:
+1. `paidUntil > now`  → source `paid`
+2. `trialEndsAt > now` → source `trial` (7 days from signup)
+3. `top10LastCheckedAt` within 24h AND `top10ContextLabel` set → source `top10`
+4. Otherwise → free, source `expired`
+
+### Free vs Premium caps
+- Hatchlings: 6 vs unlimited (`enforceHatchlingCap` on `POST /hatchlings`)
+- AI coach messages/day: 5 vs unlimited (`enforceCoachDailyCap` on `POST /coach/chat`)
+- Battle entries/day: 5 vs unlimited (`enforceBattleDailyCap` on `POST /battles/queue/join`)
+- Leaderboard scopes: `world`+`country` vs all (gated in `GET /leaderboards/scoped`)
+- Customization slots, premium cosmetics, advanced analytics, unlimited social: premium-only
+
+### Top-10 City Exemption (`services/top10.ts`)
+Across 6 metrics — xp, steps, workouts, battle_wins, streaks, artifacts — if a player ranks ≤10 in their **city cohort** for ANY of them, they get free Premium. Recomputed lazily (24h cache) by `attachEntitlement` middleware.
+
+### Stripe wiring
+- `stripeClient.ts` — Replit-managed connection (never cache the client).
+- `webhookHandlers.ts` — passes raw payload to `stripe-replit-sync` AND projects `customer.subscription.*` events onto `players.paidUntil` / `players.subscriptionTier` for fast entitlement reads.
+- Webhook route `/api/stripe/webhook` registered **before** `express.json()` in `app.ts`.
+- `initStripe()` in `index.ts` runs migrations + sets up managed webhook + `syncBackfill()` on boot (best-effort — server still boots if Stripe is offline).
+- `stripe-replit-sync` is externalized in `build.mjs` because it loads SQL migration files from a sibling `./migrations` dir via `__dirname`; bundling breaks that path.
+
+### Subscription routes (`routes/subscription.ts`)
+- `GET /subscription/me` — full entitlement snapshot + pricing + `stripeConfigured`
+- `POST /subscription/refresh-top10` — manual recheck
+- `POST /subscription/checkout` — Stripe Checkout session (returns 503 if Stripe not connected)
+- `POST /subscription/portal` — Stripe customer portal
+
+### Frontend
+- `/subscription` paywall page with plan picker, status block, feature comparison, Top-10 explainer.
+- `<SubscriptionChip />` in `home.tsx` header — shows Premium / Trial Xd / Top-10 / Upgrade.
+- New players are auto-seeded with `subscriptionTier="premium"`, `subscriptionSource="trial"`, `trialEndsAt=now+7d`.
+
 ## Gotchas
 
 - Vite `strictPort: true` was removed — it caused the workflow restart tool to fail with DIDNT_OPEN_A_PORT even though the server was running

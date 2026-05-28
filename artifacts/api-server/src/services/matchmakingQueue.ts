@@ -20,6 +20,7 @@ import {
   type MoveType,
 } from "./battleService";
 import { loadActiveLoadoutModifiers, awardArtifactBattleXp } from "./artifactLoadoutService";
+import { checkAndConsumeBattleCap } from "./subscriptionGuards";
 import { logger } from "../lib/logger";
 
 // ── In-memory state ──────────────────────────────────────────────────────────
@@ -394,6 +395,13 @@ async function handleMessage(ws: WebSocket, playerId: number, raw: string) {
     // Ranked gate: player must be level 10+ (enforced on the WS path, the real path)
     if (mode === "ranked" && (player?.level ?? 0) < 10) {
       send(ws, { type: "error", message: "Ranked mode requires player level 10+" });
+      return;
+    }
+
+    // Free-tier daily battle cap (mirrors REST POST /battles/queue/join).
+    const capCheck = await checkAndConsumeBattleCap(playerId);
+    if (!capCheck.ok) {
+      send(ws, { type: "error", error: capCheck.error, message: capCheck.message, cap: capCheck.cap });
       return;
     }
 

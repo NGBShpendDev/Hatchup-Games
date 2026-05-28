@@ -100,6 +100,9 @@ async function buildAll() {
       "puppeteer",
       "puppeteer-core",
       "electron",
+      // Loads SQL migration files from a sibling ./migrations directory via __dirname,
+      // which only works if it stays in node_modules instead of being bundled.
+      "stripe-replit-sync",
     ],
     sourcemap: "linked",
     plugins: [
