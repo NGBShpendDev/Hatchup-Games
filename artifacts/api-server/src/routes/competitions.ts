@@ -10,6 +10,7 @@ import {
   SubmitCompetitionResultBody,
 } from "@workspace/api-zod";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth.ts";
+import { applyHatchlingXp } from "../services/hatchlingXp.ts";
 
 const router = Router();
 
@@ -102,6 +103,10 @@ router.post("/competitions/:id/result", requireAuth, attachPlayer, async (req, r
   if (body.data.rank === 1) {
     await db.update(playersTable).set({ totalWins: (await db.query.playersTable.findFirst({ where: eq(playersTable.id, comp.playerId) }))?.totalWins ?? 0 + 1, totalMatches: (await db.query.playersTable.findFirst({ where: eq(playersTable.id, comp.playerId) }))?.totalMatches ?? 0 + 1 }).where(eq(playersTable.id, comp.playerId));
   }
+
+  // Award XP to the participating hatchling so level-ups can cross
+  // the evolution thresholds (5 and 15) that trigger the share prompt.
+  await applyHatchlingXp(comp.hatchlingId, xpEarned).catch(() => undefined);
 
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, comp.playerId) });
   const hatchling = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, comp.hatchlingId) });

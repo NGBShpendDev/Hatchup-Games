@@ -23,6 +23,7 @@ import {
 } from "./battleService.ts";
 import { loadActiveLoadoutModifiers, awardArtifactBattleXp } from "./artifactLoadoutService.ts";
 import { checkAndConsumeBattleCap } from "./subscriptionGuards.ts";
+import { applyHatchlingXp } from "./hatchlingXp.ts";
 import { logger } from "../lib/logger.ts";
 import { BattleWsClientMessageSchema, BattleWsServerMessageSchema } from "@workspace/api-zod";
 
@@ -346,6 +347,15 @@ async function finalizeBattle(battleId: number) {
         totalBattleWins: p2Won ? p2.totalBattleWins + 1 : p2.totalBattleWins,
       }).where(eq(playersTable.id, p2.id));
     }
+
+    // Award XP to the participating hatchlings so level-ups can cross the
+    // evolution thresholds (5 and 15) that trigger the share prompt.
+    await Promise.all([
+      applyHatchlingXp(state.fighter1.hatchlingId, r1.xp).catch(() => undefined),
+      state.fighter2.hatchlingId && !state.fighter2.isBot
+        ? applyHatchlingXp(state.fighter2.hatchlingId, computeRewards(state, 2).xp).catch(() => undefined)
+        : Promise.resolve(undefined),
+    ]);
 
     // Award artifact battle XP to both fighters' equipped artifacts
     const [artifactXpP1, artifactXpP2] = await Promise.all([

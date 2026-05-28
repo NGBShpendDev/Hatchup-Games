@@ -353,6 +353,18 @@ router.post("/fitness/log", requireAuth, attachPlayer, fitnessLogLimiter, requir
     });
   }
 
+  // Surface active Pal level-up in the reward summary so the unified
+  // RewardSummaryModal can celebrate it and the EvolutionShareProvider
+  // watcher gets a chance to trigger the share prompt on client refetch.
+  if (result.palXpResult && result.palXpResult.newLevel > result.palXpResult.prevLevel) {
+    rewardSummary.push({
+      kind: "hatchling",
+      label: "Pal levelled up!",
+      value: result.palXpResult.newLevel,
+      detail: `Now level ${result.palXpResult.newLevel} (+${result.palXpResult.xpDelta} XP)`,
+    });
+  }
+
   res.status(201).json({
     activity: activityFormatted,
     fitnessXpEarned: result.fitnessXpEarned + groupBonusXp,
@@ -364,6 +376,7 @@ router.post("/fitness/log", requireAuth, attachPlayer, fitnessLogLimiter, requir
     newArtifacts: result.newArtifacts ?? [],
     newBadges: result.newBadges ?? [],
     rewardSummary,
+    palXpResult: result.palXpResult ?? null,
   });
 });
 

@@ -9,6 +9,7 @@ import {
 import { eq, and, gte } from "drizzle-orm";
 import { checkAndAwardBadges, type BadgeDefinition } from "./badgeService.ts";
 import { awardFitnessBarXp, checkAndAwardArtifacts } from "./artifactService.ts";
+import { applyHatchlingXp, getActivePalId, type HatchlingXpResult } from "./hatchlingXp.ts";
 import { logger } from "../lib/logger.ts";
 
 export const STRENGTH_TYPES = new Set(["pushups", "burpees", "squats", "pullups", "planks", "situps"]);
@@ -71,6 +72,7 @@ export type LogActivityResult = {
   newBadges?: BadgeDefinition[];
   prResult?: PrResult;
   newArtifacts?: Array<{ id: number; name: string; rarity: string; lore: string; imageSlug: string }>;
+  palXpResult?: HatchlingXpResult | null;
 };
 
 /** Upsert a personal record. Returns whether it is a new/improved PR. */
@@ -337,6 +339,19 @@ export async function logFitnessActivity(
     return [];
   });
 
+  // Flow fitness XP into the active Pal so level-ups can cross evolution
+  // thresholds (5 and 15) and surface the share prompt on the next refetch.
+  let palXpResult: HatchlingXpResult | null = null;
+  if (fitnessXpEarned > 0) {
+    const palId = await getActivePalId(playerId).catch(() => null);
+    if (palId) {
+      palXpResult = await applyHatchlingXp(palId, fitnessXpEarned).catch(err => {
+        logger.error({ err, playerId, palId }, "applyHatchlingXp (fitness) failed");
+        return null;
+      });
+    }
+  }
+
   return {
     fitnessXpEarned,
     eggsUpdated,
@@ -346,5 +361,6 @@ export async function logFitnessActivity(
     newBadges,
     prResult,
     newArtifacts: newArtifacts.map(a => ({ id: a.id, name: a.name, rarity: a.rarity, lore: a.lore, imageSlug: a.imageSlug })),
+    palXpResult,
   };
 }
