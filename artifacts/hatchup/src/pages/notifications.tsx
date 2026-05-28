@@ -10,8 +10,11 @@ import {
   useDeclineBattleRematch,
   useGetMyChallengeInvites,
   getGetMyChallengeInvitesQueryKey,
+  useGetMyClubInvites,
+  getGetMyClubInvitesQueryKey,
   type Notification,
   type ChallengeInvite,
+  type ClubInvite,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -219,6 +222,14 @@ export default function NotificationsPage() {
       staleTime: 10_000,
     },
   });
+  const { data: clubInvitesData, isLoading: isLoadingClubInvites } = useGetMyClubInvites({
+    query: {
+      queryKey: getGetMyClubInvitesQueryKey(),
+      refetchInterval: POLL_MS,
+      refetchOnWindowFocus: true,
+      staleTime: 10_000,
+    },
+  });
 
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
@@ -230,6 +241,7 @@ export default function NotificationsPage() {
     qc.invalidateQueries({ queryKey: getGetUnreadNotificationCountQueryKey() });
     qc.invalidateQueries({ queryKey: getListNotificationsQueryKey({ limit: 20 }) });
     qc.invalidateQueries({ queryKey: getGetMyChallengeInvitesQueryKey() });
+    qc.invalidateQueries({ queryKey: getGetMyClubInvitesQueryKey() });
   };
 
   const open = (n: Notification) => {
@@ -315,11 +327,12 @@ export default function NotificationsPage() {
   };
 
   const respondToClubInvite = async (
-    n: Notification,
+    busyKey: string,
     inviteId: number,
     status: "accepted" | "declined",
+    successNavigate?: string,
   ) => {
-    setBusy({ key: `n-${n.id}`, action: status === "accepted" ? "accept" : "decline" });
+    setBusy({ key: busyKey, action: status === "accepted" ? "accept" : "decline" });
     try {
       const res = await fetch(`${BASE}/api/club-invites/${inviteId}/respond`, {
         method: "POST",
@@ -331,11 +344,10 @@ export default function NotificationsPage() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err?.error ?? `HTTP ${res.status}`);
       }
-      if (!n.read) markRead.mutate({ id: n.id });
       refresh();
       if (status === "accepted") {
         toast({ title: "Joined the club", description: "Welcome aboard!" });
-        navigate(n.link ?? "/club");
+        navigate(successNavigate ?? "/club");
       } else {
         toast({ title: "Club invite declined" });
       }
@@ -348,6 +360,24 @@ export default function NotificationsPage() {
     } finally {
       setBusy(null);
     }
+  };
+
+  const respondToClubInviteFromNotification = (
+    n: Notification,
+    inviteId: number,
+    status: "accepted" | "declined",
+  ) => {
+    if (!n.read) markRead.mutate({ id: n.id });
+    return respondToClubInvite(`n-${n.id}`, inviteId, status, n.link ?? undefined);
+  };
+
+  const respondToClubInviteRaw = (
+    invite: ClubInvite,
+    status: "accepted" | "declined",
+  ) => {
+    const club = invite.club as { id?: number } | undefined | null;
+    const navTarget = typeof club?.id === "number" ? `/club/${club.id}` : "/club";
+    return respondToClubInvite(`cl-${invite.id}`, invite.id, status, navTarget);
   };
 
   const dismissNotification = async (n: Notification) => {
@@ -395,24 +425,21 @@ export default function NotificationsPage() {
   const items = data ?? [];
   const unread = countData?.count ?? 0;
   const challengeInvites = challengeInvitesData ?? [];
+  const clubInvites = clubInvitesData ?? [];
 
   const pendingRematchNotifs = useMemo(
     () => items.filter(isPendingRematchInvite),
     [items],
   );
 
-  const pendingClubInviteNotifs = useMemo(
-    () => items.filter((n) => n.type === "club_invite" && !n.read && clubInviteId(n) !== null),
-    [items],
-  );
-
-  // Build the unified Invites list. Challenge invites come from the dedicated
-  // endpoint (source of truth for pending status). Rematch and club invites
-  // only live as notifications today, so we surface those filtered.
+  // Build the unified Invites list. Challenge and club invites come from
+  // dedicated endpoints (source of truth, enriched with inviter profile).
+  // Rematch invites only live as notifications today, so we surface those
+  // filtered.
   type InviteRow =
     | { kind: "challenge"; invite: ChallengeInvite; sortKey: number }
     | { kind: "rematch"; notification: Notification; rematchId: string; sortKey: number }
-    | { kind: "club"; notification: Notification; sortKey: number };
+    | { kind: "club"; invite: ClubInvite; sortKey: number };
 
   const inviteRows: InviteRow[] = useMemo(() => {
     const rows: InviteRow[] = [];
@@ -433,16 +460,16 @@ export default function NotificationsPage() {
         sortKey: new Date(n.createdAt).getTime(),
       });
     }
-    for (const n of pendingClubInviteNotifs) {
+    for (const inv of clubInvites) {
       rows.push({
         kind: "club",
-        notification: n,
-        sortKey: new Date(n.createdAt).getTime(),
+        invite: inv,
+        sortKey: new Date(inv.sentAt).getTime(),
       });
     }
     rows.sort((a, b) => b.sortKey - a.sortKey);
     return rows;
-  }, [challengeInvites, pendingRematchNotifs, pendingClubInviteNotifs]);
+  }, [challengeInvites, pendingRematchNotifs, clubInvites]);
 
   const inviteCounts = useMemo(
     () => ({
@@ -594,7 +621,7 @@ export default function NotificationsPage() {
                 disabled={rowBusy !== null}
                 onClick={(e) => {
                   e.stopPropagation();
-                  respondToClubInvite(n, clubInvId, "accepted");
+                  respondToClubInviteFromNotification(n, clubInvId, "accepted");
                 }}
                 data-testid={`button-accept-club-invite-${n.id}`}
               >
@@ -610,7 +637,7 @@ export default function NotificationsPage() {
                 disabled={rowBusy !== null}
                 onClick={(e) => {
                   e.stopPropagation();
-                  respondToClubInvite(n, clubInvId, "declined");
+                  respondToClubInviteFromNotification(n, clubInvId, "declined");
                 }}
                 data-testid={`button-decline-club-invite-${n.id}`}
               >
@@ -777,6 +804,85 @@ export default function NotificationsPage() {
     );
   };
 
+  const renderClubInviteRow = (invite: ClubInvite, idx: number) => {
+    const meta = iconFor("club_invite");
+    const Icon = meta.icon;
+    const rowBusy = busy?.key === `cl-${invite.id}` ? busy.action : null;
+    const club = invite.club as { id?: number; name?: string; description?: string } | undefined | null;
+    const clubName = club?.name?.trim() || "a club";
+    const inviter = invite.inviter as { displayName?: string | null; avatarUrl?: string | null } | undefined | null;
+    const inviterName = inviter?.displayName?.trim() || "Someone";
+    const title = `${inviterName} invited you to ${clubName}`;
+    const body = (club?.description as string | undefined) ?? "Tap to view this club.";
+    const clubLink = typeof club?.id === "number" ? `/club/${club.id}` : "/club";
+    return (
+      <motion.div
+        key={`invite-club-${invite.id}`}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.18, delay: Math.min(idx * 0.02, 0.2) }}
+        onClick={() => navigate(clubLink)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            navigate(clubLink);
+          }
+        }}
+        className="w-full text-left rounded-xl border border-primary/40 bg-card/60 backdrop-blur p-3 flex items-start gap-3 transition-all hover:bg-card hover:border-border shadow-[0_0_12px_-4px_hsl(var(--primary)/0.6)] cursor-pointer"
+        data-testid={`invite-row-club-${invite.id}`}
+      >
+        <div className={`shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br ${meta.color} flex items-center justify-center text-white shadow-md`}>
+          <Icon className="w-5 h-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold leading-tight flex-1 truncate" data-testid={`invite-row-club-${invite.id}-title`}>{title}</span>
+            <span className="w-2 h-2 rounded-full bg-primary shrink-0 shadow-[0_0_6px_rgba(var(--primary),0.8)]" />
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{body}</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 mt-1">
+            {formatRelative(invite.sentAt)}
+          </p>
+          <div className="mt-2 flex gap-2">
+            <Button
+              size="sm"
+              className="h-7 px-2.5 gap-1 bg-gradient-to-br from-indigo-500 to-violet-500 hover:from-indigo-500/90 hover:to-violet-500/90"
+              disabled={rowBusy !== null}
+              onClick={(e) => {
+                e.stopPropagation();
+                respondToClubInviteRaw(invite, "accepted");
+              }}
+              data-testid={`button-accept-club-invite-raw-${invite.id}`}
+            >
+              {rowBusy === "accept"
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Check className="w-3.5 h-3.5" />}
+              Accept
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2.5 gap-1"
+              disabled={rowBusy !== null}
+              onClick={(e) => {
+                e.stopPropagation();
+                respondToClubInviteRaw(invite, "declined");
+              }}
+              data-testid={`button-decline-club-invite-raw-${invite.id}`}
+            >
+              {rowBusy === "decline"
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <X className="w-3.5 h-3.5" />}
+              Decline
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
   return (
     <Layout>
       <div className="space-y-4">
@@ -913,7 +1019,7 @@ export default function NotificationsPage() {
           </TabsContent>
 
           <TabsContent value="invites">
-            {isLoading || isLoadingInvites ? (
+            {isLoading || isLoadingInvites || isLoadingClubInvites ? (
               <div className="space-y-2">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-20 w-full rounded-xl" />
@@ -982,11 +1088,11 @@ export default function NotificationsPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {filteredInviteRows.map((row, idx) =>
-                      row.kind === "challenge"
-                        ? renderChallengeInviteRow(row.invite, idx)
-                        : renderNotificationRow(row.notification, idx),
-                    )}
+                    {filteredInviteRows.map((row, idx) => {
+                      if (row.kind === "challenge") return renderChallengeInviteRow(row.invite, idx);
+                      if (row.kind === "club") return renderClubInviteRow(row.invite, idx);
+                      return renderNotificationRow(row.notification, idx);
+                    })}
                   </div>
                 )}
               </div>

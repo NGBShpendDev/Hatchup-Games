@@ -5872,6 +5872,14 @@ components:
         status:    { type: string }
         sentAt:    { type: string }
         club:      { type: object }
+        inviter:
+          type: object
+          nullable: true
+          required: [id]
+          properties:
+            id:          { type: integer }
+            displayName: { type: string, nullable: true }
+            avatarUrl:   { type: string, nullable: true }
 
     PendingClubInvite:
       type: object

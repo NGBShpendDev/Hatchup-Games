@@ -1265,6 +1265,12 @@ export interface InviteToChallengeBody {
 
 export type ClubInviteClub = { [key: string]: unknown };
 
+export type ClubInviteInviter = {
+  id: number;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+} | null;
+
 export interface ClubInvite {
   id: number;
   clubId: number;
@@ -1273,6 +1279,7 @@ export interface ClubInvite {
   status: string;
   sentAt: string;
   club?: ClubInviteClub;
+  inviter?: ClubInviteInviter;
 }
 
 export interface PendingClubInvite {

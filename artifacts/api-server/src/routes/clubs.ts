@@ -344,10 +344,12 @@ router.get("/club-invites", requireAuth, attachPlayer, async (req, res) => {
 
   const enriched = await Promise.all(invites.map(async (inv) => {
     const club = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, inv.clubId) });
+    const inviter = await db.query.playersTable.findFirst({ where: eq(playersTable.id, inv.inviterId) });
     return {
       ...inv,
       sentAt: inv.sentAt.toISOString(),
       club: club ? { ...club, createdAt: club.createdAt.toISOString() } : null,
+      inviter: inviter ? { id: inviter.id, displayName: inviter.displayName, avatarUrl: inviter.avatarUrl } : null,
     };
   }));
 

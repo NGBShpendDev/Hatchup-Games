@@ -3556,7 +3556,12 @@ export const GetMyClubInvitesResponseItem = zod.object({
   "sentAt": zod.string(),
   "club": zod.object({
 
-}).passthrough().optional()
+}).passthrough().optional(),
+  "inviter": zod.object({
+  "id": zod.number(),
+  "displayName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish()
+}).nullish()
 })
 export const GetMyClubInvitesResponse = zod.array(GetMyClubInvitesResponseItem)
 
