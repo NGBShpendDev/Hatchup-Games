@@ -47,6 +47,8 @@ import type {
   CreatePostInput,
   DeletePostCommentParams,
   DeletePostParams,
+  DiscoverPlayersParams,
+  DiscoverablePlayer,
   Egg,
   EvolutionCategory,
   EvolutionType,
@@ -6832,6 +6834,174 @@ export const useUnfollowPlayer = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getUnfollowPlayerMutationOptions(options));
     }
+
+export const getDiscoverPlayersUrl = (params: DiscoverPlayersParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/social/discover?${stringifiedParams}` : `/api/social/discover`
+}
+
+/**
+ * @summary Suggested players to follow (shared groups, top creators, recently active)
+ */
+export const discoverPlayers = async (params: DiscoverPlayersParams, options?: RequestInit): Promise<DiscoverablePlayer[]> => {
+
+  return customFetch<DiscoverablePlayer[]>(getDiscoverPlayersUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDiscoverPlayersQueryKey = (params?: DiscoverPlayersParams,) => {
+    return [
+    `/api/social/discover`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getDiscoverPlayersQueryOptions = <TData = Awaited<ReturnType<typeof discoverPlayers>>, TError = ErrorType<unknown>>(params: DiscoverPlayersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof discoverPlayers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDiscoverPlayersQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof discoverPlayers>>> = ({ signal }) => discoverPlayers(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof discoverPlayers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DiscoverPlayersQueryResult = NonNullable<Awaited<ReturnType<typeof discoverPlayers>>>
+export type DiscoverPlayersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Suggested players to follow (shared groups, top creators, recently active)
+ */
+
+export function useDiscoverPlayers<TData = Awaited<ReturnType<typeof discoverPlayers>>, TError = ErrorType<unknown>>(
+ params: DiscoverPlayersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof discoverPlayers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDiscoverPlayersQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSearchPlayersUrl = (params: SearchPlayersParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/social/search?${stringifiedParams}` : `/api/social/search`
+}
+
+/**
+ * @summary Search players by username or display name
+ */
+export const searchPlayers = async (params: SearchPlayersParams, options?: RequestInit): Promise<DiscoverablePlayer[]> => {
+
+  return customFetch<DiscoverablePlayer[]>(getSearchPlayersUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchPlayersQueryKey = (params?: SearchPlayersParams,) => {
+    return [
+    `/api/social/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchPlayersQueryOptions = <TData = Awaited<ReturnType<typeof searchPlayers>>, TError = ErrorType<unknown>>(params: SearchPlayersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchPlayers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchPlayersQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchPlayers>>> = ({ signal }) => searchPlayers(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchPlayers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type SearchPlayersQueryResult = NonNullable<Awaited<ReturnType<typeof searchPlayers>>>
+export type SearchPlayersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Search players by username or display name
+ */
+
+export function useSearchPlayers<TData = Awaited<ReturnType<typeof searchPlayers>>, TError = ErrorType<unknown>>(
+ params: SearchPlayersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchPlayers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getSearchPlayersQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetPlayerSocialProfileUrl = (id: number,
     params?: GetPlayerSocialProfileParams,) => {

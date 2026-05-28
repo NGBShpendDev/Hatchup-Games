@@ -8,8 +8,9 @@ import {
   postRepostsTable,
   playersTable,
   hatchlingsTable,
+  groupMembersTable,
 } from "@workspace/db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, or, ne, inArray, ilike } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
 import { blockMinorSocialWrite } from "../middlewares/minorGuard";
 import { socialWriteLimiter } from "../middlewares/rateLimiters";
@@ -619,6 +620,148 @@ async function getMemoryForPlayer(
 
   return null;
 }
+
+// ── GET /social/discover ────────────────────────────────────────────────────
+
+router.get("/social/discover", requireAuth, attachPlayer, async (req, res) => {
+  const viewerId = req.playerId!;
+  const limit = Math.min(Number(req.query.limit) || 20, 50);
+
+  // Who the viewer already follows
+  const myFollows = await db.query.playerFollowsTable.findMany({
+    where: eq(playerFollowsTable.followerId, viewerId),
+  });
+  const followedIds = new Set(myFollows.map(f => f.followeeId));
+
+  // Shared-group cohort: players in any group the viewer is also a member of
+  const myMemberships = await db.query.groupMembersTable.findMany({
+    where: eq(groupMembersTable.playerId, viewerId),
+  });
+  const myGroupIds = myMemberships.map(m => m.groupId);
+
+  type Candidate = { id: number; reason: string; reasonDetail: string | null; weight: number };
+  const candidates = new Map<number, Candidate>();
+  const consider = (id: number, reason: string, detail: string | null, weight: number) => {
+    if (id === viewerId || followedIds.has(id)) return;
+    const existing = candidates.get(id);
+    if (!existing || existing.weight < weight) {
+      candidates.set(id, { id, reason, reasonDetail: detail, weight });
+    }
+  };
+
+  if (myGroupIds.length > 0) {
+    const sharedMembers = await db.query.groupMembersTable.findMany({
+      where: inArray(groupMembersTable.groupId, myGroupIds),
+    });
+    for (const m of sharedMembers) consider(m.playerId, "shared_group", "In a group with you", 100);
+  }
+
+  // Top creators by creator badge / total engagement (proxy via posts engagementScore sum)
+  const creators = await db.query.playersTable.findMany({
+    where: and(ne(playersTable.id, viewerId), sql`${playersTable.creatorBadge} IS NOT NULL`),
+    limit: 30,
+  });
+  for (const c of creators) consider(c.id, "top_creator", "Verified creator", 60);
+
+  // Recently active: latest posters
+  const recentPosts = await db.query.postsTable.findMany({
+    orderBy: [desc(postsTable.createdAt)],
+    limit: 100,
+  });
+  for (const p of recentPosts) consider(p.playerId, "recently_active", "Posted recently", 30);
+
+  // Pick top N candidates by weight
+  const ranked = Array.from(candidates.values()).sort((a, b) => b.weight - a.weight).slice(0, limit);
+  if (ranked.length === 0) { res.json([]); return; }
+
+  const playerRows = await db.query.playersTable.findMany({
+    where: inArray(playersTable.id, ranked.map(c => c.id)),
+  });
+  const playerMap = new Map(playerRows.map(p => [p.id, p]));
+
+  // Follower counts
+  const followerRows = await db
+    .select({ followeeId: playerFollowsTable.followeeId, count: sql<number>`count(*)::int` })
+    .from(playerFollowsTable)
+    .where(inArray(playerFollowsTable.followeeId, ranked.map(c => c.id)))
+    .groupBy(playerFollowsTable.followeeId);
+  const followerCounts = new Map(followerRows.map(r => [r.followeeId, r.count]));
+
+  const result = ranked.flatMap(c => {
+    const p = playerMap.get(c.id);
+    if (!p) return [];
+    return [{
+      id: p.id,
+      username: p.username,
+      displayName: p.displayName ?? null,
+      avatarUrl: p.avatarUrl ?? null,
+      creatorBadge: p.creatorBadge ?? null,
+      followerCount: followerCounts.get(p.id) ?? 0,
+      isFollowing: false,
+      reason: c.reason,
+      reasonDetail: c.reasonDetail,
+    }];
+  });
+
+  res.json(result);
+});
+
+// ── GET /social/search ──────────────────────────────────────────────────────
+
+router.get("/social/search", requireAuth, attachPlayer, async (req, res) => {
+  const viewerId = req.playerId!;
+  const q = String(req.query.q ?? "").trim();
+  const limit = Math.min(Number(req.query.limit) || 20, 50);
+  if (q.length < 1) { res.json([]); return; }
+  const pattern = `%${q.replace(/[%_]/g, m => "\\" + m)}%`;
+
+  const matches = await db.query.playersTable.findMany({
+    where: and(
+      ne(playersTable.id, viewerId),
+      or(ilike(playersTable.username, pattern), ilike(playersTable.displayName, pattern)),
+    ),
+    limit,
+  });
+
+  if (matches.length === 0) { res.json([]); return; }
+  const ids = matches.map(m => m.id);
+
+  const myFollows = await db.query.playerFollowsTable.findMany({
+    where: and(eq(playerFollowsTable.followerId, viewerId), inArray(playerFollowsTable.followeeId, ids)),
+  });
+  const followingSet = new Set(myFollows.map(f => f.followeeId));
+
+  const followerRows = await db
+    .select({ followeeId: playerFollowsTable.followeeId, count: sql<number>`count(*)::int` })
+    .from(playerFollowsTable)
+    .where(inArray(playerFollowsTable.followeeId, ids))
+    .groupBy(playerFollowsTable.followeeId);
+  const followerCounts = new Map(followerRows.map(r => [r.followeeId, r.count]));
+
+  // Rank: username prefix match first, then displayName prefix, then others
+  const lowerQ = q.toLowerCase();
+  const scored = matches.map(p => {
+    let score = 0;
+    if (p.username.toLowerCase().startsWith(lowerQ)) score += 100;
+    else if (p.username.toLowerCase().includes(lowerQ)) score += 50;
+    if ((p.displayName ?? "").toLowerCase().startsWith(lowerQ)) score += 80;
+    else if ((p.displayName ?? "").toLowerCase().includes(lowerQ)) score += 40;
+    score += Math.min(20, followerCounts.get(p.id) ?? 0);
+    return { p, score };
+  }).sort((a, b) => b.score - a.score);
+
+  res.json(scored.map(({ p }) => ({
+    id: p.id,
+    username: p.username,
+    displayName: p.displayName ?? null,
+    avatarUrl: p.avatarUrl ?? null,
+    creatorBadge: p.creatorBadge ?? null,
+    followerCount: followerCounts.get(p.id) ?? 0,
+    isFollowing: followingSet.has(p.id),
+    reason: "search",
+    reasonDetail: null,
+  })));
+});
 
 router.get("/social/memories", requireAuth, attachPlayer, async (req, res) => {
   const playerId = req.playerId!;

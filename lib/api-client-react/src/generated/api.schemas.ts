@@ -1140,6 +1140,22 @@ export interface PlayerStub {
   creatorBadge: string | null;
 }
 
+export interface DiscoverablePlayer {
+  id: number;
+  username: string;
+  /** @nullable */
+  displayName: string | null;
+  /** @nullable */
+  avatarUrl: string | null;
+  /** @nullable */
+  creatorBadge: string | null;
+  followerCount: number;
+  isFollowing: boolean;
+  reason: string;
+  /** @nullable */
+  reasonDetail?: string | null;
+}
+
 export interface MemoryPost {
   post: FeedPost;
   memoryType: string;
@@ -1633,6 +1649,17 @@ playerId: number;
 
 export type DeletePostCommentParams = {
 playerId: number;
+};
+
+export type DiscoverPlayersParams = {
+playerId: number;
+limit?: number;
+};
+
+export type SearchPlayersParams = {
+q: string;
+playerId: number;
+limit?: number;
 };
 
 export type GetPlayerSocialProfileParams = {

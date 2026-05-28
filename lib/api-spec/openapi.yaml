@@ -1910,6 +1910,61 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResult"
 
+  /social/discover:
+    get:
+      operationId: discoverPlayers
+      tags: [social]
+      summary: Suggested players to follow (shared groups, top creators, recently active)
+      parameters:
+        - name: playerId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Discoverable players
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DiscoverablePlayer"
+
+  /social/search:
+    get:
+      operationId: searchPlayers
+      tags: [social]
+      summary: Search players by username or display name
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: playerId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Matching players
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DiscoverablePlayer"
+
   /social/players/{id}/profile:
     get:
       operationId: getPlayerSocialProfile
@@ -3840,6 +3895,20 @@ components:
         displayName: { type: ["string", "null"] }
         avatarUrl:   { type: ["string", "null"] }
         creatorBadge: { type: ["string", "null"] }
+
+    DiscoverablePlayer:
+      type: object
+      required: [id, username, displayName, avatarUrl, creatorBadge, followerCount, isFollowing, reason]
+      properties:
+        id:            { type: integer }
+        username:      { type: string }
+        displayName:   { type: ["string", "null"] }
+        avatarUrl:     { type: ["string", "null"] }
+        creatorBadge:  { type: ["string", "null"] }
+        followerCount: { type: integer }
+        isFollowing:   { type: boolean }
+        reason:        { type: string }
+        reasonDetail:  { type: ["string", "null"] }
 
     PlayerSocialProfile:
       type: object

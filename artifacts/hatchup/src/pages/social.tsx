@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { ForYouStrip } from "@/components/for-you-strip";
 import { usePlayer } from "@/lib/playerContext";
@@ -13,6 +13,11 @@ import {
   useFollowPlayer,
   useGetPlayerSocialProfile,
   getGetPlayerSocialProfileQueryKey,
+  useDiscoverPlayers,
+  getDiscoverPlayersQueryKey,
+  useSearchPlayers,
+  getSearchPlayersQueryKey,
+  type DiscoverablePlayer,
   useListHatchlings,
   getListHatchlingsQueryKey,
   type FeedPost,
@@ -68,7 +73,12 @@ import {
   Award,
   Sparkles,
   Camera,
+  Search,
+  Compass,
+  Users2,
+  X,
 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
 
 const POST_TYPES = [
@@ -756,11 +766,208 @@ function ProfileModal({
   );
 }
 
+function PlayerDiscoverCard({
+  player,
+  viewerId,
+  onViewProfile,
+}: {
+  player: DiscoverablePlayer;
+  viewerId: number;
+  onViewProfile: (pid: number) => void;
+}) {
+  const followPlayer = useFollowPlayer();
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [optimisticFollow, setOptimisticFollow] = useState(player.isFollowing);
+
+  const reasonLabel: Record<string, { text: string; icon: React.ReactNode; color: string }> = {
+    shared_group: { text: "In a group with you", icon: <Users2 className="w-3 h-3" />, color: "text-purple-400" },
+    top_creator: { text: "Top creator", icon: <Award className="w-3 h-3" />, color: "text-yellow-400" },
+    recently_active: { text: "Recently active", icon: <Sparkles className="w-3 h-3" />, color: "text-cyan-400" },
+    search: { text: "", icon: null, color: "" },
+  };
+  const reason = reasonLabel[player.reason] ?? reasonLabel.recently_active;
+
+  async function handleFollow() {
+    if (optimisticFollow) return;
+    setOptimisticFollow(true);
+    try {
+      await followPlayer.mutateAsync({ data: { followerId: viewerId, followeeId: player.id } });
+      qc.invalidateQueries({ queryKey: getGetSocialFeedQueryKey({ playerId: viewerId }) });
+      qc.invalidateQueries({ queryKey: getDiscoverPlayersQueryKey({ playerId: viewerId }) });
+      toast({ title: `Following ${player.displayName ?? player.username}! 🤝` });
+    } catch {
+      setOptimisticFollow(false);
+      toast({ title: "Could not follow", variant: "destructive" });
+    }
+  }
+
+  return (
+    <Card className="border border-border/50 bg-card/80 backdrop-blur rounded-2xl overflow-hidden">
+      <CardContent className="p-3 flex items-center gap-3">
+        <button onClick={() => onViewProfile(player.id)} className="flex-shrink-0">
+          <Avatar className="h-12 w-12 border border-border ring-2 ring-primary/20">
+            <AvatarImage src={player.avatarUrl ?? undefined} />
+            <AvatarFallback className="font-bold text-sm bg-primary/20">
+              {(player.username ?? "?").substring(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              onClick={() => onViewProfile(player.id)}
+              className="font-bold text-sm hover:text-primary transition-colors truncate"
+              data-testid={`button-view-profile-${player.id}`}
+            >
+              {player.displayName ?? player.username}
+            </button>
+            {player.creatorBadge && (
+              <Badge className="bg-gradient-to-r from-yellow-500 to-amber-400 text-black text-[10px] font-black px-1.5 py-0">
+                <Award className="w-2.5 h-2.5 mr-0.5" /> Creator
+              </Badge>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground truncate">
+            @{player.username} · {player.followerCount} {player.followerCount === 1 ? "follower" : "followers"}
+          </p>
+          {reason.text && (
+            <p className={`text-[10px] font-bold mt-0.5 flex items-center gap-1 ${reason.color}`}>
+              {reason.icon}
+              {reason.text}
+            </p>
+          )}
+        </div>
+        {player.id !== viewerId && (
+          optimisticFollow ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              className="rounded-full h-8 px-3 text-xs font-black"
+              data-testid={`button-following-${player.id}`}
+            >
+              <UserPlus className="w-3.5 h-3.5 mr-1" /> Following
+            </Button>
+          ) : (
+            <Button
+              onClick={handleFollow}
+              disabled={followPlayer.isPending}
+              size="sm"
+              className="rounded-full h-8 px-3 text-xs font-black"
+              data-testid={`button-follow-${player.id}`}
+            >
+              <UserPlus className="w-3.5 h-3.5 mr-1" /> Follow
+            </Button>
+          )
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DiscoverPanel({
+  playerId,
+  onViewProfile,
+}: {
+  playerId: number;
+  onViewProfile: (pid: number) => void;
+}) {
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchInput.trim()), 250);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  const isSearching = debouncedQuery.length > 0;
+
+  const { data: suggestions, isLoading: loadingSuggest } = useDiscoverPlayers(
+    { playerId },
+    { query: { queryKey: getDiscoverPlayersQueryKey({ playerId }), enabled: !isSearching && !!playerId } },
+  );
+
+  const { data: searchResults, isLoading: loadingSearch } = useSearchPlayers(
+    { q: debouncedQuery, playerId },
+    { query: { queryKey: getSearchPlayersQueryKey({ q: debouncedQuery, playerId }), enabled: isSearching && !!playerId } },
+  );
+
+  const list: DiscoverablePlayer[] = (isSearching ? searchResults : suggestions) ?? [];
+  const loading = isSearching ? loadingSearch : loadingSuggest;
+
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Search players by username or name..."
+          className="pl-9 pr-9 h-10 rounded-full bg-card/80 text-sm"
+          data-testid="input-player-search"
+        />
+        {searchInput && (
+          <button
+            onClick={() => setSearchInput("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {!isSearching && (
+        <h2 className="text-xs font-black uppercase tracking-wider text-muted-foreground px-1 flex items-center gap-2">
+          <Compass className="w-3.5 h-3.5" /> Suggested for you
+        </h2>
+      )}
+
+      {loading ? (
+        <div className="space-y-2">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-2xl" />
+          ))}
+        </div>
+      ) : list.length === 0 ? (
+        <div className="text-center py-12 bg-card/50 rounded-3xl border border-dashed border-border">
+          {isSearching ? (
+            <>
+              <Search className="w-10 h-10 text-muted-foreground mx-auto mb-2 opacity-40" />
+              <p className="text-sm font-bold">No players match "{debouncedQuery}"</p>
+              <p className="text-xs text-muted-foreground mt-1">Try a different username or name.</p>
+            </>
+          ) : (
+            <>
+              <Compass className="w-10 h-10 text-muted-foreground mx-auto mb-2 opacity-40" />
+              <p className="text-sm font-bold">No suggestions yet</p>
+              <p className="text-xs text-muted-foreground mt-1">Join a group or post to discover other players.</p>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {list.map((p) => (
+            <PlayerDiscoverCard
+              key={p.id}
+              player={p}
+              viewerId={playerId}
+              onViewProfile={onViewProfile}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Social() {
   const { playerId } = usePlayer();
   const pid = playerId ?? 1;
   const [composeOpen, setComposeOpen] = useState(false);
   const [profilePlayerId, setProfilePlayerId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState("feed");
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -822,44 +1029,60 @@ export default function Social() {
           ]}
         />
 
-        {/* Feed */}
-        {isLoading ? (
-          <div className="space-y-3">
-            {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-40 w-full rounded-2xl" />
-            ))}
-          </div>
-        ) : !feed || feed.posts.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="text-center py-16 bg-card/50 rounded-3xl border border-dashed border-border"
-          >
-            <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" />
-            <h3 className="text-xl font-black mb-2">Be the First!</h3>
-            <p className="text-muted-foreground text-sm font-medium max-w-xs mx-auto mb-4">
-              The community feed is empty. Share your first win and inspire others!
-            </p>
-            <Button onClick={() => setComposeOpen(true)} className="rounded-full font-black">
-              <Plus className="w-4 h-4 mr-2" /> Create First Post
-            </Button>
-          </motion.div>
-        ) : (
-          <AnimatePresence>
-            <div className="space-y-3">
-              {feed.posts.map(post => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  playerId={pid}
-                  onReact={handleReact}
-                  onDelete={handleDelete}
-                  onViewProfile={setProfilePlayerId}
-                />
-              ))}
-            </div>
-          </AnimatePresence>
-        )}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 rounded-full bg-card/60 backdrop-blur p-1 h-10">
+            <TabsTrigger value="feed" className="rounded-full text-xs font-black" data-testid="tab-feed">
+              <Users className="w-3.5 h-3.5 mr-1.5" /> Feed
+            </TabsTrigger>
+            <TabsTrigger value="discover" className="rounded-full text-xs font-black" data-testid="tab-discover">
+              <Compass className="w-3.5 h-3.5 mr-1.5" /> Discover
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="feed" className="mt-4">
+            {isLoading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <Skeleton key={i} className="h-40 w-full rounded-2xl" />
+                ))}
+              </div>
+            ) : !feed || feed.posts.length === 0 ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center py-16 bg-card/50 rounded-3xl border border-dashed border-border"
+              >
+                <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" />
+                <h3 className="text-xl font-black mb-2">Be the First!</h3>
+                <p className="text-muted-foreground text-sm font-medium max-w-xs mx-auto mb-4">
+                  The community feed is empty. Share your first win and inspire others!
+                </p>
+                <Button onClick={() => setComposeOpen(true)} className="rounded-full font-black">
+                  <Plus className="w-4 h-4 mr-2" /> Create First Post
+                </Button>
+              </motion.div>
+            ) : (
+              <AnimatePresence>
+                <div className="space-y-3">
+                  {feed.posts.map(post => (
+                    <PostCard
+                      key={post.id}
+                      post={post}
+                      playerId={pid}
+                      onReact={handleReact}
+                      onDelete={handleDelete}
+                      onViewProfile={setProfilePlayerId}
+                    />
+                  ))}
+                </div>
+              </AnimatePresence>
+            )}
+          </TabsContent>
+
+          <TabsContent value="discover" className="mt-4">
+            <DiscoverPanel playerId={pid} onViewProfile={setProfilePlayerId} />
+          </TabsContent>
+        </Tabs>
 
         {/* Compose sheet */}
         <ComposeSheet

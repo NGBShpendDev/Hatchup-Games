@@ -2283,6 +2283,51 @@ export const UnfollowPlayerResponse = zod.object({
 
 
 /**
+ * @summary Suggested players to follow (shared groups, top creators, recently active)
+ */
+export const DiscoverPlayersQueryParams = zod.object({
+  "playerId": zod.coerce.number(),
+  "limit": zod.coerce.number().optional()
+})
+
+export const DiscoverPlayersResponseItem = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable(),
+  "followerCount": zod.number(),
+  "isFollowing": zod.boolean(),
+  "reason": zod.string(),
+  "reasonDetail": zod.string().nullish()
+})
+export const DiscoverPlayersResponse = zod.array(DiscoverPlayersResponseItem)
+
+
+/**
+ * @summary Search players by username or display name
+ */
+export const SearchPlayersQueryParams = zod.object({
+  "q": zod.coerce.string(),
+  "playerId": zod.coerce.number(),
+  "limit": zod.coerce.number().optional()
+})
+
+export const SearchPlayersResponseItem = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable(),
+  "followerCount": zod.number(),
+  "isFollowing": zod.boolean(),
+  "reason": zod.string(),
+  "reasonDetail": zod.string().nullish()
+})
+export const SearchPlayersResponse = zod.array(SearchPlayersResponseItem)
+
+
+/**
  * @summary Get player social profile with timeline posts and memories
  */
 export const GetPlayerSocialProfileParams = zod.object({
