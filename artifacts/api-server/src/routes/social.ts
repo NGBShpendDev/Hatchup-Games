@@ -15,12 +15,12 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, sql, or, ne, inArray, ilike, gte, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
-import { attachEntitlement, requirePremium } from "../services/subscriptionGuards";
-import { blockMinorSocialWrite } from "../middlewares/minorGuard";
-import { blockSuspendedSocialWrite } from "../middlewares/suspendedGuard";
-import { socialWriteLimiter, postViewLimiter } from "../middlewares/rateLimiters";
-import { sendPushToPlayer } from "../services/pushNotifications";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { attachEntitlement, requirePremium } from "../services/subscriptionGuards.ts";
+import { blockMinorSocialWrite } from "../middlewares/minorGuard.ts";
+import { blockSuspendedSocialWrite } from "../middlewares/suspendedGuard.ts";
+import { socialWriteLimiter, postViewLimiter } from "../middlewares/rateLimiters.ts";
+import { sendPushToPlayer } from "../services/pushNotifications.ts";
 import { notificationsTable } from "@workspace/db";
 import { createHmac } from "node:crypto";
 import {
