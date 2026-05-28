@@ -3219,6 +3219,10 @@ export type ListClubsParams = {
 limit?: number;
 };
 
+export type LeaveClub200 = {
+  success: boolean;
+};
+
 export type ListEggsParams = {
 playerId: number;
 hatched?: boolean;

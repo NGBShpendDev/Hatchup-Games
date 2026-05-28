@@ -1218,6 +1218,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/Club"
 
+  /clubs/{id}/leave:
+    post:
+      operationId: leaveClub
+      tags: [clubs]
+      summary: Leave a club
+      description: |
+        Removes the authenticated caller from the club. Decrements the club's
+        memberCount and clears the caller's clubId and clubRole. Owners cannot
+        leave until they transfer ownership.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Left the club
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success]
+                properties:
+                  success:
+                    type: boolean
+        "403":
+          description: Caller is the owner or not a member
+        "404":
+          description: Club not found
+
   # ── Eggs ─────────────────────────────────────────────────────────────────
   /eggs:
     get:

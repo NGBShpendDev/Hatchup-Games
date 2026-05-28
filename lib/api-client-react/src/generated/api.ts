@@ -133,6 +133,7 @@ import type {
   JoinGroupInput,
   JoinLocalChallenge200,
   LeaderboardEntry,
+  LeaveClub200,
   LeaveFamilyGroup200,
   LeaveGroupInput,
   ListBattleHistoryParams,
@@ -4487,6 +4488,80 @@ export const useJoinClub = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getJoinClubMutationOptions(options));
+    }
+
+export const getLeaveClubUrl = (id: number,) => {
+
+
+
+
+  return `/api/clubs/${id}/leave`
+}
+
+/**
+ * Removes the authenticated caller from the club. Decrements the club's
+memberCount and clears the caller's clubId and clubRole. Owners cannot
+leave until they transfer ownership.
+
+ * @summary Leave a club
+ */
+export const leaveClub = async (id: number, options?: RequestInit): Promise<LeaveClub200> => {
+
+  return customFetch<LeaveClub200>(getLeaveClubUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getLeaveClubMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof leaveClub>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof leaveClub>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['leaveClub'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof leaveClub>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  leaveClub(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LeaveClubMutationResult = NonNullable<Awaited<ReturnType<typeof leaveClub>>>
+
+    export type LeaveClubMutationError = ErrorType<void>
+
+    /**
+ * @summary Leave a club
+ */
+export const useLeaveClub = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof leaveClub>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof leaveClub>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getLeaveClubMutationOptions(options));
     }
 
 export const getListEggsUrl = (params: ListEggsParams,) => {

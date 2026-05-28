@@ -77,6 +77,34 @@ router.post("/clubs/:id/join", requireAuth, attachPlayer, async (req, res) => {
   res.json({ ...updated!, createdAt: updated!.createdAt.toISOString() });
 });
 
+router.post("/clubs/:id/leave", requireAuth, attachPlayer, async (req, res) => {
+  const params = GetClubParams.safeParse({ id: Number(req.params.id) });
+  if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const club = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, params.data.id) });
+  if (!club) { res.status(404).json({ error: "Club not found" }); return; }
+
+  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!player || player.clubId !== params.data.id) {
+    res.status(403).json({ error: "You are not a member of this club" });
+    return;
+  }
+
+  if ((player.clubRole ?? "").toLowerCase() === "owner") {
+    res.status(403).json({ error: "Transfer ownership before leaving the club" });
+    return;
+  }
+
+  await db.update(playersTable)
+    .set({ clubId: null, clubRole: null })
+    .where(eq(playersTable.id, req.playerId!));
+  await db.update(clubsTable)
+    .set({ memberCount: Math.max(0, club.memberCount - 1) })
+    .where(eq(clubsTable.id, params.data.id));
+
+  res.json({ success: true });
+});
+
 // ── Invite a player to a club (admin/leader only) ─────────────────────────
 router.post("/clubs/:id/invite", requireAuth, attachPlayer, async (req, res) => {
   const params = GetClubParams.safeParse({ id: Number(req.params.id) });

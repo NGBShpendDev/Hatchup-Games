@@ -1468,6 +1468,22 @@ export const JoinClubResponse = zod.object({
 
 
 /**
+ * Removes the authenticated caller from the club. Decrements the club's
+memberCount and clears the caller's clubId and clubRole. Owners cannot
+leave until they transfer ownership.
+
+ * @summary Leave a club
+ */
+export const LeaveClubParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const LeaveClubResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
  * @summary List player's eggs
  */
 export const ListEggsQueryParams = zod.object({

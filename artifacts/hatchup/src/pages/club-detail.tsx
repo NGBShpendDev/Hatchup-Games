@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useRoute } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 import { Layout } from "@/components/layout";
 import {
   useGetClub,
@@ -14,7 +14,18 @@ import {
   getListClubPendingInvitesQueryKey,
   useCancelClubInvite,
   useUpdateClubMemberRole,
+  useLeaveClub,
 } from "@workspace/api-client-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePlayer } from "@/lib/playerContext";
 import { useToast } from "@/hooks/use-toast";
@@ -28,7 +39,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, ArrowDown, ArrowUp, Check, Crown, Mail, Search, Shield, ShieldCheck, Trophy, UserPlus, Users, X } from "lucide-react";
+import { ArrowLeft, ArrowDown, ArrowUp, Check, Crown, LogOut, Mail, Search, Shield, ShieldCheck, Trophy, UserPlus, Users, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 
@@ -60,8 +71,10 @@ export default function ClubDetail() {
   const { player } = usePlayer();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
 
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
   const [inviteSearch, setInviteSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [invitedIds, setInvitedIds] = useState<Set<number>>(new Set());
@@ -120,6 +133,26 @@ export default function ClubDetail() {
     },
   });
 
+  const leaveMutation = useLeaveClub({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Left club", description: "You're no longer a member of this club." });
+        queryClient.invalidateQueries({ queryKey: getGetClubQueryKey(id) });
+        queryClient.invalidateQueries({ queryKey: getListClubMembersQueryKey(id) });
+        setLeaveOpen(false);
+        navigate("/club");
+      },
+      onError: (err: { response?: { data?: { error?: string } } }) => {
+        toast({
+          title: "Could not leave club",
+          description: err?.response?.data?.error ?? "Try again",
+          variant: "destructive",
+        });
+        setLeaveOpen(false);
+      },
+    },
+  });
+
   const cancelInvite = useCancelClubInvite({
     mutation: {
       onSuccess: () => {
@@ -139,6 +172,7 @@ export default function ClubDetail() {
 
   const myMembership = player ? (members ?? []).find((m) => m.id === player.id) : null;
   const canInvite = myMembership?.clubRole === "owner" || myMembership?.clubRole === "officer";
+  const isMember = !!myMembership;
   const isOwner = myMembership?.clubRole === "owner";
 
   const updateRole = useUpdateClubMemberRole({
@@ -195,7 +229,7 @@ export default function ClubDetail() {
                 </div>
                 <p className="text-muted-foreground font-medium max-w-2xl">{club.description}</p>
               </div>
-              <div className="flex gap-6">
+              <div className="flex gap-6 items-center">
                 <div className="text-center">
                   <div className="flex items-center gap-2 justify-center text-blue-500 font-bold">
                     <Users className="w-4 h-4" />
@@ -210,10 +244,52 @@ export default function ClubDetail() {
                   </div>
                   <div className="text-xs text-muted-foreground font-bold uppercase tracking-wide">Total XP</div>
                 </div>
+                {isMember && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setLeaveOpen(true)}
+                    disabled={isOwner}
+                    title={isOwner ? "Transfer ownership before leaving" : undefined}
+                    className="font-bold gap-2 border-2 hover:border-destructive hover:text-destructive"
+                    data-testid="button-leave-club"
+                  >
+                    <LogOut className="w-4 h-4" /> Leave Club
+                  </Button>
+                )}
               </div>
             </div>
+            {isOwner && (
+              <p className="text-xs text-muted-foreground font-medium mt-4">
+                As the owner, you must transfer ownership before you can leave this club.
+              </p>
+            )}
           </div>
         )}
+
+        <AlertDialog open={leaveOpen} onOpenChange={setLeaveOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Leave {club?.name ?? "this club"}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You'll lose access to club chat, events, and the club leaderboard. You can join another club or come back later.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={leaveMutation.isPending}>Stay</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  leaveMutation.mutate({ id });
+                }}
+                disabled={leaveMutation.isPending}
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                data-testid="button-confirm-leave-club"
+              >
+                {leaveMutation.isPending ? "Leaving…" : "Leave Club"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {isAdmin && (
           <div>
