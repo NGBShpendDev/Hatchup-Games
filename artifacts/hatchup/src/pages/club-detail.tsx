@@ -10,6 +10,9 @@ import {
   useSearchPlayers,
   getSearchPlayersQueryKey,
   type PlayerStub,
+  useListClubPendingInvites,
+  getListClubPendingInvitesQueryKey,
+  useCancelClubInvite,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePlayer } from "@/lib/playerContext";
@@ -24,8 +27,9 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft, Check, Crown, Search, Shield, ShieldCheck, Trophy, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, Check, Crown, Mail, Search, Shield, ShieldCheck, Trophy, UserPlus, Users, X } from "lucide-react";
 import { motion } from "framer-motion";
+import { formatDistanceToNow } from "date-fns";
 
 function roleStyle(role: string | null | undefined) {
   if (role === "owner") {
@@ -90,6 +94,7 @@ export default function ClubDetail() {
         setInvitedIds((prev) => new Set(prev).add(vars.data.inviteeId));
         toast({ title: "Invite sent!", description: "They'll see it on their invites." });
         queryClient.invalidateQueries({ queryKey: getListClubMembersQueryKey(id) });
+        queryClient.invalidateQueries({ queryKey: getListClubPendingInvitesQueryKey(id) });
       },
       onError: (err: { response?: { data?: { error?: string } } }) => {
         toast({
@@ -100,6 +105,29 @@ export default function ClubDetail() {
       },
     },
   });
+
+  // Pending invites — only loads if the viewer is an admin/leader/officer.
+  // The endpoint returns 403 for everyone else, which we treat as "hide section".
+  const {
+    data: pendingInvites,
+    isError: pendingError,
+  } = useListClubPendingInvites(id, {
+    query: {
+      queryKey: getListClubPendingInvitesQueryKey(id),
+      enabled: Number.isFinite(id),
+      retry: false,
+    },
+  });
+
+  const cancelInvite = useCancelClubInvite({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListClubPendingInvitesQueryKey(id) });
+      },
+    },
+  });
+
+  const isAdmin = !pendingError && Array.isArray(pendingInvites);
 
   const sortedMembers = [...(members ?? [])].sort((a, b) => {
     const rank = (r: string | null | undefined) => (r === "owner" ? 0 : r === "officer" ? 1 : 2);
@@ -158,6 +186,68 @@ export default function ClubDetail() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {isAdmin && (
+          <div>
+            <h2 className="text-2xl font-black tracking-tight mb-4 flex items-center gap-2">
+              <Mail className="w-6 h-6 text-primary" /> Pending Invites
+              {pendingInvites && pendingInvites.length > 0 && (
+                <Badge variant="secondary" className="font-bold">{pendingInvites.length}</Badge>
+              )}
+            </h2>
+
+            {pendingInvites && pendingInvites.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground font-medium">
+                  No pending invites. Invite players to grow your club.
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {pendingInvites?.map((inv) => {
+                  const name = inv.inviteeName;
+                  const sent = (() => {
+                    try {
+                      return formatDistanceToNow(new Date(inv.sentAt), { addSuffix: true });
+                    } catch {
+                      return "recently";
+                    }
+                  })();
+                  const isCancelling =
+                    cancelInvite.isPending && cancelInvite.variables?.id === inv.id;
+                  return (
+                    <Card key={inv.id} className="border-2">
+                      <CardContent className="p-4 flex items-center gap-4">
+                        <Avatar className="h-12 w-12 border-2 border-border">
+                          {inv.inviteeAvatar && <AvatarImage src={inv.inviteeAvatar} alt={name} />}
+                          <AvatarFallback className="font-bold">{initials(name)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold truncate">{name}</div>
+                          <div className="text-xs text-muted-foreground font-bold mt-1">
+                            Invited {sent}
+                            {inv.inviterName ? ` by ${inv.inviterName}` : ""}
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={isCancelling}
+                          onClick={() => cancelInvite.mutate({ id: inv.id })}
+                          data-testid={`button-cancel-club-invite-${inv.id}`}
+                          className="gap-1 font-bold"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          {isCancelling ? "Cancelling…" : "Cancel"}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

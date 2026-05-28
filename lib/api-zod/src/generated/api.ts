@@ -3466,6 +3466,39 @@ export const GetMyClubInvitesResponse = zod.array(GetMyClubInvitesResponseItem)
 
 
 /**
+ * @summary List pending invites for a club (admins/leaders only)
+ */
+export const ListClubPendingInvitesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListClubPendingInvitesResponseItem = zod.object({
+  "id": zod.number(),
+  "clubId": zod.number(),
+  "inviteeId": zod.number(),
+  "inviterId": zod.number(),
+  "status": zod.string(),
+  "sentAt": zod.string(),
+  "inviteeName": zod.string(),
+  "inviteeAvatar": zod.string().nullish(),
+  "inviterName": zod.string().nullish()
+})
+export const ListClubPendingInvitesResponse = zod.array(ListClubPendingInvitesResponseItem)
+
+
+/**
+ * @summary Cancel a pending club invite (admins/leaders only)
+ */
+export const CancelClubInviteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CancelClubInviteResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
  * @summary Accept or decline a club invite
  */
 export const RespondToClubInviteParams = zod.object({

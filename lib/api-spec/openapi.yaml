@@ -2957,6 +2957,44 @@ paths:
                 items:
                   $ref: "#/components/schemas/ClubInvite"
 
+  /clubs/{id}/pending-invites:
+    get:
+      operationId: listClubPendingInvites
+      tags: [clubs]
+      summary: List pending invites for a club (admins/leaders only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Pending invites for this club
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PendingClubInvite"
+
+  /club-invites/{id}:
+    delete:
+      operationId: cancelClubInvite
+      tags: [clubs]
+      summary: Cancel a pending club invite (admins/leaders only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Invite cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResult"
+
   /club-invites/{id}/respond:
     post:
       operationId: respondToClubInvite
@@ -5328,6 +5366,20 @@ components:
         status:    { type: string }
         sentAt:    { type: string }
         club:      { type: object }
+
+    PendingClubInvite:
+      type: object
+      required: [id, clubId, inviteeId, inviterId, status, sentAt, inviteeName]
+      properties:
+        id:           { type: integer }
+        clubId:       { type: integer }
+        inviteeId:    { type: integer }
+        inviterId:    { type: integer }
+        status:       { type: string }
+        sentAt:       { type: string }
+        inviteeName:  { type: string }
+        inviteeAvatar: { type: ["string", "null"] }
+        inviterName:  { type: ["string", "null"] }
 
     InviteToClubBody:
       type: object

@@ -188,6 +188,90 @@ router.post("/club-invites/:id/respond", requireAuth, attachPlayer, async (req, 
   res.json({ success: true, status });
 });
 
+// ── List pending invites for a club (admins/leaders only) ─────────────────
+router.get("/clubs/:id/pending-invites", requireAuth, attachPlayer, async (req, res) => {
+  const params = GetClubParams.safeParse({ id: Number(req.params.id) });
+  if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const viewer = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!viewer || viewer.clubId !== params.data.id) {
+    res.status(403).json({ error: "Only club admins can view pending invites" });
+    return;
+  }
+  const role = (viewer.clubRole ?? "").toLowerCase();
+  if (role !== "leader" && role !== "admin" && role !== "officer") {
+    res.status(403).json({ error: "Only club admins can view pending invites" });
+    return;
+  }
+
+  const invites = await db.query.clubInvitesTable.findMany({
+    where: and(
+      eq(clubInvitesTable.clubId, params.data.id),
+      eq(clubInvitesTable.status, "pending"),
+    ),
+  });
+
+  const enriched = await Promise.all(invites.map(async (inv) => {
+    const [invitee, inviter] = await Promise.all([
+      db.query.playersTable.findFirst({ where: eq(playersTable.id, inv.inviteeId) }),
+      db.query.playersTable.findFirst({ where: eq(playersTable.id, inv.inviterId) }),
+    ]);
+    return {
+      id: inv.id,
+      clubId: inv.clubId,
+      inviteeId: inv.inviteeId,
+      inviterId: inv.inviterId,
+      status: inv.status,
+      sentAt: inv.sentAt.toISOString(),
+      inviteeName: invitee?.displayName ?? invitee?.username ?? `Player ${inv.inviteeId}`,
+      inviteeAvatar: invitee?.avatarUrl ?? null,
+      inviterName: inviter?.displayName ?? inviter?.username ?? null,
+    };
+  }));
+
+  res.json(enriched);
+});
+
+// ── Cancel a pending club invite (admins/leaders only) ────────────────────
+router.delete("/club-invites/:id", requireAuth, attachPlayer, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+
+  const invite = await db.query.clubInvitesTable.findFirst({
+    where: eq(clubInvitesTable.id, id),
+  });
+  if (!invite) { res.status(404).json({ error: "Invite not found" }); return; }
+  if (invite.status !== "pending") {
+    res.status(409).json({ error: "Invite already responded to" });
+    return;
+  }
+
+  const viewer = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!viewer || viewer.clubId !== invite.clubId) {
+    res.status(403).json({ error: "Only club admins can cancel invites" });
+    return;
+  }
+  const role = (viewer.clubRole ?? "").toLowerCase();
+  if (role !== "leader" && role !== "admin" && role !== "officer") {
+    res.status(403).json({ error: "Only club admins can cancel invites" });
+    return;
+  }
+
+  await db.delete(clubInvitesTable).where(eq(clubInvitesTable.id, id));
+
+  // Dismiss the invitee's club_invite notification for this invite.
+  await db.delete(notificationsTable).where(and(
+    eq(notificationsTable.playerId, invite.inviteeId),
+    eq(notificationsTable.type, "club_invite"),
+    eq(notificationsTable.sourceId, id),
+  ));
+
+  res.json({ success: true });
+});
+
 // ── List my pending club invites ───────────────────────────────────────────
 router.get("/club-invites", requireAuth, attachPlayer, async (req, res) => {
   const invites = await db.query.clubInvitesTable.findMany({

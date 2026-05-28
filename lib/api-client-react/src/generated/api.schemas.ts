@@ -1197,6 +1197,20 @@ export interface ClubInvite {
   club?: ClubInviteClub;
 }
 
+export interface PendingClubInvite {
+  id: number;
+  clubId: number;
+  inviteeId: number;
+  inviterId: number;
+  status: string;
+  sentAt: string;
+  inviteeName: string;
+  /** @nullable */
+  inviteeAvatar?: string | null;
+  /** @nullable */
+  inviterName?: string | null;
+}
+
 export interface InviteToClubBody {
   inviteeId: number;
 }

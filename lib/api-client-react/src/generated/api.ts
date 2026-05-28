@@ -183,6 +183,7 @@ import type {
   OkResponse,
   OnboardingInput,
   OwnedArtifact,
+  PendingClubInvite,
   PhysiqueGoalInput,
   PhysiqueGoalResult,
   Player,
@@ -10238,6 +10239,153 @@ export function useGetMyClubInvites<TData = Awaited<ReturnType<typeof getMyClubI
 
 
 
+
+export const getListClubPendingInvitesUrl = (id: number,) => {
+
+
+
+
+  return `/api/clubs/${id}/pending-invites`
+}
+
+/**
+ * @summary List pending invites for a club (admins/leaders only)
+ */
+export const listClubPendingInvites = async (id: number, options?: RequestInit): Promise<PendingClubInvite[]> => {
+
+  return customFetch<PendingClubInvite[]>(getListClubPendingInvitesUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListClubPendingInvitesQueryKey = (id: number,) => {
+    return [
+    `/api/clubs/${id}/pending-invites`
+    ] as const;
+    }
+
+
+export const getListClubPendingInvitesQueryOptions = <TData = Awaited<ReturnType<typeof listClubPendingInvites>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClubPendingInvites>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListClubPendingInvitesQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listClubPendingInvites>>> = ({ signal }) => listClubPendingInvites(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listClubPendingInvites>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListClubPendingInvitesQueryResult = NonNullable<Awaited<ReturnType<typeof listClubPendingInvites>>>
+export type ListClubPendingInvitesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List pending invites for a club (admins/leaders only)
+ */
+
+export function useListClubPendingInvites<TData = Awaited<ReturnType<typeof listClubPendingInvites>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClubPendingInvites>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListClubPendingInvitesQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCancelClubInviteUrl = (id: number,) => {
+
+
+
+
+  return `/api/club-invites/${id}`
+}
+
+/**
+ * @summary Cancel a pending club invite (admins/leaders only)
+ */
+export const cancelClubInvite = async (id: number, options?: RequestInit): Promise<SuccessResult> => {
+
+  return customFetch<SuccessResult>(getCancelClubInviteUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getCancelClubInviteMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelClubInvite>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelClubInvite>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['cancelClubInvite'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelClubInvite>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  cancelClubInvite(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelClubInviteMutationResult = NonNullable<Awaited<ReturnType<typeof cancelClubInvite>>>
+
+    export type CancelClubInviteMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Cancel a pending club invite (admins/leaders only)
+ */
+export const useCancelClubInvite = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelClubInvite>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelClubInvite>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getCancelClubInviteMutationOptions(options));
+    }
 
 export const getRespondToClubInviteUrl = (id: number,) => {
 
