@@ -174,6 +174,7 @@ import type {
   PlayerStub,
   PlayerUpdate,
   PostComment,
+  PostCommentRevision,
   PostInsightsResponse,
   PushPreferences,
   PushPreferencesUpdate,
@@ -7284,6 +7285,88 @@ export const useDeletePostComment = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getDeletePostCommentMutationOptions(options));
     }
+
+export const getListCommentRevisionsUrl = (id: number,
+    commentId: number,) => {
+
+
+
+
+  return `/api/social/posts/${id}/comments/${commentId}/revisions`
+}
+
+/**
+ * @summary List prior versions of a comment (edit history)
+ */
+export const listCommentRevisions = async (id: number,
+    commentId: number, options?: RequestInit): Promise<PostCommentRevision[]> => {
+
+  return customFetch<PostCommentRevision[]>(getListCommentRevisionsUrl(id,commentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCommentRevisionsQueryKey = (id: number,
+    commentId: number,) => {
+    return [
+    `/api/social/posts/${id}/comments/${commentId}/revisions`
+    ] as const;
+    }
+
+
+export const getListCommentRevisionsQueryOptions = <TData = Awaited<ReturnType<typeof listCommentRevisions>>, TError = ErrorType<unknown>>(id: number,
+    commentId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCommentRevisions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCommentRevisionsQueryKey(id,commentId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCommentRevisions>>> = ({ signal }) => listCommentRevisions(id,commentId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id && commentId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCommentRevisions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCommentRevisionsQueryResult = NonNullable<Awaited<ReturnType<typeof listCommentRevisions>>>
+export type ListCommentRevisionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List prior versions of a comment (edit history)
+ */
+
+export function useListCommentRevisions<TData = Awaited<ReturnType<typeof listCommentRevisions>>, TError = ErrorType<unknown>>(
+ id: number,
+    commentId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCommentRevisions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCommentRevisionsQueryOptions(id,commentId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getToggleCommentLikeUrl = (id: number,
     commentId: number,) => {

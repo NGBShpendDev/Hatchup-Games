@@ -5,6 +5,7 @@ import {
   postViewsTable,
   postReactionsTable,
   postCommentsTable,
+  postCommentRevisionsTable,
   postCommentReactionsTable,
   playerFollowsTable,
   postRepostsTable,
@@ -756,8 +757,16 @@ router.patch("/social/posts/:id/comments/:commentId", socialWriteLimiter, requir
     return;
   }
 
+  const newContent = content.trim().slice(0, 280);
+  if (existing.content !== newContent) {
+    await db.insert(postCommentRevisionsTable).values({
+      commentId,
+      content: existing.content,
+    });
+  }
+
   const [updated] = await db.update(postCommentsTable)
-    .set({ content: content.trim().slice(0, 280), updatedAt: new Date() })
+    .set({ content: newContent, updatedAt: new Date() })
     .where(eq(postCommentsTable.id, commentId))
     .returning();
 
@@ -783,6 +792,39 @@ router.patch("/social/posts/:id/comments/:commentId", socialWriteLimiter, requir
     likeCount,
     myLiked: !!myLike,
   });
+});
+
+// ── GET /social/posts/:id/comments/:commentId/revisions ───────────────────
+
+router.get("/social/posts/:id/comments/:commentId/revisions", requireAuth, attachPlayer, async (req, res) => {
+  const postId = Number(req.params.id);
+  const commentId = Number(req.params.commentId);
+  if (!Number.isFinite(postId) || !Number.isFinite(commentId)) {
+    res.status(404).json({ error: "Comment not found" });
+    return;
+  }
+  const comment = await db.query.postCommentsTable.findFirst({
+    where: eq(postCommentsTable.id, commentId),
+  });
+  if (!comment || comment.postId !== postId) {
+    res.status(404).json({ error: "Comment not found" });
+    return;
+  }
+  const parent = await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) });
+  if (!parent || parent.deletedAt != null) {
+    res.status(404).json({ error: "Comment not found" });
+    return;
+  }
+  const revisions = await db.query.postCommentRevisionsTable.findMany({
+    where: eq(postCommentRevisionsTable.commentId, commentId),
+    orderBy: [desc(postCommentRevisionsTable.editedAt)],
+  });
+  res.json(revisions.map(r => ({
+    id: r.id,
+    commentId: r.commentId,
+    content: r.content,
+    editedAt: r.editedAt.toISOString(),
+  })));
 });
 
 // ── POST /social/posts/:id/comments/:commentId/like ────────────────────────
@@ -891,6 +933,7 @@ router.delete("/social/posts/:id/comments/:commentId", requireAuth, attachPlayer
   if (comment.playerId !== playerId) { res.status(403).json({ error: "Not your comment" }); return; }
 
   await db.delete(postCommentReactionsTable).where(eq(postCommentReactionsTable.commentId, commentId));
+  await db.delete(postCommentRevisionsTable).where(eq(postCommentRevisionsTable.commentId, commentId));
   await db.delete(postCommentsTable).where(eq(postCommentsTable.id, commentId));
   res.status(204).send();
 });

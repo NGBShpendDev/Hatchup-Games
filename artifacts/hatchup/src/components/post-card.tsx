@@ -5,10 +5,12 @@ import {
   useDeletePostComment,
   useRepostPost,
   useToggleCommentLike,
+  useListCommentRevisions,
   getGetSocialFeedQueryKey,
   type FeedPost,
   type PostComment,
 } from "@workspace/api-client-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 // Note: useEditPostComment / useDeletePostComment are consumed by CommentRow below.
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -59,6 +61,69 @@ export function buildPostShareUrl(postId: number): string {
   if (typeof window === "undefined") return "";
   const basePath = (import.meta as any).env?.BASE_URL?.replace(/\/$/, "") ?? "";
   return `${window.location.origin}${basePath}/post/${postId}`;
+}
+
+function CommentEditedLabel({
+  postId,
+  commentId,
+  updatedAt,
+  testIdPrefix,
+}: {
+  postId: number;
+  commentId: number;
+  updatedAt: string;
+  testIdPrefix: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const { data: revisions, isLoading } = useListCommentRevisions(postId, commentId, {
+    query: { enabled: open },
+  });
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="text-[10px] text-muted-foreground italic hover:text-foreground underline-offset-2 hover:underline"
+          title={`Edited ${new Date(updatedAt).toLocaleString()} — click to see history`}
+          data-testid={`text-${testIdPrefix}-edited-${commentId}`}
+        >
+          (edited)
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-72 p-3 space-y-2"
+        align="start"
+        data-testid={`popover-${testIdPrefix}-history-${commentId}`}
+      >
+        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+          Edit history
+        </p>
+        {isLoading && (
+          <p className="text-xs text-muted-foreground">Loading…</p>
+        )}
+        {!isLoading && (!revisions || revisions.length === 0) && (
+          <p className="text-xs text-muted-foreground">No previous versions.</p>
+        )}
+        {!isLoading && revisions && revisions.length > 0 && (
+          <ul className="space-y-2 max-h-60 overflow-y-auto">
+            {revisions.map(r => (
+              <li
+                key={r.id}
+                className="bg-muted/50 rounded-lg p-2 space-y-1"
+                data-testid={`revision-${commentId}-${r.id}`}
+              >
+                <p className="text-[10px] text-muted-foreground">
+                  {new Date(r.editedAt).toLocaleString()}
+                </p>
+                <p className="text-xs break-words whitespace-pre-wrap">{r.content}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function CommentRow({
@@ -180,13 +245,12 @@ export function CommentRow({
             </span>
           )}
           {comment.updatedAt && (
-            <span
-              className="text-[10px] text-muted-foreground italic"
-              title={`Edited ${new Date(comment.updatedAt).toLocaleString()}`}
-              data-testid={`text-${testIdPrefix}-edited-${comment.id}`}
-            >
-              (edited)
-            </span>
+            <CommentEditedLabel
+              postId={postId}
+              commentId={comment.id}
+              updatedAt={comment.updatedAt}
+              testIdPrefix={testIdPrefix}
+            />
           )}
           {isOwn && !isEditing && (
             <div className="ml-auto flex items-center gap-1">

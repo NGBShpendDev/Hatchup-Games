@@ -2512,6 +2512,23 @@ export const DeletePostCommentQueryParams = zod.object({
 
 
 /**
+ * @summary List prior versions of a comment (edit history)
+ */
+export const ListCommentRevisionsParams = zod.object({
+  "id": zod.coerce.number(),
+  "commentId": zod.coerce.number()
+})
+
+export const ListCommentRevisionsResponseItem = zod.object({
+  "id": zod.number(),
+  "commentId": zod.number(),
+  "content": zod.string(),
+  "editedAt": zod.string()
+})
+export const ListCommentRevisionsResponse = zod.array(ListCommentRevisionsResponseItem)
+
+
+/**
  * @summary Toggle a like on a comment (idempotent per player)
  */
 export const ToggleCommentLikeParams = zod.object({

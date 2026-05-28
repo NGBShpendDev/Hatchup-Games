@@ -1290,6 +1290,13 @@ export interface TrendingPage {
   window: TrendingPageWindow;
 }
 
+export interface PostCommentRevision {
+  id: number;
+  commentId: number;
+  content: string;
+  editedAt: string;
+}
+
 export interface CommentLikeResult {
   liked: boolean;
   likeCount: number;

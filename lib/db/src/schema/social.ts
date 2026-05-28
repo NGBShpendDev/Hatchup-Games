@@ -52,6 +52,15 @@ export const postCommentsTable = pgTable("post_comments", {
   updatedAt: timestamp("updated_at", { withTimezone: true }),
 });
 
+export const postCommentRevisionsTable = pgTable("post_comment_revisions", {
+  id: serial("id").primaryKey(),
+  commentId: integer("comment_id").notNull(),
+  content: text("content").notNull(),
+  editedAt: timestamp("edited_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("post_comment_revisions_comment_idx").on(t.commentId, t.editedAt),
+]);
+
 export const postCommentReactionsTable = pgTable("post_comment_reactions", {
   id: serial("id").primaryKey(),
   commentId: integer("comment_id").notNull(),

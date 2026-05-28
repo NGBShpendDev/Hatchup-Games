@@ -2074,6 +2074,32 @@ paths:
         "204":
           description: Deleted
 
+  /social/posts/{id}/comments/{commentId}/revisions:
+    get:
+      operationId: listCommentRevisions
+      tags: [social]
+      summary: List prior versions of a comment (edit history)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Revisions (most recent first)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostCommentRevision"
+
   /social/posts/{id}/comments/{commentId}/like:
     post:
       operationId: toggleCommentLike
@@ -4947,6 +4973,15 @@ components:
             and is being surfaced as the lead comment in a preview. Only set by
             endpoints that enrich a post with its comments (feed/highlights);
             comment-mutation endpoints leave it unset.
+
+    PostCommentRevision:
+      type: object
+      required: [id, commentId, content, editedAt]
+      properties:
+        id:        { type: integer }
+        commentId: { type: integer }
+        content:   { type: string }
+        editedAt:  { type: string }
 
     CommentLikeResult:
       type: object
