@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ErrorCard } from "@/components/error-card";
-import { ArrowLeft, Swords, Flame, Crown, Trophy } from "lucide-react";
+import { ArrowLeft, Swords, Flame, Crown, Trophy, TrendingUp, TrendingDown, Zap, Sparkles } from "lucide-react";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -62,6 +62,94 @@ function formatTime(iso: string): string {
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return "";
   return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+interface Highlights {
+  biggestWin: RivalBattle | null;
+  biggestLoss: RivalBattle | null;
+  currentStreak: { count: number; type: "win" | "loss" | "draw" } | null;
+  longestWinStreak: number;
+  topMatchup: {
+    myHatchlingId: number;
+    myHatchlingName: string;
+    opponentHatchlingId: number;
+    opponentHatchlingName: string;
+    count: number;
+    wins: number;
+    losses: number;
+  } | null;
+}
+
+function computeHighlights(battles: RivalBattle[]): Highlights {
+  let biggestWin: RivalBattle | null = null;
+  let biggestLoss: RivalBattle | null = null;
+  for (const b of battles) {
+    if (b.outcome === "win" && (!biggestWin || b.eloChange > biggestWin.eloChange)) biggestWin = b;
+    if (b.outcome === "loss" && (!biggestLoss || b.eloChange < biggestLoss.eloChange)) biggestLoss = b;
+  }
+
+  // Battles are sorted newest-first; reverse for chronological streak math.
+  const chrono = [...battles].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+
+  let longestWinStreak = 0;
+  let runWin = 0;
+  for (const b of chrono) {
+    if (b.outcome === "win") {
+      runWin += 1;
+      if (runWin > longestWinStreak) longestWinStreak = runWin;
+    } else {
+      runWin = 0;
+    }
+  }
+
+  let currentStreak: Highlights["currentStreak"] = null;
+  if (chrono.length > 0) {
+    const latest = chrono[chrono.length - 1].outcome;
+    let count = 0;
+    for (let i = chrono.length - 1; i >= 0; i -= 1) {
+      if (chrono[i].outcome === latest) count += 1;
+      else break;
+    }
+    currentStreak = { count, type: latest };
+  }
+
+  const matchupMap = new Map<
+    string,
+    {
+      myHatchlingId: number;
+      myHatchlingName: string;
+      opponentHatchlingId: number;
+      opponentHatchlingName: string;
+      count: number;
+      wins: number;
+      losses: number;
+    }
+  >();
+  for (const b of battles) {
+    if (!b.myHatchlingId || !b.opponentHatchlingId) continue;
+    const key = `${b.myHatchlingId}-${b.opponentHatchlingId}`;
+    const existing = matchupMap.get(key) ?? {
+      myHatchlingId: b.myHatchlingId,
+      myHatchlingName: b.myHatchlingName ?? "Unknown",
+      opponentHatchlingId: b.opponentHatchlingId,
+      opponentHatchlingName: b.opponentHatchlingName ?? "Unknown",
+      count: 0,
+      wins: 0,
+      losses: 0,
+    };
+    existing.count += 1;
+    if (b.outcome === "win") existing.wins += 1;
+    else if (b.outcome === "loss") existing.losses += 1;
+    matchupMap.set(key, existing);
+  }
+  let topMatchup: Highlights["topMatchup"] = null;
+  for (const m of matchupMap.values()) {
+    if (!topMatchup || m.count > topMatchup.count) topMatchup = m;
+  }
+
+  return { biggestWin, biggestLoss, currentStreak, longestWinStreak, topMatchup };
 }
 
 export default function RivalsDetail() {
@@ -206,6 +294,91 @@ export default function RivalsDetail() {
                 </div>
               </div>
             </GlassCard>
+
+            {/* Highlights */}
+            {data.battles.length > 0 && (() => {
+              const h = computeHighlights(data.battles);
+              const anyHighlights = h.biggestWin || h.biggestLoss || h.longestWinStreak > 0 || h.topMatchup || h.currentStreak;
+              if (!anyHighlights) return null;
+              return (
+                <div className="space-y-3" data-testid="section-highlights">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-yellow-400" />
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Highlights</p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {h.biggestWin && (
+                      <GlassCard className="p-4" data-testid="card-highlight-biggest-win">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <TrendingUp className="w-4 h-4 text-green-400" />
+                          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Biggest Win</p>
+                        </div>
+                        <p className="font-black text-2xl text-green-400">+{h.biggestWin.eloChange} ELO</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {h.biggestWin.myHatchlingName ?? "Your Hatchling"} · {formatDate(h.biggestWin.createdAt)}
+                        </p>
+                      </GlassCard>
+                    )}
+                    {h.biggestLoss && (
+                      <GlassCard className="p-4" data-testid="card-highlight-biggest-loss">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <TrendingDown className="w-4 h-4 text-red-400" />
+                          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Worst Loss</p>
+                        </div>
+                        <p className="font-black text-2xl text-red-400">{h.biggestLoss.eloChange} ELO</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {h.biggestLoss.myHatchlingName ?? "Your Hatchling"} · {formatDate(h.biggestLoss.createdAt)}
+                        </p>
+                      </GlassCard>
+                    )}
+                    {(h.currentStreak && h.currentStreak.count > 1) || h.longestWinStreak > 0 ? (
+                      <GlassCard className="p-4" data-testid="card-highlight-streak">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <Flame className="w-4 h-4 text-orange-400" />
+                          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Streaks</p>
+                        </div>
+                        {h.currentStreak && h.currentStreak.count > 1 && (
+                          <p className={`font-black text-2xl ${
+                            h.currentStreak.type === "win" ? "text-green-400"
+                              : h.currentStreak.type === "loss" ? "text-red-400"
+                              : "text-yellow-300"
+                          }`} data-testid="text-current-streak">
+                            {h.currentStreak.count}-{h.currentStreak.type === "win" ? "W" : h.currentStreak.type === "loss" ? "L" : "D"} now
+                          </p>
+                        )}
+                        {h.longestWinStreak > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1" data-testid="text-longest-streak">
+                            Longest win streak: <span className="font-black text-foreground">{h.longestWinStreak}</span>
+                          </p>
+                        )}
+                      </GlassCard>
+                    ) : null}
+                    {h.topMatchup && h.topMatchup.count >= 2 && (
+                      <GlassCard className="p-4" data-testid="card-highlight-matchup">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <Zap className="w-4 h-4 text-cyan-400" />
+                          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Signature Matchup</p>
+                        </div>
+                        <p className="font-black text-base leading-tight">
+                          <Link href={`/hatchlings/${h.topMatchup.myHatchlingId}`}>
+                            <span className="hover:text-primary cursor-pointer">{h.topMatchup.myHatchlingName}</span>
+                          </Link>
+                          <span className="text-muted-foreground mx-1.5">vs</span>
+                          <Link href={`/hatchlings/${h.topMatchup.opponentHatchlingId}`}>
+                            <span className="hover:text-primary cursor-pointer">{h.topMatchup.opponentHatchlingName}</span>
+                          </Link>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {h.topMatchup.count} battles ·{" "}
+                          <span className="text-green-400 font-bold">{h.topMatchup.wins}W</span>{" "}
+                          <span className="text-red-400 font-bold">{h.topMatchup.losses}L</span>
+                        </p>
+                      </GlassCard>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Battle log */}
             <div className="space-y-3">
