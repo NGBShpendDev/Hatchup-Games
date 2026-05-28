@@ -12,6 +12,7 @@ import { eq, desc, and, gt, lt, sql, inArray } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
 import { awardBadge } from "../services/badgeService";
 import { computeChallengeReward } from "../services/challengeRewards";
+import { planEliminationRound } from "../services/eliminationBracket";
 
 const router = Router();
 
@@ -43,39 +44,32 @@ async function advanceEliminationRound(challengeId: number): Promise<boolean> {
     orderBy: [desc(challengeParticipantsTable.currentValue)],
   });
 
-  // Need at least 2 active players to have anything to eliminate.
-  if (active.length <= 1) return false;
+  const plan = planEliminationRound(
+    { currentRound: challenge.currentRound, durationDays: challenge.durationDays },
+    active.map(p => ({ id: p.id, currentValue: p.currentValue })),
+  );
 
-  // Bottom half gets eliminated. For head-to-head (2 players) we drop the
-  // loser so a single champion remains. For odd counts we keep the extra
-  // survivor (e.g. 5 → keep top 3, drop bottom 2).
-  const surviveCount = active.length === 2 ? 1 : Math.ceil(active.length / 2);
-  const survivors = active.slice(0, surviveCount);
-  const eliminated = active.slice(surviveCount);
+  if (plan.kind === "noop") return false;
 
-  const currentRound = challenge.currentRound;
-
-  if (eliminated.length > 0) {
+  if (plan.eliminatedIds.length > 0) {
     await db.update(challengeParticipantsTable)
-      .set({ eliminated: true, eliminatedRound: currentRound })
-      .where(inArray(challengeParticipantsTable.id, eliminated.map(p => p.id)));
+      .set({ eliminated: true, eliminatedRound: plan.eliminatedRound })
+      .where(inArray(challengeParticipantsTable.id, plan.eliminatedIds));
   }
 
   // If only one survivor remains, the bracket is resolved — let the caller
   // run normal finalization (ranking + reward payout) for the champion.
   // Do NOT reset their progress or extend the timer.
-  if (survivors.length <= 1) return false;
+  if (plan.kind === "champion") return false;
 
   // Reset survivor progress so the next round is a fresh race.
   await db.update(challengeParticipantsTable)
     .set({ currentValue: 0 })
-    .where(inArray(challengeParticipantsTable.id, survivors.map(p => p.id)));
+    .where(inArray(challengeParticipantsTable.id, plan.survivorIds));
 
   // Extend the challenge window by another durationDays for the next round.
-  const nextEndAt = new Date(Date.now() + challenge.durationDays * 24 * 60 * 60 * 1000);
-
   await db.update(challengesTable)
-    .set({ currentRound: currentRound + 1, endAt: nextEndAt })
+    .set({ currentRound: plan.nextRound, endAt: plan.nextEndAt })
     .where(eq(challengesTable.id, challengeId));
 
   return true;
