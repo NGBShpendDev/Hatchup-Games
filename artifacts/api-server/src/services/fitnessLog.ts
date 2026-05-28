@@ -277,8 +277,9 @@ export async function logFitnessActivity(
   if (isStrength) {
     // Track best reps in a single session per exercise
     prResult = await detectAndSavePr(playerId, type, "reps", value, true);
-  } else if (type === "running" && distanceMiles && distanceMiles > 0) {
+  } else if (type === "running" && distanceMiles && distanceMiles > 0 && value > 0) {
     // Pace PR in seconds per mile (lower = faster = better PR)
+    // Guard: value (minutes) must be positive — otherwise division produces Infinity.
     const paceSecondsPerMile = Math.round((value * 60) / distanceMiles);
     const pacePr = await detectAndSavePr(playerId, "running", "pace_seconds_per_mile", paceSecondsPerMile, false);
     // Longest single-run distance PR (stored as miles × 100 for integer precision)
@@ -286,8 +287,10 @@ export async function logFitnessActivity(
     const distPr = await detectAndSavePr(playerId, "running", "longest_distance_miles_x100", distanceX100, true);
     // Prefer surfacing whichever PR was newly set
     prResult = distPr.isNew ? distPr : pacePr;
-  } else if (type === "cycling" && distanceMiles && distanceMiles > 0) {
+  } else if (type === "cycling" && distanceMiles && distanceMiles > 0 && value > 0) {
     // Speed PR in mph × 10 (higher = faster = better PR)
+    // Guard: value (minutes) must be positive — otherwise division produces Infinity
+    // which would fail the integer column write on personal_records.value.
     const speedMphX10 = Math.round((distanceMiles / value) * 60 * 10);
     prResult = await detectAndSavePr(playerId, "cycling", "speed_mph_x10", speedMphX10, true);
   }

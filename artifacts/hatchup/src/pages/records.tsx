@@ -3,7 +3,7 @@ import { Layout } from "@/components/layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Dumbbell, Zap, TrendingUp, Award } from "lucide-react";
+import { Trophy, Dumbbell, Zap, TrendingUp, Award, Activity } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 interface PersonalRecord {
@@ -33,10 +33,10 @@ interface PlayerRecordsResult {
 }
 
 const REP_MILESTONES = [
-  { label: "Rep Starter",  threshold: 1_000,   icon: "💪", tier: "Common"    },
-  { label: "Rep Machine",  threshold: 10_000,  icon: "🦾", tier: "Rare"      },
-  { label: "Iron Body",    threshold: 50_000,  icon: "🏗️", tier: "Epic"      },
-  { label: "Rep God",      threshold: 100_000, icon: "🗿", tier: "Legendary" },
+  { label: "Rep Starter",  threshold: 1_000,   icon: "💪", tier: "Common",    abilityHint: "Unlocks the 'Flex' idle animation for your Hatchlings."             },
+  { label: "Rep Machine",  threshold: 10_000,  icon: "🦾", tier: "Rare",      abilityHint: "Unlocks 'Power Stance' — small attack buff in battles."             },
+  { label: "Iron Body",    threshold: 50_000,  icon: "🏗️", tier: "Epic",      abilityHint: "Unlocks 'Iron Hide' — 10% reduced physical damage."                 },
+  { label: "Rep God",      threshold: 100_000, icon: "🗿", tier: "Legendary", abilityHint: "Unlocks the legendary 'Titan Form' mythic evolution path."          },
 ];
 
 const EXERCISE_LABELS: Record<string, { label: string; icon: string; unit: string }> = {
@@ -88,10 +88,50 @@ export default function Records() {
   const totals = data?.strengthTotals;
   const totalReps = totals?.totalReps ?? 0;
 
-  // Group PRs by activity type
+  // Group PRs by activityType + metric (running has multiple PR metrics)
   const prMap: Record<string, PersonalRecord> = {};
   for (const r of records) {
-    prMap[r.activityType] = r;
+    prMap[`${r.activityType}:${r.metric}`] = r;
+    // Also keep a plain activityType key for backward compatibility with strength tiles
+    if (r.metric === "reps") prMap[r.activityType] = r;
+  }
+
+  const pacePr = prMap["running:pace_seconds_per_mile"];
+  const longestRunPr = prMap["running:longest_distance_miles_x100"];
+  const cyclingSpeedPr = prMap["cycling:speed_mph_x10"];
+
+  const performancePrs: {
+    label: string;
+    icon: string;
+    value: string;
+    achievedAt: string | null;
+  }[] = [];
+  if (pacePr) {
+    const totalSecs = pacePr.value;
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+    performancePrs.push({
+      label: "Best Mile Pace",
+      icon: "⚡",
+      value: `${mins}:${secs.toString().padStart(2, "0")} /mi`,
+      achievedAt: pacePr.achievedAt,
+    });
+  }
+  if (longestRunPr) {
+    performancePrs.push({
+      label: "Longest Run",
+      icon: "🏃",
+      value: `${(longestRunPr.value / 100).toFixed(2)} mi`,
+      achievedAt: longestRunPr.achievedAt,
+    });
+  }
+  if (cyclingSpeedPr) {
+    performancePrs.push({
+      label: "Top Cycling Speed",
+      icon: "🚴",
+      value: `${(cyclingSpeedPr.value / 10).toFixed(1)} mph`,
+      achievedAt: cyclingSpeedPr.achievedAt,
+    });
   }
 
   // Determine next milestone
@@ -155,6 +195,26 @@ export default function Records() {
                   );
                 })}
               </div>
+
+              {/* Ability hints unlocked by milestones */}
+              <ul className="space-y-1.5 pt-1">
+                {REP_MILESTONES.map(m => {
+                  const unlocked = totalReps >= m.threshold;
+                  return (
+                    <li
+                      key={`hint-${m.label}`}
+                      className={`text-[11px] flex items-start gap-2 leading-snug ${
+                        unlocked ? "text-foreground" : "text-muted-foreground/70"
+                      }`}
+                    >
+                      <span className="mt-px">{unlocked ? "✨" : "🔒"}</span>
+                      <span>
+                        <span className="font-bold">{m.label}:</span> {m.abilityHint}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
 
               {/* Progress bar to next milestone */}
               {nextMilestone && (
@@ -226,6 +286,54 @@ export default function Records() {
                 })}
               </div>
             </section>
+
+            {/* Performance PRs (running / cycling) */}
+            {performancePrs.length > 0 && (
+              <section className="bg-card border border-border rounded-2xl overflow-hidden">
+                <div className="px-5 py-4 border-b border-border">
+                  <h2 className="font-black text-lg flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-cyan-400" /> Performance PRs
+                  </h2>
+                  <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                    Best running and cycling efforts, with the date achieved
+                  </p>
+                </div>
+                <div className="divide-y divide-border">
+                  {performancePrs.map((p, i) => {
+                    const isRecent = p.achievedAt
+                      ? Date.now() - new Date(p.achievedAt).getTime() < TWENTY_FOUR_HOURS_MS
+                      : false;
+                    return (
+                      <motion.div
+                        key={p.label}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="flex items-center gap-4 px-5 py-3.5"
+                      >
+                        <span className="text-xl w-8 text-center">{p.icon}</span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm">{p.label}</span>
+                            {isRecent && (
+                              <Badge className="text-[9px] px-1.5 py-0 bg-yellow-500/20 text-yellow-400 border-yellow-500/40 font-black animate-pulse">
+                                NEW PR! 🏆
+                              </Badge>
+                            )}
+                          </div>
+                          {p.achievedAt && (
+                            <span className="text-[11px] text-muted-foreground font-medium">
+                              Achieved {formatRelativeDate(p.achievedAt)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-black text-xl text-primary">{p.value}</p>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
             {/* Lifetime Totals Summary */}
             <section className="bg-card border border-border rounded-2xl p-5">

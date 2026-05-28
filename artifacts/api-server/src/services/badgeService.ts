@@ -15,6 +15,8 @@ export interface BadgeDefinition {
   isSecret: boolean;
   xpReward: number;
   coinsReward: number;
+  /** Optional hint about a special creature ability unlocked alongside this badge. */
+  creatureAbilityHint?: string;
 }
 
 export const BADGE_DEFINITIONS: BadgeDefinition[] = [
@@ -59,10 +61,10 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
   { key: "DRAGON_MASTER",    name: "Dragon Master",     description: "???",                                   tier: "Epic",      category: "secret",    icon: "🐲", isSecret: true,  xpReward: 500,   coinsReward: 250  },
 
   // ---- STRENGTH REP BADGES ----
-  { key: "REP_1K",           name: "Rep Starter",       description: "Log 1,000 total reps across all exercises",   tier: "Common",    category: "strength", icon: "💪", isSecret: false, xpReward: 200,   coinsReward: 100  },
-  { key: "REP_10K",          name: "Rep Machine",       description: "Log 10,000 total reps",                       tier: "Rare",      category: "strength", icon: "🦾", isSecret: false, xpReward: 500,   coinsReward: 250  },
-  { key: "REP_50K",          name: "Iron Body",         description: "Log 50,000 total reps",                       tier: "Epic",      category: "strength", icon: "🏗️", isSecret: false, xpReward: 1500,  coinsReward: 750  },
-  { key: "REP_100K",         name: "Rep God",           description: "Log 100,000 total reps",                      tier: "Legendary", category: "strength", icon: "🗿", isSecret: false, xpReward: 5000,  coinsReward: 2500 },
+  { key: "REP_1K",           name: "Rep Starter",       description: "Log 1,000 total reps across all exercises",   tier: "Common",    category: "strength", icon: "💪", isSecret: false, xpReward: 200,   coinsReward: 100, creatureAbilityHint: "Unlocks the 'Flex' idle animation — your Hatchlings start showing off their muscles." },
+  { key: "REP_10K",          name: "Rep Machine",       description: "Log 10,000 total reps",                       tier: "Rare",      category: "strength", icon: "🦾", isSecret: false, xpReward: 500,   coinsReward: 250, creatureAbilityHint: "Unlocks the 'Power Stance' ability — Hatchlings gain a small attack buff in battles." },
+  { key: "REP_50K",          name: "Iron Body",         description: "Log 50,000 total reps",                       tier: "Epic",      category: "strength", icon: "🏗️", isSecret: false, xpReward: 1500,  coinsReward: 750, creatureAbilityHint: "Unlocks 'Iron Hide' — Hatchlings take 10% reduced damage from physical attacks." },
+  { key: "REP_100K",         name: "Rep God",           description: "Log 100,000 total reps",                      tier: "Legendary", category: "strength", icon: "🗿", isSecret: false, xpReward: 5000,  coinsReward: 2500, creatureAbilityHint: "Unlocks the legendary 'Titan Form' evolution path — a mythic body-builder transformation." },
   { key: "PUSHUP_CENTURY",   name: "Pushup Century",    description: "Log 100 pushups in a single session",         tier: "Rare",      category: "strength", icon: "💥", isSecret: false, xpReward: 400,   coinsReward: 200  },
   { key: "IRON_WILL",        name: "Iron Will",         description: "Log 1,000 total pushups lifetime",            tier: "Epic",      category: "strength", icon: "⚙️", isSecret: false, xpReward: 800,   coinsReward: 400  },
   { key: "SQUAT_LEGEND",     name: "Squat Legend",      description: "Log 10,000 total squats lifetime",            tier: "Legendary", category: "strength", icon: "🏋️", isSecret: false, xpReward: 3000,  coinsReward: 1500 },

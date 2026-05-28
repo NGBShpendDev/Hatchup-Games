@@ -171,6 +171,16 @@ router.post("/fitness/log", requireAuth, attachPlayer, requirePlayerOwnership, a
   const body = LogActivityBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
+  // Reject non-positive duration when distance is provided — guards pace/speed PR math from Infinity.
+  if (body.data.value <= 0) {
+    res.status(400).json({ error: "Duration (value) must be positive" });
+    return;
+  }
+  if (body.data.distanceMiles != null && body.data.distanceMiles <= 0) {
+    res.status(400).json({ error: "Distance must be positive when provided" });
+    return;
+  }
+
   const result = await logFitnessActivity({
     playerId: body.data.playerId,
     type: body.data.type,
