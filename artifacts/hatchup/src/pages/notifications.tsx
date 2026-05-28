@@ -95,6 +95,7 @@ export default function NotificationsPage() {
   const { toast } = useToast();
   const [busy, setBusy] = useState<{ key: BusyKey; action: "accept" | "decline" } | null>(null);
   const [tab, setTab] = useState<"all" | "invites">("all");
+  const [inviteFilter, setInviteFilter] = useState<"all" | "challenge" | "rematch" | "club">("all");
 
   const listParams = { limit: 50 };
   const { data, isLoading } = useListNotifications(listParams, {
@@ -302,12 +303,18 @@ export default function NotificationsPage() {
     [items],
   );
 
+  const pendingClubInviteNotifs = useMemo(
+    () => items.filter((n) => n.type === "club_invite" && !n.read && clubInviteId(n) !== null),
+    [items],
+  );
+
   // Build the unified Invites list. Challenge invites come from the dedicated
-  // endpoint (source of truth for pending status). Rematch invites only live as
-  // notifications today, so we surface those filtered.
+  // endpoint (source of truth for pending status). Rematch and club invites
+  // only live as notifications today, so we surface those filtered.
   type InviteRow =
     | { kind: "challenge"; invite: ChallengeInvite; sortKey: number }
-    | { kind: "rematch"; notification: Notification; rematchId: string; sortKey: number };
+    | { kind: "rematch"; notification: Notification; rematchId: string; sortKey: number }
+    | { kind: "club"; notification: Notification; sortKey: number };
 
   const inviteRows: InviteRow[] = useMemo(() => {
     const rows: InviteRow[] = [];
@@ -328,11 +335,35 @@ export default function NotificationsPage() {
         sortKey: new Date(n.createdAt).getTime(),
       });
     }
+    for (const n of pendingClubInviteNotifs) {
+      rows.push({
+        kind: "club",
+        notification: n,
+        sortKey: new Date(n.createdAt).getTime(),
+      });
+    }
     rows.sort((a, b) => b.sortKey - a.sortKey);
     return rows;
-  }, [challengeInvites, pendingRematchNotifs]);
+  }, [challengeInvites, pendingRematchNotifs, pendingClubInviteNotifs]);
 
-  const inviteCount = inviteRows.length;
+  const inviteCounts = useMemo(
+    () => ({
+      all: inviteRows.length,
+      challenge: inviteRows.filter((r) => r.kind === "challenge").length,
+      rematch: inviteRows.filter((r) => r.kind === "rematch").length,
+      club: inviteRows.filter((r) => r.kind === "club").length,
+    }),
+    [inviteRows],
+  );
+
+  const inviteCount = inviteCounts.all;
+
+  const filteredInviteRows = useMemo(() => {
+    if (inviteFilter === "all") return inviteRows;
+    return inviteRows.filter((r) => r.kind === inviteFilter);
+  }, [inviteRows, inviteFilter]);
+
+  const showClubChip = inviteCounts.club > 0 || inviteFilter === "club";
 
   const renderNotificationRow = (n: Notification, idx: number) => {
     const meta = iconFor(n.type);
@@ -708,11 +739,64 @@ export default function NotificationsPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {inviteRows.map((row, idx) =>
-                  row.kind === "challenge"
-                    ? renderChallengeInviteRow(row.invite, idx)
-                    : renderNotificationRow(row.notification, idx),
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2" data-testid="invite-filter-chips">
+                  {([
+                    { value: "all", label: "All", count: inviteCounts.all },
+                    { value: "challenge", label: "Challenges", count: inviteCounts.challenge },
+                    { value: "rematch", label: "Rematches", count: inviteCounts.rematch },
+                    ...(showClubChip
+                      ? [{ value: "club" as const, label: "Clubs", count: inviteCounts.club }]
+                      : []),
+                  ] as const).map((chip) => {
+                    const active = inviteFilter === chip.value;
+                    return (
+                      <button
+                        key={chip.value}
+                        type="button"
+                        onClick={() => setInviteFilter(chip.value)}
+                        className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs font-bold transition-colors ${
+                          active
+                            ? "bg-primary text-primary-foreground border-primary shadow-[0_0_10px_-2px_hsl(var(--primary)/0.7)]"
+                            : "bg-card/60 backdrop-blur border-border/60 text-muted-foreground hover:text-foreground hover:border-border"
+                        }`}
+                        data-testid={`chip-invite-filter-${chip.value}`}
+                        aria-pressed={active}
+                      >
+                        <span>{chip.label}</span>
+                        <span
+                          className={`inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full text-[10px] leading-none ${
+                            active
+                              ? "bg-primary-foreground/20 text-primary-foreground"
+                              : "bg-border/60 text-foreground/80"
+                          }`}
+                          data-testid={`chip-invite-filter-${chip.value}-count`}
+                        >
+                          {chip.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {filteredInviteRows.length === 0 ? (
+                  <div className="text-center py-12" data-testid="invites-filter-empty">
+                    <div className="mx-auto w-14 h-14 rounded-full bg-card border border-border/40 flex items-center justify-center mb-3">
+                      <Mail className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-bold">No invites in this filter</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Try another category to see pending invites.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredInviteRows.map((row, idx) =>
+                      row.kind === "challenge"
+                        ? renderChallengeInviteRow(row.invite, idx)
+                        : renderNotificationRow(row.notification, idx),
+                    )}
+                  </div>
                 )}
               </div>
             )}
