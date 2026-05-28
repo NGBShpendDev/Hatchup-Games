@@ -763,3 +763,92 @@ describe("social.ts deleted-post hiding", () => {
     });
   });
 });
+
+// ── Comment-like notifications ──────────────────────────────────────────
+// Covers the toggleCommentLike notification path: self-like skip,
+// dedupe on rapid toggle, and that unliking preserves the existing
+// notification row (we never retract a notification on unlike).
+describe("social.ts comment-like notifications", () => {
+  const COMMENT_ID = 5000;
+  const POST_ID = LIVE_ID;
+
+  // Viewer (req.playerId) is player 1 from seedBaseline; author is player 2.
+  function seedAuthoredComment(authorId: number) {
+    state.posts.push(makePost({ id: POST_ID, playerId: authorId, content: "p" }));
+    state.postComments.push({
+      id: COMMENT_ID,
+      postId: POST_ID,
+      playerId: authorId,
+      content: "great workout!",
+      isFlagged: false,
+      createdAt: new Date(),
+      updatedAt: null,
+    });
+  }
+
+  const likePath = `/social/posts/${POST_ID}/comments/${COMMENT_ID}/like`;
+
+  beforeEach(() => {
+    resetState();
+    seedBaseline();
+  });
+
+  it("liking another player's comment creates exactly one notification", async () => {
+    seedAuthoredComment(2);
+    const r = await req("POST", likePath, {});
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.body, { liked: true, likeCount: 1 });
+    assert.equal(state.notifications.length, 1);
+    const notif = state.notifications[0] as Record<string, unknown>;
+    assert.equal(notif.playerId, 2);
+    assert.equal(notif.type, "comment_like");
+    assert.equal(notif.sourceId, COMMENT_ID);
+  });
+
+  it("self-likes create no notification", async () => {
+    // Author is player 1 (the same as the viewer).
+    seedAuthoredComment(1);
+    const r = await req("POST", likePath, {});
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.body, { liked: true, likeCount: 1 });
+    assert.equal(state.notifications.length, 0);
+  });
+
+  it("rapid unlike + relike does not create a duplicate notification row", async () => {
+    seedAuthoredComment(2);
+    // 1) like
+    const a = await req("POST", likePath, {});
+    assert.equal(a.status, 200);
+    assert.equal((a.body as { liked: boolean }).liked, true);
+    assert.equal(state.notifications.length, 1);
+    // 2) unlike
+    const b = await req("POST", likePath, {});
+    assert.equal(b.status, 200);
+    assert.equal((b.body as { liked: boolean }).liked, false);
+    // 3) relike — must hit the dedupe guard
+    const c = await req("POST", likePath, {});
+    assert.equal(c.status, 200);
+    assert.equal((c.body as { liked: boolean }).liked, true);
+    assert.equal(
+      state.notifications.length,
+      1,
+      `expected dedupe to hold; got ${state.notifications.length} notifications`,
+    );
+  });
+
+  it("unliking does not remove the existing notification", async () => {
+    seedAuthoredComment(2);
+    const a = await req("POST", likePath, {});
+    assert.equal(a.status, 200);
+    assert.equal(state.notifications.length, 1);
+    const notifIdBefore = (state.notifications[0] as { id: number }).id;
+
+    const b = await req("POST", likePath, {});
+    assert.equal(b.status, 200);
+    assert.equal((b.body as { liked: boolean }).liked, false);
+    assert.equal(state.postCommentReactions.length, 0);
+    // Notification row is intentionally retained on unlike.
+    assert.equal(state.notifications.length, 1);
+    assert.equal((state.notifications[0] as { id: number }).id, notifIdBefore);
+  });
+});
