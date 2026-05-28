@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useListEvents } from "@workspace/api-client-react";
+import { useListEvents, useJoinLiveEvent, useGetPlayer, useGetHatchling } from "@workspace/api-client-react";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
@@ -13,6 +13,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { usePalMilestoneShare } from "@/hooks/usePalMilestoneShare";
+
+const PLAYER_ID = 1;
 
 export default function EventsScreen() {
   const colors = useColors();
@@ -22,10 +25,29 @@ export default function EventsScreen() {
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const { data: events, isLoading } = useListEvents();
+  const joinMutation = useJoinLiveEvent();
+  const shareMilestone = usePalMilestoneShare();
+
+  const { data: player } = useGetPlayer(PLAYER_ID);
+  const activePalId = player?.activeHatchlingId ?? 0;
+  const { data: activePal } = useGetHatchling(activePalId);
 
   const liveEvent = (events ?? []).find((e) => e.status === "live" || e.status === "active");
   const upcoming = (events ?? []).filter((e) => e.status !== "ended" && e.status !== "live" && e.status !== "active");
   const past = (events ?? []).filter((e) => e.status === "ended").slice(0, 5);
+
+  function handleJoin(eventId: number) {
+    joinMutation.mutate(
+      { id: eventId },
+      {
+        onSuccess: async (result) => {
+          if (result?.palXpResult) {
+            await shareMilestone(result.palXpResult, activePal?.name);
+          }
+        },
+      },
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -67,6 +89,7 @@ export default function EventsScreen() {
             const ev = item.event;
             const isLive = item.type === "live";
             const isPast = item.type === "past";
+            const isJoining = joinMutation.isPending && joinMutation.variables?.id === ev.id;
             return (
               <View style={[styles.eventCard, { backgroundColor: colors.card, borderColor: isLive ? colors.primary : colors.border }]}>
                 {isLive && (
@@ -96,10 +119,22 @@ export default function EventsScreen() {
                   )}
                 </View>
                 {!isPast && (
-                  <Pressable style={[styles.joinBtn, { backgroundColor: isLive ? colors.primary : colors.card, borderColor: colors.primary }]}>
-                    <Text style={[styles.joinText, { color: isLive ? "#fff" : colors.primary }]}>
-                      {isLive ? "Join Now" : "View Event"}
-                    </Text>
+                  <Pressable
+                    onPress={() => handleJoin(ev.id)}
+                    disabled={isJoining}
+                    style={[
+                      styles.joinBtn,
+                      { backgroundColor: isLive ? colors.primary : colors.card, borderColor: colors.primary },
+                      isJoining && styles.joinBtnDisabled,
+                    ]}
+                  >
+                    {isJoining ? (
+                      <ActivityIndicator size="small" color={isLive ? "#fff" : colors.primary} />
+                    ) : (
+                      <Text style={[styles.joinText, { color: isLive ? "#fff" : colors.primary }]}>
+                        {isLive ? "Join Now" : "View Event"}
+                      </Text>
+                    )}
                   </Pressable>
                 )}
               </View>
@@ -127,6 +162,7 @@ const styles = StyleSheet.create({
   metaChip: { flexDirection: "row", alignItems: "center", gap: 4 },
   metaText: { fontSize: 11 },
   joinBtn: { borderRadius: 10, paddingVertical: 9, alignItems: "center", borderWidth: 1.5, marginTop: 4 },
+  joinBtnDisabled: { opacity: 0.6 },
   joinText: { fontSize: 13, fontWeight: "700" },
   empty: { alignItems: "center", justifyContent: "center", gap: 10, paddingTop: 80 },
   emptyText: { fontSize: 14 },

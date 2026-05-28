@@ -1,5 +1,11 @@
 import { Feather } from "@expo/vector-icons";
-import { useListCompetitions, useListGameModes } from "@workspace/api-client-react";
+import {
+  useListCompetitions,
+  useListGameModes,
+  useSubmitCompetitionResult,
+  useGetPlayer,
+  useGetHatchling,
+} from "@workspace/api-client-react";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -15,6 +21,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { usePalMilestoneShare } from "@/hooks/usePalMilestoneShare";
+
+const PLAYER_ID = 1;
 
 const STATUS_COLORS: Record<string, string> = {
   active: "#22c55e",
@@ -32,10 +41,39 @@ export default function CompeteScreen() {
   const [statusFilter, setStatusFilter] = useState<"active" | "pending" | "completed">("active");
 
   const { data: gameModes, isLoading: loadingModes } = useListGameModes();
-  const { data: competitions, isLoading: loadingComps } = useListCompetitions({
+  const { data: competitions, isLoading: loadingComps, refetch } = useListCompetitions({
     status: statusFilter,
     limit: 20,
   });
+
+  const submitResult = useSubmitCompetitionResult();
+  const shareMilestone = usePalMilestoneShare();
+
+  const { data: player } = useGetPlayer(PLAYER_ID);
+  const activePalId = player?.activeHatchlingId ?? 0;
+  const { data: activePal } = useGetHatchling(activePalId);
+
+  function handleSubmitResult(competitionId: number) {
+    submitResult.mutate(
+      {
+        id: competitionId,
+        data: { score: 100, duration: 300, rank: 1, playerId: PLAYER_ID },
+      },
+      {
+        onSuccess: async (result) => {
+          await refetch();
+          if (result?.hatchlingEvolutionSharePrompt) {
+            const palXpLike = {
+              evolutionSharePrompt: result.hatchlingEvolutionSharePrompt,
+              newLevel: result.hatchlingNewLevel,
+              hatchlingId: result.hatchlingId,
+            };
+            await shareMilestone(palXpLike, activePal?.name ?? result.hatchlingName);
+          }
+        },
+      },
+    );
+  }
 
   return (
     <ScrollView
@@ -121,6 +159,7 @@ export default function CompeteScreen() {
       ) : (
         (competitions ?? []).map((comp) => {
           const statusColor = STATUS_COLORS[comp.status ?? "pending"] ?? colors.mutedForeground;
+          const isSubmitting = submitResult.isPending && submitResult.variables?.id === comp.id;
           return (
             <View key={comp.id} style={[styles.compCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.compHeader}>
@@ -140,9 +179,21 @@ export default function CompeteScreen() {
                   </Text>
                 </View>
               </View>
-              {comp.status === "pending" && (
-                <Pressable style={[styles.joinBtn, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.joinBtnText}>Join Battle</Text>
+              {comp.status === "active" && (
+                <Pressable
+                  onPress={() => handleSubmitResult(comp.id)}
+                  disabled={isSubmitting}
+                  style={[styles.submitBtn, { borderColor: "#22c55e" }, isSubmitting && styles.submitBtnDisabled]}
+                  testID={`button-submit-result-${comp.id}`}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator size="small" color="#22c55e" />
+                  ) : (
+                    <>
+                      <Feather name="check-circle" size={14} color="#22c55e" />
+                      <Text style={[styles.submitBtnText, { color: "#22c55e" }]}>Submit Result</Text>
+                    </>
+                  )}
                 </Pressable>
               )}
             </View>
@@ -180,6 +231,7 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 11, fontWeight: "600" },
   compMeta: { flexDirection: "row", alignItems: "center", gap: 5 },
   compMetaText: { fontSize: 12 },
-  joinBtn: { borderRadius: 10, paddingVertical: 10, alignItems: "center" },
-  joinBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  submitBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 10, paddingVertical: 9, borderWidth: 1.5 },
+  submitBtnDisabled: { opacity: 0.6 },
+  submitBtnText: { fontSize: 13, fontWeight: "700" },
 });
