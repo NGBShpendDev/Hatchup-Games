@@ -21,6 +21,7 @@ import {
   notificationsTable,
   artifactsTable,
   playerArtifactsTable,
+  artifactWorldNotificationsTable,
 } from "@workspace/db";
 import { eq, desc, and, gt, lt, sql, inArray } from "drizzle-orm";
 import { awardBadge } from "./badgeService.ts";
@@ -377,6 +378,34 @@ async function notifyTournamentChampion(
     category: "completed",
     tag: `tournament-champion-${challengeId}`,
   });
+
+  // World-feed announcement so the global "recent drops" UI surfaces the
+  // champion. The Crown of the Bracket is Legendary (not Mythic+), so it
+  // doesn't ride the regular world-notification path in `artifactService`.
+  // We mark this row with a dedicated `"Champion"` rarity label so the
+  // client can render it distinctly from regular artifact drops.
+  try {
+    const [player, artifact] = await Promise.all([
+      db.query.playersTable.findFirst({
+        where: eq(playersTable.id, playerId),
+        columns: { username: true },
+      }),
+      db.query.artifactsTable.findFirst({
+        where: eq(artifactsTable.imageSlug, CHAMPION_ARTIFACT_SLUG),
+      }),
+    ]);
+    if (player && artifact) {
+      await db.insert(artifactWorldNotificationsTable).values({
+        playerId,
+        playerUsername: player.username,
+        artifactId: artifact.id,
+        artifactName: `Crown of the Bracket — ${challengeTitle}`,
+        rarity: "Champion",
+      });
+    }
+  } catch (err) {
+    logger.warn({ err, playerId, challengeId }, "tournament_champion world notification insert failed");
+  }
 
   if (!isEmailConfigured()) return;
 

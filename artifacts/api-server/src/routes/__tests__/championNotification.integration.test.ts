@@ -62,6 +62,7 @@ const {
   playerBadgesTable,
   playerArtifactsTable,
   notificationsTable,
+  artifactWorldNotificationsTable,
 } = await import("@workspace/db");
 const { eq, inArray } = await import("drizzle-orm");
 const { finalizeChallenge } = await import("../../services/challengeFinalize.ts");
@@ -139,6 +140,8 @@ async function cleanup() {
   if (createdPlayerIds.length > 0) {
     await db.delete(notificationsTable)
       .where(inArray(notificationsTable.playerId, createdPlayerIds));
+    await db.delete(artifactWorldNotificationsTable)
+      .where(inArray(artifactWorldNotificationsTable.playerId, createdPlayerIds));
     await db.delete(playerBadgesTable)
       .where(inArray(playerBadgesTable.playerId, createdPlayerIds));
     await db.delete(playerArtifactsTable)
@@ -202,6 +205,28 @@ describe("notifyTournamentChampion (via finalizeChallenge)", () => {
     assert.ok(champPush, "champion-specific push was sent");
     assert.equal(champPush!.playerId, champion);
     assert.equal(champPush!.category, "completed");
+
+    // World-feed announcement: a row should land in
+    // artifact_world_notifications with the dedicated "Champion" rarity
+    // label so the global "recent drops" UI distinguishes tournament wins
+    // from regular artifact drops. The world-notif insert happens inside
+    // the fire-and-forget `notifyTournamentChampion` after the in-app
+    // notification, so give it a moment to settle.
+    await new Promise(r => setTimeout(r, 100));
+    const worldRows = await db.query.artifactWorldNotificationsTable.findMany({
+      where: inArray(artifactWorldNotificationsTable.playerId, [champion, runnerUp]),
+    });
+    const champWorld = worldRows.filter(r => r.rarity === "Champion");
+    assert.equal(champWorld.length, 1, "exactly one Champion world notification");
+    assert.equal(champWorld[0].playerId, champion);
+    assert.ok(
+      champWorld[0].artifactName.includes("Crown of the Bracket"),
+      "world notification names the Crown of the Bracket",
+    );
+    assert.ok(
+      champWorld[0].artifactName.includes("Bracket Royale"),
+      "world notification embeds the challenge title",
+    );
 
     // (c) Generic "Challenge complete!" fan-out fires for the runner-up
     // but NOT for the champion (avoids double-notifying them).

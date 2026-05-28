@@ -87,6 +87,7 @@ const RARITY_NOTIF_STYLES: Record<string, string> = {
   Mythic:    "bg-pink-950/60 border-pink-500/60 text-pink-300",
   Ancient:   "bg-orange-950/60 border-orange-500/60 text-orange-300",
   Celestial: "bg-cyan-950/60 border-cyan-400/70 text-cyan-200",
+  Champion:  "bg-yellow-950/60 border-yellow-400/70 text-yellow-200",
 };
 
 const TIER_GLOW: Record<string, string> = {
@@ -1087,7 +1088,16 @@ export default function Home() {
             <div className="space-y-2">
               {worldNotifs.map(notif => {
                 const s = RARITY_NOTIF_STYLES[notif.rarity] ?? "bg-muted/40 border-border text-muted-foreground";
-                const emoji = notif.rarity === "Celestial" ? "🌟" : notif.rarity === "Ancient" ? "🟠" : "🔴";
+                const isChampion = notif.rarity === "Champion";
+                const emoji = isChampion
+                  ? "🏆"
+                  : notif.rarity === "Celestial"
+                    ? "🌟"
+                    : notif.rarity === "Ancient"
+                      ? "🟠"
+                      : "🔴";
+                const verb = isChampion ? "won the tournament:" : "unlocked";
+                const subLabel = isChampion ? "Tournament Champion" : `${notif.rarity} Artifact`;
                 return (
                   <motion.div
                     key={notif.id}
@@ -1097,8 +1107,8 @@ export default function Home() {
                   >
                     <span className="text-xl flex-shrink-0">{emoji}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-black truncate">{notif.playerUsername} <span className="font-normal opacity-80">unlocked</span> {notif.artifactName}</p>
-                      <p className="text-[10px] opacity-60">{notif.rarity} Artifact · {new Date(notif.createdAt).toLocaleDateString()}</p>
+                      <p className="text-xs font-black truncate">{notif.playerUsername} <span className="font-normal opacity-80">{verb}</span> {notif.artifactName}</p>
+                      <p className="text-[10px] opacity-60">{subLabel} · {new Date(notif.createdAt).toLocaleDateString()}</p>
                     </div>
                   </motion.div>
                 );
