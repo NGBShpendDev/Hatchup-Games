@@ -58,6 +58,27 @@ export function MutualWorkoutPartnersLine({
         data-testid={`text-${testIdPrefix}-mutual-partners`}
       >
         <Dumbbell className={iconClassName ?? "w-3 h-3 shrink-0"} />
+        {preview.length > 0 && (
+          <span
+            className="flex -space-x-1.5 shrink-0"
+            data-testid={`avatars-${testIdPrefix}-mutual-partners`}
+          >
+            {preview.map((p) => (
+              <Avatar
+                key={p.id}
+                className="h-4 w-4 border border-background ring-1 ring-emerald-500/40"
+                data-testid={`avatar-${testIdPrefix}-mutual-partner-${p.id}`}
+              >
+                {p.avatarUrl ? (
+                  <AvatarImage src={p.avatarUrl} alt={p.displayName} />
+                ) : null}
+                <AvatarFallback className="text-[8px] font-black bg-emerald-500/20 text-emerald-200">
+                  {initialsOf(p.displayName)}
+                </AvatarFallback>
+              </Avatar>
+            ))}
+          </span>
+        )}
         <span className="truncate">
           <span>Workouts with </span>
           {preview.map((p, idx) => (
