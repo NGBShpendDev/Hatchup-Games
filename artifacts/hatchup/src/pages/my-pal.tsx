@@ -25,6 +25,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { ErrorCard } from "@/components/error-card";
 import { HatchlingReaction, type HatchlingReactionData } from "@/components/hatchling-reaction";
+import {
+  LoyaltyMilestoneCelebration,
+  checkLoyaltyMilestone,
+  markMilestoneSeen,
+  type LoyaltyMilestoneData,
+} from "@/components/loyalty-milestone-celebration";
 
 import lavaDragonImg from "@/assets/images/lava-dragon.png";
 import cyberCreatureImg from "@/assets/images/cyber-creature.png";
@@ -161,6 +167,7 @@ export default function MyPalPage() {
   const { player } = usePlayer();
 
   const [reaction, setReaction] = useState<HatchlingReactionData | null>(null);
+  const [loyaltyMilestone, setLoyaltyMilestone] = useState<LoyaltyMilestoneData | null>(null);
   const palImgControls = useAnimation();
 
   type PalSnapshot = { loyaltyScore: number; motivationScore: number; battleWins: number };
@@ -250,6 +257,7 @@ export default function MyPalPage() {
           const newMotivation = updatedPal?.motivationScore ?? (pal as any).motivationScore ?? 50;
           const newBattleWins = updatedPal?.battleWins      ?? (pal as any).battleWins      ?? 0;
           const prevSnapshot  = prevPalRef.current;
+          const prevLoyalty     = prevSnapshot?.loyaltyScore ?? (pal as any).loyaltyScore ?? 50;
           const loyaltyDelta    = prevSnapshot ? newLoyalty    - prevSnapshot.loyaltyScore    : 3;
           const motivationDelta = prevSnapshot ? newMotivation - prevSnapshot.motivationScore : 10;
 
@@ -268,6 +276,20 @@ export default function MyPalPage() {
             realm: (pal as any).realm ?? null,
           });
           triggerPalBounce(true);
+
+          const crossedMilestone = checkLoyaltyMilestone(activePalId, prevLoyalty, newLoyalty);
+          if (crossedMilestone) {
+            markMilestoneSeen(activePalId, crossedMilestone);
+            setTimeout(() => {
+              setLoyaltyMilestone({
+                palId: activePalId,
+                palName: pal.name,
+                milestone: crossedMilestone,
+                imageUrl: pal.imageUrl,
+                realm: (pal as any).realm ?? null,
+              });
+            }, 2000);
+          }
 
           prevPalRef.current = { loyaltyScore: newLoyalty, motivationScore: newMotivation, battleWins: newBattleWins };
           queryClient.invalidateQueries({ queryKey: getGetHatchlingQueryKey(activePalId) });
@@ -458,6 +480,7 @@ export default function MyPalPage() {
   return (
     <Layout>
       <HatchlingReaction reaction={reaction} onDismiss={() => setReaction(null)} />
+      <LoyaltyMilestoneCelebration data={loyaltyMilestone} onDismiss={() => setLoyaltyMilestone(null)} />
       <div className="max-w-2xl mx-auto pb-20">
 
         {/* Header */}
