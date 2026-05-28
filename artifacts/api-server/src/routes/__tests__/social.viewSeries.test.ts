@@ -152,6 +152,14 @@ function truncHour(d: Date): Date {
   return new Date(t - (t % 3600_000));
 }
 
+// Bucket a Date to the top of its UTC day, mirroring date_trunc('day', ...).
+// Postgres `date_trunc('day', ts)` returns the start of the day in the session
+// timezone, which in our server config is UTC.
+function truncDay(d: Date): Date {
+  const t = d.getTime();
+  return new Date(t - (t % (24 * 3600_000)));
+}
+
 const fakeDb = {
   query: {
     postsTable: {
@@ -167,24 +175,30 @@ const fakeDb = {
     },
   },
   // The view-series route uses `db.select(...).from(postViewsTable).where(...).groupBy(...)`.
-  // Return a thenable from groupBy that resolves to per-hour aggregated rows
-  // filtered by postId + createdAt >= cutoff.
+  // Return a thenable from groupBy that resolves to per-bucket aggregated rows
+  // filtered by postId + createdAt >= cutoff. The bucket size is inferred
+  // from the cutoff window: a cutoff > 24h ago means the route is in `week`
+  // mode and we should mirror `date_trunc('day', ...)` instead of `'hour'`.
   select: (_proj: unknown) => ({
     from: (_t: unknown) => ({
       where: (cond: Pred) => ({
         groupBy: (_g: unknown) => {
           const postId = findPred(cond, "eq", "postId")?.val as number | undefined;
           const cutoff = findPred(cond, "gte", "createdAt")?.val as Date | undefined;
+          const isWeek = cutoff
+            ? Date.now() - cutoff.getTime() > 25 * 3600_000
+            : false;
+          const trunc = isWeek ? truncDay : truncHour;
           const grouped = new Map<number, number>();
           for (const v of state.views) {
             if (postId !== undefined && v.postId !== postId) continue;
             if (cutoff && v.createdAt < cutoff) continue;
-            const hourT = truncHour(v.createdAt).getTime();
-            grouped.set(hourT, (grouped.get(hourT) ?? 0) + 1);
+            const bucketT = trunc(v.createdAt).getTime();
+            grouped.set(bucketT, (grouped.get(bucketT) ?? 0) + 1);
           }
           return Promise.resolve(
             Array.from(grouped.entries()).map(([t, views]) => ({
-              hour: new Date(t),
+              bucket: new Date(t),
               views,
             })),
           );
@@ -244,14 +258,20 @@ beforeEach(() => {
 });
 
 interface SeriesBody {
+  window?: "day" | "week";
   windowHours?: number;
+  bucketHours?: number;
   total?: number;
   buckets?: { hour: string; views: number }[];
   error?: string;
 }
 
-async function getSeries(postId: number): Promise<{ status: number; body: SeriesBody }> {
-  const res = await fetch(`${baseUrl}/social/posts/${postId}/view-series`);
+async function getSeries(
+  postId: number,
+  window?: "day" | "week",
+): Promise<{ status: number; body: SeriesBody }> {
+  const qs = window ? `?window=${window}` : "";
+  const res = await fetch(`${baseUrl}/social/posts/${postId}/view-series${qs}`);
   const body = (await res.json().catch(() => ({}))) as SeriesBody;
   return { status: res.status, body };
 }
@@ -294,6 +314,8 @@ describe("GET /social/posts/:id/view-series", () => {
 
     const r = await getSeries(1);
     assert.equal(r.status, 200);
+    assert.equal(r.body.window, "day");
+    assert.equal(r.body.bucketHours, 1);
     assert.equal(r.body.windowHours, 24);
     assert.ok(r.body.buckets);
     assert.equal(r.body.buckets!.length, 24, "must always return windowHours buckets");
@@ -381,5 +403,121 @@ describe("GET /social/posts/:id/view-series", () => {
         `bucket ${i} (${hoursAgo}h ago) should be zero-filled`,
       );
     }
+  });
+
+  it("returns exactly 7 zero-filled daily buckets oldest-first for window=week", async () => {
+    state.posts.set(1, { id: 1, playerId: 1, viewCount: 0 });
+    state.currentPlayerId = 1;
+
+    const r = await getSeries(1, "week");
+    assert.equal(r.status, 200);
+    assert.equal(r.body.window, "week");
+    assert.equal(r.body.bucketHours, 24);
+    assert.equal(r.body.windowHours, 24 * 7);
+    assert.ok(r.body.buckets);
+    assert.equal(r.body.buckets!.length, 7, "week window must return 7 daily buckets");
+    assert.equal(r.body.total, 0);
+    // Every bucket is zeroed and aligned to UTC midnight.
+    for (const b of r.body.buckets!) {
+      assert.equal(b.views, 0);
+      const d = new Date(b.hour);
+      assert.equal(d.getUTCHours(), 0);
+      assert.equal(d.getUTCMinutes(), 0);
+      assert.equal(d.getUTCSeconds(), 0);
+      assert.equal(d.getUTCMilliseconds(), 0);
+    }
+    // Buckets are strictly increasing by exactly one day (oldest first).
+    for (let i = 1; i < r.body.buckets!.length; i++) {
+      const prev = new Date(r.body.buckets![i - 1].hour).getTime();
+      const cur = new Date(r.body.buckets![i].hour).getTime();
+      assert.equal(
+        cur - prev,
+        24 * 3600_000,
+        `bucket ${i} should be one day after bucket ${i - 1}`,
+      );
+    }
+    // The last bucket is the current UTC day.
+    const now = Date.now();
+    const currentDayStart = now - (now % (24 * 3600_000));
+    assert.equal(
+      new Date(r.body.buckets![6].hour).getTime(),
+      currentDayStart,
+      "last bucket should be the current UTC day",
+    );
+  });
+
+  it("places views in the correct daily bucket for window=week and total matches", async () => {
+    state.posts.set(1, { id: 1, playerId: 1, viewCount: 0 });
+    state.currentPlayerId = 1;
+
+    const dayMs = 24 * 3600_000;
+    const now = Date.now();
+    const currentDayStart = now - (now % dayMs);
+
+    // Seed views: 4 today, 2 three days ago, 1 six days ago (oldest bucket),
+    // plus 9 stale views 8 days ago that must be excluded by the cutoff.
+    const seed = (daysAgo: number, count: number) => {
+      const base = currentDayStart - daysAgo * dayMs;
+      for (let i = 0; i < count; i++) {
+        // Stagger each view a few hours into the day to confirm
+        // date_trunc('day', ...) bucketing rounds down to the day start.
+        state.views.push({
+          postId: 1,
+          viewerKey: `k${state.views.length}`,
+          viewDate: "2024-01-01",
+          createdAt: new Date(base + (3 + i) * 3600_000),
+        });
+      }
+    };
+    seed(0, 4);
+    seed(3, 2);
+    seed(6, 1);
+    seed(8, 9); // outside the 7-day window — must be ignored
+
+    const r = await getSeries(1, "week");
+    assert.equal(r.status, 200);
+    assert.equal(r.body.window, "week");
+    assert.equal(r.body.buckets!.length, 7);
+
+    // total reflects only views inside the 7-day window.
+    assert.equal(r.body.total, 7);
+
+    // Sum of bucket views equals total.
+    const sum = r.body.buckets!.reduce((a, b) => a + b.views, 0);
+    assert.equal(sum, r.body.total);
+
+    // Each seeded day lands in the right bucket.
+    const bucketFor = (daysAgo: number) =>
+      r.body.buckets!.find(
+        (b) => new Date(b.hour).getTime() === currentDayStart - daysAgo * dayMs,
+      );
+    assert.equal(bucketFor(0)?.views, 4, "today's bucket should hold 4 views");
+    assert.equal(bucketFor(3)?.views, 2, "3d-ago bucket should hold 2 views");
+    assert.equal(bucketFor(6)?.views, 1, "oldest bucket should hold 1 view");
+
+    // Every other bucket is zero.
+    const nonZeroOffsets = new Set([0, 3, 6]);
+    for (let i = 0; i < 7; i++) {
+      const daysAgo = 6 - i;
+      if (nonZeroOffsets.has(daysAgo)) continue;
+      assert.equal(
+        r.body.buckets![i].views,
+        0,
+        `bucket ${i} (${daysAgo}d ago) should be zero-filled`,
+      );
+    }
+  });
+
+  it("treats unknown window values as `day`", async () => {
+    // The route narrows `req.query.window === "week"` only; anything else
+    // (including typos like `month`) must fall back to the 24h daily view.
+    state.posts.set(1, { id: 1, playerId: 1, viewCount: 0 });
+    state.currentPlayerId = 1;
+
+    const res = await fetch(`${baseUrl}/social/posts/1/view-series?window=month`);
+    const body = (await res.json()) as SeriesBody;
+    assert.equal(res.status, 200);
+    assert.equal(body.window, "day");
+    assert.equal(body.buckets!.length, 24);
   });
 });
