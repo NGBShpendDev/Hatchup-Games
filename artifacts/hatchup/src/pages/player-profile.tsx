@@ -24,6 +24,7 @@ const SLUG_EMOJIS: Record<string, string> = {
   flame_keeper: "🕯️", crystal_horizon: "💎", iron_fist: "✊",
   steel_resolve: "🛡️", thunderstride: "⚡", iron_devotee: "💪",
   steel_form: "🗿", leg_day_legend: "🦵", centurion_flame: "👑",
+  crown_of_the_bracket: "👑",
   marathon_spirit: "🏃", million_paces: "🌍", phoenix_core: "🦅",
   obsidian_sovereign: "⚫", stellar_epoch: "⭐", void_whisper: "🌑",
   agile_phantom: "🐆", eternal_vigil: "🌙",

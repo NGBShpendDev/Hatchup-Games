@@ -7,6 +7,8 @@ import {
   playersTable,
   userReportsTable,
   notificationsTable,
+  artifactsTable,
+  playerArtifactsTable,
 } from "@workspace/db";
 import { eq, desc, and, gt, lt, sql, inArray } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
@@ -153,6 +155,49 @@ export async function sendEndingSoonPushes(): Promise<void> {
   }
 }
 
+// ── Champion cosmetic artifact ─────────────────────────────────────────────
+// Tournament champions receive the "Crown of the Bracket" — a unique
+// Legendary artifact that shows up alongside their other artifacts on the
+// profile / artifact showcase. Idempotent: if the catalog row is missing
+// (e.g. seed never ran), it is lazily inserted; if the player already owns
+// it (e.g. won another tournament), the insert is a no-op.
+const CHAMPION_ARTIFACT_SLUG = "crown_of_the_bracket";
+const CHAMPION_ARTIFACT_NAME = "Crown of the Bracket";
+
+async function awardChampionArtifact(playerId: number): Promise<void> {
+  let artifact = await db.query.artifactsTable.findFirst({
+    where: eq(artifactsTable.imageSlug, CHAMPION_ARTIFACT_SLUG),
+  });
+
+  if (!artifact) {
+    const [inserted] = await db.insert(artifactsTable).values({
+      name: CHAMPION_ARTIFACT_NAME,
+      lore: "Forged from the shattered hopes of every contender you outlasted. Worn only by tournament champions.",
+      rarity: "Legendary",
+      type: "special",
+      imageSlug: CHAMPION_ARTIFACT_SLUG,
+      isHidden: true,
+      abilities: [
+        { name: "Champion's Aura", description: "+25% XP from competitive activities", value: 25 },
+        { name: "Bracket Tactician", description: "+10% coins from challenge rewards", value: 10 },
+      ],
+      triggerKey: null,
+      triggerValue: null,
+    }).onConflictDoNothing({ target: artifactsTable.name }).returning();
+
+    artifact = inserted ?? await db.query.artifactsTable.findFirst({
+      where: eq(artifactsTable.imageSlug, CHAMPION_ARTIFACT_SLUG),
+    });
+  }
+
+  if (!artifact) return;
+
+  await db.insert(playerArtifactsTable).values({
+    playerId,
+    artifactId: artifact.id,
+  }).onConflictDoNothing();
+}
+
 // ── Reward distribution helper ─────────────────────────────────────────────
 async function finalizeChallenge(challengeId: number) {
   const challenge = await db.query.challengesTable.findFirst({
@@ -208,6 +253,7 @@ async function finalizeChallenge(challengeId: number) {
       }
       if (grant.isChampion) {
         await awardBadge(participants[i].playerId, "TOURNAMENT_CHAMPION");
+        await awardChampionArtifact(participants[i].playerId);
       }
     }
   }

@@ -269,6 +269,21 @@ const CATALOG: ArtifactInsert[] = [
     triggerKey: "discipline_bar_level",
     triggerValue: 15,
   },
+  // ── Champion-only (Legendary, hidden from milestone engine) ───────────────
+  {
+    name: "Crown of the Bracket",
+    lore: "Forged from the shattered hopes of every contender you outlasted. Worn only by tournament champions.",
+    rarity: "Legendary",
+    type: "special",
+    imageSlug: "crown_of_the_bracket",
+    isHidden: true,
+    abilities: [
+      { name: "Champion's Aura", description: "+25% XP from competitive activities", value: 25 },
+      { name: "Bracket Tactician", description: "+10% coins from challenge rewards", value: 10 },
+    ],
+    triggerKey: null,
+    triggerValue: null,
+  },
   // ── Celestial ─────────────────────────────────────────────────────────────
   {
     name: "Stellar Epoch",
