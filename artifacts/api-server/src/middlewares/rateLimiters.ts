@@ -1,4 +1,4 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 /**
  * Stricter per-endpoint limiters layered on top of the global /api limiters.
@@ -57,13 +57,21 @@ export const postViewLimiter = rateLimit({
 });
 
 // Weekly recap preview: lets a player send themselves a sample notification
-// after changing the recap day/time. Strictly 1/hour per IP to prevent abuse
-// (each preview computes a full recap + optional AI tip call).
+// after changing the recap day/time. Strictly 1/hour per player to prevent
+// abuse (each preview computes a full recap + optional AI tip call).
+//
+// Keyed by `req.playerId` so players sharing an IP (corporate Wi-Fi, school
+// networks, cellular CGNAT) don't block each other. Falls back to the
+// IP-based key for unauthenticated edge cases — those requests are rejected
+// by `requireAuth` immediately after the limiter anyway, but the fallback
+// keeps the limiter from blowing up on a missing key.
 export const recapPreviewLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 1,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) =>
+    req.playerId != null ? `player:${req.playerId}` : ipKeyGenerator(req.ip ?? ""),
   message: { error: "You can only send one recap preview per hour." },
 });
 

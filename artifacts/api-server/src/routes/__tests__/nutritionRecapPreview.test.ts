@@ -54,13 +54,24 @@ const state = {
   notifications: [] as Notification[],
 };
 
+// Each test gets a unique default player so the per-player rate limiter
+// (module singleton) doesn't bleed state across tests. Tests that need
+// additional players (e.g. shared-IP scenarios) can add more to `state.players`
+// and pass the matching `userId` to `postJson`.
+let nextPlayerSeq = 0;
+let defaultPlayerId = 1;
+let defaultClerkId = "u_1";
+
 function reset() {
   state.players.clear();
   state.posts = [];
   state.notifications = [];
-  state.players.set(1, {
-    id: 1,
-    clerkId: "u_1",
+  nextPlayerSeq += 1;
+  defaultPlayerId = nextPlayerSeq;
+  defaultClerkId = `u_${nextPlayerSeq}`;
+  state.players.set(defaultPlayerId, {
+    id: defaultPlayerId,
+    clerkId: defaultClerkId,
     physiqueGoal: "lean_athlete",
     email: null,
     notifyRecapEmail: false,
@@ -176,10 +187,15 @@ mock.module("drizzle-orm", {
   },
 });
 
-// Auth: every request authenticates as clerk user u_1 → player id 1.
+// Auth: read the clerk user from an `x-test-user` header so individual tests
+// can simulate multiple authenticated players sharing one IP. Defaults to u_1.
 mock.module("@clerk/express", {
   namedExports: {
-    getAuth: () => ({ userId: "u_1" }),
+    getAuth: (req: { headers: Record<string, string | string[] | undefined> }) => {
+      const raw = req.headers["x-test-user"];
+      const userId = Array.isArray(raw) ? raw[0] : raw;
+      return { userId: userId ?? "u_1" };
+    },
   },
 });
 
@@ -290,13 +306,20 @@ beforeEach(() => {
   reset();
 });
 
-async function postJson(path: string, body: unknown = {}, ip?: string) {
+async function postJson(
+  path: string,
+  body: unknown = {},
+  ip?: string,
+  userId?: string,
+) {
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    "x-forwarded-for": ip ?? nextIp(),
+  };
+  headers["x-test-user"] = userId ?? defaultClerkId;
   const res = await fetch(`${baseUrl}${path}`, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-forwarded-for": ip ?? nextIp(),
-    },
+    headers,
     body: JSON.stringify(body),
   });
   const text = await res.text();
@@ -307,7 +330,7 @@ async function postJson(path: string, body: unknown = {}, ip?: string) {
 describe("POST /nutrition/recap/preview", () => {
   it("inserts a notification with type=nutrition_recap_preview and a negative sourceId", async () => {
     state.posts.push({
-      playerId: 1,
+      playerId: defaultPlayerId,
       name: "Oatmeal",
       emoji: "🥣",
       calories: 400, proteinG: 20, carbsG: 60, fatG: 10,
@@ -322,7 +345,7 @@ describe("POST /nutrition/recap/preview", () => {
 
     assert.equal(state.notifications.length, 1);
     const n = state.notifications[0]!;
-    assert.equal(n.playerId, 1);
+    assert.equal(n.playerId, defaultPlayerId);
     assert.equal(n.type, "nutrition_recap_preview");
     assert.equal(n.link, "/nutrition");
     assert.ok(n.title.startsWith("Preview: "), "notification title is prefixed with 'Preview: '");
@@ -331,7 +354,7 @@ describe("POST /nutrition/recap/preview", () => {
 
   it("does NOT suppress (or get suppressed by) the real weekly recap — they use different sourceId spaces", async () => {
     state.posts.push({
-      playerId: 1,
+      playerId: defaultPlayerId,
       name: "Salad",
       emoji: "🥗",
       calories: 350, proteinG: 25, carbsG: 30, fatG: 12,
@@ -362,16 +385,90 @@ describe("POST /nutrition/recap/preview", () => {
     assert.ok(preview!.sourceId < 0, "preview sourceId stays in the negative epoch-second space");
   });
 
-  it("rate-limits the second preview call within the hour to 429", async () => {
+  it("lets two different players sharing one IP each preview once within the hour", async () => {
+    // beforeEach already seeded the default player. Add a second one so we
+    // have two distinct authenticated identities behind the same IP.
+    const playerA = defaultPlayerId;
+    const clerkA = defaultClerkId;
+    nextPlayerSeq += 1;
+    const playerB = nextPlayerSeq;
+    const clerkB = `u_${nextPlayerSeq}`;
+    state.players.set(playerB, {
+      id: playerB,
+      clerkId: clerkB,
+      physiqueGoal: "lean_athlete",
+      email: null,
+      notifyRecapEmail: false,
+      notifyRecapPush: false,
+      displayName: "Misty",
+      username: "misty",
+    });
+
     state.posts.push({
-      playerId: 1,
+      playerId: playerA,
+      name: "Eggs",
+      emoji: "🥚",
+      calories: 300, proteinG: 20, carbsG: 5, fatG: 18,
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    });
+    state.posts.push({
+      playerId: playerB,
+      name: "Yogurt",
+      emoji: "🥛",
+      calories: 200, proteinG: 18, carbsG: 22, fatG: 4,
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    });
+
+    // Both players are behind the same NAT'd IP (shared corporate Wi-Fi).
+    const sharedIp = nextIp();
+
+    const p1 = await postJson("/nutrition/recap/preview", {}, sharedIp, clerkA);
+    assert.equal(p1.res.status, 200, "player A's first preview should succeed");
+
+    const p2 = await postJson("/nutrition/recap/preview", {}, sharedIp, clerkB);
+    assert.equal(
+      p2.res.status,
+      200,
+      "player B must NOT be blocked by player A's preview on the same IP",
+    );
+
+    assert.equal(state.notifications.length, 2);
+    const owners = state.notifications.map((n) => n.playerId).sort((a, b) => a - b);
+    assert.deepEqual(owners, [playerA, playerB].sort((a, b) => a - b));
+  });
+
+  it("still caps a single player at 1 preview per hour even on a fresh IP", async () => {
+    state.posts.push({
+      playerId: defaultPlayerId,
+      name: "Bagel",
+      emoji: "🥯",
+      calories: 280, proteinG: 10, carbsG: 55, fatG: 2,
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    });
+
+    // Different IPs on purpose — the per-player key must still trip.
+    const first = await postJson("/nutrition/recap/preview", {}, nextIp(), defaultClerkId);
+    assert.equal(first.res.status, 200);
+
+    const second = await postJson("/nutrition/recap/preview", {}, nextIp(), defaultClerkId);
+    assert.equal(
+      second.res.status,
+      429,
+      "same player must be rate-limited even when their IP changes",
+    );
+    assert.equal(state.notifications.length, 1);
+  });
+
+  it("rate-limits the second preview call within the hour", async () => {
+    state.posts.push({
+      playerId: defaultPlayerId,
       name: "Toast",
       emoji: "🍞",
       calories: 200, proteinG: 6, carbsG: 30, fatG: 5,
       createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
     });
 
-    // Both calls share an IP so the limiter keys them together.
+    // Same player both times — the per-player key trips regardless of IP.
     const sharedIp = nextIp();
     const first = await postJson("/nutrition/recap/preview", {}, sharedIp);
     assert.equal(first.res.status, 200, "first call within the hour should succeed");

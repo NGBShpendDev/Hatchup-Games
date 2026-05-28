@@ -848,7 +848,7 @@ router.post("/nutrition/recap/send", requireAuth, attachPlayer, async (req, res)
 // suppresses — the real weekly recap), and also returns the rendered payload
 // so the UI can show an inline preview. Rate-limited to 1/hour to keep the
 // AI tip call from being abused.
-router.post("/nutrition/recap/preview", recapPreviewLimiter, requireAuth, attachPlayer, async (req, res) => {
+router.post("/nutrition/recap/preview", requireAuth, attachPlayer, recapPreviewLimiter, async (req, res) => {
   const playerId = req.playerId!;
   try {
     const recap = await computeWeeklyRecap(playerId);
