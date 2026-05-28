@@ -30,13 +30,32 @@ const REALM_EMOJI: Record<string, string> = {
 const router = Router();
 
 // ── Mood state helpers ─────────────────────────────────────────────────────────
-function computeMoodState(lastWorkoutAt: Date | null): string {
+// Returns "sad" when:
+//   • motivationScore has fallen below 30 (critically demotivated), OR
+//   • no workout has been logged today and the local clock has passed 20:00
+//     (the evening daily-goal deadline).
+// "celebrating" wins over everything if the last workout was within 2 h.
+function computeMoodState(lastWorkoutAt: Date | null, motivationScore: number = 50): string {
+  const now = new Date();
+
+  if (lastWorkoutAt) {
+    const ms = now.getTime() - lastWorkoutAt.getTime();
+    const hours = ms / (1000 * 60 * 60);
+    if (hours < 2) return "celebrating";
+  }
+
+  // Critically low motivation → sad regardless of time
+  if (motivationScore < 30) return "sad";
+
+  // Past 20:00 and no workout logged today → missed daily goal
+  const todayMidnight = new Date(now);
+  todayMidnight.setHours(0, 0, 0, 0);
+  const workedOutToday = lastWorkoutAt !== null && lastWorkoutAt >= todayMidnight;
+  if (!workedOutToday && now.getHours() >= 20) return "sad";
+
   if (!lastWorkoutAt) return "happy";
-  const now = Date.now();
-  const ms = now - lastWorkoutAt.getTime();
-  const hours = ms / (1000 * 60 * 60);
-  if (hours < 2) return "celebrating";
-  if (hours > 24) return "resting";
+  const hoursTotal = (now.getTime() - lastWorkoutAt.getTime()) / (1000 * 60 * 60);
+  if (hoursTotal > 24) return "resting";
   return "happy";
 }
 
@@ -251,7 +270,7 @@ router.get("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, asy
     const streak = streaks.get(h.id) ?? 0;
     return {
       ...h,
-      moodState: computeMoodState(h.lastWorkoutAt),
+      moodState: computeMoodState(h.lastWorkoutAt, h.motivationScore),
       powerScore: computePowerScore(h.level, h.rarity, h.battleWins),
       stepsToEvolution: computeStepsToEvolution(h.xp, h.evolutionStage),
       streakCount: streak >= 2 ? streak : null,
@@ -315,7 +334,7 @@ router.get("/hatchlings/showcase", async (req, res) => {
     const streak = streaks.get(h.id) ?? 0;
     return {
       ...h,
-      moodState: computeMoodState(h.lastWorkoutAt),
+      moodState: computeMoodState(h.lastWorkoutAt, h.motivationScore),
       powerScore: computePowerScore(h.level, h.rarity, h.battleWins),
       stepsToEvolution: computeStepsToEvolution(h.xp, h.evolutionStage),
       streakCount: streak >= 2 ? streak : null,
@@ -398,7 +417,7 @@ router.get("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
   const streak = await computeStreak(hatchling.id);
   res.json({
     ...hatchling,
-    moodState: computeMoodState(hatchling.lastWorkoutAt),
+    moodState: computeMoodState(hatchling.lastWorkoutAt, hatchling.motivationScore),
     powerScore: computePowerScore(hatchling.level, hatchling.rarity, hatchling.battleWins),
     stepsToEvolution: computeStepsToEvolution(hatchling.xp, hatchling.evolutionStage),
     streakCount: streak >= 2 ? streak : null,
@@ -448,7 +467,7 @@ router.patch("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
   const patchStreak = await computeStreak(updated[0].id);
   res.json({
     ...updated[0],
-    moodState: computeMoodState(updated[0].lastWorkoutAt),
+    moodState: computeMoodState(updated[0].lastWorkoutAt, updated[0].motivationScore),
     powerScore: computePowerScore(updated[0].level, updated[0].rarity, updated[0].battleWins),
     stepsToEvolution: computeStepsToEvolution(updated[0].xp, updated[0].evolutionStage),
     streakCount: patchStreak >= 2 ? patchStreak : null,

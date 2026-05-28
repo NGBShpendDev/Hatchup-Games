@@ -165,6 +165,7 @@ export default function MyPalPage() {
 
   type PalSnapshot = { loyaltyScore: number; motivationScore: number; battleWins: number };
   const prevPalRef = useRef<PalSnapshot | null>(null);
+  const sadReactionFiredRef = useRef<number | null>(null);
 
   const startIdleFloat = useCallback(() => {
     palImgControls.start({
@@ -300,13 +301,36 @@ export default function MyPalPage() {
 
   useEffect(() => {
     if (!pal) return;
-    startIdleFloat();
 
     const current: PalSnapshot = {
       loyaltyScore: (pal as any).loyaltyScore ?? 50,
       motivationScore: (pal as any).motivationScore ?? 50,
       battleWins: (pal as any).battleWins ?? 0,
     };
+
+    // On first encounter of this pal (or when switching pals) check for a sad
+    // moodState returned by the server, which means the player missed today's
+    // daily goal or motivation has dropped critically low. Fire the sad slump
+    // animation and a motivation-loss toast exactly once per pal per session.
+    const palMoodState = (pal.moodState as string | undefined) ?? "happy";
+    if (palMoodState === "sad" && sadReactionFiredRef.current !== pal.id) {
+      sadReactionFiredRef.current = pal.id;
+      toast({
+        title: "-5 Motivation 😞",
+        description: `${pal.name} missed today's goal!`,
+      });
+      setReaction({
+        hatchlingName: pal.name,
+        happinessDelta: -5,
+        energyDelta: 0,
+        motivationDelta: -5,
+        imageUrl: pal.imageUrl,
+        realm: (pal as any).realm ?? null,
+      });
+      triggerPalBounce(false);
+    } else {
+      startIdleFloat();
+    }
 
     if (prevPalRef.current !== null) {
       const prev = prevPalRef.current;
