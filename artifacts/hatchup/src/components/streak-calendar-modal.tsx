@@ -15,6 +15,7 @@ const KIND_BG: Record<string, string> = {
   egg:      "from-green-500/20 to-green-600/10 border-green-500/40",
   artifact: "from-cyan-500/20 to-cyan-600/10 border-cyan-500/40",
   chest:    "from-purple-500/20 to-pink-600/10 border-purple-500/40",
+  shield:   "from-cyan-500/20 to-cyan-600/10 border-cyan-500/40",
 };
 
 const MILESTONE_DAYS = new Set([7, 14, 21, 30]);
@@ -154,7 +155,8 @@ export function StreakCalendarModal({ open, onClose, playerId, onClaimed }: Prop
               {schedule.map((day) => {
                 const state = getDayState(day);
                 const isMilestone = MILESTONE_DAYS.has(day.day);
-                const isShieldDay = shieldActive && state === "claimed" && day.day === currentDay;
+                const isShieldConsumedDay = shieldActive && state === "claimed" && day.day === currentDay;
+                const isShieldRewardDay = day.bonus === "streak_shield";
 
                 return (
                   <motion.div
@@ -164,11 +166,13 @@ export function StreakCalendarModal({ open, onClose, playerId, onClaimed }: Prop
                     animate={state === "today" ? { scale: 1 } : {}}
                     className={cn(
                       "relative flex flex-col items-center justify-center rounded-xl border aspect-square p-1 gap-0.5 select-none",
-                      state === "claimed" && !isShieldDay && "bg-gradient-to-br from-green-500/15 to-green-600/5 border-green-500/30 opacity-70",
-                      isShieldDay && "bg-gradient-to-br from-cyan-500/20 to-cyan-600/10 border-cyan-500/40 opacity-90",
-                      state === "today" && !streak?.alreadyClaimed && cn("bg-gradient-to-br border-2", KIND_BG[day.kind] ?? "border-primary/50", "ring-2 ring-primary/30 shadow-[0_0_12px_rgba(255,45,85,0.3)]"),
+                      state === "claimed" && !isShieldConsumedDay && "bg-gradient-to-br from-green-500/15 to-green-600/5 border-green-500/30 opacity-70",
+                      isShieldConsumedDay && "bg-gradient-to-br from-cyan-500/20 to-cyan-600/10 border-cyan-500/40 opacity-90",
+                      state === "today" && !streak?.alreadyClaimed && isShieldRewardDay && "bg-gradient-to-br border-2 from-cyan-500/20 to-cyan-600/10 border-cyan-500/40 ring-2 ring-cyan-500/30 shadow-[0_0_12px_rgba(6,182,212,0.3)]",
+                      state === "today" && !streak?.alreadyClaimed && !isShieldRewardDay && cn("bg-gradient-to-br border-2", KIND_BG[day.kind] ?? "border-primary/50", "ring-2 ring-primary/30 shadow-[0_0_12px_rgba(255,45,85,0.3)]"),
                       state === "today" && streak?.alreadyClaimed && "bg-gradient-to-br from-green-500/20 to-green-600/10 border-green-500/50 opacity-80",
-                      state === "future" && "bg-white/3 border-white/10 opacity-50",
+                      state === "future" && !isShieldRewardDay && "bg-white/3 border-white/10 opacity-50",
+                      state === "future" && isShieldRewardDay && "bg-cyan-950/20 border-cyan-500/20 opacity-60",
                       isMilestone && state !== "future" && "border-2",
                       isMilestone && state === "future" && "border-yellow-500/20",
                     )}
@@ -177,10 +181,12 @@ export function StreakCalendarModal({ open, onClose, playerId, onClaimed }: Prop
                     <span className="text-[9px] font-black text-muted-foreground leading-none">{day.day}</span>
 
                     {/* Icon */}
-                    {isShieldDay ? (
+                    {isShieldConsumedDay ? (
                       <ShieldCheck className="w-4 h-4 text-cyan-400" />
                     ) : state === "claimed" ? (
                       <CheckCircle2 className="w-4 h-4 text-green-400" />
+                    ) : isShieldRewardDay ? (
+                      <ShieldCheck className={cn("w-4 h-4", state === "future" ? "text-cyan-500/60" : "text-cyan-400")} />
                     ) : state === "future" ? (
                       <span className="text-base leading-none grayscale">{day.icon}</span>
                     ) : (
@@ -190,9 +196,9 @@ export function StreakCalendarModal({ open, onClose, playerId, onClaimed }: Prop
                     {/* Label */}
                     <span className={cn(
                       "text-[8px] font-bold leading-none text-center truncate w-full text-center",
-                      isShieldDay ? "text-cyan-400/80" : state === "claimed" ? "text-green-400/70" : state === "future" ? "text-muted-foreground/50" : "text-foreground/80",
+                      isShieldConsumedDay ? "text-cyan-400/80" : state === "claimed" ? "text-green-400/70" : isShieldRewardDay && state === "future" ? "text-cyan-500/50" : isShieldRewardDay ? "text-cyan-400/80" : state === "future" ? "text-muted-foreground/50" : "text-foreground/80",
                     )}>
-                      {isShieldDay ? "Shield" : day.label.replace(" Coins", "¢").replace(" XP", "xp").replace("Streak ", "")}
+                      {isShieldConsumedDay ? "Shield" : isShieldRewardDay ? "Shield" : day.label.replace(" Coins", "¢").replace(" XP", "xp").replace("Streak ", "")}
                     </span>
 
                     {/* Milestone glow ring */}

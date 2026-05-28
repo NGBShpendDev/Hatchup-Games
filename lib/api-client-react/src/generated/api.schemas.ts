@@ -1148,6 +1148,8 @@ export interface DailyClaimResult {
   bonus?: string | null;
   /** True if a Streak Shield was auto-consumed to preserve the streak */
   shieldConsumed: boolean;
+  /** True if a Streak Shield was granted as a daily reward bonus */
+  streakShieldGranted: boolean;
   artifactGranted?: DailyClaimResultArtifactGranted;
   newBadges: DailyClaimResultNewBadgesItem[];
 }

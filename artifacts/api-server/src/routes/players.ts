@@ -603,6 +603,7 @@ router.post("/players/me/daily-claim", requireAuth, attachPlayer, async (req, re
   let eggAdded = false;
   let artifactGranted: { artifactId: number; artifactName: string } | null = null;
   let streakFreezeGranted = false;
+  let streakShieldGranted = false;
 
   // Handle bonus rewards
   if (reward.bonus === "rare_egg") {
@@ -616,6 +617,11 @@ router.post("/players/me/daily-claim", requireAuth, attachPlayer, async (req, re
       .set({ streakFreezes: sql`${playersTable.streakFreezes} + 1` })
       .where(eq(playersTable.id, playerId));
     streakFreezeGranted = true;
+  } else if (reward.bonus === "streak_shield") {
+    await db.update(playersTable)
+      .set({ streakShields: sql`${playersTable.streakShields} + 1` })
+      .where(eq(playersTable.id, playerId));
+    streakShieldGranted = true;
   } else if (reward.bonus === "rare_chest") {
     // Rare Chest: add Rare egg
     eggAdded = await tryAddEgg("Rare");
@@ -647,6 +653,7 @@ router.post("/players/me/daily-claim", requireAuth, attachPlayer, async (req, re
     eggAdded,
     artifactGranted,
     streakFreezeGranted,
+    streakShieldGranted,
     bonus: reward.bonus ?? null,
     streakBroken,
     shieldConsumed,

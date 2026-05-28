@@ -1271,6 +1271,7 @@ export const ClaimDailyRewardResponse = zod.object({
   "eggAdded": zod.boolean(),
   "bonus": zod.string().nullish(),
   "shieldConsumed": zod.boolean().describe('True if a Streak Shield was auto-consumed to preserve the streak'),
+  "streakShieldGranted": zod.boolean().describe('True if a Streak Shield was granted as a daily reward bonus'),
   "artifactGranted": zod.object({
   "artifactId": zod.number(),
   "artifactName": zod.string()

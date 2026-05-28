@@ -6115,17 +6115,18 @@ components:
 
     DailyClaimResult:
       type: object
-      required: [ok, day, coinsGranted, xpGranted, streakDay, newStreakDay, eggAdded, newBadges, shieldConsumed]
+      required: [ok, day, coinsGranted, xpGranted, streakDay, newStreakDay, eggAdded, newBadges, shieldConsumed, streakShieldGranted]
       properties:
-        ok:                { type: boolean }
-        day:               { type: integer }
-        coinsGranted:      { type: integer }
-        xpGranted:         { type: integer }
-        streakDay:         { type: integer, description: "Streak day after claim" }
-        newStreakDay:       { type: integer, description: "Next unclaimed day (for badge/UI purposes)" }
-        eggAdded:          { type: boolean }
-        bonus:             { type: ["string", "null"] }
-        shieldConsumed:    { type: boolean, description: "True if a Streak Shield was auto-consumed to preserve the streak" }
+        ok:                  { type: boolean }
+        day:                 { type: integer }
+        coinsGranted:        { type: integer }
+        xpGranted:           { type: integer }
+        streakDay:           { type: integer, description: "Streak day after claim" }
+        newStreakDay:         { type: integer, description: "Next unclaimed day (for badge/UI purposes)" }
+        eggAdded:            { type: boolean }
+        bonus:               { type: ["string", "null"] }
+        shieldConsumed:      { type: boolean, description: "True if a Streak Shield was auto-consumed to preserve the streak" }
+        streakShieldGranted: { type: boolean, description: "True if a Streak Shield was granted as a daily reward bonus" }
         artifactGranted:
           nullable: true
           type: object

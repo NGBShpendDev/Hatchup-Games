@@ -136,7 +136,7 @@ export interface DailyRewardDay {
 export const DAILY_REWARD_SCHEDULE: DailyRewardDay[] = [
   { day:  1, coins:  50, xp:  25,                          kind: "coins",    label: "50 Coins",           icon: "🪙" },
   { day:  2, coins:   0, xp: 100,                          kind: "xp",       label: "100 XP Boost",       icon: "⚡" },
-  { day:  3, coins: 100, xp: 100,                          kind: "xp",       label: "Coin + XP Boost",    icon: "⚡" },
+  { day:  3, coins: 100, xp: 100, bonus: "streak_shield",  kind: "xp",       label: "Streak Shield",      icon: "🛡️" },
   { day:  4, coins: 100, xp: 100, bonus: "artifact",       kind: "artifact", label: "Artifact",           icon: "🏺" },
   { day:  5, coins: 125, xp: 100, bonus: "rare_egg",       kind: "egg",      label: "Rare Egg",           icon: "🥚" },
   { day:  6, coins: 150, xp: 250,                          kind: "xp",       label: "250 XP Boost",       icon: "⚡" },
@@ -153,7 +153,7 @@ export const DAILY_REWARD_SCHEDULE: DailyRewardDay[] = [
   { day: 17, coins: 150, xp: 150, bonus: "artifact",       kind: "artifact", label: "Artifact",           icon: "🏺" },
   { day: 18, coins: 175, xp: 175,                          kind: "coins",    label: "175 Coins",          icon: "🪙" },
   { day: 19, coins: 200, xp: 225,                          kind: "xp",       label: "225 XP Boost",       icon: "⚡" },
-  { day: 20, coins: 225, xp: 225,                          kind: "coins",    label: "225 Coins",          icon: "🪙" },
+  { day: 20, coins: 225, xp: 225, bonus: "streak_shield",  kind: "coins",    label: "Streak Shield",      icon: "🛡️" },
   { day: 21, coins: 250, xp: 250, bonus: "epic_egg",       kind: "egg",      label: "Epic Egg",           icon: "🟣" },
   { day: 22, coins: 125, xp: 125,                          kind: "coins",    label: "125 Coins",          icon: "🪙" },
   { day: 23, coins: 150, xp: 200,                          kind: "xp",       label: "200 XP Boost",       icon: "⚡" },
