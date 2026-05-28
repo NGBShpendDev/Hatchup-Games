@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GlowBadge } from "@/components/ui/glow-badge";
-import { useQuery } from "@tanstack/react-query";
-import { Shield, ScrollText, User, Flag, ArrowLeft } from "lucide-react";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { Shield, ScrollText, User, Flag, ArrowLeft, Undo2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface AuditEntry {
@@ -19,25 +19,34 @@ interface AuditEntry {
   reason: string | null;
   metadata: unknown;
   createdAt: string;
+  isUndoable?: boolean;
+  isUndone?: boolean;
+  isUndoEntry?: boolean;
+  undoOfId?: number | null;
+  undoneByEntryId?: number | null;
 }
 
 const ACTION_LABELS: Record<string, string> = {
   suspend: "Suspended account",
   unsuspend: "Unsuspended account",
   verify: "Verified profile",
+  unverify: "Removed verification",
   resolve_report: "Resolved report",
   dismiss_report: "Dismissed report",
+  reopen_report: "Reopened report",
 };
 
 const ACTION_TONES: Record<string, "yellow" | "green" | "violet" | "cyan"> = {
   suspend: "yellow",
   unsuspend: "green",
   verify: "cyan",
+  unverify: "yellow",
   resolve_report: "green",
   dismiss_report: "violet",
+  reopen_report: "yellow",
 };
 
-const ACTIONS = ["suspend", "unsuspend", "verify", "resolve_report", "dismiss_report"] as const;
+const ACTIONS = ["suspend", "unsuspend", "verify", "unverify", "resolve_report", "dismiss_report", "reopen_report"] as const;
 
 function formatRelative(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -53,10 +62,12 @@ function formatRelative(iso: string): string {
 export default function AdminAudit() {
   const { playerId, player } = usePlayer();
   const isAdmin = !!(player as { isAdmin?: boolean } | null)?.isAdmin;
+  const queryClient = useQueryClient();
 
   const [actorFilter, setActorFilter] = useState("");
   const [targetFilter, setTargetFilter] = useState("");
   const [actionFilter, setActionFilter] = useState<string>("");
+  const [undoError, setUndoError] = useState<string | null>(null);
 
   const { data: entries, isLoading } = useQuery<AuditEntry[]>({
     queryKey: ["admin-audit", actorFilter, targetFilter, actionFilter, playerId],
@@ -70,6 +81,29 @@ export default function AdminAudit() {
       return res.json();
     },
     enabled: isAdmin && !!playerId,
+  });
+
+  const undoMutation = useMutation({
+    mutationFn: async (entryId: number) => {
+      const res = await fetch(`/api/admin/audit/${entryId}/undo`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { error?: string }).error ?? "Failed to undo");
+      return data;
+    },
+    onSuccess: () => {
+      setUndoError(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-audit"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-suspended"] });
+    },
+    onError: (err: Error) => {
+      setUndoError(err.message);
+    },
   });
 
   if (!isAdmin) {
@@ -136,6 +170,12 @@ export default function AdminAudit() {
           </div>
         </GlassCard>
 
+        {undoError && (
+          <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-medium rounded-xl px-3 py-2" data-testid="text-undo-error">
+            Couldn't undo: {undoError}
+          </div>
+        )}
+
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full rounded-2xl" />)}
@@ -156,9 +196,21 @@ export default function AdminAudit() {
                 <GlassCard className="p-3">
                   <div className="relative z-10 space-y-2">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-black text-sm">
-                        {ACTION_LABELS[e.action] ?? e.action}
-                      </p>
+                      <div className="space-y-0.5">
+                        <p className="font-black text-sm">
+                          {ACTION_LABELS[e.action] ?? e.action}
+                        </p>
+                        {e.isUndoEntry && e.undoOfId != null && (
+                          <p className="text-[10px] text-muted-foreground font-medium">
+                            Undo of entry #{e.undoOfId}
+                          </p>
+                        )}
+                        {e.isUndone && e.undoneByEntryId != null && (
+                          <p className="text-[10px] text-muted-foreground font-medium">
+                            Already undone by entry #{e.undoneByEntryId}
+                          </p>
+                        )}
+                      </div>
                       <GlowBadge tone={ACTION_TONES[e.action] ?? "violet"}>
                         {e.action}
                       </GlowBadge>
@@ -191,6 +243,21 @@ export default function AdminAudit() {
                       <pre className="text-[10px] text-muted-foreground bg-muted/20 px-3 py-2 rounded-xl overflow-x-auto">
                         {JSON.stringify(e.metadata)}
                       </pre>
+                    )}
+                    {(e.isUndoable || e.isUndone || (!e.isUndoEntry && ["suspend", "verify", "resolve_report", "dismiss_report"].includes(e.action))) && (
+                      <div className="flex justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!e.isUndoable || undoMutation.isPending}
+                          onClick={() => undoMutation.mutate(e.id)}
+                          data-testid={`button-undo-${e.id}`}
+                          className="h-7 text-xs font-bold gap-1.5"
+                        >
+                          <Undo2 className="w-3 h-3" />
+                          {e.isUndone ? "Already undone" : "Undo"}
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </GlassCard>

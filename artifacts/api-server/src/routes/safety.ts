@@ -107,8 +107,10 @@ type AuditAction =
   | "suspend"
   | "unsuspend"
   | "verify"
+  | "unverify"
   | "resolve_report"
-  | "dismiss_report";
+  | "dismiss_report"
+  | "reopen_report";
 
 async function writeAuditLog(entry: {
   actorId: number;
@@ -215,11 +217,170 @@ router.get("/admin/audit", requireAuth, attachPlayer, async (req, res) => {
     ? await db.select().from(moderationAuditLogTable).where(and(...filters)).orderBy(desc(moderationAuditLogTable.createdAt)).limit(limit)
     : await db.select().from(moderationAuditLogTable).orderBy(desc(moderationAuditLogTable.createdAt)).limit(limit);
 
-  res.json(rows.map(r => ({
-    ...r,
-    createdAt: r.createdAt.toISOString(),
-    metadata: r.metadata ? safeParseJson(r.metadata) : null,
-  })));
+  // Determine which of these entries have already been undone by a later
+  // entry whose metadata.undoOf points back at them. We grab every audit row
+  // whose metadata mentions undoOf and project that into a set of original
+  // ids for O(1) lookup. Using a LIKE filter keeps this cheap even on large
+  // logs since most rows have NULL metadata.
+  const undoRows = await db
+    .select({ id: moderationAuditLogTable.id, metadata: moderationAuditLogTable.metadata })
+    .from(moderationAuditLogTable);
+  const undoneIds = new Set<number>();
+  const undoEntryByOriginal = new Map<number, number>();
+  for (const r of undoRows) {
+    if (!r.metadata) continue;
+    const parsed = safeParseJson(r.metadata) as { undoOf?: unknown } | null;
+    const undoOf = parsed && typeof parsed === "object" ? Number((parsed as { undoOf?: unknown }).undoOf) : NaN;
+    if (Number.isFinite(undoOf)) {
+      undoneIds.add(undoOf);
+      undoEntryByOriginal.set(undoOf, r.id);
+    }
+  }
+
+  res.json(rows.map(r => {
+    const parsedMeta = r.metadata ? safeParseJson(r.metadata) : null;
+    const isUndoEntry =
+      parsedMeta != null &&
+      typeof parsedMeta === "object" &&
+      Number.isFinite(Number((parsedMeta as { undoOf?: unknown }).undoOf));
+    return {
+      ...r,
+      createdAt: r.createdAt.toISOString(),
+      metadata: parsedMeta,
+      isUndoable: UNDOABLE_ACTIONS.has(r.action as AuditAction)
+        && !isUndoEntry
+        && !undoneIds.has(r.id)
+        && Date.now() - r.createdAt.getTime() <= UNDO_WINDOW_MS,
+      isUndone: undoneIds.has(r.id),
+      isUndoEntry,
+      undoOfId: isUndoEntry ? Number((parsedMeta as { undoOf?: unknown }).undoOf) : null,
+      undoneByEntryId: undoEntryByOriginal.get(r.id) ?? null,
+    };
+  }));
+});
+
+// Window during which an audit entry can be undone. Tweak via UNDO_WINDOW_HOURS.
+const UNDO_WINDOW_MS =
+  (Number.isFinite(Number(process.env.UNDO_WINDOW_HOURS))
+    ? Number(process.env.UNDO_WINDOW_HOURS)
+    : 24 * 7) * 60 * 60 * 1000;
+
+const UNDOABLE_ACTIONS = new Set<AuditAction>([
+  "suspend",
+  "verify",
+  "resolve_report",
+  "dismiss_report",
+]);
+
+// POST /api/admin/audit/:id/undo
+// Reverses a moderation action and records a new audit entry that references
+// the original via metadata.undoOf. Refuses if the entry is already undone,
+// is itself an undo entry, isn't a reversible action, or is older than the
+// configured window.
+router.post("/admin/audit/:id/undo", requireAuth, attachPlayer, async (req, res) => {
+  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!caller?.isAdmin) {
+    res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const entry = await db.query.moderationAuditLogTable.findFirst({
+    where: eq(moderationAuditLogTable.id, id),
+  });
+  if (!entry) {
+    res.status(404).json({ error: "Audit entry not found" });
+    return;
+  }
+  if (!UNDOABLE_ACTIONS.has(entry.action as AuditAction)) {
+    res.status(400).json({ error: "Action is not reversible" });
+    return;
+  }
+  // Reject undo-of-an-undo.
+  const parsedMeta = entry.metadata ? safeParseJson(entry.metadata) : null;
+  if (parsedMeta && typeof parsedMeta === "object" && (parsedMeta as { undoOf?: unknown }).undoOf != null) {
+    res.status(400).json({ error: "Cannot undo an undo entry" });
+    return;
+  }
+  // Reject if already undone — look for any audit row whose metadata.undoOf
+  // equals this entry's id.
+  const allMeta = await db
+    .select({ id: moderationAuditLogTable.id, metadata: moderationAuditLogTable.metadata })
+    .from(moderationAuditLogTable);
+  const alreadyUndone = allMeta.some((r) => {
+    if (!r.metadata) return false;
+    const p = safeParseJson(r.metadata) as { undoOf?: unknown } | null;
+    return p && typeof p === "object" && Number((p as { undoOf?: unknown }).undoOf) === entry.id;
+  });
+  if (alreadyUndone) {
+    res.status(409).json({ error: "Already undone" });
+    return;
+  }
+  if (Date.now() - entry.createdAt.getTime() > UNDO_WINDOW_MS) {
+    res.status(400).json({ error: "Undo window expired" });
+    return;
+  }
+
+  let undoAction: AuditAction;
+  switch (entry.action as AuditAction) {
+    case "suspend": {
+      if (entry.targetPlayerId == null) {
+        res.status(400).json({ error: "Audit entry missing target player" });
+        return;
+      }
+      await db
+        .update(playersTable)
+        .set({ isSuspended: false, suspendedAt: null })
+        .where(eq(playersTable.id, entry.targetPlayerId));
+      undoAction = "unsuspend";
+      break;
+    }
+    case "verify": {
+      if (entry.targetPlayerId == null) {
+        res.status(400).json({ error: "Audit entry missing target player" });
+        return;
+      }
+      await db
+        .update(playersTable)
+        .set({ isVerified: false })
+        .where(eq(playersTable.id, entry.targetPlayerId));
+      undoAction = "unverify";
+      break;
+    }
+    case "resolve_report":
+    case "dismiss_report": {
+      if (entry.targetReportId == null) {
+        res.status(400).json({ error: "Audit entry missing target report" });
+        return;
+      }
+      await db
+        .update(userReportsTable)
+        .set({ status: "open", resolvedAt: null })
+        .where(eq(userReportsTable.id, entry.targetReportId));
+      undoAction = "reopen_report";
+      break;
+    }
+    default: {
+      res.status(400).json({ error: "Action is not reversible" });
+      return;
+    }
+  }
+
+  await writeAuditLog({
+    actorId: caller.id,
+    action: undoAction,
+    targetPlayerId: entry.targetPlayerId,
+    targetReportId: entry.targetReportId,
+    reason: typeof (req.body as { reason?: unknown })?.reason === "string"
+      ? ((req.body as { reason: string }).reason).trim().slice(0, 500) || null
+      : null,
+    metadata: { undoOf: entry.id, originalAction: entry.action },
+  });
+
+  res.json({ success: true, undoneEntryId: entry.id });
 });
 
 function safeParseJson(s: string): unknown {
