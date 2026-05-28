@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   useAddPostComment,
   useEditPostComment,
   useDeletePostComment,
   useRepostPost,
+  useRecordPostView,
   useToggleCommentLike,
   useListCommentRevisions,
   getListCommentRevisionsQueryKey,
@@ -401,6 +402,8 @@ function ViewSparkline({ postId, playerId }: { postId: number; playerId: number 
   );
 }
 
+export const viewedPostIds = new Set<number>();
+
 export function PostCard({
   post,
   playerId,
@@ -409,6 +412,7 @@ export function PostCard({
   onViewProfile,
   defaultShowComments = false,
   onAnonymousAction,
+  disableViewTracking = false,
 }: {
   post: FeedPost;
   playerId: number | null;
@@ -417,17 +421,95 @@ export function PostCard({
   onViewProfile?: (pid: number) => void;
   defaultShowComments?: boolean;
   onAnonymousAction?: () => void;
+  disableViewTracking?: boolean;
 }) {
   const [showComments, setShowComments] = useState(defaultShowComments);
   const [commentText, setCommentText] = useState("");
   const addComment = useAddPostComment();
   const repost = useRepostPost();
+  const recordView = useRecordPostView();
   const { toast } = useToast();
   const qc = useQueryClient();
   const isAnonymous = playerId == null;
   const { player } = usePlayer();
   const isSuspended = !!player?.isSuspended;
   const suspendedTitle = "Your account is suspended. Contact support to appeal.";
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (disableViewTracking) return;
+    if (typeof window === "undefined") return;
+    if (typeof IntersectionObserver === "undefined") return;
+    const node = cardRef.current;
+    if (!node) return;
+    const postId = post.id;
+    if (!Number.isFinite(postId) || postId <= 0) return;
+    if (viewedPostIds.has(postId)) return;
+
+    const DWELL_MS = 2500;
+    let dwellTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearDwell = () => {
+      if (dwellTimer !== null) {
+        clearTimeout(dwellTimer);
+        dwellTimer = null;
+      }
+    };
+
+    const fire = () => {
+      if (viewedPostIds.has(postId)) return;
+      if (document.visibilityState === "hidden") return;
+      viewedPostIds.add(postId);
+      recordView.mutate(
+        { id: postId },
+        {
+          onSuccess: (data) => {
+            if (data?.counted) {
+              if (playerId != null) {
+                qc.invalidateQueries({ queryKey: getGetSocialFeedQueryKey({ playerId }) });
+                qc.invalidateQueries({
+                  queryKey: getGetPostViewSeriesQueryKey(postId, { playerId }),
+                });
+              }
+              qc.invalidateQueries({ queryKey: ["/api/social/feed"] });
+            }
+          },
+          onError: () => {
+            viewedPostIds.delete(postId);
+          },
+        },
+      );
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+            if (dwellTimer === null && !viewedPostIds.has(postId)) {
+              dwellTimer = setTimeout(fire, DWELL_MS);
+            }
+          } else {
+            clearDwell();
+          }
+        }
+      },
+      { threshold: [0, 0.5, 1] },
+    );
+    observer.observe(node);
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") clearDwell();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      clearDwell();
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+    // recordView is stable; only re-run when the tracked post or viewer changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post.id, playerId, disableViewTracking]);
 
   async function handleRepost() {
     if (isAnonymous) { onAnonymousAction?.(); return; }
@@ -494,6 +576,7 @@ export function PostCard({
 
   return (
     <motion.div
+      ref={cardRef}
       layout
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}

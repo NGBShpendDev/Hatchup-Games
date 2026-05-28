@@ -161,6 +161,7 @@ function PostBody({ postId, viewerId }: { postId: number; viewerId: number | nul
           onReact={handleReact}
           onDelete={handleDelete}
           defaultShowComments
+          disableViewTracking
           onAnonymousAction={() => redirectToSignIn()}
         />
       ) : null}
