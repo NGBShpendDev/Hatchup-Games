@@ -1313,6 +1313,20 @@ export interface LocationUpdateBody {
   visibility?: LocationUpdateBodyVisibility;
 }
 
+export type PlayerLocationRecordVisibility = typeof PlayerLocationRecordVisibility[keyof typeof PlayerLocationRecordVisibility];
+
+
+export const PlayerLocationRecordVisibility = {
+  exact: 'exact',
+  neighborhood: 'neighborhood',
+  city: 'city',
+  hidden: 'hidden',
+} as const;
+
+/**
+ * Location record derived from reverse geocoding. Privacy-first design: raw GPS coordinates are NEVER stored — only city/state/county/country fields from Nominatim. The "nearby" scope uses same-city matching (no distance calculation required). Visibility mirrors players.locationVisibility and is the canonical privacy control.
+
+ */
 export interface PlayerLocationRecord {
   id: number;
   playerId: number;
@@ -1326,7 +1340,7 @@ export interface PlayerLocationRecord {
   county?: string | null;
   /** @nullable */
   city?: string | null;
-  visibility: string;
+  visibility: PlayerLocationRecordVisibility;
   updatedAt: string;
 }
 

@@ -3794,6 +3794,11 @@ components:
 
     PlayerLocationRecord:
       type: object
+      description: >
+        Location record derived from reverse geocoding. Privacy-first design: raw GPS coordinates
+        are NEVER stored — only city/state/county/country fields from Nominatim. The "nearby" scope
+        uses same-city matching (no distance calculation required). Visibility mirrors
+        players.locationVisibility and is the canonical privacy control.
       required: [id, playerId, visibility, updatedAt]
       properties:
         id:          { type: integer }
@@ -3803,7 +3808,7 @@ components:
         state:       { type: ["string", "null"] }
         county:      { type: ["string", "null"] }
         city:        { type: ["string", "null"] }
-        visibility:  { type: string }
+        visibility:  { type: string, enum: [exact, neighborhood, city, hidden] }
         updatedAt:   { type: string }
 
     ScopedLeaderboardEntry:

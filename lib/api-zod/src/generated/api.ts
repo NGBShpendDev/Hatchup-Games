@@ -2763,9 +2763,9 @@ export const UpdateMyLocationResponse = zod.object({
   "state": zod.string().nullish(),
   "county": zod.string().nullish(),
   "city": zod.string().nullish(),
-  "visibility": zod.string(),
+  "visibility": zod.enum(['exact', 'neighborhood', 'city', 'hidden']),
   "updatedAt": zod.string()
-})
+}).describe('Location record derived from reverse geocoding. Privacy-first design: raw GPS coordinates are NEVER stored — only city\/state\/county\/country fields from Nominatim. The \"nearby\" scope uses same-city matching (no distance calculation required). Visibility mirrors players.locationVisibility and is the canonical privacy control.\n')
 
 
 /**
@@ -2779,9 +2779,9 @@ export const GetMyLocationResponse = zod.union([zod.object({
   "state": zod.string().nullish(),
   "county": zod.string().nullish(),
   "city": zod.string().nullish(),
-  "visibility": zod.string(),
+  "visibility": zod.enum(['exact', 'neighborhood', 'city', 'hidden']),
   "updatedAt": zod.string()
-}),zod.null()])
+}).describe('Location record derived from reverse geocoding. Privacy-first design: raw GPS coordinates are NEVER stored — only city\/state\/county\/country fields from Nominatim. The \"nearby\" scope uses same-city matching (no distance calculation required). Visibility mirrors players.locationVisibility and is the canonical privacy control.\n'),zod.null()])
 
 
 /**

@@ -236,6 +236,22 @@ router.get("/local-challenges/:id/leaderboard", requireAuth, attachPlayer, async
   });
   if (!challenge) { res.status(404).json({ error: "Challenge not found" }); return; }
 
+  // Authorization: requester must be eligible for this challenge's scope before participant data is exposed.
+  // This prevents cross-region enumeration of local participant identities.
+  const viewerLoc = await db.query.playerLocationTable.findFirst({
+    where: eq(playerLocationTable.playerId, req.playerId!),
+  });
+  const viewerEligible =
+    challenge.scope === "world" ||
+    (challenge.scope === "country" && viewerLoc?.country === challenge.scopeValue) ||
+    (challenge.scope === "state"   && viewerLoc?.state   === challenge.scopeValue) ||
+    (challenge.scope === "county"  && viewerLoc?.county  === challenge.scopeValue) ||
+    (challenge.scope === "city"    && viewerLoc?.city    === challenge.scopeValue);
+  if (!viewerEligible) {
+    res.status(403).json({ error: "Challenge not available in your location" });
+    return;
+  }
+
   const participants = await db.query.localChallengeParticipantsTable.findMany({
     where: eq(localChallengeParticipantsTable.challengeId, id),
   });

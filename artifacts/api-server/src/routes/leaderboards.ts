@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   playersTable, hatchlingsTable, fitnessActivitiesTable,
-  personalRecordsTable, playerLocationTable,
+  personalRecordsTable, playerLocationTable, playerArtifactsTable,
 } from "@workspace/db";
 import { desc, eq, notInArray, gte, and, ne } from "drizzle-orm";
 import { GetGlobalLeaderboardQueryParams, GetModeLeaderboardQueryParams } from "@workspace/api-zod";
@@ -24,13 +24,17 @@ const RANK_COLORS: Record<string, string> = {
 type MetricKey = "steps" | "workouts" | "battle_wins" | "streaks" | "xp" | "artifacts";
 type ScopeKey  = "world" | "country" | "state" | "county" | "city" | "nearby";
 
-function getMetricValue(player: typeof playersTable.$inferSelect, metric: MetricKey): number {
+function getMetricValue(
+  player: typeof playersTable.$inferSelect,
+  metric: MetricKey,
+  artifactCountMap?: Map<number, number>,
+): number {
   switch (metric) {
     case "steps":       return player.totalSteps;
     case "workouts":    return player.totalWorkouts;
     case "battle_wins": return player.totalBattleWins;
     case "streaks":     return player.currentStreak;
-    case "artifacts":   return player.xp; // Proxy: artifact count requires a join; XP correlates well enough for MVP
+    case "artifacts":   return artifactCountMap?.get(player.id) ?? 0;
     default:            return player.xp;
   }
 }
@@ -42,7 +46,7 @@ function metricLabel(metric: MetricKey, value: number): string {
     case "battle_wins": return value.toLocaleString() + " wins";
     case "streaks":     return value + " day streak";
     case "xp":          return value.toLocaleString() + " XP";
-    case "artifacts":   return value.toLocaleString() + " XP";
+    case "artifacts":   return value.toLocaleString() + " artifact" + (value === 1 ? "" : "s");
   }
 }
 
@@ -175,8 +179,6 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, async (req, res) =
   }
 
   // ── Build final player list ───────────────────────────────────────────────
-  const playerMap = new Map(basePlayers.map(p => [p.id, p]));
-
   // For world scope: includes ALL players. For location scopes: only non-hidden.
   let filteredPlayers = basePlayers.filter(p => {
     if (blockedSet.has(p.id)) return false;
@@ -184,8 +186,18 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, async (req, res) =
     return true;
   });
 
+  // For the "artifacts" metric, fetch actual owned artifact counts from player_artifacts table
+  let artifactCountMap: Map<number, number> | undefined;
+  if (metric === "artifacts") {
+    const playerArtifacts = await db.query.playerArtifactsTable.findMany();
+    artifactCountMap = new Map();
+    for (const pa of playerArtifacts) {
+      artifactCountMap.set(pa.playerId, (artifactCountMap.get(pa.playerId) ?? 0) + 1);
+    }
+  }
+
   // Sort by metric descending in memory
-  filteredPlayers.sort((a, b) => getMetricValue(b, metric) - getMetricValue(a, metric));
+  filteredPlayers.sort((a, b) => getMetricValue(b, metric, artifactCountMap) - getMetricValue(a, metric, artifactCountMap));
 
   const top = filteredPlayers.slice(0, limit);
   const myRankIndex = filteredPlayers.findIndex(p => p.id === req.playerId);
@@ -197,8 +209,8 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, async (req, res) =
     displayName:   p.displayName,
     avatarUrl:     p.avatarUrl,
     rank:          p.rank,
-    metricValue:   getMetricValue(p, metric),
-    metricLabel:   metricLabel(metric, getMetricValue(p, metric)),
+    metricValue:   getMetricValue(p, metric, artifactCountMap),
+    metricLabel:   metricLabel(metric, getMetricValue(p, metric, artifactCountMap)),
     isMe:          p.id === req.playerId,
     currentStreak: p.currentStreak,
   }));
@@ -214,8 +226,8 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, async (req, res) =
       displayName:   mp.displayName,
       avatarUrl:     mp.avatarUrl,
       rank:          mp.rank,
-      metricValue:   getMetricValue(mp, metric),
-      metricLabel:   metricLabel(metric, getMetricValue(mp, metric)),
+      metricValue:   getMetricValue(mp, metric, artifactCountMap),
+      metricLabel:   metricLabel(metric, getMetricValue(mp, metric, artifactCountMap)),
       isMe:          true,
       currentStreak: mp.currentStreak,
     };
