@@ -12,6 +12,8 @@ export interface HatchlingReactionData {
   hatchlingName: string;
   happinessDelta: number;
   energyDelta: number;
+  loyaltyDelta?: number;
+  motivationDelta?: number;
   imageUrl?: string | null;
   realm?: string | null;
 }
@@ -69,6 +71,12 @@ export function HatchlingReaction({ reaction, onDismiss, variant = "overlay" }: 
   }
   if (reaction?.energyDelta) {
     parts.push(`${reaction.energyDelta > 0 ? "+" : ""}${reaction.energyDelta} energy`);
+  }
+  if (reaction?.loyaltyDelta) {
+    parts.push(`${reaction.loyaltyDelta > 0 ? "+" : ""}${reaction.loyaltyDelta} loyalty`);
+  }
+  if (reaction?.motivationDelta) {
+    parts.push(`${reaction.motivationDelta > 0 ? "+" : ""}${reaction.motivationDelta} motivation`);
   }
   const caption = parts.join(" · ");
 

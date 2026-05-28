@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { Layout } from "@/components/layout";
 import {
@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
 import { GlowBadge } from "@/components/ui/glow-badge";
-import { motion } from "framer-motion";
+import { motion, useAnimation } from "framer-motion";
 import {
   Heart, Zap, Coffee, Star, Shield, TrendingUp, Footprints,
   Swords, ChevronLeft, ChevronRight, ArrowLeft,
@@ -24,6 +24,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { ErrorCard } from "@/components/error-card";
+import { HatchlingReaction, type HatchlingReactionData } from "@/components/hatchling-reaction";
 
 import lavaDragonImg from "@/assets/images/lava-dragon.png";
 import cyberCreatureImg from "@/assets/images/cyber-creature.png";
@@ -61,11 +62,11 @@ function getFallbackImage(cat?: string | null) {
 }
 
 function StatRing({
-  value, max = 100, size = 90, strokeWidth = 8, color, label, icon: Icon, sublabel,
+  value, max = 100, size = 90, strokeWidth = 8, color, label, icon: Icon, sublabel, pulse = false,
 }: {
   value: number; max?: number; size?: number; strokeWidth?: number;
   color: string; label: string; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
-  sublabel?: string;
+  sublabel?: string; pulse?: boolean;
 }) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -76,7 +77,12 @@ function StatRing({
 
   return (
     <div className="flex flex-col items-center gap-1.5">
-      <div className="relative" style={{ width: size, height: size }}>
+      <motion.div
+        className="relative"
+        style={{ width: size, height: size }}
+        animate={pulse ? { scale: [1, 1.07, 1], filter: ["brightness(1)", "brightness(1.4)", "brightness(1)"] } : {}}
+        transition={pulse ? { repeat: Infinity, duration: 1.4, ease: "easeInOut" } : {}}
+      >
         <svg width={size} height={size} className="-rotate-90" style={{ display: "block" }}>
           <circle cx={cx} cy={cy} r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} />
           <motion.circle
@@ -94,7 +100,7 @@ function StatRing({
           <Icon className="w-4 h-4 mb-0.5" style={{ color }} />
           <span className="text-sm font-black leading-none" style={{ color }}>{value}</span>
         </div>
-      </div>
+      </motion.div>
       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
       {sublabel && <p className="text-[9px] text-muted-foreground/60 text-center max-w-[80px]">{sublabel}</p>}
     </div>
@@ -154,6 +160,45 @@ export default function MyPalPage() {
   const queryClient = useQueryClient();
   const { player } = usePlayer();
 
+  const [reaction, setReaction] = useState<HatchlingReactionData | null>(null);
+  const palImgControls = useAnimation();
+
+  type PalSnapshot = { loyaltyScore: number; motivationScore: number; battleWins: number };
+  const prevPalRef = useRef<PalSnapshot | null>(null);
+
+  const startIdleFloat = useCallback(() => {
+    palImgControls.start({
+      y: [0, -5, 0],
+      transition: { repeat: Infinity, duration: 3.5, ease: "easeInOut" },
+    });
+  }, [palImgControls]);
+
+  const triggerPalBounce = useCallback(async (positive: boolean) => {
+    palImgControls.stop();
+    if (positive) {
+      await palImgControls.start({
+        y: [0, -18, 4, -10, 2, 0],
+        scale: [1, 1.12, 0.97, 1.06, 0.99, 1],
+        filter: [
+          "drop-shadow(0 0 16px rgba(236,72,153,0.5))",
+          "drop-shadow(0 0 36px rgba(236,72,153,1.0))",
+          "drop-shadow(0 0 24px rgba(236,72,153,0.7))",
+          "drop-shadow(0 0 28px rgba(236,72,153,0.85))",
+          "drop-shadow(0 0 20px rgba(236,72,153,0.6))",
+          "drop-shadow(0 0 16px rgba(236,72,153,0.5))",
+        ],
+        transition: { duration: 1.2, ease: "easeInOut" },
+      });
+    } else {
+      await palImgControls.start({
+        y: [0, 8, 4, 6, 0],
+        scale: [1, 0.92, 0.95, 0.93, 1],
+        transition: { duration: 1, ease: "easeInOut" },
+      });
+    }
+    startIdleFloat();
+  }, [palImgControls, startIdleFloat]);
+
   const palListParams = { playerId: player?.id, limit: 20 };
   const { data: allPals, isLoading: palsLoading } = useListHatchlings(
     palListParams,
@@ -199,8 +244,31 @@ export default function MyPalPage() {
     updateMutation.mutate(
       { id: activePalId, data: { happiness: Math.min(100, pal.happiness + 15), energy: Math.max(0, pal.energy - 10), lastWorkoutAt: new Date().toISOString() } },
       {
-        onSuccess: () => {
-          toast({ title: "Training Complete!", description: `${pal.name} is getting stronger! Loyalty +3` });
+        onSuccess: (updatedPal: any) => {
+          const newLoyalty    = updatedPal?.loyaltyScore    ?? (pal as any).loyaltyScore    ?? 50;
+          const newMotivation = updatedPal?.motivationScore ?? (pal as any).motivationScore ?? 50;
+          const newBattleWins = updatedPal?.battleWins      ?? (pal as any).battleWins      ?? 0;
+          const prevSnapshot  = prevPalRef.current;
+          const loyaltyDelta    = prevSnapshot ? newLoyalty    - prevSnapshot.loyaltyScore    : 3;
+          const motivationDelta = prevSnapshot ? newMotivation - prevSnapshot.motivationScore : 10;
+
+          const parts: string[] = [];
+          if (loyaltyDelta    > 0) parts.push(`+${loyaltyDelta} Loyalty`);
+          if (motivationDelta > 0) parts.push(`+${motivationDelta} Motivation`);
+          toast({ title: parts.length ? `${parts.join(", ")}! 🎉` : "Training Complete!" });
+
+          setReaction({
+            hatchlingName: pal.name,
+            happinessDelta: 15,
+            energyDelta: -10,
+            loyaltyDelta:    loyaltyDelta    > 0 ? loyaltyDelta    : undefined,
+            motivationDelta: motivationDelta > 0 ? motivationDelta : undefined,
+            imageUrl: pal.imageUrl,
+            realm: (pal as any).realm ?? null,
+          });
+          triggerPalBounce(true);
+
+          prevPalRef.current = { loyaltyScore: newLoyalty, motivationScore: newMotivation, battleWins: newBattleWins };
           queryClient.invalidateQueries({ queryKey: getGetHatchlingQueryKey(activePalId) });
         },
         onError: () => toast({ title: "Couldn't train", variant: "destructive" }),
@@ -214,13 +282,93 @@ export default function MyPalPage() {
       { id: activePalId, data: { hunger: Math.min(100, pal.hunger + 20) } },
       {
         onSuccess: () => {
-          toast({ title: "Yum!", description: `${pal.name} enjoyed the meal!` });
+          toast({ title: "+20 Hunger! 😋", description: `${pal.name} enjoyed the meal!` });
+          setReaction({
+            hatchlingName: pal.name,
+            happinessDelta: 5,
+            energyDelta: 0,
+            imageUrl: pal.imageUrl,
+            realm: (pal as any).realm ?? null,
+          });
+          triggerPalBounce(true);
           queryClient.invalidateQueries({ queryKey: getGetHatchlingQueryKey(activePalId) });
         },
         onError: () => toast({ title: "Couldn't feed", variant: "destructive" }),
       }
     );
   };
+
+  useEffect(() => {
+    if (!pal) return;
+    startIdleFloat();
+
+    const current: PalSnapshot = {
+      loyaltyScore: (pal as any).loyaltyScore ?? 50,
+      motivationScore: (pal as any).motivationScore ?? 50,
+      battleWins: (pal as any).battleWins ?? 0,
+    };
+
+    if (prevPalRef.current !== null) {
+      const prev = prevPalRef.current;
+      const loyaltyDelta   = current.loyaltyScore   - prev.loyaltyScore;
+      const motivationDelta = current.motivationScore - prev.motivationScore;
+      const battleWinsDelta = current.battleWins     - prev.battleWins;
+
+      if (battleWinsDelta > 0) {
+        const moodParts: string[] = [];
+        if (loyaltyDelta    > 0) moodParts.push(`+${loyaltyDelta} Loyalty`);
+        if (motivationDelta > 0) moodParts.push(`+${motivationDelta} Motivation`);
+        const plural = battleWinsDelta > 1 ? "s" : "";
+        const moodSuffix = moodParts.length ? ` · ${moodParts.join(", ")}` : "";
+        toast({
+          title: `+${battleWinsDelta} Battle Win${plural}! ⚔️${moodSuffix}`,
+          description: `${pal.name} is growing stronger!`,
+        });
+        setReaction({
+          hatchlingName: pal.name,
+          happinessDelta: 20,
+          energyDelta: -15,
+          loyaltyDelta:    loyaltyDelta    > 0 ? loyaltyDelta    : 5,
+          motivationDelta: motivationDelta > 0 ? motivationDelta : undefined,
+          imageUrl: pal.imageUrl,
+          realm: (pal as any).realm ?? null,
+        });
+        triggerPalBounce(true);
+      } else if (loyaltyDelta > 0 || motivationDelta > 0) {
+        const parts: string[] = [];
+        if (loyaltyDelta > 0) parts.push(`+${loyaltyDelta} Loyalty`);
+        if (motivationDelta > 0) parts.push(`+${motivationDelta} Motivation`);
+        toast({ title: `${parts.join(", ")}! 🎉` });
+        setReaction({
+          hatchlingName: pal.name,
+          happinessDelta: 15,
+          energyDelta: -10,
+          loyaltyDelta:    loyaltyDelta    > 0 ? loyaltyDelta    : undefined,
+          motivationDelta: motivationDelta > 0 ? motivationDelta : undefined,
+          imageUrl: pal.imageUrl,
+          realm: (pal as any).realm ?? null,
+        });
+        triggerPalBounce(true);
+      } else if (motivationDelta < -1) {
+        toast({
+          title: `${motivationDelta} Motivation 😞`,
+          description: `${pal.name} needs your attention!`,
+        });
+        setReaction({
+          hatchlingName: pal.name,
+          happinessDelta: -5,
+          energyDelta: 0,
+          motivationDelta,
+          imageUrl: pal.imageUrl,
+          realm: (pal as any).realm ?? null,
+        });
+        triggerPalBounce(false);
+      }
+    }
+
+    prevPalRef.current = current;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pal]);
 
   const isLoading = palsLoading || palLoading;
 
@@ -285,6 +433,7 @@ export default function MyPalPage() {
 
   return (
     <Layout>
+      <HatchlingReaction reaction={reaction} onDismiss={() => setReaction(null)} />
       <div className="max-w-2xl mx-auto pb-20">
 
         {/* Header */}
@@ -372,9 +521,7 @@ export default function MyPalPage() {
               src={pal.imageUrl || getFallbackImage(realm)}
               alt={pal.name}
               className="w-24 h-24 object-contain"
-              style={{ filter: `drop-shadow(0 0 16px ${realmCfg.color}60)` }}
-              animate={moodState === "celebrating" ? { y: [0, -8, 0], scale: [1, 1.05, 1] } : { y: [0, -5, 0] }}
-              transition={{ repeat: Infinity, duration: moodState === "celebrating" ? 0.7 : 3.5, ease: "easeInOut" }}
+              animate={palImgControls}
             />
           </div>
 
@@ -409,7 +556,14 @@ export default function MyPalPage() {
           <h3 className="font-black text-sm mb-4">Core Stats</h3>
           <div className="flex justify-around flex-wrap gap-y-4">
             <StatRing value={loyaltyScore} color="#ec4899" label="Loyalty" icon={Heart} sublabel="Grows with training" />
-            <StatRing value={motivationScore} color="#f59e0b" label="Motivation" icon={TrendingUp} sublabel="Daily goal impact" />
+            <StatRing
+              value={motivationScore}
+              color={motivationScore < 25 ? "#ef4444" : "#f59e0b"}
+              label="Motivation"
+              icon={TrendingUp}
+              sublabel={motivationScore < 25 ? "Needs a boost! 😞" : "Daily goal impact"}
+              pulse={motivationScore < 25}
+            />
             <StatRing value={confidenceScore} color="#8b5cf6" label="Confidence" icon={Swords} sublabel={`${battleWins} battle wins`} />
             <StatRing value={Math.min(100, Math.round(powerScore / 5))} max={100} color={realmCfg.color} label="Power" icon={Shield} sublabel={`Score: ${powerScore}`} />
           </div>
