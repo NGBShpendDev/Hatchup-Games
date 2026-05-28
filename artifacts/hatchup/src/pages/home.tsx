@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
-import { useGetPlayerDashboard, getGetPlayerDashboardQueryKey, useLogActivity } from "@workspace/api-client-react";
+import { useGetPlayerDashboard, getGetPlayerDashboardQueryKey, useLogActivity, useGetSocialFeed, getGetSocialFeedQueryKey, useReactToPost } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot, Dumbbell, Minus, Plus } from "lucide-react";
+import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot, Dumbbell, Minus, Plus, Users } from "lucide-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { XpBar } from "@/components/xp-bar";
@@ -86,6 +86,33 @@ export default function Home() {
     queryFn: () => fetch(`${BASE}/api/players/me/fitness-bars`, { credentials: "include" }).then(r => r.json()),
     enabled: !!playerId,
   });
+
+  const { data: socialFeed } = useGetSocialFeed(
+    { playerId: pid, limit: 3 },
+    { query: { queryKey: getGetSocialFeedQueryKey({ playerId: pid, limit: 3 }), enabled: !!playerId } }
+  );
+  const reactToPost = useReactToPost();
+  const handleHighlightReact = (postId: number) => {
+    if (!playerId) return;
+    reactToPost.mutate(
+      { id: postId, data: { playerId: pid, reactionType: "fire" as any } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetSocialFeedQueryKey({ playerId: pid, limit: 3 }) });
+        },
+      }
+    );
+  };
+
+  const HIGHLIGHT_POST_TYPE_ICONS: Record<string, string> = {
+    general: "💬",
+    gym_selfie: "💪",
+    evolution_reveal: "✨",
+    streak_milestone: "🔥",
+    transformation: "🦋",
+    workout_stat: "📊",
+    hatch_moment: "🥚",
+  };
 
   const logActivity = useLogActivity();
   const [logModalOpen, setLogModalOpen] = useState(false);
@@ -550,6 +577,74 @@ export default function Home() {
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Community Highlights */}
+        {socialFeed && socialFeed.posts && socialFeed.posts.length > 0 && (
+          <section>
+            <div className="flex justify-between items-end mb-3">
+              <h2 className="text-lg font-black flex items-center gap-2">
+                <Users className="w-4 h-4 text-primary" /> Community Highlights
+              </h2>
+              <Link href="/social" className="text-xs font-bold text-primary flex items-center hover:underline">
+                See all <ChevronRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="space-y-2">
+              {socialFeed.posts.slice(0, 3).map((post: any) => {
+                const totalReactions = Object.values(post.reactionCounts ?? {}).reduce(
+                  (a: number, b: any) => a + (b as number), 0
+                ) as number;
+                const myReaction = post.myReaction as string | null;
+                const typeIcon = HIGHLIGHT_POST_TYPE_ICONS[post.postType] ?? "💬";
+                return (
+                  <Card
+                    key={post.id}
+                    className="bg-card border-2 hover:border-primary/40 transition-colors overflow-hidden"
+                  >
+                    <CardContent className="p-3 flex items-start gap-3">
+                      <Link href="/social" className="shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/20 border border-primary/40 flex items-center justify-center font-black text-sm text-primary">
+                          {post.authorAvatar ? (
+                            <img src={post.authorAvatar} alt={post.authorName} className="w-10 h-10 rounded-full object-cover" />
+                          ) : (
+                            (post.authorName?.[0] ?? "?").toUpperCase()
+                          )}
+                        </div>
+                      </Link>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="font-black text-sm truncate">{post.authorName}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1 shrink-0">
+                            <span>{typeIcon}</span>
+                            {(post.postType ?? "general").replace(/_/g, " ")}
+                          </span>
+                        </div>
+                        <Link href="/social">
+                          <p className="text-xs text-foreground/90 line-clamp-2 leading-snug cursor-pointer">
+                            {post.content}
+                          </p>
+                        </Link>
+                      </div>
+                      <button
+                        onClick={() => handleHighlightReact(post.id)}
+                        disabled={reactToPost.isPending}
+                        className={`shrink-0 flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 border transition-colors ${
+                          myReaction === "fire"
+                            ? "bg-orange-500/20 border-orange-500/60 text-orange-400"
+                            : "bg-muted/40 border-border text-muted-foreground hover:border-orange-500/40 hover:text-orange-400"
+                        }`}
+                        aria-label="React with fire"
+                      >
+                        <Flame className="w-4 h-4" />
+                        <span className="text-[10px] font-black leading-none">{totalReactions}</span>
+                      </button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Badge Showcase */}
         {recentBadges.length > 0 && (
