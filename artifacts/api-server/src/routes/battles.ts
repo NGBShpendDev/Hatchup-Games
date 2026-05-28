@@ -65,24 +65,28 @@ router.get("/battles/history", requireAuth, attachPlayer, async (req, res) => {
   const playerMap = Object.fromEntries(players.map(p => [p.id, p]));
   const hatchlingMap = Object.fromEntries(hatchlings.map(h => [h.id, h]));
 
-  res.json(battles.map(b => ({
-    ...b,
-    createdAt: b.createdAt.toISOString(),
-    isViewer1: b.player1Id === playerId,
-    viewerWon: b.winnerId === playerId,
-    opponent: b.player1Id === playerId
-      ? (b.player2Id ? playerMap[b.player2Id]?.username ?? "Bot" : "Bot")
-      : (playerMap[b.player1Id]?.username ?? "Unknown"),
-    opponentPlayerId: b.player1Id === playerId
+  res.json(battles.map(b => {
+    const opponentDbId = b.player1Id === playerId
       ? (b.player2Id ?? null)
-      : (b.player1Id ?? null),
-    myHatchling: b.player1Id === playerId
-      ? (b.hatchling1Id ? hatchlingMap[b.hatchling1Id]?.name : null)
-      : (b.hatchling2Id ? hatchlingMap[b.hatchling2Id]?.name : null),
-    opponentHatchling: b.player1Id === playerId
-      ? (b.hatchling2Id ? hatchlingMap[b.hatchling2Id]?.name ?? "Bot" : "Bot")
-      : (b.hatchling1Id ? hatchlingMap[b.hatchling1Id]?.name : null),
-  })));
+      : (b.player1Id ?? null);
+    const opponentPlayer = opponentDbId ? playerMap[opponentDbId] : null;
+    return {
+      ...b,
+      createdAt: b.createdAt.toISOString(),
+      isViewer1: b.player1Id === playerId,
+      viewerWon: b.winnerId === playerId,
+      opponent: opponentPlayer?.username ?? "Bot",
+      opponentPlayerId: opponentDbId,
+      opponentUsername: opponentPlayer?.username ?? null,
+      opponentDisplayName: opponentPlayer?.displayName ?? opponentPlayer?.username ?? null,
+      myHatchling: b.player1Id === playerId
+        ? (b.hatchling1Id ? hatchlingMap[b.hatchling1Id]?.name : null)
+        : (b.hatchling2Id ? hatchlingMap[b.hatchling2Id]?.name : null),
+      opponentHatchling: b.player1Id === playerId
+        ? (b.hatchling2Id ? hatchlingMap[b.hatchling2Id]?.name ?? "Bot" : "Bot")
+        : (b.hatchling1Id ? hatchlingMap[b.hatchling1Id]?.name : null),
+    };
+  }));
 });
 
 // ── GET /battles/:id ─────────────────────────────────────────────────────────

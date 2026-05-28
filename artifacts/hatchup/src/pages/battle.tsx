@@ -31,6 +31,8 @@ interface EquippedArtifactSlot {
 
 interface FighterState {
   playerId: number;
+  playerUsername: string | null;
+  playerDisplayName: string | null;
   hatchlingId: number;
   hatchlingName: string;
   hatchlingLevel: number;
@@ -279,6 +281,24 @@ function FighterPanel({
           <p className="font-black text-sm truncate">{fighter.hatchlingName}</p>
           <Badge variant="secondary" className="text-[10px] px-1.5">Lv.{fighter.hatchlingLevel}</Badge>
         </div>
+        {!isPlayer && (
+          <p className="text-[10px] text-muted-foreground truncate" data-testid="text-opponent-trainer">
+            {fighter.isBot ? (
+              <>Trainer: <span className="font-medium text-white/70">Bot 🤖</span></>
+            ) : fighter.playerId > 0 ? (
+              <>
+                Trainer:{" "}
+                <Link
+                  href={`/players/${fighter.playerId}`}
+                  className="font-medium text-primary hover:underline"
+                  data-testid={`link-opponent-profile-${fighter.playerId}`}
+                >
+                  {fighter.playerDisplayName ?? fighter.playerUsername ?? `Player #${fighter.playerId}`}
+                </Link>
+              </>
+            ) : null}
+          </p>
+        )}
 
         <div>
           <div className="flex justify-between text-[10px] text-muted-foreground mb-0.5">
@@ -405,7 +425,7 @@ export default function BattlePage() {
     enabled: !!pid,
   });
 
-  const { data: history = [] } = useQuery<{ id: number; opponent: string; opponentPlayerId: number | null; viewerWon: boolean; myHatchling: string; createdAt: string; battleMode: string }[]>({
+  const { data: history = [] } = useQuery<{ id: number; opponent: string; opponentPlayerId: number | null; opponentUsername: string | null; opponentDisplayName: string | null; viewerWon: boolean; myHatchling: string; createdAt: string; battleMode: string }[]>({
     queryKey: ["battle-history", pid],
     queryFn: () => fetch(`${BASE}/api/battles/history`, { credentials: "include" }).then(r => r.json()),
     enabled: !!pid,
@@ -830,7 +850,7 @@ export default function BattlePage() {
                               className="hover:text-primary transition-colors"
                               data-testid={`link-profile-${b.opponentPlayerId}`}
                             >
-                              {b.opponent}
+                              {b.opponentDisplayName ?? b.opponentUsername ?? b.opponent}
                             </Link>
                           ) : (
                             b.opponent
@@ -1123,7 +1143,24 @@ export default function BattlePage() {
                   {viewerWon ? "Victory!" : battleState.winner === 0 ? "Draw!" : "Defeated!"}
                 </motion.h2>
                 <p className="text-muted-foreground mt-1 text-sm">
-                  vs {battleState.fighter2.isBot ? "Bot" : (yourSlot === 1 ? battleState.fighter2.hatchlingName : battleState.fighter1.hatchlingName)}
+                  vs{" "}
+                  {opponentFighter?.isBot ? (
+                    <span className="font-medium">Bot 🤖</span>
+                  ) : opponentFighter && opponentFighter.playerId > 0 ? (
+                    <>
+                      <span className="font-medium">{opponentFighter.hatchlingName}</span>
+                      {" · "}
+                      <Link
+                        href={`/players/${opponentFighter.playerId}`}
+                        className="font-medium text-primary hover:underline"
+                        data-testid={`link-result-opponent-profile-${opponentFighter.playerId}`}
+                      >
+                        @{opponentFighter.playerDisplayName ?? opponentFighter.playerUsername ?? `Player #${opponentFighter.playerId}`}
+                      </Link>
+                    </>
+                  ) : (
+                    <span className="font-medium">{opponentFighter?.hatchlingName ?? "Bot"}</span>
+                  )}
                 </p>
               </div>
 
@@ -1200,7 +1237,22 @@ export default function BattlePage() {
                 <p className="font-bold text-xs text-muted-foreground uppercase tracking-wider mb-2">Battle Summary</p>
                 <p>Turns played: <span className="font-bold">{battleState.turnNumber}</span></p>
                 <p>My Hatchling: <span className="font-bold">{myFighter?.hatchlingName}</span></p>
-                <p>Opponent: <span className="font-bold">{opponentFighter?.hatchlingName ?? "Bot"} {opponentFighter?.isBot ? "🤖" : ""}</span></p>
+                <p>
+                  Opponent:{" "}
+                  <span className="font-bold">{opponentFighter?.hatchlingName ?? "Bot"} {opponentFighter?.isBot ? "🤖" : ""}</span>
+                  {opponentFighter && !opponentFighter.isBot && opponentFighter.playerId > 0 && (
+                    <>
+                      {" "}·{" "}
+                      <Link
+                        href={`/players/${opponentFighter.playerId}`}
+                        className="font-bold text-primary hover:underline"
+                        data-testid={`link-summary-opponent-profile-${opponentFighter.playerId}`}
+                      >
+                        @{opponentFighter.playerDisplayName ?? opponentFighter.playerUsername ?? `Player #${opponentFighter.playerId}`}
+                      </Link>
+                    </>
+                  )}
+                </p>
                 <p>Result: <span className={`font-bold ${viewerWon ? "text-green-400" : "text-red-400"}`}>{viewerWon ? "WIN" : battleState.winner === 0 ? "DRAW" : "LOSS"}</span></p>
                 {myFighter && myFighter.artifactPowerScore > 0 && (
                   <p>Artifact Power: <span className="font-bold text-purple-400">{myFighter.artifactPowerScore.toFixed(0)} pts</span></p>
@@ -1220,7 +1272,11 @@ export default function BattlePage() {
                       `⚔️ HatchUp Battle Result`,
                       `${viewerWon ? "🏆 VICTORY" : battleState?.winner === 0 ? "🤝 DRAW" : "💀 DEFEAT"}`,
                       `My Hatchling: ${myFighter?.hatchlingName ?? "?"}`,
-                      `Opponent: ${opponentFighter?.hatchlingName ?? "Bot"} ${opponentFighter?.isBot ? "🤖" : ""}`,
+                      `Opponent: ${opponentFighter?.hatchlingName ?? "Bot"}${
+                        opponentFighter && !opponentFighter.isBot && opponentFighter.playerId > 0
+                          ? ` (@${opponentFighter.playerDisplayName ?? opponentFighter.playerUsername ?? `Player #${opponentFighter.playerId}`})`
+                          : opponentFighter?.isBot ? " 🤖" : ""
+                      }`,
                       `Turns: ${battleState?.turnNumber ?? 0}`,
                       rewards ? `XP: +${rewards.xp}  Coins: +${rewards.coins}` : "",
                       battleState?.mode === "ranked" && rewards?.eloChange

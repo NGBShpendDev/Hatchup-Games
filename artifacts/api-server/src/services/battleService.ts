@@ -56,6 +56,8 @@ export interface EquippedArtifactSlot {
 // ── Fighter state ─────────────────────────────────────────────────────────
 export interface FighterState {
   playerId: number;  // 0 = bot
+  playerUsername: string | null;     // null for bots
+  playerDisplayName: string | null;  // null for bots
   hatchlingId: number;
   hatchlingName: string;
   hatchlingLevel: number;
@@ -114,6 +116,8 @@ export function buildFighter(
 
   return {
     playerId: player?.id ?? 0,
+    playerUsername: isBot ? null : (player?.username ?? null),
+    playerDisplayName: isBot ? null : (player?.displayName ?? null),
     hatchlingId: hatchling.id,
     hatchlingName: hatchling.name,
     hatchlingLevel: level,
@@ -139,6 +143,8 @@ export function buildBotFighter(level: number): FighterState {
   const botNames = ["ShadowClaw", "IronFang", "TurboScales", "NeonWisp", "BlazeTail"];
   return {
     playerId: 0,
+    playerUsername: null,
+    playerDisplayName: null,
     hatchlingId: 0,
     hatchlingName: botNames[Math.floor(Math.random() * botNames.length)]!,
     hatchlingLevel: level,
