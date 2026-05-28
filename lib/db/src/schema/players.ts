@@ -51,6 +51,9 @@ export const playersTable = pgTable("players", {
   isVerified: boolean("is_verified").notNull().default(false),
   // Nutrition / body goal
   physiqueGoal: text("physique_goal"),
+  // Battle Arena
+  battleElo: integer("battle_elo").notNull().default(1000),
+  totalBattleWins: integer("total_battle_wins").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

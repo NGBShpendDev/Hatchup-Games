@@ -19,6 +19,7 @@ import safetyRouter from "./safety";
 import coachRouter from "./coach";
 import recordsRouter from "./records";
 import nutritionRouter from "./nutrition";
+import battlesRouter from "./battles";
 
 const router: IRouter = Router();
 
@@ -42,5 +43,6 @@ router.use(safetyRouter);
 router.use(coachRouter);
 router.use(recordsRouter);
 router.use(nutritionRouter);
+router.use(battlesRouter);
 
 export default router;

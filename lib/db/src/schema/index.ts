@@ -13,3 +13,4 @@ export * from "./groups";
 export * from "./badges";
 export * from "./safety";
 export * from "./nutrition";
+export * from "./battles";

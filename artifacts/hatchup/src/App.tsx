@@ -27,6 +27,7 @@ import SafetyGuidelines from "@/pages/safety-guidelines";
 import Coach from "@/pages/coach";
 import Records from "@/pages/records";
 import Nutrition from "@/pages/nutrition";
+import Battle from "@/pages/battle";
 
 const queryClient = new QueryClient();
 
@@ -220,6 +221,7 @@ function AppRoutes() {
         <Route path="/groups" component={Groups} />
         <Route path="/health-settings" component={HealthSettings} />
         <Route path="/hatchlings/:id" component={HatchlingDetail} />
+        <Route path="/compete/battle" component={Battle} />
         <Route path="/compete/race" component={Race} />
         <Route path="/rewards" component={Rewards} />
         <Route path="/settings/privacy" component={SettingsPrivacy} />
