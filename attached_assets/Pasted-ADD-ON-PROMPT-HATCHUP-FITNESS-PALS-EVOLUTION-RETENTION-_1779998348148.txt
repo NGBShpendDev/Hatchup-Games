@@ -1,0 +1,359 @@
+ADD-ON PROMPT: HATCHUP FITNESS PALS EVOLUTION & RETENTION EXPANSION
+
+Enhance the existing HatchUp Fitness Pals ecosystem by seamlessly integrating the following features into the current game architecture. Do not replace existing systems. Expand and connect all features into one cohesive, premium, highly polished experience that feels AAA quality.
+
+PAL FOCUS SYSTEM
+
+Make the user's Pal the emotional center of the game.
+
+Add a dedicated "My Pal" section displaying:
+
+• Animated 3D Pal
+• Current Level
+• Evolution Stage
+• Power Score
+• Rarity Tier
+• Personality Traits
+• Battle Readiness
+• Happiness Meter
+• Loyalty Meter
+• Steps Remaining Until Evolution
+
+Example:
+
+Inferno Drake
+Level 17
+Legendary
+Power: 4,872
+
+Next Evolution:
+4,221 Steps Remaining
+
+Every activity should affect the Pal:
+
+Walking:
+• Increase Happiness
+• Increase XP
+
+Workouts:
+• Increase Power
+
+Nutrition Logging:
+• Increase Health Stats
+
+Battles:
+• Increase Confidence
+
+Missed Goals:
+• Reduce Motivation
+
+Players should form a strong emotional connection with their Pal.
+
+━━━━━━━━━━━━━━━━━━━━
+
+ADVANCED RARITY SYSTEM
+
+Create rarity tiers:
+
+• Common
+• Rare
+• Epic
+• Legendary
+• Mythic
+• Ancient
+• Celestial
+
+Each rarity includes:
+
+• Unique Borders
+• Unique Colors
+• Unique Animations
+• Unique Hatch Effects
+• Unique Evolution Effects
+• Exclusive Visual Auras
+
+Rare creatures should feel highly collectible.
+
+━━━━━━━━━━━━━━━━━━━━
+
+LEGENDARY HATCH REVEAL SYSTEM
+
+Create cinematic hatch sequences.
+
+When an egg hatches:
+
+• Screen Shake
+• Particle Effects
+• Dramatic Camera Movement
+• Rarity Reveal
+• Creature Reveal
+• Dynamic Music
+• Share Button
+
+Legendary and Mythic hatches should feel as exciting as pulling a rare Pokémon card.
+
+Add:
+
+SHARE HATCH
+
+Auto-generate:
+
+"I just hatched a Legendary Inferno Drake after 12,000 steps in HatchUp Fitness Pals!"
+
+Generate a social-media-ready image automatically.
+
+━━━━━━━━━━━━━━━━━━━━
+
+DAILY LOGIN REWARD SYSTEM
+
+Create reward streaks:
+
+Day 1:
+Coins
+
+Day 2:
+XP
+
+Day 3:
+Consumables
+
+Day 4:
+Artifact
+
+Day 5:
+Egg
+
+Day 6:
+Boost
+
+Day 7:
+Rare Reward Chest
+
+Day 30:
+Legendary Reward Chest
+
+Missing a day resets the streak.
+
+Display streak progress prominently.
+
+━━━━━━━━━━━━━━━━━━━━
+
+FITNESS STREAK SYSTEM
+
+Track daily consistency.
+
+Examples:
+
+🔥 7 Day Streak
+🔥 30 Day Streak
+🔥 100 Day Streak
+🔥 365 Day Streak
+
+Rewards:
+
+• Profile Badges
+• Cosmetics
+• Eggs
+• Artifacts
+• Exclusive Creatures
+• Prestige Titles
+
+Long-term consistency should be heavily rewarded.
+
+━━━━━━━━━━━━━━━━━━━━
+
+CLUB HEADQUARTERS SYSTEM
+
+Every Club receives a customizable headquarters.
+
+Features:
+
+• Club Banner
+• Trophy Room
+• Museum
+• Achievement Wall
+• Club Mascot
+• Seasonal Decorations
+• Club Ranking Display
+
+Club Levels unlock:
+
+• Better Headquarters
+• Larger Member Limits
+• Exclusive Events
+• Club Rewards
+• Club Cosmetics
+
+Make Clubs feel alive and meaningful.
+
+━━━━━━━━━━━━━━━━━━━━
+
+WORLD BOSS EVENTS
+
+Introduce massive global fitness events.
+
+Example:
+
+Titan Rex
+
+Global Requirement:
+1 Billion Combined Steps
+
+Rewards:
+
+• Exclusive Creatures
+• Exclusive Artifacts
+• Titles
+• Cosmetics
+• Limited-Time Collectibles
+
+Display global progress in real time.
+
+━━━━━━━━━━━━━━━━━━━━
+
+FITNESS RAID SYSTEM
+
+Allow Clubs to battle giant raid bosses.
+
+Raid Progress is earned through:
+
+• Steps
+• Workouts
+• Nutrition Goals
+• Consistency Goals
+
+Rewards:
+
+• Rare Eggs
+• Legendary Artifacts
+• Exclusive Evolutions
+• Club Prestige
+
+━━━━━━━━━━━━━━━━━━━━
+
+PERSONALITY SYSTEM
+
+Every Pal receives randomized personality traits.
+
+Examples:
+
+• Brave
+• Loyal
+• Competitive
+• Wise
+• Aggressive
+• Playful
+• Energetic
+
+Traits affect:
+
+• Animations
+• Battle Performance
+• Evolution Variations
+• Interactions
+
+No two Pals should feel identical.
+
+━━━━━━━━━━━━━━━━━━━━
+
+MULTI-PATH EVOLUTION SYSTEM
+
+Allow creatures to evolve into different forms.
+
+Example:
+
+Baby Drake
+
+Can evolve into:
+
+• Inferno Drake
+• Storm Drake
+• Shadow Drake
+
+Evolution paths depend on:
+
+• Steps
+• Nutrition Habits
+• Workout Types
+• Battle Decisions
+
+Players should feel ownership over their creature's growth.
+
+━━━━━━━━━━━━━━━━━━━━
+
+ANTI-CHEAT FITNESS SYSTEM
+
+Protect game integrity.
+
+Integrate:
+
+• Apple Health
+• Google Fit
+• GPS Validation
+• Activity Verification
+• Anti-Spoofing Detection
+• Fraud Detection Systems
+
+Automatically flag suspicious activity.
+
+Protect all leaderboards.
+
+━━━━━━━━━━━━━━━━━━━━
+
+SOCIAL VIRALITY SYSTEM
+
+Every major achievement should be shareable.
+
+Examples:
+
+• Hatches
+• Evolutions
+• Level Ups
+• Club Victories
+• World Boss Victories
+• Leaderboard Rankings
+
+One-click sharing:
+
+• Instagram
+• TikTok
+• Facebook
+• X
+
+Create organic viral growth loops.
+
+━━━━━━━━━━━━━━━━━━━━
+
+RETENTION SYSTEM
+
+Daily:
+• Quests
+• Goals
+• Rewards
+
+Weekly:
+• Club Battles
+• Raids
+• Tournaments
+
+Monthly:
+• Seasons
+• Legendary Events
+
+Quarterly:
+• New Regions
+• New Creatures
+• New Artifacts
+• Major Expansions
+
+━━━━━━━━━━━━━━━━━━━━
+
+PRIMARY DESIGN GOAL
+
+Make HatchUp Fitness Pals feel like a living universe that combines fitness, creature collecting, RPG progression, competition, social interaction, clubs, nutrition, AI coaching, exploration, and long-term progression into one seamless ecosystem.
+
+Core Loop:
+
+Walk → Earn → Hatch → Evolve → Train → Compete → Socialize → Progress → Repeat
+
+Every feature must reinforce this loop and increase retention, engagement, community, and fun while maintaining a premium AAA-quality user experience.

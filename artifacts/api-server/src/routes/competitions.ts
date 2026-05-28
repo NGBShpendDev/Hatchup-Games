@@ -11,6 +11,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth.ts";
 import { applyHatchlingXp } from "../services/hatchlingXp.ts";
+import { resolveActivePartner } from "../services/activePartner.ts";
 
 const router = Router();
 
@@ -50,16 +51,32 @@ router.post("/competitions", requireAuth, attachPlayer, requirePlayerOwnership, 
   const body = CreateCompetitionBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
+  // Race/competition entry pre-selects the player's chosen partner Hatchling
+  // when the client doesn't pass one explicitly. Falls back to the most-recent
+  // hatchling so single-creature players still work.
+  let hatchlingId = body.data.hatchlingId ?? null;
+  if (hatchlingId != null) {
+    const owned = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, hatchlingId) });
+    if (!owned || owned.playerId !== body.data.playerId) {
+      res.status(403).json({ error: "Invalid hatchling" });
+      return;
+    }
+  } else {
+    const active = await resolveActivePartner(body.data.playerId);
+    if (!active) { res.status(400).json({ error: "No Hatchling available to enter" }); return; }
+    hatchlingId = active.id;
+  }
+
   const comp = await db.insert(competitionsTable).values({
     mode: body.data.mode,
     playerId: body.data.playerId,
-    hatchlingId: body.data.hatchlingId,
+    hatchlingId,
     status: "active",
     score: 0,
   }).returning();
 
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, body.data.playerId) });
-  const hatchling = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, body.data.hatchlingId) });
+  const hatchling = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, hatchlingId) });
 
   res.status(201).json({
     ...comp[0],

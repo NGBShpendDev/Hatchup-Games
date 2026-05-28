@@ -15,6 +15,7 @@ import {
   type RematchInvite,
 } from "../services/matchmakingQueue.ts";
 import { pushForNotification } from "../services/notificationFanout.ts";
+import { resolveActivePartner } from "../services/activePartner.ts";
 
 function serializeInvite(inv: RematchInvite, fromName: string | null, toName: string | null) {
   return {
@@ -37,14 +38,23 @@ const router = Router();
 
 // ── POST /battles/queue/join (REST fallback — primary join is via WS) ─────────
 router.post("/battles/queue/join", requireAuth, attachPlayer, attachEntitlement, enforceBattleDailyCap, async (req, res) => {
-  const body = z.object({ hatchlingId: z.number(), mode: z.enum(["casual", "ranked"]).default("casual") }).safeParse(req.body);
+  const body = z.object({ hatchlingId: z.number().optional(), mode: z.enum(["casual", "ranked"]).default("casual") }).safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
   const playerId = req.playerId!;
-  const { hatchlingId, mode } = body.data;
+  const { mode } = body.data;
 
-  const hatchling = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, hatchlingId) });
-  if (!hatchling || hatchling.playerId !== playerId) { res.status(403).json({ error: "Invalid hatchling" }); return; }
+  // Battle entry pre-selects the player's active partner when the client
+  // doesn't pass `hatchlingId` explicitly, mirroring race entry. Falls back
+  // to the most-recent hatchling so single-creature players still queue.
+  let hatchling;
+  if (body.data.hatchlingId != null) {
+    hatchling = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, body.data.hatchlingId) });
+    if (!hatchling || hatchling.playerId !== playerId) { res.status(403).json({ error: "Invalid hatchling" }); return; }
+  } else {
+    hatchling = await resolveActivePartner(playerId);
+    if (!hatchling) { res.status(400).json({ error: "No Hatchling available to battle" }); return; }
+  }
 
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
   if (mode === "ranked" && (player?.level ?? 0) < 10) {

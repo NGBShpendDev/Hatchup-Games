@@ -4983,10 +4983,12 @@ components:
 
     CompetitionInput:
       type: object
-      required: [mode, playerId, hatchlingId]
+      required: [mode, playerId]
       properties:
         mode:        { type: string }
         playerId:    { type: integer }
+        # Optional — when omitted, the server uses the caller's active partner
+        # Hatchling (players.activeHatchlingId, with a most-recent fallback).
         hatchlingId: { type: integer }
 
     CompetitionResultInput:
@@ -7517,8 +7519,9 @@ components:
 
     BattleQueueJoinBody:
       type: object
-      required: [hatchlingId]
       properties:
+        # Optional — when omitted, the server uses the caller's active partner
+        # Hatchling (players.activeHatchlingId, with a most-recent fallback).
         hatchlingId: { type: integer }
         mode:        { type: string, enum: [casual, ranked], default: casual }
 

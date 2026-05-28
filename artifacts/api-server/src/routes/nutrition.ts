@@ -27,6 +27,7 @@ import {
 } from "../services/dailyMacroReward.ts";
 import { notificationsTable } from "@workspace/db";
 import { recapPreviewLimiter } from "../middlewares/rateLimiters.ts";
+import { resolveActivePartner } from "../services/activePartner.ts";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -104,28 +105,10 @@ async function applyNutritionStatBuff(playerId: number, qualityScore: number) {
   const delta = statDeltaForQuality(qualityScore);
   if (!delta) return null;
 
-  // Prefer the player's explicitly chosen active Hatchling. Verify ownership
-  // in case the row was transferred or deleted, then fall back to the
-  // implicit "most recently worked out" rule.
-  const player = await db.query.playersTable.findFirst({
-    where: eq(playersTable.id, playerId),
-    columns: { activeHatchlingId: true },
-  });
-
-  let active = null as Awaited<ReturnType<typeof db.query.hatchlingsTable.findFirst>> | null;
-  if (player?.activeHatchlingId) {
-    active = await db.query.hatchlingsTable.findFirst({
-      where: and(eq(hatchlingsTable.id, player.activeHatchlingId), eq(hatchlingsTable.playerId, playerId)),
-    }) ?? null;
-  }
-  if (!active) {
-    // NULLS LAST so a hatchling that was never worked out isn't preferred over
-    // one the player just trained with. createdAt is the secondary tiebreaker.
-    active = await db.query.hatchlingsTable.findFirst({
-      where: eq(hatchlingsTable.playerId, playerId),
-      orderBy: [sql`${hatchlingsTable.lastWorkoutAt} DESC NULLS LAST`, desc(hatchlingsTable.createdAt)],
-    }) ?? null;
-  }
+  // Delegated to the shared partner resolver so every perk fan-out
+  // (nutrition, workouts, daily rewards, battle entry) targets the same
+  // explicitly chosen Hatchling, falling back to the most-recent rule.
+  const active = await resolveActivePartner(playerId);
   if (!active) return null;
 
   const newHappiness = Math.max(0, Math.min(100, active.happiness + delta.happiness));

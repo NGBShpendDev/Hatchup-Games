@@ -802,7 +802,7 @@ export const ListCompetitionsResponse = zod.array(ListCompetitionsResponseItem)
 export const CreateCompetitionBody = zod.object({
   "mode": zod.string(),
   "playerId": zod.number(),
-  "hatchlingId": zod.number()
+  "hatchlingId": zod.number().optional()
 })
 
 
@@ -4693,7 +4693,7 @@ environments that cannot speak the live socket directly.
 export const joinBattleQueueBodyModeDefault = `casual`;
 
 export const JoinBattleQueueBody = zod.object({
-  "hatchlingId": zod.number(),
+  "hatchlingId": zod.number().optional(),
   "mode": zod.enum(['casual', 'ranked']).default(joinBattleQueueBodyModeDefault)
 })
 

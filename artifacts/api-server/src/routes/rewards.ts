@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { playersTable, playerBadgesTable } from "@workspace/db";
+import { playersTable, playerBadgesTable, hatchlingsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { getDailyReward, checkAndAwardBadges } from "../services/badgeService.ts";
+import { resolveActivePartner } from "../services/activePartner.ts";
 
 const router = Router();
 
@@ -77,6 +78,30 @@ router.post("/rewards/daily/claim", requireAuth, attachPlayer, async (req, res) 
     })
     .where(eq(playersTable.id, req.playerId!));
 
+  // ── Active partner stat bump ────────────────────────────────────────────
+  // The daily reward also tops up the player's chosen partner Hatchling so
+  // the "active partner" choice is felt on every login, not just nutrition
+  // and workouts. Falls back to the most-recent hatchling rule.
+  let hatchlingBump: { hatchlingId: number; hatchlingName: string; happinessDelta: number; energyDelta: number; happiness: number; energy: number } | null = null;
+  const partner = await resolveActivePartner(req.playerId!);
+  if (partner) {
+    const happinessDelta = 5;
+    const energyDelta = 5;
+    const newHappiness = Math.min(100, partner.happiness + happinessDelta);
+    const newEnergy    = Math.min(100, partner.energy    + energyDelta);
+    await db.update(hatchlingsTable)
+      .set({ happiness: newHappiness, energy: newEnergy })
+      .where(eq(hatchlingsTable.id, partner.id));
+    hatchlingBump = {
+      hatchlingId: partner.id,
+      hatchlingName: partner.name,
+      happinessDelta: newHappiness - partner.happiness,
+      energyDelta: newEnergy - partner.energy,
+      happiness: newHappiness,
+      energy: newEnergy,
+    };
+  }
+
   // Check for badges
   const newBadges = await checkAndAwardBadges(req.playerId!, { dailyRewardStreak: newStreak });
 
@@ -84,6 +109,7 @@ router.post("/rewards/daily/claim", requireAuth, attachPlayer, async (req, res) 
     reward,
     newStreak,
     newBadges: newBadges.map(b => ({ key: b.key, name: b.name, tier: b.tier, icon: b.icon })),
+    hatchlingBump,
   });
 });
 

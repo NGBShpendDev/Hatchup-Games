@@ -303,7 +303,7 @@ export interface RealmInfo {
 export interface CompetitionInput {
   mode: string;
   playerId: number;
-  hatchlingId: number;
+  hatchlingId?: number;
 }
 
 export interface CompetitionResultInput {
@@ -2669,7 +2669,7 @@ export const BattleQueueJoinBodyMode = {
 } as const;
 
 export interface BattleQueueJoinBody {
-  hatchlingId: number;
+  hatchlingId?: number;
   mode?: BattleQueueJoinBodyMode;
 }
 

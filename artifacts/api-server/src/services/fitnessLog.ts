@@ -3,6 +3,7 @@ import {
   fitnessActivitiesTable,
   fitnessQuestsTable,
   playersTable,
+  hatchlingsTable,
   eggsTable,
   personalRecordsTable,
 } from "@workspace/db";
@@ -10,6 +11,7 @@ import { eq, and, gte } from "drizzle-orm";
 import { checkAndAwardBadges, type BadgeDefinition } from "./badgeService.ts";
 import { awardFitnessBarXp, checkAndAwardArtifacts } from "./artifactService.ts";
 import { applyHatchlingXp, getActivePalId, type HatchlingXpResult } from "./hatchlingXp.ts";
+import { resolveActivePartner } from "./activePartner.ts";
 import { logger } from "../lib/logger.ts";
 
 export const STRENGTH_TYPES = new Set(["pushups", "burpees", "squats", "pullups", "planks", "situps"]);
@@ -244,6 +246,26 @@ export async function logFitnessActivity(
     .set(updateFields)
     .where(eq(playersTable.id, playerId))
     .returning();
+
+  // ── Active partner stat bump ─────────────────────────────────────────────
+  // Happiness, energy, friendship, mood, and lastWorkoutAt flow to the active
+  // partner on every workout/strength activity. XP and level advancement are
+  // handled separately below via applyHatchlingXp so we don't double-count.
+  if (isWorkout || isStrength) {
+    const partner = await resolveActivePartner(playerId);
+    if (partner) {
+      const newHappiness  = Math.min(100, partner.happiness + 2);
+      const newEnergy     = Math.max(0,   partner.energy    - 1);
+      const newFriendship = Math.min(100, partner.friendshipLevel + 5);
+      await db.update(hatchlingsTable).set({
+        happiness: newHappiness,
+        energy: newEnergy,
+        friendshipLevel: newFriendship,
+        moodState: "celebrating",
+        lastWorkoutAt: new Date(),
+      }).where(eq(hatchlingsTable.id, partner.id));
+    }
+  }
 
   let eggsUpdated = 0;
   if (stepsEquiv > 0) {
