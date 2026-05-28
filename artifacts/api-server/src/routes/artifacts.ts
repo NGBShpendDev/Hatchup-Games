@@ -7,7 +7,7 @@ import {
   artifactLoadoutsTable,
   artifactBattleXpTable,
 } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
 import {
@@ -51,6 +51,7 @@ router.get("/artifacts", requireAuth, attachPlayer, async (req, res) => {
       discovered,
       isEquipped: playerOwned?.isEquipped ?? false,
       isFeatured: playerOwned?.isFeatured ?? false,
+      featuredOrder: playerOwned?.featuredOrder ?? null,
       earnedAt: playerOwned?.earnedAt?.toISOString() ?? null,
     };
   });
@@ -63,7 +64,7 @@ router.get("/players/me/artifacts", requireAuth, attachPlayer, async (req, res) 
   const playerId = req.playerId!;
   const owned = await db.query.playerArtifactsTable.findMany({
     where: eq(playerArtifactsTable.playerId, playerId),
-    orderBy: (t, { desc }) => [desc(t.earnedAt)],
+    orderBy: (t, { desc, sql: sqlFn }) => [sqlFn`${t.featuredOrder} asc nulls last`, desc(t.earnedAt)],
   });
 
   const artifactIds = owned.map(o => o.artifactId);
@@ -87,6 +88,7 @@ router.get("/players/me/artifacts", requireAuth, attachPlayer, async (req, res) 
       abilities: a.abilities as unknown[],
       isEquipped: o.isEquipped,
       isFeatured: o.isFeatured,
+      featuredOrder: o.featuredOrder,
       earnedAt: o.earnedAt.toISOString(),
     };
   }).filter(Boolean);
@@ -115,15 +117,69 @@ router.patch("/players/me/artifacts/:id", requireAuth, attachPlayer, async (req,
   });
   if (!owned) { res.status(404).json({ error: "Artifact not owned" }); return; }
 
+  // Assign next featuredOrder when featuring; clear it when unfeaturing.
+  let nextFeaturedOrder: number | null = owned.featuredOrder;
+  if (isFeatured === true && !owned.isFeatured) {
+    const others = await db.query.playerArtifactsTable.findMany({
+      where: and(eq(playerArtifactsTable.playerId, playerId), eq(playerArtifactsTable.isFeatured, true)),
+    });
+    const maxOrder = others.reduce((m, o) => Math.max(m, o.featuredOrder ?? 0), 0);
+    nextFeaturedOrder = maxOrder + 1;
+  } else if (isFeatured === false) {
+    nextFeaturedOrder = null;
+  }
+
   const updated = await db.update(playerArtifactsTable)
     .set({
       isEquipped: isEquipped ?? owned.isEquipped,
       isFeatured: isFeatured ?? owned.isFeatured,
+      featuredOrder: nextFeaturedOrder,
     })
     .where(eq(playerArtifactsTable.id, owned.id))
     .returning();
 
   res.json(updated[0]);
+});
+
+// ── PUT /players/me/featured-order ────────────────────────────────────────────
+// Reorder featured artifacts. Body: { artifactIds: number[] } in desired order.
+const ReorderSchema = z.object({
+  artifactIds: z.array(z.number().int().positive()).max(10),
+});
+
+router.put("/players/me/featured-order", requireAuth, attachPlayer, async (req, res) => {
+  const playerId = req.playerId!;
+  const body = ReorderSchema.safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
+
+  const { artifactIds } = body.data;
+  // Ensure uniqueness
+  if (new Set(artifactIds).size !== artifactIds.length) {
+    res.status(400).json({ error: "Duplicate artifactIds" }); return;
+  }
+
+  // Verify the player owns and has featured every artifact passed in.
+  const owned = await db.query.playerArtifactsTable.findMany({
+    where: and(eq(playerArtifactsTable.playerId, playerId), eq(playerArtifactsTable.isFeatured, true)),
+  });
+  const ownedFeaturedIds = new Set(owned.map(o => o.artifactId));
+  const invalid = artifactIds.filter(id => !ownedFeaturedIds.has(id));
+  if (invalid.length > 0) {
+    res.status(400).json({ error: `Not featured or not owned: ${invalid.join(", ")}` }); return;
+  }
+
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < artifactIds.length; i++) {
+      await tx.update(playerArtifactsTable)
+        .set({ featuredOrder: i + 1 })
+        .where(and(
+          eq(playerArtifactsTable.playerId, playerId),
+          eq(playerArtifactsTable.artifactId, artifactIds[i]!),
+        ));
+    }
+  });
+
+  res.json({ ok: true, order: artifactIds });
 });
 
 // ── GET /artifacts/world-notifications ───────────────────────────────────────

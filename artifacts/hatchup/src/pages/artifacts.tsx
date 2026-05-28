@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Lock, Star, Zap, Shield, Trophy, ChevronDown, ChevronUp, User } from "lucide-react";
+import { Sparkles, Lock, Star, Zap, Shield, Trophy, ChevronDown, ChevronUp, User, GripVertical } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
@@ -55,6 +55,7 @@ interface ArtifactEntry {
   discovered: boolean;
   isEquipped: boolean;
   isFeatured: boolean;
+  featuredOrder: number | null;
   earnedAt: string | null;
 }
 
@@ -80,8 +81,50 @@ export default function Artifacts() {
     enabled: !!pid,
   });
 
-  const featuredCount = (museum ?? []).filter(a => a.isFeatured).length;
+  const featuredArtifacts = (museum ?? [])
+    .filter(a => a.isFeatured)
+    .sort((a, b) => {
+      const ao = a.featuredOrder ?? Number.MAX_SAFE_INTEGER;
+      const bo = b.featuredOrder ?? Number.MAX_SAFE_INTEGER;
+      return ao - bo;
+    });
+  const featuredCount = featuredArtifacts.length;
   const MAX_FEATURED = 3;
+
+  // Local order state for drag-to-reorder; synced from server data.
+  const [orderedFeatured, setOrderedFeatured] = useState<ArtifactEntry[]>([]);
+  useEffect(() => {
+    setOrderedFeatured(featuredArtifacts);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [museum]);
+
+  const reorderFeatured = useMutation({
+    mutationFn: async (artifactIds: number[]) => {
+      const res = await fetch(`${BASE}/api/players/me/featured-order`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artifactIds }),
+      });
+      if (!res.ok) throw new Error("Failed to reorder");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["artifacts-museum", pid] });
+      qc.invalidateQueries({ queryKey: ["player-profile", pid] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Couldn't reorder", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const commitReorder = (next: ArtifactEntry[]) => {
+    setOrderedFeatured(next);
+    const ids = next.map(a => a.id);
+    const prevIds = featuredArtifacts.map(a => a.id);
+    const changed = ids.length !== prevIds.length || ids.some((id, i) => id !== prevIds[i]);
+    if (changed) reorderFeatured.mutate(ids);
+  };
 
   const toggleFeatured = useMutation({
     mutationFn: async ({ artifactId, isFeatured }: { artifactId: number; isFeatured: boolean }) => {
@@ -175,6 +218,48 @@ export default function Artifacts() {
             </div>
           )}
         </div>
+
+        {/* ── Featured Showcase (drag to reorder) ── */}
+        {!museumLoading && featuredCount > 0 && (
+          <div className="bg-card border border-border rounded-3xl p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+              <h2 className="font-black text-lg">Profile Showcase</h2>
+              <span className="text-xs text-muted-foreground ml-auto">{featuredCount}/{MAX_FEATURED} featured</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">Drag to reorder how they appear on your profile.</p>
+            <Reorder.Group
+              axis="y"
+              values={orderedFeatured}
+              onReorder={commitReorder}
+              className="space-y-2"
+              data-testid="featured-reorder-list"
+            >
+              {orderedFeatured.map((artifact, idx) => {
+                const s = RARITY_STYLES[artifact.rarity] ?? RARITY_STYLES.Common!;
+                return (
+                  <Reorder.Item
+                    key={artifact.id}
+                    value={artifact}
+                    className={`flex items-center gap-3 rounded-2xl border ${s.border} ${s.bg} p-3 cursor-grab active:cursor-grabbing select-none`}
+                    data-testid={`featured-item-${artifact.id}`}
+                    whileDrag={{ scale: 1.03, zIndex: 10, boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }}
+                  >
+                    <GripVertical className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-xl ${s.bg} border ${s.border}`}>
+                      <ArtifactEmoji slug={artifact.imageSlug} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-black truncate ${s.text}`}>{artifact.name}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{artifact.rarity}</p>
+                    </div>
+                    <span className="text-xs font-black text-muted-foreground w-5 text-right">#{idx + 1}</span>
+                  </Reorder.Item>
+                );
+              })}
+            </Reorder.Group>
+          </div>
+        )}
 
         {/* ── Fitness Bars Panel ── */}
         <div className="bg-card border border-border rounded-3xl p-5 space-y-4">

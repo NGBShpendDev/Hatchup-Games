@@ -135,7 +135,7 @@ router.get("/players/:id/profile", requireAuth, async (req, res) => {
     db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) }),
     db.query.playerArtifactsTable.findMany({
       where: eq(playerArtifactsTable.playerId, playerId),
-      orderBy: (t, { desc: d }) => [d(t.isFeatured), d(t.isEquipped), d(t.earnedAt)],
+      orderBy: (t, { desc: d, sql: s }) => [d(t.isFeatured), s`${t.featuredOrder} asc nulls last`, d(t.isEquipped), d(t.earnedAt)],
     }),
   ]);
 

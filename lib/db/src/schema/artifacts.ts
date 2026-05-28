@@ -29,6 +29,7 @@ export const playerArtifactsTable = pgTable("player_artifacts", {
   artifactId: integer("artifact_id").notNull(),
   isEquipped: boolean("is_equipped").notNull().default(false),
   isFeatured: boolean("is_featured").notNull().default(false),
+  featuredOrder: integer("featured_order"),
   earnedAt: timestamp("earned_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   uniq: unique("player_artifacts_player_artifact_unique").on(t.playerId, t.artifactId),
