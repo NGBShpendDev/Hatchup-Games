@@ -116,10 +116,10 @@ export default function HatchScreen() {
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const { data: eggs, isLoading } = useListEggs({ playerId: PLAYER_ID, limit: 20 });
+  const { data: eggs, isLoading } = useListEggs({ playerId: PLAYER_ID });
 
-  const ready = (eggs ?? []).filter((e) => e.status === "ready" || (e.stepsWalked ?? 0) >= (e.stepsRequired ?? 1000));
-  const incubating = (eggs ?? []).filter((e) => e.status !== "ready" && (e.stepsWalked ?? 0) < (e.stepsRequired ?? 1000));
+  const ready = (eggs ?? []).filter((e) => e.isReady || (e.stepsProgress ?? 0) >= (e.stepsRequired ?? 1000));
+  const incubating = (eggs ?? []).filter((e) => !e.isReady && (e.stepsProgress ?? 0) < (e.stepsRequired ?? 1000));
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

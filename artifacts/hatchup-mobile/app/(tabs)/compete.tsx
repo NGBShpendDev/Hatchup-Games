@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useListCompetitions, useListGameModes } from "@workspace/api-client-react";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -24,6 +25,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function CompeteScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -44,7 +46,22 @@ export default function CompeteScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 12 }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>Battle</Text>
-        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Compete with your pals</Text>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={() => router.push("/leaderboard")}
+            style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <Feather name="award" size={14} color="#f59e0b" />
+            <Text style={[styles.headerBtnText, { color: "#f59e0b" }]}>Ranks</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push("/events")}
+            style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <Feather name="calendar" size={14} color="#6366f1" />
+            <Text style={[styles.headerBtnText, { color: "#6366f1" }]}>Events</Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* Game Modes */}
@@ -60,20 +77,14 @@ export default function CompeteScreen() {
           contentContainerStyle={styles.modesRow}
           scrollEnabled={!!(gameModes && gameModes.length > 0)}
           renderItem={({ item: mode }) => {
-            const isLive = mode.isLive === "true" || mode.isLive === true;
+            const isLive = mode.isLive === true;
             return (
-              <Pressable
-                style={[styles.modeCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-              >
+              <Pressable style={[styles.modeCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={[styles.modeIconBg, { backgroundColor: colors.primary + "22" }]}>
                   <Feather name="zap" size={20} color={colors.primary} />
                 </View>
-                <Text style={[styles.modeName, { color: colors.foreground }]} numberOfLines={1}>
-                  {mode.name}
-                </Text>
-                {isLive && (
-                  <View style={[styles.liveDot, { backgroundColor: "#22c55e" }]} />
-                )}
+                <Text style={[styles.modeName, { color: colors.foreground }]} numberOfLines={1}>{mode.name}</Text>
+                {isLive && <View style={[styles.liveDot, { backgroundColor: "#22c55e" }]} />}
               </Pressable>
             );
           }}
@@ -86,20 +97,12 @@ export default function CompeteScreen() {
           <Pressable
             key={s}
             onPress={() => setStatusFilter(s)}
-            style={[
-              styles.filterPill,
-              {
-                backgroundColor: statusFilter === s ? colors.primary : colors.card,
-                borderColor: statusFilter === s ? colors.primary : colors.border,
-              },
-            ]}
+            style={[styles.filterPill, {
+              backgroundColor: statusFilter === s ? colors.primary : colors.card,
+              borderColor: statusFilter === s ? colors.primary : colors.border,
+            }]}
           >
-            <Text
-              style={[
-                styles.filterText,
-                { color: statusFilter === s ? "#fff" : colors.mutedForeground },
-              ]}
-            >
+            <Text style={[styles.filterText, { color: statusFilter === s ? "#fff" : colors.mutedForeground }]}>
               {s.charAt(0).toUpperCase() + s.slice(1)}
             </Text>
           </Pressable>
@@ -113,23 +116,16 @@ export default function CompeteScreen() {
       ) : (competitions?.length ?? 0) === 0 ? (
         <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Feather name="calendar" size={28} color={colors.mutedForeground} />
-          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-            No {statusFilter} competitions
-          </Text>
+          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No {statusFilter} competitions</Text>
         </View>
       ) : (
         (competitions ?? []).map((comp) => {
           const statusColor = STATUS_COLORS[comp.status ?? "pending"] ?? colors.mutedForeground;
           return (
-            <View
-              key={comp.id}
-              style={[styles.compCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            >
+            <View key={comp.id} style={[styles.compCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.compHeader}>
                 <View style={styles.compTitleRow}>
-                  <Text style={[styles.compMode, { color: colors.foreground }]}>
-                    {comp.mode}
-                  </Text>
+                  <Text style={[styles.compMode, { color: colors.foreground }]}>{comp.mode}</Text>
                   <View style={[styles.statusBadge, { backgroundColor: statusColor + "22" }]}>
                     <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
                     <Text style={[styles.statusText, { color: statusColor }]}>
@@ -138,9 +134,9 @@ export default function CompeteScreen() {
                   </View>
                 </View>
                 <View style={styles.compMeta}>
-                  <Feather name="users" size={12} color={colors.mutedForeground} />
+                  <Feather name="award" size={12} color={colors.mutedForeground} />
                   <Text style={[styles.compMetaText, { color: colors.mutedForeground }]}>
-                    {comp.participantCount ?? 0} participants
+                    Rank: {comp.rank ?? "—"} · Score: {comp.score ?? 0}
                   </Text>
                 </View>
               </View>
@@ -159,20 +155,14 @@ export default function CompeteScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingHorizontal: 20, paddingBottom: 12 },
-  title: { fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
-  subtitle: { fontSize: 13, marginTop: 3 },
+  header: { paddingHorizontal: 16, paddingBottom: 12 },
+  title: { fontSize: 26, fontWeight: "800", letterSpacing: -0.5, marginBottom: 8 },
+  headerActions: { flexDirection: "row", gap: 8 },
+  headerBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
+  headerBtnText: { fontSize: 12, fontWeight: "700" },
   sectionTitle: { fontSize: 16, fontWeight: "700", paddingHorizontal: 20, marginBottom: 10, marginTop: 4 },
   modesRow: { paddingHorizontal: 16, gap: 10, paddingBottom: 4 },
-  modeCard: {
-    width: 100,
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 12,
-    alignItems: "center",
-    gap: 8,
-    position: "relative",
-  },
+  modeCard: { width: 100, borderRadius: 14, borderWidth: 1, padding: 12, alignItems: "center", gap: 8, position: "relative" },
   modeIconBg: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   modeName: { fontSize: 11, fontWeight: "600", textAlign: "center" },
   liveDot: { position: "absolute", top: 8, right: 8, width: 7, height: 7, borderRadius: 4 },

@@ -24,8 +24,23 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ headerBackTitle: "Back" }}>
+    <Stack screenOptions={{ headerShown: false, headerBackTitle: "Back" }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="hatchling/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="evolutions" options={{ headerShown: false }} />
+      <Stack.Screen name="leaderboard" options={{ headerShown: false }} />
+      <Stack.Screen name="events" options={{ headerShown: false }} />
+      <Stack.Screen name="clubs" options={{ headerShown: false }} />
+      <Stack.Screen name="feed" options={{ headerShown: false }} />
+      <Stack.Screen name="coach" options={{ headerShown: false }} />
+      <Stack.Screen name="fitness" options={{ headerShown: false }} />
+      <Stack.Screen name="my-pal" options={{ headerShown: false }} />
+      <Stack.Screen name="training" options={{ headerShown: false }} />
+      <Stack.Screen name="nutrition" options={{ headerShown: false }} />
+      <Stack.Screen name="nearby" options={{ headerShown: false }} />
+      <Stack.Screen name="subscription" options={{ headerShown: false }} />
+      <Stack.Screen name="notifications" options={{ headerShown: false }} />
+      <Stack.Screen name="settings" options={{ headerShown: false }} />
     </Stack>
   );
 }
