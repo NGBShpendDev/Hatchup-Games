@@ -149,11 +149,25 @@ mock.module("drizzle-orm", {
     notInArray: () => ({}),
     ilike: () => ({}),
     isNull: () => ({}),
+    isNotNull: () => ({}),
+    lt: () => ({}),
     gte: (_col: unknown, value: Date) => {
       lastWindowCutoff = value;
       return {};
     },
   },
+});
+
+// postPurgeJob is loaded transitively by social.ts but is never exercised by
+// the trending route. Stub it so it doesn't try to walk the real drizzle
+// helpers (which the mock above intentionally narrows).
+mock.module("../../services/postPurgeJob.ts", {
+  namedExports: { hardDeletePosts: async () => 0, RETENTION_DAYS: 30 },
+});
+// safety.ts pulls in tables and email services the trending route never
+// touches. Only `getHiddenPlayerIds` is referenced from social.ts.
+mock.module("../safety.ts", {
+  namedExports: { getHiddenPlayerIds: async () => [] },
 });
 
 mock.module("drizzle-orm/pg-core", {
@@ -216,11 +230,14 @@ const fakeDb = {
         };
         return chain;
       }
-      // count(*) chains used by enrichPost — `.then` resolves to [{count:0}]
+      // count(*) chains used by enrichPost and the reaction/comment tie-break
+      // aggregations — both `.where().then(...)` and `.where().groupBy().then(...)`
+      // resolve to an empty rowset.
       const countChain: any = {
         where: () => countChain,
+        groupBy: () => countChain,
         then: (resolve: any, reject: any) =>
-          Promise.resolve([{ count: 0 }]).then(resolve, reject),
+          Promise.resolve([]).then(resolve, reject),
       };
       return countChain;
     },
@@ -244,7 +261,9 @@ mock.module("@workspace/db", {
     postViewsTable,
     postReactionsTable,
     postCommentsTable,
+    postCommentRevisionsTable: {},
     postCommentReactionsTable,
+    userReportsTable: {},
     playerFollowsTable,
     postRepostsTable,
     playersTable,
