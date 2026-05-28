@@ -5,7 +5,7 @@ import {
   personalRecordsTable, playerLocationTable, playerArtifactsTable,
   artifactsTable,
 } from "@workspace/db";
-import { desc, eq, notInArray, gte, and } from "drizzle-orm";
+import { desc, eq, notInArray, gte, and, inArray, sql } from "drizzle-orm";
 import { GetGlobalLeaderboardQueryParams, GetModeLeaderboardQueryParams } from "@workspace/api-zod";
 import { getHiddenPlayerIds, filterDiscoverableCandidates } from "./safety.ts";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
@@ -277,55 +277,77 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, attachEntitlement,
 // ── GET /leaderboards/artifacts ───────────────────────────────────────────────
 // Top artifact collectors, ranked by weighted rarity score then by count.
 // Rarity weights: Celestial=7, Ancient=6, Mythic=5, Legendary=4, Epic=3, Rare=2, Common=1.
-const RARITY_WEIGHTS: Record<string, number> = {
-  Common: 1, Rare: 2, Epic: 3, Legendary: 4, Mythic: 5, Ancient: 6, Celestial: 7,
-};
-
 router.get("/leaderboards/artifacts", requireAuth, attachPlayer, async (req, res) => {
   const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
   const hiddenIds = req.playerId ? await getHiddenPlayerIds(req.playerId) : [];
-  const hiddenSet = new Set(hiddenIds);
 
-  const [ownedRows, catalog, players] = await Promise.all([
-    db.query.playerArtifactsTable.findMany(),
-    db.query.artifactsTable.findMany(),
-    db.query.playersTable.findMany(),
-  ]);
+  // Weighted rarity expression — matches the rarity weights documented above.
+  const rarityWeightExpr = sql<number>`CASE ${artifactsTable.rarity}
+    WHEN 'Celestial' THEN 7
+    WHEN 'Ancient'   THEN 6
+    WHEN 'Mythic'    THEN 5
+    WHEN 'Legendary' THEN 4
+    WHEN 'Epic'      THEN 3
+    WHEN 'Rare'      THEN 2
+    WHEN 'Common'    THEN 1
+    ELSE 0
+  END`;
 
-  const catalogMap = new Map<number, typeof artifactsTable.$inferSelect>();
-  for (const a of catalog) catalogMap.set(a.id, a);
+  // Single aggregation query: join player_artifacts → artifacts → players,
+  // sum weighted rarity per player, sort and take top N in Postgres.
+  const aggRows = await db
+    .select({
+      playerId:     playerArtifactsTable.playerId,
+      count:        sql<number>`COUNT(*)::int`.as("count"),
+      score:        sql<number>`COALESCE(SUM(${rarityWeightExpr}), 0)::int`.as("score"),
+      rarestWeight: sql<number>`COALESCE(MAX(${rarityWeightExpr}), 0)::int`.as("rarest_weight"),
+    })
+    .from(playerArtifactsTable)
+    .innerJoin(artifactsTable, eq(artifactsTable.id, playerArtifactsTable.artifactId))
+    .innerJoin(playersTable,   eq(playersTable.id,   playerArtifactsTable.playerId))
+    .where(hiddenIds.length > 0 ? notInArray(playerArtifactsTable.playerId, hiddenIds) : undefined)
+    .groupBy(playerArtifactsTable.playerId)
+    .orderBy(sql`score DESC`, sql`count DESC`, playerArtifactsTable.playerId)
+    .limit(limit);
 
-  type Agg = { playerId: number; count: number; score: number; rarestWeight: number; rarestRarity: string | null; rarestName: string | null; };
-  const aggMap = new Map<number, Agg>();
-
-  for (const pa of ownedRows) {
-    if (hiddenSet.has(pa.playerId)) continue;
-    const art = catalogMap.get(pa.artifactId);
-    if (!art) continue;
-    const w = RARITY_WEIGHTS[art.rarity] ?? 0;
-    let agg = aggMap.get(pa.playerId);
-    if (!agg) {
-      agg = { playerId: pa.playerId, count: 0, score: 0, rarestWeight: 0, rarestRarity: null, rarestName: null };
-      aggMap.set(pa.playerId, agg);
-    }
-    agg.count += 1;
-    agg.score += w;
-    if (w > agg.rarestWeight) {
-      agg.rarestWeight = w;
-      agg.rarestRarity = art.rarity;
-      agg.rarestName = art.name;
-    }
+  if (aggRows.length === 0) {
+    res.json([]);
+    return;
   }
 
-  const playerMap = new Map(players.map(p => [p.id, p]));
-  const ranked = [...aggMap.values()]
-    .filter(a => playerMap.has(a.playerId))
-    .sort((a, b) => b.score - a.score || b.count - a.count || a.playerId - b.playerId)
-    .slice(0, limit);
+  const topPlayerIds = aggRows.map(r => r.playerId);
 
-  res.json(ranked.map((a, i) => {
-    const p = playerMap.get(a.playerId)!;
-    return {
+  // Fetch player info and the rarest artifact name per top player in parallel.
+  // DISTINCT ON picks one rarest-tier artifact per player (alphabetical tiebreak).
+  const [players, rarestRows] = await Promise.all([
+    db.select().from(playersTable).where(inArray(playersTable.id, topPlayerIds)),
+    db.execute<{ player_id: number; rarity: string; name: string }>(sql`
+      SELECT DISTINCT ON (pa.player_id)
+        pa.player_id, a.rarity, a.name
+      FROM ${playerArtifactsTable} pa
+      JOIN ${artifactsTable} a ON a.id = pa.artifact_id
+      WHERE pa.player_id IN (${sql.join(topPlayerIds, sql`, `)})
+      ORDER BY pa.player_id,
+        CASE a.rarity
+          WHEN 'Celestial' THEN 7 WHEN 'Ancient' THEN 6 WHEN 'Mythic' THEN 5
+          WHEN 'Legendary' THEN 4 WHEN 'Epic' THEN 3 WHEN 'Rare' THEN 2
+          WHEN 'Common' THEN 1 ELSE 0
+        END DESC,
+        a.name ASC
+    `),
+  ]);
+
+  const playerMap = new Map(players.map(p => [p.id, p]));
+  const rarestMap = new Map<number, { rarity: string; name: string }>();
+  for (const r of rarestRows.rows ?? []) {
+    rarestMap.set(r.player_id, { rarity: r.rarity, name: r.name });
+  }
+
+  res.json(aggRows.flatMap((a, i) => {
+    const p = playerMap.get(a.playerId);
+    if (!p) return [];
+    const rarest = rarestMap.get(a.playerId);
+    return [{
       position:      i + 1,
       playerId:      p.id,
       username:      p.username,
@@ -334,10 +356,10 @@ router.get("/leaderboards/artifacts", requireAuth, attachPlayer, async (req, res
       rank:          p.rank,
       artifactCount: a.count,
       rarityScore:   a.score,
-      rarestRarity:  a.rarestRarity,
-      rarestName:    a.rarestName,
+      rarestRarity:  rarest?.rarity ?? null,
+      rarestName:    rarest?.name ?? null,
       isMe:          p.id === req.playerId,
-    };
+    }];
   }));
 });
 
