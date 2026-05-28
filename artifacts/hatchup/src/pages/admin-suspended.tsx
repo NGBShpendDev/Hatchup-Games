@@ -16,6 +16,12 @@ interface SuspendedPlayer {
   avatarUrl: string | null;
   suspendedAt: string | null;
   suspensionReason: string | null;
+  suspendedByAdminId: number | null;
+  suspendedByAdmin: {
+    id: number;
+    username: string;
+    displayName: string | null;
+  } | null;
 }
 
 export default function AdminSuspended() {
@@ -133,6 +139,15 @@ export default function AdminSuspended() {
                         >
                           <span className="font-black uppercase tracking-wider text-[9px] mr-1 text-red-400">Reason:</span>
                           {p.suspensionReason}
+                        </p>
+                      )}
+                      {p.suspendedByAdmin && (
+                        <p
+                          className="text-[10px] text-muted-foreground font-medium mt-0.5"
+                          data-testid={`text-suspended-by-${p.id}`}
+                        >
+                          By @{p.suspendedByAdmin.username}
+                          {p.suspendedByAdmin.displayName ? ` (${p.suspendedByAdmin.displayName})` : ""}
                         </p>
                       )}
                     </div>

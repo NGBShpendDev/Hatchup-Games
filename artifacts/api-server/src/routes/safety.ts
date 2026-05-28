@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { userReportsTable, blockedUsersTable, playersTable, moderationAuditLogTable, notificationsTable } from "@workspace/db";
-import { eq, and, desc, or, notInArray } from "drizzle-orm";
+import { eq, and, desc, or, notInArray, inArray } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { emailResendLimiter, consumeEmailResendBudget } from "../middlewares/rateLimiters.ts";
@@ -849,14 +849,39 @@ router.get("/admin/players/suspended", requireAuth, attachPlayer, async (req, re
       avatarUrl: playersTable.avatarUrl,
       suspendedAt: playersTable.suspendedAt,
       suspensionReason: playersTable.suspensionReason,
+      suspendedByAdminId: playersTable.suspendedByAdminId,
     })
     .from(playersTable)
     .where(eq(playersTable.isSuspended, true))
     .orderBy(desc(playersTable.suspendedAt));
-  res.json(rows.map(r => ({
-    ...r,
-    suspendedAt: r.suspendedAt ? r.suspendedAt.toISOString() : null,
-  })));
+
+  // Resolve the acting admin's username / display name for each row so the
+  // moderation UI can show "Suspended by @alice" without a second round trip.
+  const adminIds = Array.from(
+    new Set(rows.map((r) => r.suspendedByAdminId).filter((v): v is number => typeof v === "number")),
+  );
+  const admins = adminIds.length
+    ? await db
+        .select({
+          id: playersTable.id,
+          username: playersTable.username,
+          displayName: playersTable.displayName,
+        })
+        .from(playersTable)
+        .where(inArray(playersTable.id, adminIds))
+    : [];
+  const adminById = new Map(admins.map((a) => [a.id, a]));
+
+  res.json(rows.map(r => {
+    const admin = r.suspendedByAdminId != null ? adminById.get(r.suspendedByAdminId) : undefined;
+    return {
+      ...r,
+      suspendedAt: r.suspendedAt ? r.suspendedAt.toISOString() : null,
+      suspendedByAdmin: admin
+        ? { id: admin.id, username: admin.username, displayName: admin.displayName }
+        : null,
+    };
+  }));
 });
 
 // ── Admin: suspend / unsuspend account ──────────────────────────────────────
@@ -894,6 +919,7 @@ router.patch("/admin/players/:id/suspend", requireAuth, attachPlayer, async (req
       isSuspended: body.isSuspended,
       suspendedAt: body.isSuspended ? new Date() : null,
       suspensionReason: body.isSuspended ? suspendReason : null,
+      suspendedByAdminId: body.isSuspended ? caller.id : null,
     })
     .where(eq(playersTable.id, targetId))
     .returning({
@@ -902,6 +928,7 @@ router.patch("/admin/players/:id/suspend", requireAuth, attachPlayer, async (req
       isSuspended: playersTable.isSuspended,
       suspendedAt: playersTable.suspendedAt,
       suspensionReason: playersTable.suspensionReason,
+      suspendedByAdminId: playersTable.suspendedByAdminId,
     });
   if (!updated) {
     res.status(404).json({ error: "Player not found" });

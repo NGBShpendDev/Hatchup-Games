@@ -22,6 +22,8 @@ interface PlayerRow {
   username: string;
   isAdmin: boolean;
   isSuspended: boolean;
+  suspendedByAdminId?: number | null;
+  suspensionReason?: string | null;
 }
 
 const state = {
@@ -66,6 +68,21 @@ mock.module("../../services/emailVerification.ts", {
   },
 });
 
+mock.module("../../services/bouncedEmails.ts", {
+  namedExports: {
+    isEmailBouncing: async () => false,
+    recordEmailBounce: async () => true,
+    clearEmailBounce: async () => true,
+    normalizeEmail: (e: string) => e.trim().toLowerCase(),
+  },
+});
+
+mock.module("../../services/moderationNotify.ts", {
+  namedExports: {
+    notifyModerationAction: async () => undefined,
+  },
+});
+
 mock.module("drizzle-orm", {
   namedExports: {
     lt: () => ({}),
@@ -74,6 +91,7 @@ mock.module("drizzle-orm", {
     or: (...args: unknown[]) => ({ op: "or", args }),
     desc: () => ({}),
     notInArray: () => ({}),
+    inArray: (col: unknown, vals: unknown[]) => ({ op: "inArray", col, vals }),
   },
 });
 
@@ -106,7 +124,13 @@ const fakeDb = {
         if (idx === -1) return [];
         state.players[idx] = { ...state.players[idx], ...setValues };
         const p = state.players[idx];
-        return [{ id: p.id, username: p.username, isSuspended: p.isSuspended }];
+        return [{
+          id: p.id,
+          username: p.username,
+          isSuspended: p.isSuspended,
+          suspendedByAdminId: p.suspendedByAdminId ?? null,
+          suspensionReason: p.suspensionReason ?? null,
+        }];
       },
     };
     return chain;
@@ -117,7 +141,7 @@ mock.module("@workspace/db", {
   namedExports: {
     emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
     db: fakeDb,
-    playersTable: { id: {}, clerkId: {}, username: {}, isSuspended: {} },
+    playersTable: { id: {}, clerkId: {}, username: {}, isSuspended: {}, suspendedAt: {}, suspensionReason: {}, suspendedByAdminId: {} },
     userReportsTable: { id: {}, status: {}, createdAt: {}, reportedUserId: {}, contentType: {} },
     blockedUsersTable: { blockerId: {}, blockedId: {}, createdAt: {} },
     moderationAuditLogTable: { id: {}, actorId: {}, action: {}, targetPlayerId: {}, targetReportId: {}, reason: {}, metadata: {}, createdAt: {} },
@@ -239,6 +263,42 @@ describe("PATCH /admin/players/:id/suspend", () => {
     }
     // None of the rejected bodies should have changed the target.
     assert.equal(state.players.find((p) => p.id === 2)!.isSuspended, false);
+  });
+
+  it("records the acting admin id and reason when suspending, clears them when unsuspending", async () => {
+    seedAdmin();
+    seedTarget({ id: 2, clerkId: "u_target", username: "target" });
+
+    const suspendRes = await suspend(2, { isSuspended: true, reason: "spam and harassment" });
+    assert.equal(suspendRes.status, 200);
+    assert.equal(suspendRes.body.player.suspendedByAdminId, 1);
+    assert.equal(suspendRes.body.player.suspensionReason, "spam and harassment");
+    const row = state.players.find((p) => p.id === 2)!;
+    assert.equal(row.suspendedByAdminId, 1);
+    assert.equal(row.suspensionReason, "spam and harassment");
+
+    const unsuspendRes = await suspend(2, { isSuspended: false });
+    assert.equal(unsuspendRes.status, 200);
+    assert.equal(unsuspendRes.body.player.suspendedByAdminId, null);
+    assert.equal(unsuspendRes.body.player.suspensionReason, null);
+    const cleared = state.players.find((p) => p.id === 2)!;
+    assert.equal(cleared.suspendedByAdminId, null);
+    assert.equal(cleared.suspensionReason, null);
+  });
+
+  it("trims and caps the suspension reason at 500 chars; missing reason stays null", async () => {
+    seedAdmin();
+    seedTarget({ id: 2, clerkId: "u_a", username: "a" });
+    seedTarget({ id: 3, clerkId: "u_b", username: "b" });
+
+    const noReason = await suspend(2, { isSuspended: true });
+    assert.equal(noReason.status, 200);
+    assert.equal(noReason.body.player.suspensionReason, null);
+
+    const longReason = "x".repeat(800);
+    const longRes = await suspend(3, { isSuspended: true, reason: `  ${longReason}  ` });
+    assert.equal(longRes.status, 200);
+    assert.equal(longRes.body.player.suspensionReason!.length, 500);
   });
 
   it("returns 404 when the target player does not exist", async () => {

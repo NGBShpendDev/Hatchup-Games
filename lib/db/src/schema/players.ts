@@ -55,6 +55,7 @@ export const playersTable = pgTable("players", {
   isSuspended: boolean("is_suspended").notNull().default(false),
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
   suspensionReason: text("suspension_reason"),
+  suspendedByAdminId: integer("suspended_by_admin_id"),
   // Demo / seed account marker — true for NPC accounts inserted to fill out
   // sparse cold-start surfaces like the "Players Nearby" strip. Lets us
   // identify and clean them up later without touching real users.

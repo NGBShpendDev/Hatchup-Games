@@ -177,21 +177,28 @@ export default function AdminReports() {
     if (!confirm(`Suspend account #${reportedUserId}? They will be blocked from posting, commenting, reacting, and following until you unsuspend them.`)) {
       return;
     }
-    const reasonInput = window.prompt(
-      `Reason for suspending account #${reportedUserId}? (Optional — shown to the player and on the suspended-users list. Max 500 chars.)`,
-      "",
-    );
-    if (reasonInput === null) {
-      // User cancelled the reason prompt — abort the suspend entirely so
-      // they don't accidentally suspend someone without confirming intent.
-      return;
+    let reason = "";
+    // Reason is required so future admins (and appeals) have an audit trail.
+    // Loop until the admin either supplies a non-empty reason or cancels.
+    while (true) {
+      const reasonInput = window.prompt(
+        `Reason for suspending account #${reportedUserId}? (Required — shown to the player and on the suspended-users list. Max 500 chars.)`,
+        reason,
+      );
+      if (reasonInput === null) {
+        // User cancelled the reason prompt — abort the suspend entirely so
+        // they don't accidentally suspend someone without confirming intent.
+        return;
+      }
+      reason = reasonInput.trim().slice(0, 500);
+      if (reason) break;
+      window.alert("A reason is required to suspend an account.");
     }
-    const reason = reasonInput.trim().slice(0, 500);
     const res = await fetch(`/api/admin/players/${reportedUserId}/suspend`, {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isSuspended: true, reason: reason || undefined }),
+      body: JSON.stringify({ isSuspended: true, reason }),
     });
     if (res.ok) {
       toast({ title: `Account #${reportedUserId} suspended` });

@@ -25,6 +25,8 @@ interface PlayerRow {
   isAdmin: boolean;
   isSuspended: boolean;
   suspendedAt: Date | null;
+  suspensionReason?: string | null;
+  suspendedByAdminId?: number | null;
 }
 
 const state = {
@@ -65,6 +67,21 @@ mock.module("../../services/emailVerification.ts", {
   namedExports: { issueEmailVerification: async () => ({ sent: false }) },
 });
 
+mock.module("../../services/bouncedEmails.ts", {
+  namedExports: {
+    isEmailBouncing: async () => false,
+    recordEmailBounce: async () => true,
+    clearEmailBounce: async () => true,
+    normalizeEmail: (e: string) => e.trim().toLowerCase(),
+  },
+});
+
+mock.module("../../services/moderationNotify.ts", {
+  namedExports: {
+    notifyModerationAction: async () => undefined,
+  },
+});
+
 // Tag predicates so we can pattern-match them in the fake DB.
 mock.module("drizzle-orm", {
   namedExports: {
@@ -74,6 +91,7 @@ mock.module("drizzle-orm", {
     or: (...args: unknown[]) => ({ op: "or", args }),
     desc: (col: unknown) => ({ op: "desc", col }),
     notInArray: () => ({}),
+    inArray: (col: unknown, vals: unknown[]) => ({ op: "inArray", col, vals }),
   },
 });
 
@@ -88,6 +106,8 @@ const PLAYER_COLS = {
   isAdmin: { name: "isAdmin" },
   isSuspended: { name: "isSuspended" },
   suspendedAt: { name: "suspendedAt" },
+  suspensionReason: { name: "suspensionReason" },
+  suspendedByAdminId: { name: "suspendedByAdminId" },
 };
 
 const fakeDb = {
@@ -129,11 +149,15 @@ const fakeDb = {
         return chain;
       },
       then(resolve: (rows: unknown[]) => void) {
-        // Only models the suspended-list query: where isSuspended === true,
-        // ordered by suspendedAt desc.
+        // Models two query shapes:
+        //   1. suspended-list: where isSuspended === true, ordered by suspendedAt desc
+        //   2. admin lookup: where id IN (adminIds)
         let rows = state.players.filter((p) => {
           if (whereVal?.op === "eq" && whereVal.col?.name === "isSuspended") {
             return p.isSuspended === whereVal.val;
+          }
+          if (whereVal?.op === "inArray" && whereVal.col?.name === "id") {
+            return (whereVal.vals as number[]).includes(p.id);
           }
           return true;
         });
@@ -351,6 +375,34 @@ describe("GET /admin/players/suspended", () => {
       assert.equal(typeof row.suspendedAt, "string");
       assert.ok(!Number.isNaN(Date.parse(row.suspendedAt)));
     }
+  });
+
+  it("includes suspensionReason and resolves the acting admin in suspendedByAdmin", async () => {
+    seedAdmin({ id: 1, clerkId: "u_admin", username: "alice", displayName: "Alice Admin" });
+    seedPlayer({
+      id: 2, clerkId: "u_a", username: "alpha",
+      isSuspended: true, suspendedAt: new Date("2025-01-01T00:00:00Z"),
+      suspensionReason: "spam and harassment", suspendedByAdminId: 1,
+    });
+    seedPlayer({
+      id: 3, clerkId: "u_b", username: "bravo",
+      isSuspended: true, suspendedAt: new Date("2025-02-01T00:00:00Z"),
+      // No reason and no actor — legacy row.
+      suspensionReason: null, suspendedByAdminId: null,
+    });
+
+    const { status, body } = await getSuspendedList();
+    assert.equal(status, 200);
+
+    const alpha = body.find((r: any) => r.username === "alpha");
+    assert.equal(alpha.suspensionReason, "spam and harassment");
+    assert.equal(alpha.suspendedByAdminId, 1);
+    assert.deepEqual(alpha.suspendedByAdmin, { id: 1, username: "alice", displayName: "Alice Admin" });
+
+    const bravo = body.find((r: any) => r.username === "bravo");
+    assert.equal(bravo.suspensionReason, null);
+    assert.equal(bravo.suspendedByAdminId, null);
+    assert.equal(bravo.suspendedByAdmin, null);
   });
 
   it("returns an empty array when no players are suspended", async () => {
