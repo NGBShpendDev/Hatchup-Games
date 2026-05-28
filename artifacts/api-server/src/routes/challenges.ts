@@ -13,7 +13,10 @@ import {
 import { eq, desc, and, gt, lt, sql, inArray } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
 import { awardBadge } from "../services/badgeService";
-import { computeChallengeReward } from "../services/challengeRewards";
+import {
+  distributeChallengeRewards,
+  type RewardStore,
+} from "../services/challengeRewards";
 import {
   advanceEliminationRound as advanceEliminationRoundCore,
   type AdvanceOutcome,
@@ -221,6 +224,61 @@ async function awardChampionArtifact(playerId: number): Promise<void> {
 }
 
 // ── Reward distribution helper ─────────────────────────────────────────────
+// DB-backed adapter for the pure `distributeChallengeRewards` orchestrator in
+// `services/challengeRewards`. The pure function is unit-tested; this just
+// wires it to Drizzle and applies the champion-side effects (Tournament
+// Champion badge + Crown of the Bracket artifact).
+const dbRewardStore: RewardStore = {
+  async getChallenge(id) {
+    const c = await db.query.challengesTable.findFirst({
+      where: eq(challengesTable.id, id),
+    });
+    if (!c) return null;
+    return {
+      id: c.id,
+      status: c.status,
+      endAt: new Date(c.endAt),
+      isElimination: c.isElimination,
+      rewardXp: c.rewardXp,
+      rewardCoins: c.rewardCoins,
+    };
+  },
+  async getParticipants(challengeId) {
+    const rows = await db.query.challengeParticipantsTable.findMany({
+      where: eq(challengeParticipantsTable.challengeId, challengeId),
+    });
+    return rows.map(r => ({
+      id: r.id,
+      playerId: r.playerId,
+      currentValue: r.currentValue,
+      eliminated: r.eliminated,
+      eliminatedRound: r.eliminatedRound,
+    }));
+  },
+  async setParticipantRank(participantId, rank) {
+    await db.update(challengeParticipantsTable)
+      .set({ rank })
+      .where(eq(challengeParticipantsTable.id, participantId));
+  },
+  async grantPlayerReward(playerId, xp, coins) {
+    await db.update(playersTable)
+      .set({
+        xp: sql`${playersTable.xp} + ${xp}`,
+        coins: sql`${playersTable.coins} + ${coins}`,
+      })
+      .where(eq(playersTable.id, playerId));
+  },
+  async awardChampion(playerId) {
+    await awardBadge(playerId, "TOURNAMENT_CHAMPION");
+    await awardChampionArtifact(playerId);
+  },
+  async markCompleted(challengeId) {
+    await db.update(challengesTable)
+      .set({ status: "completed", completedPushSentAt: new Date() })
+      .where(eq(challengesTable.id, challengeId));
+  },
+};
+
 async function finalizeChallenge(challengeId: number) {
   const challenge = await db.query.challengesTable.findFirst({
     where: eq(challengesTable.id, challengeId),
@@ -245,44 +303,8 @@ async function finalizeChallenge(challengeId: number) {
     }
   }
 
-  // Rank participants by currentValue desc
-  const participants = await db.query.challengeParticipantsTable.findMany({
-    where: and(
-      eq(challengeParticipantsTable.challengeId, challengeId),
-      eq(challengeParticipantsTable.eliminated, false),
-    ),
-    orderBy: [desc(challengeParticipantsTable.currentValue)],
-  });
-
-  for (let i = 0; i < participants.length; i++) {
-    const rank = i + 1;
-    await db.update(challengeParticipantsTable)
-      .set({ rank })
-      .where(eq(challengeParticipantsTable.id, participants[i].id));
-
-    // Grant rewards to top 3. Elimination tournament champions (sole
-    // survivor at rank 1) get a 2× boost on top of normal first-place pay
-    // and a Tournament Champion badge that surfaces on their profile.
-    if (rank <= 3) {
-      const grant = computeChallengeReward(rank, challenge.rewardXp, challenge.rewardCoins, challenge.isElimination);
-      if (grant.xp > 0 || grant.coins > 0) {
-        await db.update(playersTable)
-          .set({
-            xp: sql`${playersTable.xp} + ${grant.xp}`,
-            coins: sql`${playersTable.coins} + ${grant.coins}`,
-          })
-          .where(eq(playersTable.id, participants[i].playerId));
-      }
-      if (grant.isChampion) {
-        await awardBadge(participants[i].playerId, "TOURNAMENT_CHAMPION");
-        await awardChampionArtifact(participants[i].playerId);
-      }
-    }
-  }
-
-  await db.update(challengesTable)
-    .set({ status: "completed", completedPushSentAt: new Date() })
-    .where(eq(challengesTable.id, challengeId));
+  const outcome = await distributeChallengeRewards(dbRewardStore, challengeId);
+  if (outcome.kind !== "completed") return;
 
   // Fan out a "challenge complete" push to every participant (active or
   // eliminated) so they can see their final rank.

@@ -34,3 +34,99 @@ export function computeChallengeReward(
     isChampion: isElimination && rank === 1,
   };
 }
+
+// ── Reward distribution orchestration ──────────────────────────────────────
+// Extracted from `routes/challenges.ts::finalizeChallenge` so the ranking +
+// payout + status-transition flow can be unit-tested without touching the DB
+// (same store-injection pattern used by `services/eliminationBracket`).
+//
+// The caller (route layer) is still responsible for the elimination-round
+// advance attempt and for fanning out "challenge complete" pushes — those
+// involve I/O that is uninteresting to the rule logic. This function owns
+// exactly: rank assignment, top-3 reward payout, champion badge/artifact
+// hook, and the one-shot status transition to "completed".
+
+export type RewardChallenge = {
+  id: number;
+  status: string;
+  endAt: Date;
+  isElimination: boolean;
+  rewardXp: number;
+  rewardCoins: number;
+};
+
+export type RewardParticipant = {
+  id: number;
+  playerId: number;
+  currentValue: number;
+  eliminated: boolean;
+  eliminatedRound: number | null;
+};
+
+export interface RewardStore {
+  getChallenge(id: number): Promise<RewardChallenge | null>;
+  getParticipants(challengeId: number): Promise<RewardParticipant[]>;
+  setParticipantRank(participantId: number, rank: number): Promise<void>;
+  grantPlayerReward(
+    playerId: number,
+    xp: number,
+    coins: number,
+  ): Promise<void>;
+  awardChampion(playerId: number): Promise<void>;
+  markCompleted(challengeId: number): Promise<void>;
+}
+
+export type DistributionRanking = {
+  participantId: number;
+  playerId: number;
+  rank: number;
+  grant: ChallengeRewardGrant;
+};
+
+export type DistributionOutcome =
+  | { kind: "noop"; reason: "not_found" | "not_active" | "not_ended" }
+  | { kind: "completed"; rankings: DistributionRanking[] };
+
+export async function distributeChallengeRewards(
+  store: RewardStore,
+  challengeId: number,
+  now: Date = new Date(),
+): Promise<DistributionOutcome> {
+  const challenge = await store.getChallenge(challengeId);
+  if (!challenge) return { kind: "noop", reason: "not_found" };
+  if (challenge.status !== "active") return { kind: "noop", reason: "not_active" };
+  if (now < challenge.endAt) return { kind: "noop", reason: "not_ended" };
+
+  // Only non-eliminated participants are ranked/paid. In elimination mode,
+  // eliminated rows keep their stale `currentValue` from the round they
+  // lost, so a raw sort across all rows would promote a loser above the
+  // sole survivor — filter first, then sort.
+  const all = await store.getParticipants(challengeId);
+  const active = all
+    .filter((p) => !p.eliminated)
+    .slice()
+    .sort((a, b) => b.currentValue - a.currentValue);
+
+  const rankings: DistributionRanking[] = [];
+  for (let i = 0; i < active.length; i++) {
+    const rank = i + 1;
+    const p = active[i];
+    await store.setParticipantRank(p.id, rank);
+    const grant = computeChallengeReward(
+      rank,
+      challenge.rewardXp,
+      challenge.rewardCoins,
+      challenge.isElimination,
+    );
+    if (grant.xp > 0 || grant.coins > 0) {
+      await store.grantPlayerReward(p.playerId, grant.xp, grant.coins);
+    }
+    if (grant.isChampion) {
+      await store.awardChampion(p.playerId);
+    }
+    rankings.push({ participantId: p.id, playerId: p.playerId, rank, grant });
+  }
+
+  await store.markCompleted(challengeId);
+  return { kind: "completed", rankings };
+}
