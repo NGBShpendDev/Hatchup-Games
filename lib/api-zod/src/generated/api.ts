@@ -212,6 +212,36 @@ export const ListNearbyPlayersResponse = zod.object({
 
 
 /**
+ * @summary Get the authenticated player's own profile
+ */
+export const GetCurrentPlayerResponse = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "level": zod.number(),
+  "xp": zod.number(),
+  "coins": zod.number(),
+  "rank": zod.string(),
+  "rankScore": zod.number().optional(),
+  "totalWins": zod.number(),
+  "totalMatches": zod.number(),
+  "clubId": zod.number().nullish(),
+  "activeHatchlingId": zod.number().nullish(),
+  "totalSteps": zod.number(),
+  "totalWorkouts": zod.number().optional(),
+  "fitnessXp": zod.number(),
+  "currentStreak": zod.number(),
+  "longestStreak": zod.number().optional(),
+  "fitnessRealm": zod.string(),
+  "waterCups": zod.number().optional(),
+  "dailyStepGoal": zod.number().optional(),
+  "lastActiveDate": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
  * @summary Get player by ID
  */
 export const GetPlayerParams = zod.object({

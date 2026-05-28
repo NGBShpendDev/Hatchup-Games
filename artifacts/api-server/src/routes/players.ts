@@ -690,6 +690,12 @@ router.post("/players/me/streak-shield/buy", requireAuth, attachPlayer, async (r
   });
 });
 
+router.get("/players/me", requireAuth, attachPlayer, async (req, res) => {
+  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!player) { res.status(404).json({ error: "Player not found" }); return; }
+  res.json(player);
+});
+
 router.get("/players/:id", requireAuth, attachPlayer, async (req, res) => {
   const params = GetPlayerParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }

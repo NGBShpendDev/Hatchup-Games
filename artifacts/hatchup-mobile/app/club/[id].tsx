@@ -1,9 +1,18 @@
 import { Feather } from "@expo/vector-icons";
-import { useGetClub, useListClubMembers } from "@workspace/api-client-react";
+import {
+  useGetClub,
+  useListClubMembers,
+  useJoinClub,
+  useLeaveClub,
+  useGetCurrentPlayer,
+  getGetClubQueryKey,
+  getListClubMembersQueryKey,
+} from "@workspace/api-client-react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -13,6 +22,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useColors } from "@/hooks/useColors";
 
@@ -28,12 +38,64 @@ export default function ClubDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const clubId = Number(id);
+  const queryClient = useQueryClient();
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
+  const { data: currentPlayer } = useGetCurrentPlayer();
   const { data: club, isLoading } = useGetClub(clubId);
   const { data: members } = useListClubMembers(clubId);
+
+  const isMember =
+    currentPlayer !== undefined &&
+    members !== undefined &&
+    members.some((m) => m.id === currentPlayer.id);
+
+  const [membershipLoading, setMembershipLoading] = useState(false);
+
+  const joinMutation = useJoinClub();
+  const leaveMutation = useLeaveClub();
+
+  async function handleJoin() {
+    if (!currentPlayer) return;
+    setMembershipLoading(true);
+    try {
+      await joinMutation.mutateAsync({ id: clubId, data: { playerId: currentPlayer.id } });
+      await queryClient.invalidateQueries({ queryKey: getGetClubQueryKey(clubId) });
+      await queryClient.invalidateQueries({ queryKey: getListClubMembersQueryKey(clubId) });
+    } catch {
+      Alert.alert("Could not join club", "Please try again.");
+    } finally {
+      setMembershipLoading(false);
+    }
+  }
+
+  async function handleLeave() {
+    Alert.alert(
+      "Leave Club",
+      "Are you sure you want to leave this club?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Leave",
+          style: "destructive",
+          onPress: async () => {
+            setMembershipLoading(true);
+            try {
+              await leaveMutation.mutateAsync({ id: clubId });
+              await queryClient.invalidateQueries({ queryKey: getGetClubQueryKey(clubId) });
+              await queryClient.invalidateQueries({ queryKey: getListClubMembersQueryKey(clubId) });
+            } catch {
+              Alert.alert("Could not leave club", "Please try again.");
+            } finally {
+              setMembershipLoading(false);
+            }
+          },
+        },
+      ],
+    );
+  }
 
   async function handleShare() {
     if (!club) return;
@@ -108,15 +170,43 @@ export default function ClubDetailScreen() {
               ))}
             </View>
 
-            {/* Share button */}
-            <Pressable
-              onPress={handleShare}
-              style={[styles.shareButton, { borderColor: colors.primary }]}
-              testID="button-share-club-inline"
-            >
-              <Feather name="share-2" size={15} color={colors.primary} />
-              <Text style={[styles.shareButtonText, { color: colors.primary }]}>Share Club</Text>
-            </Pressable>
+            {/* Action buttons row */}
+            <View style={styles.actionRow}>
+              {/* Share button */}
+              <Pressable
+                onPress={handleShare}
+                style={[styles.outlineButton, { borderColor: colors.primary }]}
+                testID="button-share-club-inline"
+              >
+                <Feather name="share-2" size={15} color={colors.primary} />
+                <Text style={[styles.outlineButtonText, { color: colors.primary }]}>Share</Text>
+              </Pressable>
+
+              {/* Join / Leave button — hidden while current player is loading */}
+              {currentPlayer === undefined ? null : membershipLoading ? (
+                <View style={[styles.membershipButton, { backgroundColor: colors.primary + "88" }]}>
+                  <ActivityIndicator size="small" color="#fff" />
+                </View>
+              ) : isMember ? (
+                <Pressable
+                  onPress={handleLeave}
+                  style={[styles.membershipButton, { backgroundColor: colors.destructive }]}
+                  testID="button-leave-club"
+                >
+                  <Feather name="log-out" size={15} color="#fff" />
+                  <Text style={styles.membershipButtonText}>Leave Club</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={handleJoin}
+                  style={[styles.membershipButton, { backgroundColor: colors.primary }]}
+                  testID="button-join-club"
+                >
+                  <Feather name="user-plus" size={15} color="#fff" />
+                  <Text style={styles.membershipButtonText}>Join Club</Text>
+                </Pressable>
+              )}
+            </View>
           </View>
 
           {/* Members section */}
@@ -171,8 +261,11 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 16, fontWeight: "800" },
   statLabel: { fontSize: 10 },
   divider: { width: 1, height: 28 },
-  shareButton: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 16, paddingHorizontal: 24, paddingVertical: 9, borderRadius: 20, borderWidth: 1.5 },
-  shareButtonText: { fontSize: 13, fontWeight: "700" },
+  actionRow: { flexDirection: "row", gap: 10, marginTop: 16, width: "100%" },
+  outlineButton: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20, borderWidth: 1.5 },
+  outlineButtonText: { fontSize: 13, fontWeight: "700" },
+  membershipButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20 },
+  membershipButtonText: { fontSize: 13, fontWeight: "700", color: "#fff" },
   section: { borderRadius: 14, borderWidth: 1, overflow: "hidden", marginBottom: 12 },
   sectionTitle: { fontSize: 14, fontWeight: "700", padding: 14, paddingBottom: 10 },
   memberRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10 },

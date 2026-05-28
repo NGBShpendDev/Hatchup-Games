@@ -299,6 +299,21 @@ paths:
                     type: boolean
                     description: True if the viewer has no city set and must update their location to see nearby players.
 
+  /players/me:
+    get:
+      operationId: getCurrentPlayer
+      tags: [players]
+      summary: Get the authenticated player's own profile
+      responses:
+        "200":
+          description: Current player
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Player"
+        "404":
+          description: Player profile not found
+
   /players/{id}:
     get:
       operationId: getPlayer

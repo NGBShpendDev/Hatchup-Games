@@ -1012,6 +1012,83 @@ export function useListNearbyPlayers<TData = Awaited<ReturnType<typeof listNearb
 
 
 
+export const getGetCurrentPlayerUrl = () => {
+
+
+
+
+  return `/api/players/me`
+}
+
+/**
+ * @summary Get the authenticated player's own profile
+ */
+export const getCurrentPlayer = async ( options?: RequestInit): Promise<Player> => {
+
+  return customFetch<Player>(getGetCurrentPlayerUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCurrentPlayerQueryKey = () => {
+    return [
+    `/api/players/me`
+    ] as const;
+    }
+
+
+export const getGetCurrentPlayerQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentPlayer>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentPlayer>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCurrentPlayerQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentPlayer>>> = ({ signal }) => getCurrentPlayer({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCurrentPlayer>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCurrentPlayerQueryResult = NonNullable<Awaited<ReturnType<typeof getCurrentPlayer>>>
+export type GetCurrentPlayerQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the authenticated player's own profile
+ */
+
+export function useGetCurrentPlayer<TData = Awaited<ReturnType<typeof getCurrentPlayer>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentPlayer>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCurrentPlayerQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetPlayerUrl = (id: number,) => {
 
 
