@@ -242,7 +242,7 @@ router.post("/battles/rematch", requireAuth, attachPlayer, async (req, res) => {
 
   const mode = (battle.battleMode === "ranked" ? "ranked" : "casual") as "casual" | "ranked";
 
-  const invite = createRematchInvite({
+  const invite = await createRematchInvite({
     fromPlayerId: me,
     toPlayerId: opponentId,
     mode,
@@ -272,7 +272,7 @@ router.post("/battles/rematch", requireAuth, attachPlayer, async (req, res) => {
 // ── GET /battles/rematch/pending — pending rematch invites involving me ──────
 router.get("/battles/rematch/pending", requireAuth, attachPlayer, async (req, res) => {
   const me = req.playerId!;
-  const invites = listPendingRematchInvitesFor(me);
+  const invites = await listPendingRematchInvitesFor(me);
   const playerIds = [...new Set(invites.flatMap(i => [i.fromPlayerId, i.toPlayerId]))];
   const players = playerIds.length
     ? await db.query.playersTable.findMany({ where: (t, { inArray }) => inArray(t.id, playerIds) })
@@ -284,7 +284,7 @@ router.get("/battles/rematch/pending", requireAuth, attachPlayer, async (req, re
 // ── GET /battles/rematch/:id — fetch a single invite by id ───────────────────
 router.get("/battles/rematch/:id", requireAuth, attachPlayer, async (req, res) => {
   const me = req.playerId!;
-  const inv = getRematchInvite(String(req.params.id ?? ""));
+  const inv = await getRematchInvite(String(req.params.id ?? ""));
   if (!inv) { res.status(404).json({ error: "Invite not found or expired" }); return; }
   if (inv.fromPlayerId !== me && inv.toPlayerId !== me) {
     res.status(403).json({ error: "Not a participant" });
@@ -300,12 +300,12 @@ router.get("/battles/rematch/:id", requireAuth, attachPlayer, async (req, res) =
 // ── POST /battles/rematch/:id/accept ─────────────────────────────────────────
 router.post("/battles/rematch/:id/accept", requireAuth, attachPlayer, async (req, res) => {
   const me = req.playerId!;
-  const inv = getRematchInvite(String(req.params.id ?? ""));
+  const inv = await getRematchInvite(String(req.params.id ?? ""));
   if (!inv) { res.status(404).json({ error: "Invite not found or expired" }); return; }
   if (inv.toPlayerId !== me) { res.status(403).json({ error: "Only the recipient can accept" }); return; }
   if (inv.status !== "pending") { res.status(409).json({ error: `Invite is ${inv.status}` }); return; }
 
-  setRematchInviteStatus(inv.id, "accepted");
+  await setRematchInviteStatus(inv.id, "accepted");
 
   // Notify the inviter so they can hop into the queue.
   const me_ = await db.query.playersTable.findFirst({ where: eq(playersTable.id, me) });
@@ -327,14 +327,14 @@ router.post("/battles/rematch/:id/accept", requireAuth, attachPlayer, async (req
 // ── POST /battles/rematch/:id/decline ────────────────────────────────────────
 router.post("/battles/rematch/:id/decline", requireAuth, attachPlayer, async (req, res) => {
   const me = req.playerId!;
-  const inv = getRematchInvite(String(req.params.id ?? ""));
+  const inv = await getRematchInvite(String(req.params.id ?? ""));
   if (!inv) { res.status(404).json({ error: "Invite not found or expired" }); return; }
   if (inv.toPlayerId !== me && inv.fromPlayerId !== me) {
     res.status(403).json({ error: "Not a participant" });
     return;
   }
   if (inv.status === "pending" || inv.status === "accepted") {
-    setRematchInviteStatus(inv.id, "declined");
+    await setRematchInviteStatus(inv.id, "declined");
     if (inv.toPlayerId === me) {
       // Tell the inviter their challenge was declined.
       const me_ = await db.query.playersTable.findFirst({ where: eq(playersTable.id, me) });

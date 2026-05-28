@@ -8,8 +8,9 @@ import {
   hatchlingsTable,
   notificationsTable,
   playersTable,
+  rematchInvitesTable,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq, lt, or } from "drizzle-orm";
 import {
   buildFighter,
   buildBotFighter,
@@ -52,63 +53,103 @@ export interface RematchInvite {
 }
 
 const REMATCH_TTL_MS = 5 * 60 * 1000;
-const rematchInvites = new Map<string, RematchInvite>();
+// Drop terminal/expired rows from the table this long after they expire.
+const REMATCH_CLEANUP_GRACE_MS = 60_000;
 
-function purgeExpiredRematches() {
-  const now = Date.now();
-  for (const [id, inv] of rematchInvites) {
-    if (inv.expiresAt < now && inv.status === "pending") {
-      inv.status = "expired";
-    }
-    // Drop fully terminal invites after TTL
-    if (inv.expiresAt + 60_000 < now) rematchInvites.delete(id);
+function rowToInvite(row: typeof rematchInvitesTable.$inferSelect): RematchInvite {
+  return {
+    id: row.id,
+    fromPlayerId: row.fromPlayerId,
+    toPlayerId: row.toPlayerId,
+    mode: row.mode === "ranked" ? "ranked" : "casual",
+    fromHatchlingId: row.fromHatchlingId,
+    fromHatchlingName: row.fromHatchlingName,
+    fromBattleId: row.fromBattleId,
+    createdAt: row.createdAt.getTime(),
+    expiresAt: row.expiresAt.getTime(),
+    status: row.status as RematchInvite["status"],
+  };
+}
+
+async function purgeExpiredRematches() {
+  const now = new Date();
+  try {
+    // Mark pending invites past their expiry as "expired".
+    await db.update(rematchInvitesTable)
+      .set({ status: "expired" })
+      .where(and(eq(rematchInvitesTable.status, "pending"), lt(rematchInvitesTable.expiresAt, now)));
+    // Hard-delete rows that have been expired/consumed/declined long enough.
+    const grace = new Date(now.getTime() - REMATCH_CLEANUP_GRACE_MS);
+    await db.delete(rematchInvitesTable)
+      .where(lt(rematchInvitesTable.expiresAt, grace));
+  } catch (err) {
+    logger.warn({ err }, "purgeExpiredRematches failed");
   }
 }
 
-export function createRematchInvite(input: {
+// Periodically clean up expired rows so old invites don't linger forever.
+setInterval(() => { void purgeExpiredRematches(); }, 60_000).unref?.();
+
+export async function createRematchInvite(input: {
   fromPlayerId: number;
   toPlayerId: number;
   mode: "casual" | "ranked";
   fromHatchlingId: number;
   fromHatchlingName: string;
   fromBattleId: number;
-}): RematchInvite {
-  purgeExpiredRematches();
-  const now = Date.now();
-  const invite: RematchInvite = {
-    id: randomUUID(),
+}): Promise<RematchInvite> {
+  await purgeExpiredRematches();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + REMATCH_TTL_MS);
+  const id = randomUUID();
+  const [row] = await db.insert(rematchInvitesTable).values({
+    id,
     fromPlayerId: input.fromPlayerId,
     toPlayerId: input.toPlayerId,
     mode: input.mode,
     fromHatchlingId: input.fromHatchlingId,
     fromHatchlingName: input.fromHatchlingName,
     fromBattleId: input.fromBattleId,
-    createdAt: now,
-    expiresAt: now + REMATCH_TTL_MS,
     status: "pending",
-  };
-  rematchInvites.set(invite.id, invite);
-  return invite;
+    createdAt: now,
+    expiresAt,
+  }).returning();
+  return rowToInvite(row!);
 }
 
-export function getRematchInvite(id: string): RematchInvite | null {
-  purgeExpiredRematches();
-  return rematchInvites.get(id) ?? null;
+export async function getRematchInvite(id: string): Promise<RematchInvite | null> {
+  if (!id) return null;
+  const row = await db.query.rematchInvitesTable.findFirst({
+    where: eq(rematchInvitesTable.id, id),
+  });
+  if (!row) return null;
+  // Lazily flip stale pending invites to "expired" so callers see the right status.
+  if (row.status === "pending" && row.expiresAt.getTime() < Date.now()) {
+    await db.update(rematchInvitesTable)
+      .set({ status: "expired" })
+      .where(eq(rematchInvitesTable.id, id));
+    return rowToInvite({ ...row, status: "expired" });
+  }
+  return rowToInvite(row);
 }
 
-export function listPendingRematchInvitesFor(playerId: number): RematchInvite[] {
-  purgeExpiredRematches();
-  return [...rematchInvites.values()].filter(i =>
-    (i.toPlayerId === playerId || i.fromPlayerId === playerId) &&
-    (i.status === "pending" || i.status === "accepted")
-  );
+export async function listPendingRematchInvitesFor(playerId: number): Promise<RematchInvite[]> {
+  await purgeExpiredRematches();
+  const rows = await db.query.rematchInvitesTable.findMany({
+    where: and(
+      or(eq(rematchInvitesTable.toPlayerId, playerId), eq(rematchInvitesTable.fromPlayerId, playerId)),
+      or(eq(rematchInvitesTable.status, "pending"), eq(rematchInvitesTable.status, "accepted")),
+    ),
+  });
+  return rows.map(rowToInvite);
 }
 
-export function setRematchInviteStatus(id: string, status: RematchInvite["status"]): RematchInvite | null {
-  const inv = rematchInvites.get(id);
-  if (!inv) return null;
-  inv.status = status;
-  return inv;
+export async function setRematchInviteStatus(id: string, status: RematchInvite["status"]): Promise<RematchInvite | null> {
+  const [row] = await db.update(rematchInvitesTable)
+    .set({ status })
+    .where(eq(rematchInvitesTable.id, id))
+    .returning();
+  return row ? rowToInvite(row) : null;
 }
 
 interface ActiveBattle {
@@ -323,7 +364,7 @@ async function tryMatch() {
       const b = queue[j]!;
       if (a.rematchInviteId !== b.rematchInviteId) continue;
       if (a.mode !== b.mode) continue;
-      const inv = rematchInvites.get(a.rematchInviteId);
+      const inv = await getRematchInvite(a.rematchInviteId);
       if (!inv) continue;
       const validPair =
         (inv.fromPlayerId === a.playerId && inv.toPlayerId === b.playerId) ||
@@ -333,7 +374,7 @@ async function tryMatch() {
       queue.splice(i, 1);
       queuedPlayers.delete(a.playerId);
       queuedPlayers.delete(b.playerId);
-      inv.status = "consumed";
+      await setRematchInviteStatus(inv.id, "consumed");
       await startBattle(a, b);
       return;
     }
@@ -502,7 +543,7 @@ async function handleMessage(ws: WebSocket, playerId: number, raw: string) {
     // status must still be pending/accepted (not consumed/declined/expired).
     let invite: RematchInvite | null = null;
     if (rematchInviteId) {
-      invite = getRematchInvite(rematchInviteId);
+      invite = await getRematchInvite(rematchInviteId);
       if (!invite) {
         send(ws, { type: "error", message: "Rematch invite not found or expired" });
         return;
