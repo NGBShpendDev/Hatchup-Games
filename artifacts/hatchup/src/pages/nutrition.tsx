@@ -559,13 +559,13 @@ export default function Nutrition() {
     if (!bodyScanImageUrl || !bodyScanToken) return;
     setAnalyzingBodyScan(true);
     try {
-      const payload = {
+      const payload: Parameters<typeof analyzeBodyScanMutation.mutateAsync>[0]["data"] = {
         imageUrl: bodyScanImageUrl,
         uploadToken: bodyScanToken,
-        ...(bodyScanMeta.heightCm ? { heightCm: Number(bodyScanMeta.heightCm) } : {}),
-        ...(bodyScanMeta.weightKg ? { weightKg: Number(bodyScanMeta.weightKg) } : {}),
-        ...(bodyScanMeta.gender   ? { gender: bodyScanMeta.gender }             : {}),
-      } as Parameters<typeof analyzeBodyScanMutation.mutateAsync>[0]["data"];
+      };
+      if (bodyScanMeta.heightCm) (payload as Record<string, unknown>).heightCm = Number(bodyScanMeta.heightCm);
+      if (bodyScanMeta.weightKg) (payload as Record<string, unknown>).weightKg = Number(bodyScanMeta.weightKg);
+      if (bodyScanMeta.gender)   (payload as Record<string, unknown>).gender   = bodyScanMeta.gender;
       const data = await analyzeBodyScanMutation.mutateAsync({ data: payload });
       setBodyScanResult(data as NutritionBodyScanResult);
       if (!(data as NutritionBodyScanResult).recognized) {

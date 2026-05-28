@@ -72,6 +72,7 @@ export function StreakCalendarModal({ open, onClose, playerId, onClaimed }: Prop
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetDailyStreakQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetPlayerDashboardQueryKey(playerId) });
+        triggerShieldCelebration();
       },
     },
   });

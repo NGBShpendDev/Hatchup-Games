@@ -115,6 +115,100 @@ async function setupStreakMocks(page: Page) {
   });
 }
 
+function makeBuyStreakState(purchased: boolean) {
+  return {
+    currentDay: 5,
+    streakBroken: false,
+    alreadyClaimed: false,
+    lastClaimedAt: null,
+    streakShields: purchased ? 1 : 0,
+    shieldActive: false,
+    todayReward: {
+      day: 5,
+      coins: 100,
+      xp: 45,
+      kind: "coins",
+      label: "100 Coins",
+      icon: "🪙",
+    },
+    schedule: Array.from({ length: 30 }, (_, i) => {
+      const day = i + 1;
+      return {
+        day,
+        coins: 50 + day * 10,
+        xp: 20 + day * 5,
+        kind: "coins",
+        label: `${50 + day * 10} Coins`,
+        icon: "🪙",
+      };
+    }),
+  };
+}
+
+async function setupBuyShieldMocks(page: Page) {
+  let fetchCount = 0;
+
+  await page.route("**/api/players/me/daily-streak", async (route: Route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    const purchased = fetchCount > 0;
+    fetchCount++;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(makeBuyStreakState(purchased)),
+    });
+  });
+
+  await page.route(
+    "**/api/players/me/buy-streak-shield",
+    async (route: Route) => {
+      if (route.request().method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, streakShields: 1, coinsSpent: 200 }),
+      });
+    },
+  );
+}
+
+test.describe("Streak Shield purchase via coins", () => {
+  test.skip(!!skipReason, skipReason);
+
+  test("shield count badge increments and celebration appears after clicking the buy button", async ({
+    page,
+  }) => {
+    await setupBuyShieldMocks(page);
+
+    await page.goto("/", { waitUntil: "networkidle" });
+
+    // Modal auto-opens because streak is unclaimed.
+    const claimBtn = page.getByRole("button", { name: /Claim Day/i });
+    await expect(claimBtn).toBeVisible({ timeout: 10_000 });
+
+    // Click the "200¢" buy button.
+    const buyBtn = page.getByRole("button", { name: /200¢/i });
+    await expect(buyBtn).toBeVisible({ timeout: 5_000 });
+    await buyBtn.click();
+
+    // The celebration banner must appear (triggerShieldCelebration fires on buy).
+    const banner = page.getByText("Streak Shield Earned!", { exact: false });
+    await expect(banner).toBeVisible({ timeout: 5_000 });
+
+    // After the refetch the shield count badge should show "1".
+    const shieldBadge = page
+      .locator(".text-cyan-400")
+      .filter({ hasText: /^1$/ });
+    await expect(shieldBadge).toBeVisible({ timeout: 5_000 });
+  });
+});
+
 test.describe("Streak Shield celebration banner", () => {
   test.skip(!!skipReason, skipReason);
 
