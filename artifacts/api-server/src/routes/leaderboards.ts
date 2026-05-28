@@ -277,6 +277,8 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, attachEntitlement,
 // ── GET /leaderboards/artifacts ───────────────────────────────────────────────
 // Top artifact collectors, ranked by weighted rarity score then by count.
 // Rarity weights: Celestial=7, Ancient=6, Mythic=5, Legendary=4, Epic=3, Rare=2, Common=1.
+// The weight contract is locked by services/artifactLeaderboard.ts unit tests —
+// keep the SQL CASE expression below in sync with RARITY_WEIGHTS there.
 router.get("/leaderboards/artifacts", requireAuth, attachPlayer, async (req, res) => {
   const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 50)));
   const hiddenIds = req.playerId ? await getHiddenPlayerIds(req.playerId) : [];
