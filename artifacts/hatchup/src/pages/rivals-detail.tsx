@@ -1,6 +1,8 @@
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { useQuery } from "@tanstack/react-query";
+import { useGetBattleRivalDetail, getGetBattleRivalDetailQueryKey } from "@workspace/api-client-react";
+import type { BattleRivalDetailEntry } from "@workspace/api-client-react";
 import { useRoute, useLocation, Link } from "wouter";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -16,35 +18,7 @@ import { ArrowLeft, Swords, Flame, Crown, Trophy, TrendingUp, TrendingDown, Zap,
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
-interface RivalBattle {
-  id: number;
-  createdAt: string;
-  battleMode: string;
-  outcome: "win" | "loss" | "draw";
-  viewerWon: boolean;
-  myHatchlingId: number | null;
-  myHatchlingName: string | null;
-  opponentHatchlingId: number | null;
-  opponentHatchlingName: string | null;
-  eloChange: number;
-  xpAwarded: number;
-  coinsAwarded: number;
-}
-
-interface RivalDetail {
-  opponentId: number;
-  opponentUsername: string | null;
-  opponentDisplayName: string | null;
-  opponentBattleElo: number;
-  totalBattles: number;
-  wins: number;
-  losses: number;
-  draws: number;
-  viewerEloDelta: number;
-  lastBattleId: number | null;
-  lastBattleAt: string | null;
-  battles: RivalBattle[];
-}
+type RivalBattle = BattleRivalDetailEntry;
 
 interface HatchlingLite {
   id: number;
@@ -162,15 +136,11 @@ export default function RivalsDetail() {
   const [rematchOpen, setRematchOpen] = useState(false);
   const [sending, setSending] = useState(false);
 
-  const { data, isLoading, isError, refetch } = useQuery<RivalDetail>({
-    queryKey: ["rival-detail", pid, opponentId],
-    queryFn: () =>
-      fetch(`${BASE}/api/battles/rivals/${opponentId}`, { credentials: "include" })
-        .then(async r => {
-          if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error ?? "Failed to load");
-          return r.json();
-        }),
-    enabled: !!pid && opponentId > 0,
+  const { data, isLoading, isError, refetch } = useGetBattleRivalDetail(opponentId, {
+    query: {
+      queryKey: getGetBattleRivalDetailQueryKey(opponentId),
+      enabled: !!pid && opponentId > 0,
+    },
   });
 
   const { data: myHatchlings = [] } = useQuery<HatchlingLite[]>({
