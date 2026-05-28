@@ -684,4 +684,38 @@ export async function getHiddenPlayerIds(viewerId: number): Promise<number[]> {
   return [...hidden];
 }
 
+/**
+ * Canonical people-discovery exclusion rule. Used by /players/nearby,
+ * /players/search, and /leaderboards/scoped so the safety policy lives in
+ * exactly one place.
+ *
+ * Drops any player who:
+ *   - is blocked by the viewer or has blocked the viewer (`getHiddenPlayerIds`)
+ *   - fails the visibility predicate (default: `locationVisibility === "hidden"`
+ *     is excluded; pass a custom predicate for scope-aware boards)
+ *   - is flagged as a minor account
+ *
+ * The viewer themselves is NOT removed — leaderboard surfaces need the viewer
+ * row in the result set to compute "my position / my entry". Callers that want
+ * to exclude self should do so at the query layer (e.g. `ne(players.id, me)`).
+ */
+export async function filterDiscoverableCandidates<
+  T extends { id: number; locationVisibility: string | null; isMinor: boolean | null },
+>(
+  viewerId: number | null | undefined,
+  players: T[],
+  options?: { allowVisibility?: (visibility: string | null) => boolean },
+): Promise<T[]> {
+  const blockedIds = viewerId
+    ? new Set(await getHiddenPlayerIds(viewerId))
+    : new Set<number>();
+  const allowVisibility = options?.allowVisibility ?? ((v) => v !== "hidden");
+  return players.filter(
+    (p) =>
+      !blockedIds.has(p.id) &&
+      allowVisibility(p.locationVisibility) &&
+      !p.isMinor,
+  );
+}
+
 export default router;

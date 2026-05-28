@@ -7,7 +7,7 @@ import {
 } from "@workspace/db";
 import { desc, eq, notInArray, gte, and } from "drizzle-orm";
 import { GetGlobalLeaderboardQueryParams, GetModeLeaderboardQueryParams } from "@workspace/api-zod";
-import { getHiddenPlayerIds } from "./safety.ts";
+import { getHiddenPlayerIds, filterDiscoverableCandidates } from "./safety.ts";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { attachEntitlement } from "../services/subscriptionGuards.ts";
 import { canAppearInScope } from "./locations.ts";
@@ -141,15 +141,14 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, attachEntitlement,
   //   city / neighborhood   → only city/nearby boards (NOT country/state/county)
   //   exact                 → every scope
   // This respects whatever the user set in /settings/privacy.
+  //
+  // filterDiscoverableCandidates collapses the shared blocked/hidden/minor
+  // exclusion rule into one helper (see safety.ts). We pass a scope-aware
+  // visibility predicate so this surface also honors canAppearInScope.
   const allPlayers = await db.query.playersTable.findMany();
-  // Apply visibility policy (canAppearInScope) AND exclude minors entirely
-  // from people-discovery leaderboard surfaces — matches the rule applied on
-  // /players/nearby and /players/search.
-  const basePlayers = allPlayers.filter(p => canAppearInScope(p.locationVisibility, scope) && !p.isMinor);
-
-  // Also exclude blocked/hidden users (block list applies to all scopes)
-  const hiddenIds = req.playerId ? await getHiddenPlayerIds(req.playerId) : [];
-  const blockedSet = new Set(hiddenIds);
+  const basePlayers = await filterDiscoverableCandidates(req.playerId, allPlayers, {
+    allowVisibility: (v) => canAppearInScope(v, scope),
+  });
 
   // ── Scope filter: find player IDs within the geographic scope ─────────────
   let eligiblePlayerIds: Set<number> | null = null;
@@ -198,7 +197,6 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, attachEntitlement,
   // ── Build final player list ───────────────────────────────────────────────
   // For world scope: includes ALL players. For location scopes: only non-hidden.
   let filteredPlayers = basePlayers.filter(p => {
-    if (blockedSet.has(p.id)) return false;
     if (eligiblePlayerIds !== null && !eligiblePlayerIds.has(p.id)) return false;
     return true;
   });

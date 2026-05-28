@@ -3,7 +3,7 @@ import { createDecipheriv, createHash } from "crypto";
 import { db } from "@workspace/db";
 import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable, eggsTable, fitnessActivitiesTable, playerBadgesTable, playerArtifactsTable, artifactsTable, playerLocationTable, groupMembersTable, groupsTable } from "@workspace/db";
 import { eq, desc, and, gte, or, ilike, ne, inArray } from "drizzle-orm";
-import { getHiddenPlayerIds } from "./safety.ts";
+import { filterDiscoverableCandidates } from "./safety.ts";
 import {
   CreatePlayerBody,
   UpdatePlayerBody,
@@ -112,14 +112,11 @@ router.get("/players/search", requireAuth, attachPlayer, async (req, res) => {
     orderBy: (t, { asc }) => [asc(t.username)],
   });
 
-  // Apply the same canAppearInScope-style filtering used by /players/nearby:
-  //   - exclude users blocked by the viewer or who have blocked the viewer
-  //   - exclude visibility=hidden (they opted out of people-discovery surfaces)
-  //   - exclude minors entirely from people-discovery surfaces
-  const hiddenIds = viewerId ? new Set(await getHiddenPlayerIds(viewerId)) : new Set<number>();
-  const rows = rawRows
-    .filter(p => !hiddenIds.has(p.id) && p.locationVisibility !== "hidden" && !p.isMinor)
-    .slice(0, limit);
+  // Apply the canonical people-discovery exclusion rule (blocked /
+  // hidden-visibility / minor accounts). See filterDiscoverableCandidates
+  // in safety.ts — the same helper is used by /players/nearby and
+  // /leaderboards/scoped so the policy lives in exactly one place.
+  const rows = (await filterDiscoverableCandidates(viewerId, rawRows)).slice(0, limit);
 
   // Compute shared groups (viewer ∩ each match) so the invite picker can
   // surface "Also in <group> with you" — same trust signal as the social
@@ -245,21 +242,15 @@ router.get("/players/nearby", requireAuth, attachPlayer, async (req, res) => {
   }
 
   const candidateIds = candidates.map(c => c.playerId);
-  const hiddenIds = new Set(await getHiddenPlayerIds(viewerId));
 
   const candidatePlayers = await db.query.playersTable.findMany({
     where: inArray(playersTable.id, candidateIds),
   });
 
-  // Privacy filters:
-  //   - exclude blocked (either direction)
-  //   - exclude visibility=hidden (per canAppearInScope policy)
-  //   - exclude minors entirely from people-discovery surfaces
-  const allowed = candidatePlayers.filter(p =>
-    !hiddenIds.has(p.id) &&
-    p.locationVisibility !== "hidden" &&
-    !p.isMinor,
-  );
+  // Canonical people-discovery exclusion rule: blocked / hidden-visibility /
+  // minor accounts. Shared with /players/search and /leaderboards/scoped via
+  // filterDiscoverableCandidates in safety.ts.
+  const allowed = await filterDiscoverableCandidates(viewerId, candidatePlayers);
 
   // Compute distance buckets — only when BOTH sides opted into "exact" visibility.
   const key = deriveLocationKey();

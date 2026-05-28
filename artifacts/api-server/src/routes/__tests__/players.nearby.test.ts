@@ -73,6 +73,18 @@ mock.module("@clerk/express", {
 mock.module("../safety.ts", {
   namedExports: {
     getHiddenPlayerIds: async (_viewerId: number) => state.hiddenIds,
+    // Mirror the real helper in safety.ts so the route's shared exclusion
+    // call (blocked / hidden-visibility / minor) is exercised under the same
+    // in-memory state the rest of this suite uses.
+    filterDiscoverableCandidates: async <T extends { id: number; locationVisibility: string | null; isMinor: boolean | null }>(
+      _viewerId: number | null | undefined,
+      players: T[],
+      options?: { allowVisibility?: (v: string | null) => boolean },
+    ): Promise<T[]> => {
+      const blocked = new Set(state.hiddenIds);
+      const allow = options?.allowVisibility ?? ((v: string | null) => v !== "hidden");
+      return players.filter(p => !blocked.has(p.id) && allow(p.locationVisibility) && !p.isMinor);
+    },
   },
 });
 
