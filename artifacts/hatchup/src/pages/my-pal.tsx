@@ -19,7 +19,7 @@ import { GlowBadge } from "@/components/ui/glow-badge";
 import { motion, useAnimation } from "framer-motion";
 import {
   Heart, Zap, Coffee, Star, Shield, TrendingUp, Footprints,
-  Swords, ChevronLeft, ChevronRight, ArrowLeft,
+  Swords, ChevronLeft, ChevronRight, ArrowLeft, AlertTriangle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -486,6 +486,32 @@ export default function MyPalPage() {
               </Button>
             </div>
           </GlassCard>
+        )}
+
+        {/* Motivation warning banner */}
+        {motivationScore < 30 && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+            className="flex items-center gap-3 mb-5 px-4 py-3 rounded-2xl border border-red-500/50 bg-red-950/40"
+            style={{ boxShadow: "0 0 20px #ef444430" }}
+          >
+            <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-black text-red-400">Your Pal needs training!</p>
+              <p className="text-[11px] text-red-300/70 mt-0.5">
+                Motivation is critically low ({motivationScore}/100). Log a workout to restore it.
+              </p>
+            </div>
+            <NeonButton
+              size="sm"
+              className="shrink-0 bg-red-600/30 border-red-500/50 text-red-300 hover:bg-red-600/50"
+              onClick={() => setLocation("/training")}
+            >
+              Train Now
+            </NeonButton>
+          </motion.div>
         )}
 
         {/* Hero card */}

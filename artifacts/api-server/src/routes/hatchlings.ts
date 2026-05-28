@@ -105,25 +105,56 @@ async function applyPassiveDecay(h: DecayableHatchling): Promise<DecayableHatchl
   const newHunger    = Math.max(0, h.hunger    - drop);
   const newEnergy    = Math.max(0, h.energy    - drop);
 
-  // Motivation decay: if the player has gone >24h without a workout,
-  // motivation drops 1 pt per 4 extra hours beyond the 24h threshold.
+  // Motivation decay: ~5 pts/hr when lastWorkoutAt > 24h.
+  // Uses a separate motivationDecayAt guard so frequent reads don't churn writes
+  // independently of the vitals decay cadence.
+  //
+  // Baseline for elapsed time is ALWAYS clamped to the 24h threshold
+  // (lastWorkoutAt + GRACE) so grace-window reads never pre-accumulate time
+  // that would over-penalize on the first overdue check.
   const MOTIVATION_GRACE_MS = 24 * 60 * 60 * 1000;
-  const lastWorkoutMs = h.lastWorkoutAt?.getTime() ?? 0;
-  const overdueMs = Math.max(0, now.getTime() - lastWorkoutMs - MOTIVATION_GRACE_MS);
-  const motivationDrop = Math.floor(overdueMs / (4 * 60 * 60 * 1000));
-  const newMotivation = motivationDrop > 0
-    ? Math.max(0, (h.motivationScore ?? 50) - Math.min(motivationDrop, drop))
-    : (h.motivationScore ?? 50);
+  const MOTIVATION_RATE_PER_HOUR = 5;
+  // Skip motivation decay until the player has logged at least one workout.
+  // Epoch fallback (??0) would make all never-trained pals immediately overdue.
+  const thresholdMs = h.lastWorkoutAt
+    ? h.lastWorkoutAt.getTime() + MOTIVATION_GRACE_MS
+    : Infinity;
+  const isMotivationOverdue = now.getTime() > thresholdMs;
 
-  const decayPatch = motivationDrop > 0
-    ? { happiness: newHappiness, hunger: newHunger, energy: newEnergy, lastDecayAt: now, motivationScore: newMotivation }
-    : { happiness: newHappiness, hunger: newHunger, energy: newEnergy, lastDecayAt: now };
+  let newMotivation = h.motivationScore ?? 50;
+  let newMotivationDecayAt: Date | null | undefined = h.motivationDecayAt;
+  let motivationChanged = false;
 
-  await db.update(hatchlingsTable)
-    .set(decayPatch)
-    .where(eq(hatchlingsTable.id, h.id));
+  if (isMotivationOverdue) {
+    // Clamp reference to threshold so pre-grace time is never counted.
+    // If motivationDecayAt is already set (a previous overdue decay ran), use
+    // whichever is later: the stored timestamp or the threshold.
+    const motivDecayRef = Math.max(
+      h.motivationDecayAt?.getTime() ?? thresholdMs,
+      thresholdMs,
+    );
+    const motivElapsedMs = Math.max(0, now.getTime() - motivDecayRef);
+    const motivRawDrop = (motivElapsedMs / MS_PER_HOUR) * MOTIVATION_RATE_PER_HOUR;
+    if (motivRawDrop >= 1) {
+      newMotivation = Math.max(0, newMotivation - Math.floor(motivRawDrop));
+      newMotivationDecayAt = now;
+      motivationChanged = true;
+    }
+  }
+  // Grace window: do NOT touch motivationDecayAt — leave it null/stale so
+  // the first overdue read always measures from the 24h threshold.
 
-  return { ...h, happiness: newHappiness, hunger: newHunger, energy: newEnergy, motivationScore: newMotivation, lastDecayAt: now };
+  if (motivationChanged) {
+    await db.update(hatchlingsTable)
+      .set({ happiness: newHappiness, hunger: newHunger, energy: newEnergy, lastDecayAt: now, motivationScore: newMotivation, motivationDecayAt: newMotivationDecayAt })
+      .where(eq(hatchlingsTable.id, h.id));
+  } else {
+    await db.update(hatchlingsTable)
+      .set({ happiness: newHappiness, hunger: newHunger, energy: newEnergy, lastDecayAt: now })
+      .where(eq(hatchlingsTable.id, h.id));
+  }
+
+  return { ...h, happiness: newHappiness, hunger: newHunger, energy: newEnergy, motivationScore: newMotivation, motivationDecayAt: newMotivationDecayAt ?? null, lastDecayAt: now };
 }
 
 router.get("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
@@ -310,6 +341,8 @@ router.patch("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
       // Loyalty grows with each workout; motivation resets toward 100
       (updateData as Record<string, unknown>).loyaltyScore = Math.min(100, (current.loyaltyScore ?? 50) + 3);
       (updateData as Record<string, unknown>).motivationScore = Math.min(100, (current.motivationScore ?? 50) + 10);
+      // Reset the motivation decay clock so the 24h grace window starts fresh
+      (updateData as Record<string, unknown>).motivationDecayAt = new Date();
     }
   }
 

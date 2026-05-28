@@ -40,6 +40,7 @@ export const hatchlingsTable = pgTable("hatchlings", {
   battleWins: integer("battle_wins").notNull().default(0),
   // Passive decay accounting + nutrition buff modifier
   lastDecayAt: timestamp("last_decay_at", { withTimezone: true }),
+  motivationDecayAt: timestamp("motivation_decay_at", { withTimezone: true }),
   nutritionBuffExpiresAt: timestamp("nutrition_buff_expires_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

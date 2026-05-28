@@ -92,6 +92,23 @@ export default function MyPalScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: bottomPad + 40 }}
           showsVerticalScrollIndicator={false}
         >
+          {/* Motivation warning banner */}
+          {(pal.motivationScore ?? 50) < 30 && (
+            <Pressable
+              onPress={() => router.push("/training" as any)}
+              style={styles.motivationBanner}
+            >
+              <Feather name="alert-triangle" size={18} color="#ef4444" />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.motivationBannerTitle}>Your Pal needs training!</Text>
+                <Text style={styles.motivationBannerBody}>
+                  Motivation is critically low ({pal.motivationScore ?? 0}/100). Tap to train now.
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={16} color="#ef4444" />
+            </Pressable>
+          )}
+
           {/* Hero */}
           <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: rarityColor + "66" }]}>
             <View style={[styles.heroAura, { backgroundColor: rarityColor + "18" }]}>
@@ -191,4 +208,11 @@ const styles = StyleSheet.create({
   actionsRow: { flexDirection: "row", gap: 10 },
   actionBtn: { flex: 1, borderRadius: 14, borderWidth: 1, paddingVertical: 14, alignItems: "center", gap: 6 },
   actionLabel: { fontSize: 11, fontWeight: "700" },
+  motivationBanner: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: "#450a0a", borderColor: "#ef444466", borderWidth: 1.5,
+    borderRadius: 14, padding: 14, marginBottom: 14,
+  },
+  motivationBannerTitle: { fontSize: 13, fontWeight: "800", color: "#ef4444" },
+  motivationBannerBody: { fontSize: 11, color: "#fca5a5", lineHeight: 15 },
 });
