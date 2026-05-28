@@ -124,6 +124,7 @@ import type {
   ListIdentityPaths200,
   ListItemsParams,
   ListMutualFollowersParams,
+  ListMutualFollowingParams,
   ListMyGroupsParams,
   ListNearbyPlayers200,
   ListNearbyPlayersParams,
@@ -145,6 +146,7 @@ import type {
   MemoryPost,
   ModerationError,
   MutualFollowersPage,
+  MutualFollowingPage,
   Notification,
   NutritionAnalyzeInput,
   NutritionAnalyzeResult,
@@ -7901,6 +7903,95 @@ export function useListMutualFollowers<TData = Awaited<ReturnType<typeof listMut
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListMutualFollowersQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListMutualFollowingUrl = (id: number,
+    params: ListMutualFollowingParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/social/players/${id}/mutual-following?${stringifiedParams}` : `/api/social/players/${id}/mutual-following`
+}
+
+/**
+ * @summary List all accounts that both the viewer and this player follow
+ */
+export const listMutualFollowing = async (id: number,
+    params: ListMutualFollowingParams, options?: RequestInit): Promise<MutualFollowingPage> => {
+
+  return customFetch<MutualFollowingPage>(getListMutualFollowingUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMutualFollowingQueryKey = (id: number,
+    params?: ListMutualFollowingParams,) => {
+    return [
+    `/api/social/players/${id}/mutual-following`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMutualFollowingQueryOptions = <TData = Awaited<ReturnType<typeof listMutualFollowing>>, TError = ErrorType<unknown>>(id: number,
+    params: ListMutualFollowingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMutualFollowing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMutualFollowingQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMutualFollowing>>> = ({ signal }) => listMutualFollowing(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMutualFollowing>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMutualFollowingQueryResult = NonNullable<Awaited<ReturnType<typeof listMutualFollowing>>>
+export type ListMutualFollowingQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all accounts that both the viewer and this player follow
+ */
+
+export function useListMutualFollowing<TData = Awaited<ReturnType<typeof listMutualFollowing>>, TError = ErrorType<unknown>>(
+ id: number,
+    params: ListMutualFollowingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMutualFollowing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMutualFollowingQueryOptions(id,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

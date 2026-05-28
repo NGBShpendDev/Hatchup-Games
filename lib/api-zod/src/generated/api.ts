@@ -2693,6 +2693,14 @@ export const GetPlayerSocialProfileResponse = zod.object({
 })).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n')
 })).describe('Up to 3 followers of this player that the viewer also follows.'),
   "mutualFollowersTotal": zod.number().describe('Total number of mutual followers (not limited to the preview list).'),
+  "mutualFollowing": zod.array(zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
+})).describe('Up to 3 accounts that both the viewer and this player follow.'),
+  "mutualFollowingTotal": zod.number().describe('Total number of accounts both the viewer and this player follow (not limited to the preview list).'),
   "sharedGroups": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string()
@@ -2748,6 +2756,35 @@ export const ListMutualFollowersResponse = zod.object({
   "id": zod.number(),
   "name": zod.string()
 })).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n')
+})),
+  "total": zod.number(),
+  "nextCursor": zod.number().nullable()
+})
+
+
+/**
+ * @summary List all accounts that both the viewer and this player follow
+ */
+export const ListMutualFollowingParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const listMutualFollowingQueryCursorDefault = 0;
+export const listMutualFollowingQueryLimitDefault = 20;
+
+export const ListMutualFollowingQueryParams = zod.object({
+  "viewerId": zod.coerce.number(),
+  "cursor": zod.coerce.number().default(listMutualFollowingQueryCursorDefault).describe('Offset (number of items to skip).'),
+  "limit": zod.coerce.number().default(listMutualFollowingQueryLimitDefault)
+})
+
+export const ListMutualFollowingResponse = zod.object({
+  "players": zod.array(zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullable(),
+  "avatarUrl": zod.string().nullable(),
+  "creatorBadge": zod.string().nullable()
 })),
   "total": zod.number(),
   "nextCursor": zod.number().nullable()

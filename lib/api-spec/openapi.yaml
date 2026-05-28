@@ -2280,6 +2280,41 @@ paths:
               schema:
                 $ref: "#/components/schemas/MutualFollowersPage"
 
+  /social/players/{id}/mutual-following:
+    get:
+      operationId: listMutualFollowing
+      tags: [social]
+      summary: List all accounts that both the viewer and this player follow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: viewerId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          description: Offset (number of items to skip).
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Paginated mutual following
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MutualFollowingPage"
+
   /social/players/{id}/following:
     get:
       operationId: listFollowing
@@ -4835,6 +4870,8 @@ components:
         - memory
         - mutualFollowers
         - mutualFollowersTotal
+        - mutualFollowing
+        - mutualFollowingTotal
         - sharedGroups
       properties:
         player:
@@ -4858,6 +4895,14 @@ components:
         mutualFollowersTotal:
           type: integer
           description: Total number of mutual followers (not limited to the preview list).
+        mutualFollowing:
+          type: array
+          description: Up to 3 accounts that both the viewer and this player follow.
+          items:
+            $ref: "#/components/schemas/PlayerStub"
+        mutualFollowingTotal:
+          type: integer
+          description: Total number of accounts both the viewer and this player follow (not limited to the preview list).
         sharedGroups:
           type: array
           description: Groups that both the viewer and this player are members of.
@@ -4865,6 +4910,17 @@ components:
             $ref: "#/components/schemas/SharedGroup"
 
     MutualFollowersPage:
+      type: object
+      required: [players, total, nextCursor]
+      properties:
+        players:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlayerStub"
+        total:      { type: integer }
+        nextCursor: { type: ["integer", "null"] }
+
+    MutualFollowingPage:
       type: object
       required: [players, total, nextCursor]
       properties:

@@ -17,6 +17,8 @@ import {
   getGetPlayerSocialProfileQueryKey,
   useListMutualFollowers,
   getListMutualFollowersQueryKey,
+  useListMutualFollowing,
+  getListMutualFollowingQueryKey,
   useDiscoverPlayers,
   getDiscoverPlayersQueryKey,
   useSearchDiscoverablePlayers,
@@ -43,6 +45,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Users,
   Plus,
@@ -91,9 +99,11 @@ function ProfileModal({
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [mutualSheetOpen, setMutualSheetOpen] = useState(false);
+  const [mutualFollowingSheetOpen, setMutualFollowingSheetOpen] = useState(false);
 
   function handleViewMutualProfile(targetId: number) {
     setMutualSheetOpen(false);
+    setMutualFollowingSheetOpen(false);
     onClose();
     setLocation(`/players/${targetId}`);
   }
@@ -221,6 +231,68 @@ function ProfileModal({
               </div>
             )}
 
+            {/* Mutual following */}
+            {profileId !== viewerId && profile.mutualFollowing && profile.mutualFollowing.length > 0 && (
+              <div className="bg-muted/30 border border-border/40 rounded-2xl p-3" data-testid="section-mutual-following">
+                <div className="flex items-center gap-2 mb-2">
+                  <UserPlus className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                    Also followed by you and them
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex -space-x-2">
+                    {profile.mutualFollowing.map(m => (
+                      <Avatar key={m.id} className="h-7 w-7 border-2 border-background">
+                        <AvatarImage src={m.avatarUrl ?? undefined} />
+                        <AvatarFallback className="text-[10px] font-bold bg-primary/20">
+                          {(m.username ?? "?").substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    ))}
+                  </div>
+                  <p className="text-xs font-bold flex-1">
+                    {(() => {
+                      const names = profile.mutualFollowing.map(m => m.displayName ?? m.username);
+                      const total = profile.mutualFollowingTotal ?? names.length;
+                      const extra = total - names.length;
+                      const joined = names.length === 1
+                        ? names[0]
+                        : names.length === 2
+                          ? `${names[0]} and ${names[1]}`
+                          : `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+                      if (extra > 0) {
+                        return (
+                          <>
+                            <span>You both follow {names.slice(0, -1).join(", ")}{names.length > 1 ? ", " : ""}{names[names.length - 1]} </span>
+                            <button
+                              className="text-primary hover:underline"
+                              data-testid="link-mutual-following-more"
+                              onClick={() => setMutualFollowingSheetOpen(true)}
+                            >
+                              and {extra} {extra === 1 ? "other" : "others"}
+                            </button>
+                          </>
+                        );
+                      }
+                      return (
+                        <>
+                          <span>You both follow {joined} </span>
+                          <button
+                            className="text-primary hover:underline"
+                            data-testid="link-mutual-following-see-all"
+                            onClick={() => setMutualFollowingSheetOpen(true)}
+                          >
+                            See all
+                          </button>
+                        </>
+                      );
+                    })()}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Shared groups */}
             {profileId !== viewerId && profile.sharedGroups && profile.sharedGroups.length > 0 && (
               <div className="bg-muted/30 border border-border/40 rounded-2xl p-3" data-testid="section-shared-groups">
@@ -279,6 +351,13 @@ function ProfileModal({
       viewerId={viewerId}
       open={mutualSheetOpen}
       onClose={() => setMutualSheetOpen(false)}
+      onViewProfile={handleViewMutualProfile}
+    />
+    <MutualFollowingSheet
+      profileId={profileId}
+      viewerId={viewerId}
+      open={mutualFollowingSheetOpen}
+      onClose={() => setMutualFollowingSheetOpen(false)}
       onViewProfile={handleViewMutualProfile}
     />
     </>
@@ -409,6 +488,144 @@ function MutualFollowersSheet({
               variant="ghost"
               className="w-full rounded-xl font-bold mt-2"
               data-testid="button-load-more-mutual-followers"
+              disabled={isFetching}
+              onClick={() => {
+                if (data?.nextCursor != null) setCursor(data.nextCursor);
+              }}
+            >
+              {isFetching ? "Loading..." : "Load more"}
+            </Button>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function MutualFollowingSheet({
+  profileId,
+  viewerId,
+  open,
+  onClose,
+  onViewProfile,
+}: {
+  profileId: number;
+  viewerId: number;
+  open: boolean;
+  onClose: () => void;
+  onViewProfile: (pid: number) => void;
+}) {
+  const [cursor, setCursor] = useState(0);
+  const [accumulated, setAccumulated] = useState<Array<{
+    id: number;
+    username: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    creatorBadge: string | null;
+  }>>([]);
+
+  useEffect(() => {
+    if (open) {
+      setCursor(0);
+      setAccumulated([]);
+    }
+  }, [open, profileId, viewerId]);
+
+  const { data, isLoading, isFetching } = useListMutualFollowing(
+    profileId,
+    { viewerId, cursor, limit: 20 },
+    {
+      query: {
+        queryKey: getListMutualFollowingQueryKey(profileId, { viewerId, cursor, limit: 20 }),
+        enabled: open && !!profileId && !!viewerId && profileId !== viewerId,
+      },
+    },
+  );
+
+  useEffect(() => {
+    if (!data) return;
+    setAccumulated(prev => {
+      const seen = new Set(prev.map(p => p.id));
+      const next = [...prev];
+      for (const p of data.players) {
+        if (!seen.has(p.id)) {
+          next.push(p);
+          seen.add(p.id);
+        }
+      }
+      return next;
+    });
+  }, [data]);
+
+  const total = data?.total ?? accumulated.length;
+  const hasMore = data?.nextCursor != null;
+
+  return (
+    <Sheet open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-3xl" data-testid="sheet-mutual-following">
+        <SheetHeader>
+          <SheetTitle className="text-lg font-black flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-primary" />
+            Also followed by you and them
+            {total > 0 && (
+              <span className="text-xs font-bold text-muted-foreground">({total})</span>
+            )}
+          </SheetTitle>
+        </SheetHeader>
+
+        <div className="mt-4 space-y-2">
+          {isLoading && accumulated.length === 0 ? (
+            <>
+              <Skeleton className="h-14 w-full rounded-2xl" />
+              <Skeleton className="h-14 w-full rounded-2xl" />
+              <Skeleton className="h-14 w-full rounded-2xl" />
+            </>
+          ) : accumulated.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No shared follows found.
+            </p>
+          ) : (
+            accumulated.map(m => (
+              <div
+                key={m.id}
+                className="flex items-center gap-3 bg-muted/30 border border-border/40 rounded-2xl p-3"
+                data-testid={`row-mutual-following-${m.id}`}
+              >
+                <Avatar className="h-10 w-10 border border-primary/40">
+                  <AvatarImage src={m.avatarUrl ?? undefined} />
+                  <AvatarFallback className="font-black text-xs">
+                    {(m.username ?? "?").substring(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-black text-sm truncate">{m.displayName ?? m.username}</p>
+                    {m.creatorBadge && (
+                      <Badge className="bg-gradient-to-r from-yellow-500 to-amber-400 text-black text-[9px] font-black px-1 py-0">
+                        <Award className="w-2 h-2 mr-0.5" /> Creator
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground truncate">@{m.username}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-xl font-bold text-xs h-8"
+                  data-testid={`button-view-mutual-following-${m.id}`}
+                  onClick={() => onViewProfile(m.id)}
+                >
+                  View profile
+                </Button>
+              </div>
+            ))
+          )}
+
+          {hasMore && (
+            <Button
+              variant="ghost"
+              className="w-full rounded-xl font-bold mt-2"
+              data-testid="button-load-more-mutual-following"
               disabled={isFetching}
               onClick={() => {
                 if (data?.nextCursor != null) setCursor(data.nextCursor);

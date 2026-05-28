@@ -839,41 +839,63 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
   const memory = await getMemoryForPlayer(id, enrichedPosts);
 
   // Mutual followers: people the viewer follows who also follow this profile.
-  let mutualFollowers: Array<{
+  type PlayerStub = {
     id: number;
     username: string;
     displayName: string | null;
     avatarUrl: string | null;
     creatorBadge: string | null;
-  }> = [];
+  };
+  let mutualFollowers: PlayerStub[] = [];
   let mutualFollowersTotal = 0;
+  let mutualFollowing: PlayerStub[] = [];
+  let mutualFollowingTotal = 0;
   if (viewerId !== id) {
     const viewerFollowsRows = await db.query.playerFollowsTable.findMany({
       where: eq(playerFollowsTable.followerId, viewerId),
     });
     const viewerFollows = new Set(viewerFollowsRows.map(f => f.followeeId));
-    const mutualIds = followers
+    const mutualFollowerIds = followers
       .map(f => f.followerId)
       .filter(fid => fid !== viewerId && viewerFollows.has(fid));
-    mutualFollowersTotal = mutualIds.length;
-    if (mutualIds.length > 0) {
-      const previewIds = mutualIds.slice(0, 3);
+    mutualFollowersTotal = mutualFollowerIds.length;
+
+    // Mutual following: accounts that both the viewer and this player follow.
+    const profileFollows = new Set(following.map(f => f.followeeId));
+    const mutualFollowingIds = Array.from(viewerFollows).filter(
+      fid => fid !== viewerId && fid !== id && profileFollows.has(fid),
+    );
+    mutualFollowingTotal = mutualFollowingIds.length;
+
+    const previewFollowerIds = mutualFollowerIds.slice(0, 3);
+    const previewFollowingIds = mutualFollowingIds.slice(0, 3);
+    const allPreviewIds = Array.from(new Set([...previewFollowerIds, ...previewFollowingIds]));
+    const previewMap = new Map<number, typeof playersTable.$inferSelect>();
+    if (allPreviewIds.length > 0) {
       const previewRows = await db.query.playersTable.findMany({
-        where: inArray(playersTable.id, previewIds),
+        where: inArray(playersTable.id, allPreviewIds),
       });
-      const previewMap = new Map(previewRows.map(p => [p.id, p]));
-      mutualFollowers = previewIds.flatMap(pid => {
-        const p = previewMap.get(pid);
-        if (!p) return [];
-        return [{
-          id: p.id,
-          username: p.username,
-          displayName: p.displayName ?? null,
-          avatarUrl: p.avatarUrl ?? null,
-          creatorBadge: p.creatorBadge ?? null,
-        }];
-      });
+      for (const p of previewRows) previewMap.set(p.id, p);
     }
+    const toStub = (pid: number): PlayerStub | null => {
+      const p = previewMap.get(pid);
+      if (!p) return null;
+      return {
+        id: p.id,
+        username: p.username,
+        displayName: p.displayName ?? null,
+        avatarUrl: p.avatarUrl ?? null,
+        creatorBadge: p.creatorBadge ?? null,
+      };
+    };
+    mutualFollowers = previewFollowerIds.flatMap(pid => {
+      const s = toStub(pid);
+      return s ? [s] : [];
+    });
+    mutualFollowing = previewFollowingIds.flatMap(pid => {
+      const s = toStub(pid);
+      return s ? [s] : [];
+    });
   }
 
   // Shared groups: groups where both viewer and profile are members.
@@ -915,6 +937,8 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
     memory,
     mutualFollowers,
     mutualFollowersTotal,
+    mutualFollowing,
+    mutualFollowingTotal,
     sharedGroups,
   });
 });
@@ -946,6 +970,67 @@ router.get("/social/players/:id/mutual-followers", requireAuth, attachPlayer, as
   const mutualIds = profileFollowers
     .map(f => f.followerId)
     .filter(fid => fid !== viewerId && viewerFollows.has(fid));
+
+  const total = mutualIds.length;
+  const pageIds = mutualIds.slice(cursor, cursor + limit);
+  const nextOffset = cursor + pageIds.length;
+  const nextCursor = nextOffset < total ? nextOffset : null;
+
+  let players: Array<{
+    id: number;
+    username: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    creatorBadge: string | null;
+  }> = [];
+  if (pageIds.length > 0) {
+    const rows = await db.query.playersTable.findMany({
+      where: inArray(playersTable.id, pageIds),
+    });
+    const map = new Map(rows.map(p => [p.id, p]));
+    players = pageIds.flatMap(pid => {
+      const p = map.get(pid);
+      if (!p) return [];
+      return [{
+        id: p.id,
+        username: p.username,
+        displayName: p.displayName ?? null,
+        avatarUrl: p.avatarUrl ?? null,
+        creatorBadge: p.creatorBadge ?? null,
+      }];
+    });
+  }
+
+  res.json({ players, total, nextCursor });
+});
+
+// ── GET /social/players/:id/mutual-following ───────────────────────────────
+
+router.get("/social/players/:id/mutual-following", requireAuth, attachPlayer, async (req, res) => {
+  const id = Number(req.params.id);
+  const viewerId = Number(req.query.viewerId);
+  const cursor = Math.max(0, Number(req.query.cursor) || 0);
+  const limit = Math.min(Math.max(1, Number(req.query.limit) || 20), 100);
+
+  if (!Number.isFinite(id) || !Number.isFinite(viewerId)) {
+    res.status(400).json({ error: "id and viewerId are required" });
+    return;
+  }
+
+  if (viewerId === id) {
+    res.json({ players: [], total: 0, nextCursor: null });
+    return;
+  }
+
+  const [profileFollowsRows, viewerFollowsRows] = await Promise.all([
+    db.query.playerFollowsTable.findMany({ where: eq(playerFollowsTable.followerId, id) }),
+    db.query.playerFollowsTable.findMany({ where: eq(playerFollowsTable.followerId, viewerId) }),
+  ]);
+
+  const profileFollows = new Set(profileFollowsRows.map(f => f.followeeId));
+  const mutualIds = viewerFollowsRows
+    .map(f => f.followeeId)
+    .filter(fid => fid !== viewerId && fid !== id && profileFollows.has(fid));
 
   const total = mutualIds.length;
   const pageIds = mutualIds.slice(cursor, cursor + limit);

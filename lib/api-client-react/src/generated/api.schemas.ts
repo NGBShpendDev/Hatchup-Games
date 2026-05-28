@@ -1344,11 +1344,22 @@ export interface PlayerSocialProfile {
   mutualFollowers: PlayerStub[];
   /** Total number of mutual followers (not limited to the preview list). */
   mutualFollowersTotal: number;
+  /** Up to 3 accounts that both the viewer and this player follow. */
+  mutualFollowing: PlayerStub[];
+  /** Total number of accounts both the viewer and this player follow (not limited to the preview list). */
+  mutualFollowingTotal: number;
   /** Groups that both the viewer and this player are members of. */
   sharedGroups: SharedGroup[];
 }
 
 export interface MutualFollowersPage {
+  players: PlayerStub[];
+  total: number;
+  /** @nullable */
+  nextCursor: number | null;
+}
+
+export interface MutualFollowingPage {
   players: PlayerStub[];
   total: number;
   /** @nullable */
@@ -2203,6 +2214,15 @@ viewerId?: number;
 };
 
 export type ListMutualFollowersParams = {
+viewerId: number;
+/**
+ * Offset (number of items to skip).
+ */
+cursor?: number;
+limit?: number;
+};
+
+export type ListMutualFollowingParams = {
 viewerId: number;
 /**
  * Offset (number of items to skip).
