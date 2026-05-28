@@ -223,6 +223,8 @@ mock.module("@workspace/db", {
     moderationAuditLogTable: { id: {}, actorId: {}, action: {}, targetPlayerId: {}, targetReportId: {}, reason: {}, metadata: {}, createdAt: {} },
     accountAppealsTable: { id: {}, playerId: {}, status: {}, reason: {}, decision: {}, decidedByAdminId: {}, decidedAt: {}, createdAt: {} },
     notificationsTable: { id: {}, playerId: {}, type: {}, title: {}, body: {}, link: {}, sourceId: {}, createdAt: {} },
+    bouncedEmailsTable: { id: {}, email: {}, bounceType: {}, reason: {}, source: {}, bouncedAt: {}, createdAt: {} },
+    accountAppealsTable: { id: {}, playerId: {}, status: {}, reason: {}, createdAt: {}, resolvedAt: {} },
   },
 });
 

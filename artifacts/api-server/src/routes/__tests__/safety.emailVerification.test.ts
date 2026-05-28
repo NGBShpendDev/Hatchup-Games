@@ -85,6 +85,7 @@ mock.module("drizzle-orm", {
     or: (...parts: Record<string, unknown>[]) => ({ __or: parts }),
     desc: () => ({}),
     lt: () => ({}),
+    gt: () => ({}),
     notInArray: () => ({}),
     inArray: () => ({}),
   },
@@ -222,6 +223,8 @@ mock.module("@workspace/db", {
     notificationsTable: { id: {}, playerId: {}, type: {}, title: {}, body: {}, link: {}, sourceId: {}, createdAt: {} },
     bouncedEmailsTable: { id: {}, email: {} },
     emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
+    notificationsTable: { id: {}, playerId: {}, type: {}, title: {}, body: {}, link: {}, sourceId: {}, createdAt: {} },
+    accountAppealsTable: { id: {}, playerId: {}, status: {}, reason: {}, createdAt: {}, resolvedAt: {} },
   },
 });
 
