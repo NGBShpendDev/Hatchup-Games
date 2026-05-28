@@ -204,6 +204,7 @@ export default function SettingsPrivacy() {
           weeklyRecapDayOfWeek: recapDay,
           weeklyRecapHourLocal: recapHour,
           weeklyRecapTzOffsetMinutes: -new Date().getTimezoneOffset(),
+          weeklyRecapTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
       if (res.ok) {

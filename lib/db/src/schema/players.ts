@@ -91,6 +91,7 @@ export const playersTable = pgTable("players", {
   weeklyRecapDayOfWeek: integer("weekly_recap_day_of_week").notNull().default(0),
   weeklyRecapHourLocal: integer("weekly_recap_hour_local").notNull().default(9),
   weeklyRecapTzOffsetMinutes: integer("weekly_recap_tz_offset_minutes").notNull().default(0),
+  weeklyRecapTimezone: text("weekly_recap_timezone"),
   // Transactional email
   email: text("email"),
   notifyRecapEmail: boolean("notify_recap_email").notNull().default(true),

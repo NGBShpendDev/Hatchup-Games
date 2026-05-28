@@ -162,6 +162,7 @@ router.get("/players/:id/privacy-settings", requireAuth, attachPlayer, async (re
     weeklyRecapDayOfWeek: player.weeklyRecapDayOfWeek,
     weeklyRecapHourLocal: player.weeklyRecapHourLocal,
     weeklyRecapTzOffsetMinutes: player.weeklyRecapTzOffsetMinutes,
+    weeklyRecapTimezone: player.weeklyRecapTimezone,
     email: player.email,
     notifyRecapEmail: player.notifyRecapEmail,
   });
@@ -187,6 +188,7 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     weeklyRecapDayOfWeek?: unknown;
     weeklyRecapHourLocal?: unknown;
     weeklyRecapTzOffsetMinutes?: unknown;
+    weeklyRecapTimezone?: unknown;
     email?: unknown;
     notifyRecapEmail?: unknown;
   };
@@ -243,6 +245,24 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
       return;
     }
     updates.weeklyRecapTzOffsetMinutes = tz;
+  }
+  if (body.weeklyRecapTimezone !== undefined) {
+    const raw = body.weeklyRecapTimezone;
+    if (raw === null || raw === "") {
+      updates.weeklyRecapTimezone = null;
+    } else if (typeof raw === "string" && raw.length <= 64) {
+      // Validate against the host's ICU database. Unknown IANA names throw.
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: raw });
+        updates.weeklyRecapTimezone = raw;
+      } catch {
+        res.status(400).json({ error: "Invalid weeklyRecapTimezone" });
+        return;
+      }
+    } else {
+      res.status(400).json({ error: "Invalid weeklyRecapTimezone" });
+      return;
+    }
   }
   if (body.email !== undefined) {
     const raw = body.email;

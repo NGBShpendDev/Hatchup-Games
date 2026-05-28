@@ -22,6 +22,7 @@ async function runRecapTick(now: Date = new Date()): Promise<void> {
       weeklyRecapDayOfWeek: true,
       weeklyRecapHourLocal: true,
       weeklyRecapTzOffsetMinutes: true,
+      weeklyRecapTimezone: true,
     },
   });
 
@@ -32,6 +33,7 @@ async function runRecapTick(now: Date = new Date()): Promise<void> {
       dayOfWeek: p.weeklyRecapDayOfWeek,
       hourLocal: p.weeklyRecapHourLocal,
       tzOffsetMinutes: p.weeklyRecapTzOffsetMinutes,
+      timezone: p.weeklyRecapTimezone,
     });
     if (!due) continue;
     considered += 1;
