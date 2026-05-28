@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useGetPlayer, useGetFitnessStats } from "@workspace/api-client-react";
+import { useGetPlayer, useGetFitnessStats, useGetPlayerSocialProfile } from "@workspace/api-client-react";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
@@ -69,6 +69,7 @@ export default function ProfileScreen() {
 
   const { data: player, isLoading } = useGetPlayer(PLAYER_ID);
   const { data: fitnessStats } = useGetFitnessStats(PLAYER_ID);
+  const { data: socialProfile } = useGetPlayerSocialProfile(PLAYER_ID, { viewerId: PLAYER_ID });
 
   async function handleShare() {
     if (!player?.username) return;
@@ -120,17 +121,28 @@ export default function ProfileScreen() {
         {/* Quick Stats */}
         <View style={styles.quickStats}>
           {[
-            { label: "XP", value: (player?.xp ?? 0).toLocaleString() },
-            { label: "Wins", value: String(player?.totalWins ?? 0) },
-            { label: "Streak", value: `${player?.currentStreak ?? 0}d` },
-            { label: "Steps", value: (player?.totalSteps ?? 0).toLocaleString() },
+            { label: "XP", value: (player?.xp ?? 0).toLocaleString(), route: null },
+            { label: "Wins", value: String(player?.totalWins ?? 0), route: null },
+            { label: "Followers", value: (socialProfile?.followerCount ?? 0).toLocaleString(), route: "/followers" },
+            { label: "Following", value: (socialProfile?.followingCount ?? 0).toLocaleString(), route: "/following" },
           ].map((s, i) => (
             <React.Fragment key={s.label}>
               {i > 0 && <View style={[styles.statDivider, { backgroundColor: colors.border }]} />}
-              <View style={styles.quickStat}>
-                <Text style={[styles.quickStatValue, { color: colors.foreground }]}>{s.value}</Text>
-                <Text style={[styles.quickStatLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
-              </View>
+              {s.route ? (
+                <Pressable
+                  style={styles.quickStat}
+                  onPress={() => router.push(s.route as any)}
+                  testID={`button-open-${s.label.toLowerCase()}-list`}
+                >
+                  <Text style={[styles.quickStatValue, { color: colors.foreground }]}>{s.value}</Text>
+                  <Text style={[styles.quickStatLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
+                </Pressable>
+              ) : (
+                <View style={styles.quickStat}>
+                  <Text style={[styles.quickStatValue, { color: colors.foreground }]}>{s.value}</Text>
+                  <Text style={[styles.quickStatLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
+                </View>
+              )}
             </React.Fragment>
           ))}
         </View>
