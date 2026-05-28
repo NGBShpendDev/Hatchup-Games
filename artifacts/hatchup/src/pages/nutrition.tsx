@@ -9,8 +9,32 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
 import { useToast } from "@/hooks/use-toast";
-import { Heart, MessageCircle, Zap, ChefHat, Plus, X, Sparkles, Droplets, Flame, Dumbbell, MoreHorizontal, Compass, Trophy, Camera, Loader2, Target } from "lucide-react";
+import { Heart, MessageCircle, Zap, ChefHat, Plus, X, Sparkles, Droplets, Flame, Dumbbell, MoreHorizontal, Compass, Trophy, Camera, Loader2, Target, Pencil, Trash2 } from "lucide-react";
 import { ReportBlockMenu } from "@/components/report-block-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ErrorCard } from "@/components/error-card";
 import { errorMessage } from "@/lib/errorMessage";
 import { HatchlingReaction, type HatchlingReactionData } from "@/components/hatchling-reaction";
@@ -20,6 +44,8 @@ import {
   useListNutritionPosts,
   useCreateMealPost,
   useToggleMealPostLike,
+  useUpdateMealPost,
+  useDeleteMealPost,
   useListMealPostComments,
   useAddMealPostComment,
   useAnalyzeMealDescription,
@@ -1138,9 +1164,170 @@ function MealCard({ post, index, onLike }: { post: MealPost; index: number; onLi
   const tag = TAG_MAP[post.tag];
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: post.name,
+    tag: post.tag,
+    emoji: post.emoji,
+    description: post.description ?? "",
+    calories: post.calories?.toString() ?? "",
+    proteinG: post.proteinG?.toString() ?? "",
+    carbsG: post.carbsG?.toString() ?? "",
+    fatG: post.fatG?.toString() ?? "",
+  });
+  // Image edit state. `editImageUrl` tracks the current desired imageUrl
+  // for the post (null = remove existing photo, undefined = leave unchanged).
+  // `editUploadToken` is non-null only when a brand-new upload happened in
+  // this edit session — the server requires it whenever imageUrl changes
+  // to a new /objects/ path.
+  const [editImageUrl, setEditImageUrl] = useState<string | null | undefined>(undefined);
+  const [editUploadToken, setEditUploadToken] = useState<string | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+  const [editUploadingImage, setEditUploadingImage] = useState(false);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
   const { playerId } = usePlayer();
   const { toast } = useToast();
+  const qc = useQueryClient();
   const pid = playerId ?? 0;
+
+  const EDIT_MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+  const EDIT_ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+  const handleEditImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!EDIT_ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      toast({ title: "Unsupported image", description: "Use JPG, PNG, WebP, or GIF.", variant: "destructive" });
+      return;
+    }
+    if (file.size > EDIT_MAX_IMAGE_BYTES) {
+      toast({ title: "Image too large", description: "Max size is 8 MB.", variant: "destructive" });
+      return;
+    }
+    setEditUploadingImage(true);
+    const localPreview = URL.createObjectURL(file);
+    setEditImagePreview(localPreview);
+    try {
+      const res = await fetch(`${BASE}/api/storage/uploads/request-url`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+      });
+      if (!res.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath, uploadToken: token } = await res.json();
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      if (!putRes.ok) throw new Error("Upload failed");
+      setEditImageUrl(objectPath);
+      setEditUploadToken(token ?? null);
+      toast({ title: "Photo ready", description: "Save changes to update your meal." });
+    } catch {
+      setEditImagePreview(null);
+      setEditImageUrl(undefined);
+      setEditUploadToken(null);
+      toast({ title: "Upload failed", description: "Try a different photo.", variant: "destructive" });
+    } finally {
+      setEditUploadingImage(false);
+      if (editFileInputRef.current) editFileInputRef.current.value = "";
+    }
+  };
+
+  const clearEditImage = () => {
+    setEditImageUrl(null);
+    setEditUploadToken(null);
+    setEditImagePreview(null);
+    if (editFileInputRef.current) editFileInputRef.current.value = "";
+  };
+
+  const revertEditImage = () => {
+    setEditImageUrl(undefined);
+    setEditUploadToken(null);
+    setEditImagePreview(null);
+    if (editFileInputRef.current) editFileInputRef.current.value = "";
+  };
+
+  const updateMutation = useUpdateMealPost({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ predicate: (q) =>
+          Array.isArray(q.queryKey) && typeof q.queryKey[0] === "string" && q.queryKey[0].startsWith("/api/nutrition/posts"),
+        });
+        toast({ title: "Meal updated" });
+        setEditOpen(false);
+      },
+      onError: (err) =>
+        toast({ title: "Couldn't update meal", description: errorMessage(err, "Try again in a moment."), variant: "destructive" }),
+    },
+  });
+
+  const deleteMutation = useDeleteMealPost({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ predicate: (q) =>
+          Array.isArray(q.queryKey) && typeof q.queryKey[0] === "string" && q.queryKey[0].startsWith("/api/nutrition/posts"),
+        });
+        toast({ title: "Meal deleted" });
+        setDeleteOpen(false);
+      },
+      onError: (err) =>
+        toast({ title: "Couldn't delete meal", description: errorMessage(err, "Try again in a moment."), variant: "destructive" }),
+    },
+  });
+
+  const openEdit = () => {
+    setEditForm({
+      name: post.name,
+      tag: post.tag,
+      emoji: post.emoji,
+      description: post.description ?? "",
+      calories: post.calories?.toString() ?? "",
+      proteinG: post.proteinG?.toString() ?? "",
+      carbsG: post.carbsG?.toString() ?? "",
+      fatG: post.fatG?.toString() ?? "",
+    });
+    setEditImageUrl(undefined);
+    setEditUploadToken(null);
+    setEditImagePreview(null);
+    setEditOpen(true);
+  };
+
+  const submitEdit = () => {
+    const name = editForm.name.trim();
+    if (!name) {
+      toast({ title: "Name required", variant: "destructive" });
+      return;
+    }
+    const numOrNull = (s: string) => {
+      const t = s.trim();
+      if (t === "") return null;
+      const n = Number(t);
+      return Number.isFinite(n) ? n : null;
+    };
+    const data: Parameters<typeof updateMutation.mutate>[0]["data"] = {
+      name,
+      tag: editForm.tag,
+      emoji: editForm.emoji || "🍽️",
+      description: editForm.description.trim() === "" ? null : editForm.description.trim(),
+      calories: numOrNull(editForm.calories),
+      proteinG: numOrNull(editForm.proteinG),
+      carbsG:   numOrNull(editForm.carbsG),
+      fatG:     numOrNull(editForm.fatG),
+    };
+    // Only include imageUrl if the user actually changed it during this edit.
+    // undefined = leave alone, null = remove existing photo, string = new upload.
+    if (editImageUrl !== undefined) {
+      data.imageUrl = editImageUrl;
+      if (typeof editImageUrl === "string" && editUploadToken) {
+        data.uploadToken = editUploadToken;
+      }
+    }
+    updateMutation.mutate({ id: post.id, data });
+  };
 
   const {
     data: comments = [],
@@ -1188,7 +1375,7 @@ function MealCard({ post, index, onLike }: { post: MealPost; index: number; onLi
         {tag && (
           <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${tag.color}`}>{tag.label}</span>
         )}
-        {!isOwnPost && (
+        {!isOwnPost ? (
           <ReportBlockMenu
             targetPlayerId={post.playerId}
             targetName={authorName}
@@ -1200,6 +1387,31 @@ function MealCard({ post, index, onLike }: { post: MealPost; index: number; onLi
               </button>
             }
           />
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="text-muted-foreground hover:text-foreground p-1 -mr-1" aria-label="Edit or delete this meal post">
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-card border-border w-44">
+              <DropdownMenuItem
+                onClick={openEdit}
+                className="flex items-center gap-2 cursor-pointer"
+              >
+                <Pencil className="w-4 h-4" />
+                Edit meal
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setDeleteOpen(true)}
+                className="flex items-center gap-2 text-red-400 focus:text-red-400 cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete meal
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
 
@@ -1295,6 +1507,171 @@ function MealCard({ post, index, onLike }: { post: MealPost; index: number; onLi
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Edit dialog (owner only) */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="bg-card max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-black">
+              <Pencil className="w-4 h-4 text-primary" />
+              Edit meal
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Name</label>
+              <input
+                type="text"
+                value={editForm.name}
+                onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                className="w-full mt-1 bg-muted/40 border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                maxLength={100}
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Tag</label>
+              <select
+                value={editForm.tag}
+                onChange={e => setEditForm(f => ({ ...f, tag: e.target.value }))}
+                className="w-full mt-1 bg-muted/40 border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                {MEAL_TAGS.map(t => (
+                  <option key={t.key} value={t.key}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Photo</label>
+              <div className="mt-1 flex items-center gap-3">
+                <div className="w-20 h-20 rounded-xl bg-muted/40 overflow-hidden flex items-center justify-center text-2xl border border-border shrink-0">
+                  {editImagePreview ? (
+                    <img src={editImagePreview} alt="" className="w-full h-full object-cover" />
+                  ) : editImageUrl === null ? (
+                    <span className="text-muted-foreground">{editForm.emoji || "🍽️"}</span>
+                  ) : post.imageUrl ? (
+                    <img src={`${BASE}/api/storage${post.imageUrl}`} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-muted-foreground">{editForm.emoji || "🍽️"}</span>
+                  )}
+                </div>
+                <div className="flex-1 flex flex-wrap gap-2">
+                  <input
+                    ref={editFileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    onChange={handleEditImagePick}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => editFileInputRef.current?.click()}
+                    disabled={editUploadingImage || updateMutation.isPending}
+                    className="gap-1.5"
+                  >
+                    {editUploadingImage ? (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading…</>
+                    ) : (
+                      <><Camera className="w-3.5 h-3.5" /> {post.imageUrl || editImageUrl ? "Replace photo" : "Add photo"}</>
+                    )}
+                  </Button>
+                  {/* "Remove" is offered when there's currently a photo on the post
+                      OR when a new upload was added in this session. */}
+                  {(editImageUrl !== null && (post.imageUrl || typeof editImageUrl === "string")) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={clearEditImage}
+                      disabled={editUploadingImage || updateMutation.isPending}
+                      className="gap-1.5 text-red-400"
+                    >
+                      <X className="w-3.5 h-3.5" /> Remove
+                    </Button>
+                  )}
+                  {/* "Undo" lets the user back out of a pending change without saving. */}
+                  {editImageUrl !== undefined && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={revertEditImage}
+                      disabled={editUploadingImage || updateMutation.isPending}
+                      className="text-muted-foreground"
+                    >
+                      Undo change
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Description</label>
+              <textarea
+                value={editForm.description}
+                onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                rows={2}
+                className="w-full mt-1 bg-muted/40 border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                maxLength={2000}
+              />
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {([
+                ["calories", "kcal"],
+                ["proteinG", "P (g)"],
+                ["carbsG",   "C (g)"],
+                ["fatG",     "F (g)"],
+              ] as const).map(([key, label]) => (
+                <div key={key}>
+                  <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">{label}</label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={editForm[key]}
+                    onChange={e => setEditForm(f => ({ ...f, [key]: e.target.value }))}
+                    className="w-full mt-1 bg-muted/40 border border-border rounded-xl px-2 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)} className="flex-1" disabled={updateMutation.isPending}>Cancel</Button>
+            <Button onClick={submitEdit} disabled={updateMutation.isPending} className="flex-1 font-black">
+              {updateMutation.isPending ? "Saving..." : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent className="bg-card">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 font-black">
+              <Trash2 className="w-4 h-4 text-red-400" />
+              Delete this meal?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove "{post.name}" along with any likes and comments. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                deleteMutation.mutate({ id: post.id });
+              }}
+              disabled={deleteMutation.isPending}
+              className="bg-red-600 hover:bg-red-500 text-white font-black"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 }

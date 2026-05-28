@@ -2116,6 +2116,81 @@ export interface CreateMealPostResult {
   dailyMacroReward: MealDailyMacroReward | null;
 }
 
+/**
+ * All fields are optional. Send only what you want to change. Pass `null`
+to clear `imageUrl`, `description`, or any macro. `uploadToken` is
+required when changing `imageUrl` to a new `/objects/` path.
+
+ */
+export interface UpdateMealPostInput {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  name?: string;
+  /** @maxLength 16 */
+  emoji?: string;
+  /** @maxLength 64 */
+  tag?: string;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  description?: string | null;
+  /**
+     * Object path returned by `/storage/uploads/request-url`, or null to remove the image. Must start with `/objects/` when non-null.
+     * @maxLength 500
+     * @nullable
+     */
+  imageUrl?: string | null;
+  /**
+     * HMAC token issued alongside the presigned upload URL. Required when `imageUrl` is being changed to a new value.
+     * @minLength 1
+     * @maxLength 256
+     */
+  uploadToken?: string;
+  /** @nullable */
+  calories?: number | null;
+  /** @nullable */
+  proteinG?: number | null;
+  /** @nullable */
+  carbsG?: number | null;
+  /** @nullable */
+  fatG?: number | null;
+}
+
+/**
+ * Raw meal post row as stored in the database, without viewer-specific fields.
+ */
+export interface MealPostRecord {
+  id: number;
+  playerId: number;
+  /** @nullable */
+  imageUrl?: string | null;
+  emoji: string;
+  name: string;
+  tag: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  calories?: number | null;
+  /** @nullable */
+  proteinG?: number | null;
+  /** @nullable */
+  carbsG?: number | null;
+  /** @nullable */
+  fatG?: number | null;
+  aiAnalyzed: boolean;
+  likesCount: number;
+  commentsCount: number;
+  createdAt: string;
+}
+
+export interface DeleteMealPostResult {
+  deleted: boolean;
+  id: number;
+}
+
 export interface MealLikeResult {
   liked: boolean;
   likesCount: number;

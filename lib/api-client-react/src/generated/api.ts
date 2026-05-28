@@ -67,6 +67,7 @@ import type {
   CreateMealPostInput,
   CreateMealPostResult,
   CreatePostInput,
+  DeleteMealPostResult,
   DeletePostCommentParams,
   DeletePostParams,
   DiscoverPlayersParams,
@@ -168,6 +169,7 @@ import type {
   MealLikeResult,
   MealPlan,
   MealPostFeedPage,
+  MealPostRecord,
   MemoryPost,
   ModerationError,
   MutualFollowersPage,
@@ -232,6 +234,7 @@ import type {
   ToggleOwnedArtifactBody,
   TrendingPage,
   UnsubscribePushBody,
+  UpdateMealPostInput,
   UploadUrlRequest,
   UploadUrlResponse,
   UpsertNotificationBody,
@@ -11900,6 +11903,156 @@ export const useCreateMealPost = <TError = ErrorType<StorageErrorEnvelope>,
         TContext
       > => {
       return useMutation(getCreateMealPostMutationOptions(options));
+    }
+
+export const getUpdateMealPostUrl = (id: number,) => {
+
+
+
+
+  return `/api/nutrition/posts/${id}`
+}
+
+/**
+ * Owner-only edit. Any subset of name/emoji/tag/description/macros/imageUrl
+may be supplied. Changing the image requires a fresh uploadToken (same
+HMAC verification used when creating a meal post).
+
+ * @summary Edit your own meal post
+ */
+export const updateMealPost = async (id: number,
+    updateMealPostInput: UpdateMealPostInput, options?: RequestInit): Promise<MealPostRecord> => {
+
+  return customFetch<MealPostRecord>(getUpdateMealPostUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateMealPostInput,)
+  }
+);}
+
+
+
+
+export const getUpdateMealPostMutationOptions = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMealPost>>, TError,{id: number;data: BodyType<UpdateMealPostInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateMealPost>>, TError,{id: number;data: BodyType<UpdateMealPostInput>}, TContext> => {
+
+const mutationKey = ['updateMealPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateMealPost>>, {id: number;data: BodyType<UpdateMealPostInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateMealPost(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateMealPostMutationResult = NonNullable<Awaited<ReturnType<typeof updateMealPost>>>
+    export type UpdateMealPostMutationBody = BodyType<UpdateMealPostInput>
+    export type UpdateMealPostMutationError = ErrorType<StorageErrorEnvelope>
+
+    /**
+ * @summary Edit your own meal post
+ */
+export const useUpdateMealPost = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMealPost>>, TError,{id: number;data: BodyType<UpdateMealPostInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateMealPost>>,
+        TError,
+        {id: number;data: BodyType<UpdateMealPostInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateMealPostMutationOptions(options));
+    }
+
+export const getDeleteMealPostUrl = (id: number,) => {
+
+
+
+
+  return `/api/nutrition/posts/${id}`
+}
+
+/**
+ * Owner-only delete. Also removes any likes and comments attached to the
+post. The 404 envelope shape matches the rest of the storage error
+responses for consistency.
+
+ * @summary Delete your own meal post
+ */
+export const deleteMealPost = async (id: number, options?: RequestInit): Promise<DeleteMealPostResult> => {
+
+  return customFetch<DeleteMealPostResult>(getDeleteMealPostUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteMealPostMutationOptions = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMealPost>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMealPost>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteMealPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMealPost>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteMealPost(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMealPostMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMealPost>>>
+
+    export type DeleteMealPostMutationError = ErrorType<StorageErrorEnvelope>
+
+    /**
+ * @summary Delete your own meal post
+ */
+export const useDeleteMealPost = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMealPost>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMealPost>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteMealPostMutationOptions(options));
     }
 
 export const getToggleMealPostLikeUrl = (id: number,) => {

@@ -545,6 +545,103 @@ router.get("/nutrition/posts", requireAuth, attachPlayer, async (req, res) => {
   });
 });
 
+// ── PATCH /nutrition/posts/:id ────────────────────────────────────────────────
+// Owner-only edit. Any subset of name/tag/description/macros/imageUrl may be
+// supplied. Changing the image requires a fresh uploadToken (same HMAC check
+// used by create) so a user can't swap in someone else's uploaded object.
+const UpdateMealPostBody = z.object({
+  name:        z.string().min(1).max(100).optional(),
+  emoji:       z.string().max(16).optional(),
+  tag:         z.string().max(64).optional(),
+  description: z.string().max(2000).nullable().optional(),
+  imageUrl:    z.union([
+    z.string().regex(/^\/objects\//, "imageUrl must be an /objects/ path").max(500),
+    z.null(),
+  ]).optional(),
+  uploadToken: z.string().min(1).max(256).optional(),
+  calories:    z.number().nullable().optional(),
+  proteinG:    z.number().nullable().optional(),
+  carbsG:      z.number().nullable().optional(),
+  fatG:        z.number().nullable().optional(),
+});
+
+router.patch("/nutrition/posts/:id", requireAuth, attachPlayer, async (req, res) => {
+  const postId = Number(req.params.id);
+  if (!Number.isInteger(postId)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const playerId = req.playerId!;
+
+  const body = UpdateMealPostBody.safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
+
+  const existing = await db.query.mealPostsTable.findFirst({ where: eq(mealPostsTable.id, postId) });
+  if (!existing) { res.status(404).json({ error: "Meal post not found" }); return; }
+  if (existing.playerId !== playerId) { res.status(403).json({ error: "Not your meal post" }); return; }
+
+  const { name, emoji, tag, description, imageUrl, uploadToken, calories, proteinG, carbsG, fatG } = body.data;
+
+  // If the imageUrl is being changed to a new object path, verify the upload
+  // token and flip the ACL to public — same flow as create.
+  const imageChanging = imageUrl !== undefined && imageUrl !== existing.imageUrl;
+  if (imageChanging && typeof imageUrl === "string") {
+    if (!uploadToken || !verifyUploadToken(imageUrl, req.clerkUserId!, uploadToken)) {
+      res.status(403).json({ error: "Invalid or missing uploadToken for imageUrl" });
+      return;
+    }
+    try {
+      await objectStorageService.trySetObjectEntityAclPolicy(imageUrl, {
+        owner: req.clerkUserId!,
+        visibility: "public",
+      });
+    } catch (err) {
+      req.log.error({ err, imageUrl }, "Failed to set ACL on updated meal image");
+      res.status(400).json({ error: "Image upload not found or expired" });
+      return;
+    }
+  }
+
+  const patch: Partial<typeof mealPostsTable.$inferInsert> = {};
+  if (name        !== undefined) patch.name        = name;
+  if (emoji       !== undefined) patch.emoji       = emoji;
+  if (tag         !== undefined) patch.tag         = tag;
+  if (description !== undefined) patch.description = description;
+  if (imageUrl    !== undefined) patch.imageUrl    = imageUrl;
+  if (calories    !== undefined) patch.calories    = calories;
+  if (proteinG    !== undefined) patch.proteinG    = proteinG;
+  if (carbsG      !== undefined) patch.carbsG      = carbsG;
+  if (fatG        !== undefined) patch.fatG        = fatG;
+
+  if (Object.keys(patch).length === 0) {
+    res.json({ ...existing, createdAt: existing.createdAt.toISOString() });
+    return;
+  }
+
+  const [updated] = await db.update(mealPostsTable)
+    .set(patch)
+    .where(eq(mealPostsTable.id, postId))
+    .returning();
+
+  res.json({ ...updated!, createdAt: updated!.createdAt.toISOString() });
+});
+
+// ── DELETE /nutrition/posts/:id ───────────────────────────────────────────────
+// Owner-only. Removes the post and any likes/comments attached to it. The
+// child tables don't have FK cascades, so we delete them explicitly first.
+router.delete("/nutrition/posts/:id", requireAuth, attachPlayer, async (req, res) => {
+  const postId = Number(req.params.id);
+  if (!Number.isInteger(postId)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const playerId = req.playerId!;
+
+  const existing = await db.query.mealPostsTable.findFirst({ where: eq(mealPostsTable.id, postId) });
+  if (!existing) { res.status(404).json({ error: "Meal post not found" }); return; }
+  if (existing.playerId !== playerId) { res.status(403).json({ error: "Not your meal post" }); return; }
+
+  await db.delete(mealLikesTable).where(eq(mealLikesTable.mealPostId, postId));
+  await db.delete(mealCommentsTable).where(eq(mealCommentsTable.mealPostId, postId));
+  await db.delete(mealPostsTable).where(eq(mealPostsTable.id, postId));
+
+  res.json({ deleted: true, id: postId });
+});
+
 // ── POST /nutrition/posts/:id/like ────────────────────────────────────────────
 // Concurrency-safe toggle: only decrement/increment when the row actually
 // changed in this request (use .returning() on insert/delete to confirm a

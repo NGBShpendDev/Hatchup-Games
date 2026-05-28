@@ -3425,6 +3425,86 @@ paths:
               schema:
                 $ref: "#/components/schemas/StorageErrorEnvelope"
 
+  /nutrition/posts/{id}:
+    patch:
+      operationId: updateMealPost
+      tags: [nutrition]
+      summary: Edit your own meal post
+      description: |
+        Owner-only edit. Any subset of name/emoji/tag/description/macros/imageUrl
+        may be supplied. Changing the image requires a fresh uploadToken (same
+        HMAC verification used when creating a meal post).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMealPostInput"
+      responses:
+        "200":
+          description: Updated meal post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MealPostRecord"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+        "403":
+          description: Not the owner, or invalid uploadToken for imageUrl
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+        "404":
+          description: Meal post not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+    delete:
+      operationId: deleteMealPost
+      tags: [nutrition]
+      summary: Delete your own meal post
+      description: |
+        Owner-only delete. Also removes any likes and comments attached to the
+        post. The 404 envelope shape matches the rest of the storage error
+        responses for consistency.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Meal post deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteMealPostResult"
+        "403":
+          description: Not the owner of the meal post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+        "404":
+          description: Meal post not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageErrorEnvelope"
+
   /nutrition/posts/{id}/like:
     post:
       operationId: toggleMealPostLike
@@ -6404,6 +6484,68 @@ components:
           oneOf:
             - $ref: "#/components/schemas/MealDailyMacroReward"
             - type: "null"
+
+    UpdateMealPostInput:
+      type: object
+      description: |
+        All fields are optional. Send only what you want to change. Pass `null`
+        to clear `imageUrl`, `description`, or any macro. `uploadToken` is
+        required when changing `imageUrl` to a new `/objects/` path.
+      properties:
+        name:        { type: string, minLength: 1, maxLength: 100 }
+        emoji:       { type: string, maxLength: 16 }
+        tag:         { type: string, maxLength: 64 }
+        description: { type: ["string", "null"], maxLength: 2000 }
+        imageUrl:
+          type: ["string", "null"]
+          description: Object path returned by `/storage/uploads/request-url`, or null to remove the image. Must start with `/objects/` when non-null.
+          maxLength: 500
+        uploadToken:
+          type: string
+          description: HMAC token issued alongside the presigned upload URL. Required when `imageUrl` is being changed to a new value.
+          minLength: 1
+          maxLength: 256
+        calories: { type: ["number", "null"] }
+        proteinG: { type: ["number", "null"] }
+        carbsG:   { type: ["number", "null"] }
+        fatG:     { type: ["number", "null"] }
+
+    MealPostRecord:
+      type: object
+      description: Raw meal post row as stored in the database, without viewer-specific fields.
+      required:
+        - id
+        - playerId
+        - emoji
+        - name
+        - tag
+        - aiAnalyzed
+        - likesCount
+        - commentsCount
+        - createdAt
+      properties:
+        id:            { type: integer }
+        playerId:      { type: integer }
+        imageUrl:      { type: ["string", "null"] }
+        emoji:         { type: string }
+        name:          { type: string }
+        tag:           { type: string }
+        description:   { type: ["string", "null"] }
+        calories:      { type: ["integer", "null"] }
+        proteinG:      { type: ["number", "null"] }
+        carbsG:        { type: ["number", "null"] }
+        fatG:          { type: ["number", "null"] }
+        aiAnalyzed:    { type: boolean }
+        likesCount:    { type: integer }
+        commentsCount: { type: integer }
+        createdAt:     { type: string }
+
+    DeleteMealPostResult:
+      type: object
+      required: [deleted, id]
+      properties:
+        deleted: { type: boolean }
+        id:      { type: integer }
 
     MealLikeResult:
       type: object

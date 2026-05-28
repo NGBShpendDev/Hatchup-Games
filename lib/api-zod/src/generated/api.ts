@@ -4014,6 +4014,80 @@ export const CreateMealPostBody = zod.object({
 
 
 /**
+ * Owner-only edit. Any subset of name/emoji/tag/description/macros/imageUrl
+may be supplied. Changing the image requires a fresh uploadToken (same
+HMAC verification used when creating a meal post).
+
+ * @summary Edit your own meal post
+ */
+export const UpdateMealPostParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const updateMealPostBodyNameMax = 100;
+
+export const updateMealPostBodyEmojiMax = 16;
+
+export const updateMealPostBodyTagMax = 64;
+
+export const updateMealPostBodyDescriptionMax = 2000;
+
+export const updateMealPostBodyImageUrlMax = 500;
+
+export const updateMealPostBodyUploadTokenMax = 256;
+
+
+
+export const UpdateMealPostBody = zod.object({
+  "name": zod.string().min(1).max(updateMealPostBodyNameMax).optional(),
+  "emoji": zod.string().max(updateMealPostBodyEmojiMax).optional(),
+  "tag": zod.string().max(updateMealPostBodyTagMax).optional(),
+  "description": zod.string().max(updateMealPostBodyDescriptionMax).nullish(),
+  "imageUrl": zod.string().max(updateMealPostBodyImageUrlMax).nullish().describe('Object path returned by `\/storage\/uploads\/request-url`, or null to remove the image. Must start with `\/objects\/` when non-null.'),
+  "uploadToken": zod.string().min(1).max(updateMealPostBodyUploadTokenMax).optional().describe('HMAC token issued alongside the presigned upload URL. Required when `imageUrl` is being changed to a new value.'),
+  "calories": zod.number().nullish(),
+  "proteinG": zod.number().nullish(),
+  "carbsG": zod.number().nullish(),
+  "fatG": zod.number().nullish()
+}).describe('All fields are optional. Send only what you want to change. Pass `null`\nto clear `imageUrl`, `description`, or any macro. `uploadToken` is\nrequired when changing `imageUrl` to a new `\/objects\/` path.\n')
+
+export const UpdateMealPostResponse = zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "imageUrl": zod.string().nullish(),
+  "emoji": zod.string(),
+  "name": zod.string(),
+  "tag": zod.string(),
+  "description": zod.string().nullish(),
+  "calories": zod.number().nullish(),
+  "proteinG": zod.number().nullish(),
+  "carbsG": zod.number().nullish(),
+  "fatG": zod.number().nullish(),
+  "aiAnalyzed": zod.boolean(),
+  "likesCount": zod.number(),
+  "commentsCount": zod.number(),
+  "createdAt": zod.string()
+}).describe('Raw meal post row as stored in the database, without viewer-specific fields.')
+
+
+/**
+ * Owner-only delete. Also removes any likes and comments attached to the
+post. The 404 envelope shape matches the rest of the storage error
+responses for consistency.
+
+ * @summary Delete your own meal post
+ */
+export const DeleteMealPostParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteMealPostResponse = zod.object({
+  "deleted": zod.boolean(),
+  "id": zod.number()
+})
+
+
+/**
  * Idempotent toggle: liking an already-liked post unlikes it. The likes
 counter on the post is updated atomically and never drops below zero.
 
