@@ -36,6 +36,9 @@ const state = {
   groupMembers: [] as GroupMemberRow[],
   // The currently-authenticated player (matched via clerkId by attachPlayer).
   currentClerkId: "u_viewer",
+  // Player ids the safety helper should treat as hidden from the viewer
+  // (block-list, either direction). Per-test override.
+  hiddenIds: [] as number[],
 };
 
 function resetState() {
@@ -44,6 +47,7 @@ function resetState() {
   state.groups = [];
   state.groupMembers = [];
   state.currentClerkId = "u_viewer";
+  state.hiddenIds = [];
 }
 
 function seedPlayer(p: Partial<PlayerRow> & { id: number; clerkId: string; username: string }): PlayerRow {
@@ -105,7 +109,7 @@ mock.module("../../services/postPurgeJob.ts", {
   const expressMod = (await import("express")).default;
   mock.module("../safety.ts", {
     namedExports: {
-      getHiddenPlayerIds: async () => [] as number[],
+      getHiddenPlayerIds: async () => [...state.hiddenIds],
       filterDiscoverableCandidates: async (_viewerId: number, rows: any[]) =>
         rows.filter((r: any) => r?.locationVisibility !== "hidden" && r?.isMinor !== true),
     },
@@ -860,6 +864,88 @@ describe("mutualWorkoutPartners on GET /social/players/:id/following", () => {
     assert.deepEqual(body.players[0].mutualWorkoutPartners, [
       { id: 3, displayName: "Partner Pat" },
     ]);
+  });
+});
+
+describe("mutualWorkoutPartners on GET /social/players/:id/profile", () => {
+  it("surfaces mutual workout partners on the profile payload", async () => {
+    seedMutualPartnerTriad();
+    // Treat the candidate (2) as the profile being viewed. Viewer (1) is the
+    // caller. Partner (3) trained with both, so the profile must expose them.
+    const { res, body } = await getJson("/social/players/2/profile");
+    assert.equal(res.status, 200);
+    assert.deepEqual(body.mutualWorkoutPartners, [
+      { id: 3, displayName: "Partner Pat" },
+    ]);
+  });
+
+  it("caps mutualWorkoutPartners at the preview limit (3) and dedups across groups", async () => {
+    // Viewer (1) and profile (2) share two groups (100, 101) with five other
+    // members who all logged co-workouts in BOTH groups. The profile preview
+    // must dedup repeats and cap the list at 3.
+    seedPlayer({ id: 1, clerkId: "u_viewer", username: "viewer" });
+    seedPlayer({ id: 2, clerkId: "u_profile", username: "profile" });
+    seedGroup(100, "G1");
+    seedGroup(101, "G2");
+    seedGroupMember(1, 100, 1);
+    seedGroupMember(2, 100, 1);
+    seedGroupMember(1, 101, 1);
+    seedGroupMember(2, 101, 1);
+    for (let i = 10; i < 15; i++) {
+      seedPlayer({ id: i, clerkId: `u_p${i}`, username: `p${i}`, displayName: `P${i}` });
+      seedGroupMember(i, 100, 1);
+      seedGroupMember(i, 101, 1);
+    }
+
+    const { res, body } = await getJson("/social/players/2/profile");
+    assert.equal(res.status, 200);
+    const partners = body.mutualWorkoutPartners as Array<{ id: number; displayName: string }>;
+    assert.equal(partners.length, 3, "preview capped at MUTUAL_WORKOUT_PARTNER_PREVIEW_LIMIT");
+    assert.equal(new Set(partners.map(p => p.id)).size, partners.length, "no dupes across shared groups");
+    for (const p of partners) {
+      assert.ok([10, 11, 12, 13, 14].includes(p.id));
+      assert.equal(p.displayName, `P${p.id}`);
+    }
+  });
+
+  it("returns an empty mutualWorkoutPartners array on the viewer's own profile", async () => {
+    // Even when the viewer has a legitimate workout partner in a shared group,
+    // browsing their own profile must short-circuit the lookup and return [].
+    seedMutualPartnerTriad();
+    const { res, body } = await getJson("/social/players/1/profile");
+    assert.equal(res.status, 200);
+    assert.deepEqual(body.mutualWorkoutPartners, []);
+  });
+
+  it("excludes minor, location-hidden, and blocked partners from the profile preview", async () => {
+    // Viewer (1) and profile (2) share group 100 with three would-be partners:
+    //   - 3: minor → must be filtered
+    //   - 4: locationVisibility="hidden" → must be filtered
+    //   - 5: blocked (in viewer's hiddenIds) → must be filtered
+    //   - 6: clean partner → must surface
+    seedPlayer({ id: 1, clerkId: "u_viewer", username: "viewer" });
+    seedPlayer({ id: 2, clerkId: "u_profile", username: "profile" });
+    seedPlayer({ id: 3, clerkId: "u_minor", username: "minor", displayName: "Minor M", isMinor: true });
+    seedPlayer({ id: 4, clerkId: "u_hidden", username: "hidden", displayName: "Hidden H", locationVisibility: "hidden" });
+    seedPlayer({ id: 5, clerkId: "u_blocked", username: "blocked", displayName: "Blocked B" });
+    seedPlayer({ id: 6, clerkId: "u_ok", username: "ok", displayName: "Ok O" });
+    seedGroup(100, "Iron Pals");
+    seedGroupMember(1, 100, 1);
+    seedGroupMember(2, 100, 1);
+    seedGroupMember(3, 100, 1);
+    seedGroupMember(4, 100, 1);
+    seedGroupMember(5, 100, 1);
+    seedGroupMember(6, 100, 1);
+    state.hiddenIds = [5];
+
+    const { res, body } = await getJson("/social/players/2/profile");
+    assert.equal(res.status, 200);
+    const partners = body.mutualWorkoutPartners as Array<{ id: number; displayName: string }>;
+    assert.deepEqual(partners, [{ id: 6, displayName: "Ok O" }]);
+    const partnerIds = partners.map(p => p.id);
+    assert.ok(!partnerIds.includes(3), "minor must be filtered");
+    assert.ok(!partnerIds.includes(4), "location-hidden must be filtered");
+    assert.ok(!partnerIds.includes(5), "blocked must be filtered");
   });
 });
 
