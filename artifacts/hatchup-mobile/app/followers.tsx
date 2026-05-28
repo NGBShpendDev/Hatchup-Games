@@ -210,6 +210,14 @@ export default function FollowersScreen() {
                     {player.displayName ?? player.username}
                   </Text>
                   <Text style={[styles.username, { color: colors.mutedForeground }]}>@{player.username}</Text>
+                  {typeof player.followerCount === "number" && (
+                    <Text style={[styles.followerCountText, { color: colors.mutedForeground }]} testID={`follower-count-${player.id}`}>
+                      {player.followerCount >= 1000
+                        ? `${(player.followerCount / 1000).toFixed(1).replace(/\.0$/, "")}k`
+                        : String(player.followerCount)}{" "}
+                      {player.followerCount === 1 ? "follower" : "followers"}
+                    </Text>
+                  )}
                 </View>
                 {!alreadyFollowing ? (
                   <Pressable
@@ -315,6 +323,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
+  followerCountText: { fontSize: 11, fontWeight: "500", marginTop: 2 },
   followBtnText: { fontSize: 12, fontWeight: "700" },
   loadMoreBtn: {
     borderWidth: 1,

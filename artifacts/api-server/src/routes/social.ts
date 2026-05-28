@@ -2194,16 +2194,32 @@ router.get("/social/players/:id/followers", requireAuth, attachPlayer, async (re
     .offset(cursor);
 
   const pageIds = rows.map(r => r.id);
-  const [sharedGroupsByPlayer, mutualWorkoutPartnersByPlayer] = await Promise.all([
+  const [sharedGroupsByPlayer, mutualWorkoutPartnersByPlayer, followerCountRows] = await Promise.all([
     loadSharedGroupsForViewer(viewerId, pageIds),
     loadMutualWorkoutPartnersForViewer(viewerId, pageIds, hiddenIds),
+    pageIds.length
+      ? db
+          .select({
+            followeeId: playerFollowsTable.followeeId,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(playerFollowsTable)
+          .where(inArray(playerFollowsTable.followeeId, pageIds))
+          .groupBy(playerFollowsTable.followeeId)
+      : Promise.resolve([]),
   ]);
+
+  const followerCountMap = new Map<number, number>(
+    followerCountRows.map(r => [r.followeeId, r.count]),
+  );
+
   const players = rows.map(p => ({
     id: p.id,
     username: p.username,
     displayName: p.displayName ?? null,
     avatarUrl: p.avatarUrl ?? null,
     creatorBadge: p.creatorBadge ?? null,
+    followerCount: followerCountMap.get(p.id) ?? 0,
     sharedGroups: sharedGroupsByPlayer.get(p.id) ?? [],
     mutualWorkoutPartners: mutualWorkoutPartnersByPlayer.get(p.id) ?? [],
   }));

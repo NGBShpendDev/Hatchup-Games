@@ -1693,6 +1693,11 @@ export interface PlayerStub {
   avatarUrl: string | null;
   /** @nullable */
   creatorBadge: string | null;
+  /** Total number of followers this player has. Optional — only
+  populated on surfaces where social context is shown (e.g. the
+  followers screen) so callers can display audience size.
+   */
+  followerCount?: number;
   /** Groups that both the viewer and this player are members of. Optional
   because not every surface populates it (e.g. raw follower lists).
   When present, picker UIs should surface "Also in <group> with you"

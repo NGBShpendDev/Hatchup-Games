@@ -6667,6 +6667,12 @@ components:
         displayName: { type: ["string", "null"] }
         avatarUrl:   { type: ["string", "null"] }
         creatorBadge: { type: ["string", "null"] }
+        followerCount:
+          type: integer
+          description: |
+            Total number of followers this player has. Optional — only
+            populated on surfaces where social context is shown (e.g. the
+            followers screen) so callers can display audience size.
         sharedGroups:
           type: array
           description: |

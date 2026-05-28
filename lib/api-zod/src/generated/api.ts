@@ -120,6 +120,7 @@ export const SearchPlayersResponseItem = zod.object({
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
   "creatorBadge": zod.string().nullable(),
+  "followerCount": zod.number().optional().describe('Total number of followers this player has. Optional — only\npopulated on surfaces where social context is shown (e.g. the\nfollowers screen) so callers can display audience size.\n'),
   "sharedGroups": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string()
@@ -164,6 +165,7 @@ export const ListInviteSuggestionsResponseItem = zod.object({
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
   "creatorBadge": zod.string().nullable(),
+  "followerCount": zod.number().optional().describe('Total number of followers this player has. Optional — only\npopulated on surfaces where social context is shown (e.g. the\nfollowers screen) so callers can display audience size.\n'),
   "sharedGroups": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string()
@@ -3181,6 +3183,7 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
   "creatorBadge": zod.string().nullable(),
+  "followerCount": zod.number().optional().describe('Total number of followers this player has. Optional — only\npopulated on surfaces where social context is shown (e.g. the\nfollowers screen) so callers can display audience size.\n'),
   "sharedGroups": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string()
@@ -3291,6 +3294,7 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
   "creatorBadge": zod.string().nullable(),
+  "followerCount": zod.number().optional().describe('Total number of followers this player has. Optional — only\npopulated on surfaces where social context is shown (e.g. the\nfollowers screen) so callers can display audience size.\n'),
   "sharedGroups": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string()
@@ -3310,6 +3314,7 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
   "creatorBadge": zod.string().nullable(),
+  "followerCount": zod.number().optional().describe('Total number of followers this player has. Optional — only\npopulated on surfaces where social context is shown (e.g. the\nfollowers screen) so callers can display audience size.\n'),
   "sharedGroups": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string()
@@ -3359,6 +3364,7 @@ export const ListFollowersResponse = zod.object({
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
   "creatorBadge": zod.string().nullable(),
+  "followerCount": zod.number().optional().describe('Total number of followers this player has. Optional — only\npopulated on surfaces where social context is shown (e.g. the\nfollowers screen) so callers can display audience size.\n'),
   "sharedGroups": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string()
@@ -3399,6 +3405,7 @@ export const ListMutualFollowersResponse = zod.object({
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
   "creatorBadge": zod.string().nullable(),
+  "followerCount": zod.number().optional().describe('Total number of followers this player has. Optional — only\npopulated on surfaces where social context is shown (e.g. the\nfollowers screen) so callers can display audience size.\n'),
   "sharedGroups": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string()
@@ -3439,6 +3446,7 @@ export const ListMutualFollowingResponse = zod.object({
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
   "creatorBadge": zod.string().nullable(),
+  "followerCount": zod.number().optional().describe('Total number of followers this player has. Optional — only\npopulated on surfaces where social context is shown (e.g. the\nfollowers screen) so callers can display audience size.\n'),
   "sharedGroups": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string()
@@ -3478,6 +3486,7 @@ export const ListFollowingResponse = zod.object({
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
   "creatorBadge": zod.string().nullable(),
+  "followerCount": zod.number().optional().describe('Total number of followers this player has. Optional — only\npopulated on surfaces where social context is shown (e.g. the\nfollowers screen) so callers can display audience size.\n'),
   "sharedGroups": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string()
