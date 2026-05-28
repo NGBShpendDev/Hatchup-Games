@@ -37,6 +37,7 @@ import {
   championSeenKey,
   podiumSeenKey,
 } from "@/lib/celebrationTrigger";
+import { diffTournamentRound } from "@/lib/tournamentRoundModal";
 import {
   Trophy, Users, Users2, Clock, Zap, Coins, Target, ArrowLeft,
   MapPin, Share2, CheckCircle2, Medal, Crown,
@@ -84,8 +85,7 @@ export default function ChallengeDetail() {
 
   const [countdown, setCountdown] = useState("");
   const [roundCountdown, setRoundCountdown] = useState("");
-  const prevRoundRef = useRef<number | null>(null);
-  const prevEliminatedRef = useRef<boolean | null>(null);
+  const prevRoundSnapshotRef = useRef<{ round: number; eliminated: boolean } | null>(null);
   const [progressOpen, setProgressOpen] = useState(false);
   const [progressValue, setProgressValue] = useState(100);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -146,113 +146,17 @@ export default function ChallengeDetail() {
   // grand-prize still in play.
   useEffect(() => {
     if (!challenge || !player) return;
-    const c = challenge as unknown as {
-      isElimination?: boolean;
-      currentRound?: number;
-      rewardXp?: number;
-      rewardCoins?: number;
-      leaderboard?: {
-        playerId: number;
-        currentValue?: number;
-        eliminated: boolean;
-        eliminatedRound?: number | null;
-        player?: { username?: string; displayName?: string | null } | null;
-      }[];
-    };
-    if (!c.isElimination) return;
-    const round = c.currentRound ?? 1;
-    const board = c.leaderboard ?? [];
-    const me = board.find(e => e.playerId === player.id);
-    if (!me) return;
-
-    const prevRound = prevRoundRef.current;
-    const prevEliminated = prevEliminatedRef.current;
-
-    if (prevRound !== null && prevEliminated !== null) {
-      const survivors = board.filter(e => !e.eliminated);
-      const baseXp = c.rewardXp ?? 0;
-      const baseCoins = c.rewardCoins ?? 0;
-
-      if (!prevEliminated && me.eliminated) {
-        // Final placement = surviving players + 1 (you were the next out).
-        // This is the same ordering the bracket card already shows.
-        const placement = survivors.length + 1;
-        const cutRound = me.eliminatedRound ?? round;
-        const entries: RewardEntry[] = [
-          {
-            kind: "challenge",
-            label: `Eliminated in round ${cutRound}`,
-            value: `#${placement}`,
-            detail: "You went the distance. Respect — every round counts.",
-          },
-        ];
-        // Top-3 finishers still get a share when the bracket finalizes.
-        // For anyone below that, be honest: no rewards this run.
-        if (placement <= 3) {
-          entries.push({
-            kind: "xp",
-            label: "Final payout pending",
-            detail: `Rewards finalize when the tournament wraps (top 3 share the prize).`,
-          });
-        } else {
-          entries.push({
-            kind: "leaderboard",
-            label: "No payout this run",
-            detail: "Top 3 finishers split the prize. Jump in the next bracket!",
-          });
-        }
-        setRewardSummary({
-          open: true,
-          title: "Bracket Run Over",
-          entries,
-        });
-      } else if (!prevEliminated && !me.eliminated && round > prevRound) {
-        // Surfaced "next opponent": the strongest other survivor by their
-        // last-round value (current cycle has just reset, so this leans on
-        // the snapshot we already render in the bracket card).
-        const opponents = survivors
-          .filter(e => e.playerId !== player.id)
-          .sort((a, b) => (b.currentValue ?? 0) - (a.currentValue ?? 0));
-        const top = opponents[0];
-        const topName =
-          top?.player?.displayName ?? top?.player?.username ?? (top ? `Player ${top.playerId}` : null);
-
-        const entries: RewardEntry[] = [
-          {
-            kind: "challenge",
-            label: `Advanced to round ${round}`,
-            value: `${survivors.length} left`,
-            detail: "You survived the cut. Progress resets — go again!",
-          },
-        ];
-        if (topName) {
-          entries.push({
-            kind: "leaderboard",
-            label: "Next to beat",
-            value: topName,
-            detail: opponents.length > 1
-              ? `${opponents.length - 1} other survivor${opponents.length - 1 === 1 ? "" : "s"} also in the hunt.`
-              : "Heads up — it's coming down to the two of you.",
-          });
-        }
-        if (baseXp > 0 || baseCoins > 0) {
-          // Champion gets a 2× boost (see services/challengeRewards.ts).
-          entries.push({
-            kind: "xp",
-            label: "Grand prize still in play",
-            detail: `Win it all for ${(baseXp * 2).toLocaleString()} XP + ${(baseCoins * 2).toLocaleString()} coins.`,
-          });
-        }
-        setRewardSummary({
-          open: true,
-          title: `Round ${round} Survived!`,
-          entries,
-        });
-      }
+    const { modal, next } = diffTournamentRound(
+      challenge as unknown as Parameters<typeof diffTournamentRound>[0],
+      player.id,
+      prevRoundSnapshotRef.current,
+    );
+    if (modal) {
+      setRewardSummary({ open: true, title: modal.title, entries: modal.entries });
     }
-
-    prevRoundRef.current = round;
-    prevEliminatedRef.current = me.eliminated;
+    if (next) {
+      prevRoundSnapshotRef.current = next;
+    }
   }, [challenge, player]);
 
   const joinMutation = useJoinChallenge({
