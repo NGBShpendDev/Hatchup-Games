@@ -79,9 +79,11 @@ async function executeTurn(
   const battle = activeBattles.get(battleId);
   if (!battle) return;
 
-  const actingPlayer = slot === 1
-    ? await db.query.playersTable.findFirst({ where: eq(playersTable.id, battle.state.fighter1.playerId) }).catch(() => null)
-    : null; // bot has no player row
+  // Load the real player for whichever slot is acting (null only for bot)
+  const actingFighter = slot === 1 ? battle.state.fighter1 : battle.state.fighter2;
+  const actingPlayer = actingFighter.isBot || actingFighter.playerId === 0
+    ? null
+    : await db.query.playersTable.findFirst({ where: eq(playersTable.id, actingFighter.playerId) }).catch(() => null);
 
   const result = applyMove(battle.state, slot, move, actingPlayer ?? null);
   if ("error" in result) {
@@ -325,9 +327,19 @@ async function handleMessage(ws: WebSocket, playerId: number, raw: string) {
     const hatchlingId = Number(msg.hatchlingId);
     const mode = (msg.mode === "ranked" ? "ranked" : "casual") as "casual" | "ranked";
 
-    const hatchling = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, hatchlingId) });
+    const [hatchling, player] = await Promise.all([
+      db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, hatchlingId) }),
+      db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) }),
+    ]);
+
     if (!hatchling || hatchling.playerId !== playerId) {
       send(ws, { type: "error", message: "Invalid hatchling" });
+      return;
+    }
+
+    // Ranked gate: player must be level 10+ (enforced on the WS path, the real path)
+    if (mode === "ranked" && (player?.level ?? 0) < 10) {
+      send(ws, { type: "error", message: "Ranked mode requires player level 10+" });
       return;
     }
 
@@ -353,7 +365,15 @@ async function handleMessage(ws: WebSocket, playerId: number, raw: string) {
     const move = String(msg.move) as MoveType;
     const battle = activeBattles.get(battleId);
     if (!battle) { send(ws, { type: "error", message: "Battle not found" }); return; }
-    const slot: 1 | 2 = battle.state.fighter1.playerId === playerId ? 1 : 2;
+
+    // Strict participant authorization: playerId must be fighter1 OR fighter2
+    const isF1 = battle.state.fighter1.playerId === playerId;
+    const isF2 = !battle.state.fighter2.isBot && battle.state.fighter2.playerId === playerId;
+    if (!isF1 && !isF2) {
+      send(ws, { type: "error", message: "Not a participant in this battle" });
+      return;
+    }
+    const slot: 1 | 2 = isF1 ? 1 : 2;
     await executeTurn(battleId, slot, move, ws);
     return;
   }

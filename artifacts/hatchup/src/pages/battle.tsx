@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { Swords, Zap, Shield, Sparkles, Trophy, RotateCcw, ChevronLeft } from "lucide-react";
+import { Swords, Zap, Shield, Sparkles, Trophy, RotateCcw, ChevronLeft, Share2 } from "lucide-react";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -651,11 +651,39 @@ export default function BattlePage() {
                 <p>Result: <span className={`font-bold ${viewerWon ? "text-green-400" : "text-red-400"}`}>{viewerWon ? "WIN" : battleState.winner === 0 ? "DRAW" : "LOSS"}</span></p>
               </motion.div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-wrap">
                 <Button onClick={resetBattle} className="flex-1 font-bold rounded-2xl" size="lg">
                   <RotateCcw className="w-4 h-4 mr-2" /> Battle Again
                 </Button>
-                <Button onClick={() => setLocation("/compete")} variant="outline" className="flex-1 font-bold rounded-2xl" size="lg">
+                <Button
+                  variant="outline"
+                  className="flex-1 font-bold rounded-2xl"
+                  size="lg"
+                  onClick={() => {
+                    const text = [
+                      `⚔️ HatchUp Battle Result`,
+                      `${viewerWon ? "🏆 VICTORY" : battleState?.winner === 0 ? "🤝 DRAW" : "💀 DEFEAT"}`,
+                      `My Hatchling: ${myFighter?.hatchlingName ?? "?"}`,
+                      `Opponent: ${opponentFighter?.hatchlingName ?? "Bot"} ${opponentFighter?.isBot ? "🤖" : ""}`,
+                      `Turns: ${battleState?.turnNumber ?? 0}`,
+                      rewards ? `XP: +${rewards.xp}  Coins: +${rewards.coins}` : "",
+                      battleState?.mode === "ranked" && rewards?.eloChange
+                        ? `ELO: ${rewards.eloChange > 0 ? "+" : ""}${rewards.eloChange}`
+                        : "",
+                      `#HatchUp #BattleArena`,
+                    ].filter(Boolean).join("\n");
+                    if (navigator.share) {
+                      navigator.share({ title: "HatchUp Battle", text }).catch(() => {});
+                    } else {
+                      navigator.clipboard.writeText(text).then(() => {
+                        toast({ title: "Copied!", description: "Battle result copied to clipboard." });
+                      });
+                    }
+                  }}
+                >
+                  <Share2 className="w-4 h-4 mr-2" /> Share
+                </Button>
+                <Button onClick={() => setLocation("/compete")} variant="ghost" className="flex-1 font-bold rounded-2xl" size="lg">
                   <Trophy className="w-4 h-4 mr-2" /> Arena
                 </Button>
               </div>

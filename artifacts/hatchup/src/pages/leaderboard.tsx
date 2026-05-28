@@ -7,12 +7,12 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
-import { Trophy, Zap, Footprints, Timer } from "lucide-react";
+import { Trophy, Zap, Footprints, Timer, Swords, Crown } from "lucide-react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { usePlayer } from "@/lib/playerContext";
 
-type TabKey = "global" | "speed";
+type TabKey = "global" | "speed" | "battle";
 type SpeedMode = "steps" | "pace";
 
 export default function Leaderboard() {
@@ -27,6 +27,13 @@ export default function Leaderboard() {
 
   const basePath = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
+  interface BattleEloEntry { rank: number; playerId: number; username: string; displayName: string | null; battleElo: number; totalBattleWins: number; level: number }
+  const { data: eloBoard, isLoading: eloLoading } = useQuery<BattleEloEntry[]>({
+    queryKey: ["leaderboard-battle-elo"],
+    queryFn: () => fetch(`${basePath}/api/leaderboards/battle-elo?limit=100`, { credentials: "include" }).then(r => r.json()),
+    enabled: activeTab === "battle",
+  });
+
   const { data: speedBoard, isLoading: speedLoading } = useQuery<SpeedLeaderboardEntry[]>({
     queryKey: ["leaderboard-speed", speedMode],
     queryFn: async () => {
@@ -40,6 +47,7 @@ export default function Leaderboard() {
   const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
     { key: "global", label: "Global Rank", icon: <Trophy className="w-4 h-4" /> },
     { key: "speed",  label: "Fitness",     icon: <Zap className="w-4 h-4" /> },
+    { key: "battle", label: "Battle ELO",  icon: <Swords className="w-4 h-4" /> },
   ];
 
   const speedModes: { key: SpeedMode; label: string; icon: React.ReactNode }[] = [
@@ -199,6 +207,61 @@ export default function Leaderboard() {
                     <div className="py-12 text-center text-muted-foreground">
                       <Footprints className="w-10 h-10 mx-auto mb-2 opacity-30" />
                       <p className="font-bold">No data yet — start logging activities!</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+        {/* ── Battle ELO Leaderboard ── */}
+        {activeTab === "battle" && (
+          <>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Crown className="w-4 h-4 text-yellow-400" />
+              <span>Top 100 players ranked by Battle ELO. Ranked mode unlocks at Level 10.</span>
+            </div>
+            {eloLoading ? (
+              <div className="space-y-3">
+                {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}
+              </div>
+            ) : (
+              <div className="bg-card rounded-3xl shadow-xl overflow-hidden border border-border">
+                <div className="grid grid-cols-12 gap-3 p-4 border-b border-border bg-muted/50 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  <div className="col-span-1 text-center">#</div>
+                  <div className="col-span-6">Player</div>
+                  <div className="col-span-3 text-right flex items-center justify-end gap-1"><Crown className="w-3 h-3 text-yellow-400" /> ELO</div>
+                  <div className="col-span-2 text-right">Wins</div>
+                </div>
+                <div className="divide-y divide-border">
+                  {(eloBoard ?? []).map((entry, index) => (
+                    <motion.div
+                      key={entry.playerId}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                      className={`grid grid-cols-12 gap-3 p-4 items-center hover:bg-muted/30 transition-colors ${index < 3 ? "bg-yellow-500/5" : ""}`}
+                    >
+                      <div className="col-span-1 text-center font-black text-lg text-muted-foreground">
+                        {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${entry.rank}`}
+                      </div>
+                      <div className="col-span-6 flex items-center gap-3">
+                        <Avatar className="h-9 w-9 border-2 border-border">
+                          <AvatarFallback className="font-bold text-xs">{entry.username.substring(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-bold text-sm leading-tight">{entry.displayName || entry.username}</p>
+                          <p className="text-[10px] text-muted-foreground">Lv.{entry.level}</p>
+                        </div>
+                      </div>
+                      <div className="col-span-3 text-right font-black text-base text-yellow-400">{entry.battleElo}</div>
+                      <div className="col-span-2 text-right font-black text-sm text-green-400">{entry.totalBattleWins}W</div>
+                    </motion.div>
+                  ))}
+                  {(eloBoard?.length ?? 0) === 0 && (
+                    <div className="py-12 text-center text-muted-foreground">
+                      <Swords className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                      <p className="font-bold">No ranked battles yet — be the first to compete!</p>
                     </div>
                   )}
                 </div>
