@@ -202,15 +202,15 @@ export default function Hatch() {
             // Mythic+ hatches get the full-screen epic moment. We let the
             // reveal modal play first so the two celebrations don't fight.
             const rarity = (res as any)?.hatchling?.rarity;
-            if (rarity === "Mythic" || rarity === "Legendary") {
+            if (rarity === "Celestial" || rarity === "Ancient" || rarity === "Mythic" || rarity === "Legendary") {
               const style = REALM_EGG_STYLES[selectedEggRealm] ?? REALM_EGG_STYLES["balance"];
               setTimeout(() => {
                 enqueueEpicMoment({
                   kind: "hatch",
                   species: (res as any)?.hatchling?.species ?? "Mystery Pal",
-                  rarity: rarity as "Mythic" | "Legendary",
-                  realmColor: style.crackColor,
-                  realmEmoji: style.emoji,
+                  rarity: rarity as "Celestial" | "Ancient" | "Mythic" | "Legendary",
+                  realmColor: rarity === "Celestial" ? "#22d3ee" : rarity === "Ancient" ? "#14b8a6" : style.crackColor,
+                  realmEmoji: rarity === "Celestial" ? "🌌" : rarity === "Ancient" ? "🏺" : style.emoji,
                 });
               }, 2000);
             }
@@ -339,7 +339,17 @@ export default function Hatch() {
                             <span className="text-muted-foreground">{egg.stepsRequired.toLocaleString()} steps</span>
                           </div>
                           <div className="text-center">
-                            <GlowBadge tone="violet">{egg.rarity}</GlowBadge>
+                            {(() => {
+                              const r = (egg.rarity ?? "Common").toLowerCase();
+                              const cls = r === "celestial" ? "border-cyan-400 text-cyan-300 bg-cyan-400/10"
+                                : r === "ancient" ? "border-teal-400 text-teal-300 bg-teal-400/10"
+                                : r === "mythic" ? "border-pink-500 text-pink-400 bg-pink-500/10"
+                                : r === "legendary" ? "border-yellow-500 text-yellow-400 bg-yellow-500/10"
+                                : r === "epic" ? "border-purple-500 text-purple-400 bg-purple-500/10"
+                                : r === "rare" ? "border-blue-500 text-blue-400 bg-blue-500/10"
+                                : "border-gray-500 text-gray-400 bg-gray-500/10";
+                              return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-black border uppercase tracking-wider ${cls}`}>{egg.rarity}</span>;
+                            })()}
                           </div>
                         </div>
 
@@ -533,7 +543,17 @@ export default function Hatch() {
                 {/* Badges */}
                 <div className="flex gap-2 justify-center mb-4 relative z-10 flex-wrap">
                   <GlowBadge tone="primary">{resultStyle.label}</GlowBadge>
-                  <GlowBadge tone="violet">{hatchResult.hatchling.rarity}</GlowBadge>
+                  {(() => {
+                    const r = (hatchResult.hatchling.rarity ?? "Common").toLowerCase();
+                    const cls = r === "celestial" ? "border-cyan-400 text-cyan-300 bg-cyan-400/10"
+                      : r === "ancient" ? "border-teal-400 text-teal-300 bg-teal-400/10"
+                      : r === "mythic" ? "border-pink-500 text-pink-400 bg-pink-500/10"
+                      : r === "legendary" ? "border-yellow-500 text-yellow-400 bg-yellow-500/10"
+                      : r === "epic" ? "border-purple-500 text-purple-400 bg-purple-500/10"
+                      : r === "rare" ? "border-blue-500 text-blue-400 bg-blue-500/10"
+                      : "border-gray-500 text-gray-400 bg-gray-500/10";
+                    return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-black border uppercase tracking-wider ${cls}`}>{hatchResult.hatchling.rarity}</span>;
+                  })()}
                   {hatchResult.hatchling.isShiny && <GlowBadge tone="yellow">✦ SHINY</GlowBadge>}
                 </div>
 

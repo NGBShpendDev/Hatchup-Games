@@ -39,7 +39,7 @@ export type EpicMomentEvent =
       id?: string;
       kind: "hatch";
       species: string;
-      rarity: "Mythic" | "Legendary";
+      rarity: "Mythic" | "Legendary" | "Ancient" | "Celestial";
       realmColor?: string;
       realmEmoji?: string;
     };

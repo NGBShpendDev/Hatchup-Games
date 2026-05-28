@@ -76,6 +76,11 @@ const RARITY_AURA: Record<string, string> = {
   legendary: "pal-aura-legendary",
 };
 
+const RARITY_BORDER_OVERRIDE: Record<string, string> = {
+  celestial: "border-cyan-400",
+  ancient: "border-teal-400",
+};
+
 function MoodIndicator({ moodState }: { moodState: string }) {
   if (moodState === "celebrating") {
     return (
@@ -149,7 +154,7 @@ export function HatchlingCard({ hatchling, onClick }: HatchlingCardProps) {
   const CardContent = (
     <motion.div
       whileHover={{ y: -8, scale: 1.02 }}
-      className={`relative overflow-hidden rounded-2xl border-2 ${isActive ? "border-yellow-400 shadow-yellow-400/40" : realmStyle.border} bg-card p-4 shadow-lg hover:shadow-2xl ${isActive ? "" : realmStyle.glow} ${rarityAura} cursor-pointer group transition-all`}
+      className={`relative overflow-hidden rounded-2xl border-2 ${isActive ? "border-yellow-400 shadow-yellow-400/40" : (RARITY_BORDER_OVERRIDE[rarityKey] ?? realmStyle.border)} bg-card p-4 shadow-lg hover:shadow-2xl ${isActive ? "" : realmStyle.glow} ${rarityAura} cursor-pointer group transition-all`}
       onClick={onClick}
       data-testid={`hatchling-card-${hatchling.id}`}
     >
