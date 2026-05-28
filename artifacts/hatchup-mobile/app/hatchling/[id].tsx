@@ -40,6 +40,12 @@ function StatBar({ label, value, color }: { label: string; value: number; color:
   );
 }
 
+function buildHatchlingShareUrl(hatchlingId: number): string {
+  const domain = process.env.EXPO_PUBLIC_DOMAIN;
+  if (!domain) return "";
+  return `https://${domain}/hatchling/${hatchlingId}`;
+}
+
 export default function HatchlingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
@@ -49,6 +55,16 @@ export default function HatchlingDetailScreen() {
 
   const { data: pal, isLoading, refetch } = useGetHatchling(Number(id));
   const evolveMutation = useEvolveHatchling();
+
+  async function handleShare() {
+    if (!pal) return;
+    const url = buildHatchlingShareUrl(Number(id));
+    if (!url) return;
+    await Share.share({
+      message: `Check out my ${capitalize(pal.rarity)} hatchling ${pal.name} on HatchUp! ${url}`,
+      url,
+    });
+  }
 
   const rarityColor = getRarityColor(pal?.rarity);
   const level = pal?.level ?? 1;
@@ -100,7 +116,13 @@ export default function HatchlingDetailScreen() {
           <Feather name="arrow-left" size={22} color={colors.foreground} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Pal Detail</Text>
-        <View style={{ width: 34 }} />
+        {pal ? (
+          <Pressable onPress={handleShare} style={styles.shareBtn} testID="button-share-hatchling">
+            <Feather name="share-2" size={20} color={colors.primary} />
+          </Pressable>
+        ) : (
+          <View style={{ width: 34 }} />
+        )}
       </View>
 
       {isLoading ? (
@@ -217,6 +239,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 8 },
   backBtn: { padding: 6 },
+  shareBtn: { padding: 6 },
   headerTitle: { fontSize: 17, fontWeight: "700" },
   heroCard: { borderRadius: 18, borderWidth: 1.5, padding: 16, flexDirection: "row", gap: 14, marginBottom: 14, alignItems: "center" },
   heroAura: { width: 84, height: 84, borderRadius: 42, alignItems: "center", justifyContent: "center" },
