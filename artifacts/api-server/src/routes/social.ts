@@ -397,7 +397,7 @@ router.get("/social/trending", requireAuth, attachPlayer, async (req, res) => {
 
 // ── POST /social/posts ──────────────────────────────────────────────────────
 
-router.post("/social/posts", socialWriteLimiter, requireAuth, attachPlayer, blockSuspendedSocialWrite, blockMinorSocialWrite, async (req, res) => {
+router.post("/social/posts", requireAuth, attachPlayer, socialWriteLimiter, blockSuspendedSocialWrite, blockMinorSocialWrite, async (req, res) => {
   const playerId = req.playerId!;
   const body = CreatePostBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
@@ -685,7 +685,7 @@ router.delete("/social/posts/:id", requireAuth, attachPlayer, async (req, res) =
 
 // ── POST /social/posts/:id/react ────────────────────────────────────────────
 
-router.post("/social/posts/:id/react", socialWriteLimiter, requireAuth, attachPlayer, blockSuspendedSocialWrite, blockMinorSocialWrite, async (req, res) => {
+router.post("/social/posts/:id/react", requireAuth, attachPlayer, socialWriteLimiter, blockSuspendedSocialWrite, blockMinorSocialWrite, async (req, res) => {
   const postId = Number(req.params.id);
   const playerId = req.playerId!;
   const body = ReactToPostBody.safeParse(req.body);
@@ -745,7 +745,7 @@ router.post("/social/posts/:id/react", socialWriteLimiter, requireAuth, attachPl
 
 // ── POST /social/posts/:id/repost ───────────────────────────────────────────
 
-router.post("/social/posts/:id/repost", socialWriteLimiter, requireAuth, attachPlayer, blockSuspendedSocialWrite, blockMinorSocialWrite, async (req, res) => {
+router.post("/social/posts/:id/repost", requireAuth, attachPlayer, socialWriteLimiter, blockSuspendedSocialWrite, blockMinorSocialWrite, async (req, res) => {
   const postId = Number(req.params.id);
   const playerId = req.playerId!;
   const body = RepostPostBody.safeParse(req.body);
@@ -837,7 +837,7 @@ router.get("/social/posts/:id/comments", requireAuth, attachPlayer, async (req, 
 
 // ── POST /social/posts/:id/comments ────────────────────────────────────────
 
-router.post("/social/posts/:id/comments", socialWriteLimiter, requireAuth, attachPlayer, blockSuspendedSocialWrite, blockMinorSocialWrite, async (req, res) => {
+router.post("/social/posts/:id/comments", requireAuth, attachPlayer, socialWriteLimiter, blockSuspendedSocialWrite, blockMinorSocialWrite, async (req, res) => {
   const postId = Number(req.params.id);
   const playerId = req.playerId!;
   const body = AddPostCommentBody.safeParse(req.body);
@@ -894,7 +894,7 @@ router.post("/social/posts/:id/comments", socialWriteLimiter, requireAuth, attac
 
 // ── PATCH /social/posts/:id/comments/:commentId ─────────────────────────────
 
-router.patch("/social/posts/:id/comments/:commentId", socialWriteLimiter, requireAuth, attachPlayer, blockSuspendedSocialWrite, blockMinorSocialWrite, async (req, res) => {
+router.patch("/social/posts/:id/comments/:commentId", requireAuth, attachPlayer, socialWriteLimiter, blockSuspendedSocialWrite, blockMinorSocialWrite, async (req, res) => {
   const commentId = Number(req.params.commentId);
   const playerId = req.playerId!;
   const body = EditPostCommentBody.safeParse(req.body);
@@ -989,9 +989,9 @@ router.get("/social/posts/:id/comments/:commentId/revisions", requireAuth, attac
 
 router.post(
   "/social/posts/:id/comments/:commentId/like",
-  socialWriteLimiter,
   requireAuth,
   attachPlayer,
+  socialWriteLimiter,
   blockSuspendedSocialWrite,
   blockMinorSocialWrite,
   async (req, res) => {
@@ -1098,7 +1098,7 @@ router.delete("/social/posts/:id/comments/:commentId", requireAuth, attachPlayer
 
 // ── POST /social/follow ─────────────────────────────────────────────────────
 
-router.post("/social/follow", socialWriteLimiter, requireAuth, attachPlayer, blockSuspendedSocialWrite, blockMinorSocialWrite, async (req, res) => {
+router.post("/social/follow", requireAuth, attachPlayer, socialWriteLimiter, blockSuspendedSocialWrite, blockMinorSocialWrite, async (req, res) => {
   const followerId = req.playerId!;
   const body = FollowPlayerBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
@@ -1117,7 +1117,7 @@ router.post("/social/follow", socialWriteLimiter, requireAuth, attachPlayer, blo
 
 // ── POST /social/unfollow ───────────────────────────────────────────────────
 
-router.post("/social/unfollow", socialWriteLimiter, requireAuth, attachPlayer, async (req, res) => {
+router.post("/social/unfollow", requireAuth, attachPlayer, socialWriteLimiter, async (req, res) => {
   const followerId = req.playerId!;
   const body = FollowPlayerBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }

@@ -95,7 +95,7 @@ function safeLocationRecord(loc: typeof playerLocationTable.$inferSelect) {
 // Accepts lat/lng → calls Nominatim → encrypts coords with AES-256-GCM → stores.
 // Raw GPS values are used ONLY for the geocoding call; only ciphertext is persisted.
 // Encrypted fields are NEVER returned in API responses.
-router.post("/players/me/location", locationUpdateLimiter, requireAuth, attachPlayer, async (req, res) => {
+router.post("/players/me/location", requireAuth, attachPlayer, locationUpdateLimiter, async (req, res) => {
   const { latitude, longitude, accuracyMeters, city, state, county, country, countryCode, visibility } = req.body as {
     latitude?: number;
     longitude?: number;

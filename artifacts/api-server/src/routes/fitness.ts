@@ -169,7 +169,7 @@ router.get("/fitness/stats/:playerId", requireAuth, attachPlayer, async (req, re
 });
 
 // POST /fitness/log
-router.post("/fitness/log", fitnessLogLimiter, requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
+router.post("/fitness/log", requireAuth, attachPlayer, fitnessLogLimiter, requirePlayerOwnership, async (req, res) => {
   const body = LogActivityBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 

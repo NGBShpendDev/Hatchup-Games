@@ -9,7 +9,7 @@ import { buildCoachContext, buildSystemPrompt } from "../services/coachService.t
 const router = Router();
 
 // POST /coach/chat — SSE streaming AI fitness coach response
-router.post("/coach/chat", aiCoachLimiter, requireAuth, attachPlayer, attachEntitlement, enforceCoachDailyCap, async (req, res) => {
+router.post("/coach/chat", requireAuth, attachPlayer, aiCoachLimiter, attachEntitlement, enforceCoachDailyCap, async (req, res) => {
   const parsed = CoachChatBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });

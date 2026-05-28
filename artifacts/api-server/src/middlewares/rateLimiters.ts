@@ -1,10 +1,42 @@
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import { getAuth } from "@clerk/express";
+import type { Request } from "express";
 
 /**
  * Stricter per-endpoint limiters layered on top of the global /api limiters.
- * Each limiter is keyed by IP+route by default; helps blunt brute-force,
- * abuse, and replay against the most sensitive surfaces.
+ *
+ * These per-endpoint limiters gate user-specific actions (location pings,
+ * fitness logs, social writes, AI coach calls, scans, post views) and are
+ * keyed on `req.playerId` so players sharing a single egress IP (corporate
+ * Wi-Fi, school networks, cellular CGNAT) don't throttle each other.
+ *
+ * Each route that uses one of these limiters MUST run `requireAuth` +
+ * `attachPlayer` BEFORE the limiter so `req.playerId` is populated. The
+ * IP fallback below only exists so the limiter doesn't crash on
+ * unauthenticated edge cases — those requests are immediately rejected
+ * by `requireAuth` afterwards.
  */
+
+/** Key on the authenticated player id, falling back to the request IP. */
+const playerOrIpKey = (req: Request): string =>
+  req.playerId != null ? `player:${req.playerId}` : ipKeyGenerator(req.ip ?? "");
+
+/**
+ * Key generator for routes that allow anonymous traffic (e.g. post view
+ * pings). Prefers `req.playerId` if `attachPlayer` ran, then the Clerk
+ * user id from the global `clerkMiddleware` (so signed-in viewers behind
+ * the same NAT don't block each other), then the request IP.
+ */
+const clerkOrIpKey = (req: Request): string => {
+  if (req.playerId != null) return `player:${req.playerId}`;
+  try {
+    const auth = getAuth(req);
+    if (auth?.userId) return `clerk:${auth.userId}`;
+  } catch {
+    // getAuth throws if clerkMiddleware hasn't run — fall through to IP.
+  }
+  return ipKeyGenerator(req.ip ?? "");
+};
 
 // Location updates: realistic phones update once every 5–30s. 30/min is plenty
 // of headroom and shuts down spoof loops that hammer the endpoint.
@@ -13,6 +45,7 @@ export const locationUpdateLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: playerOrIpKey,
   message: { error: "Too many location updates, slow down." },
 });
 
@@ -22,6 +55,7 @@ export const fitnessLogLimiter = rateLimit({
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: playerOrIpKey,
   message: { error: "Too many fitness updates, slow down." },
 });
 
@@ -31,15 +65,17 @@ export const socialWriteLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: playerOrIpKey,
   message: { error: "Too many social actions, slow down." },
 });
 
-// Coach / AI: expensive upstream calls; cap per-IP harder.
+// Coach / AI: expensive upstream calls; cap per-player harder.
 export const aiCoachLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 15,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: playerOrIpKey,
   message: { error: "Too many coach requests. Please wait a moment." },
 });
 
@@ -48,11 +84,16 @@ export const aiCoachLimiter = rateLimit({
 // permalinks across tabs). Server-side dedup is per (post, viewerKey, day),
 // so this limiter is the second line of defense against refresh-loop / bot
 // inflation that rotates target posts.
+//
+// The view route accepts anonymous traffic, so the key generator prefers the
+// Clerk user id when present (signed-in viewers sharing a NAT don't block
+// each other) and falls back to the request IP for true anons.
 export const postViewLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: clerkOrIpKey,
   message: { error: "Too many view pings, slow down." },
 });
 
@@ -127,5 +168,6 @@ export const scanLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: playerOrIpKey,
   message: { error: "Too many scans. Please wait a moment before trying again." },
 });
