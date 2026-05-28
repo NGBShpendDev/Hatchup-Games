@@ -1008,7 +1008,11 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
             eq(pfViewer.followeeId, pfProfile.followerId),
           ),
         )
-        .where(and(eq(pfProfile.followeeId, id), ne(pfProfile.followerId, viewerId))),
+        .where(and(
+          eq(pfProfile.followeeId, id),
+          ne(pfProfile.followerId, viewerId),
+          ne(pfProfile.followerId, id),
+        )),
       // Preview (3 rows) of mutual followers.
       db
         .select({
@@ -1027,7 +1031,11 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
           ),
         )
         .innerJoin(playersTable, eq(playersTable.id, pfProfile.followerId))
-        .where(and(eq(pfProfile.followeeId, id), ne(pfProfile.followerId, viewerId)))
+        .where(and(
+          eq(pfProfile.followeeId, id),
+          ne(pfProfile.followerId, viewerId),
+          ne(pfProfile.followerId, id),
+        ))
         .orderBy(playersTable.id)
         .limit(3),
       // Mutual following count: accounts both viewer and profile follow.
@@ -1041,7 +1049,11 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
             eq(pfViewer.followeeId, pfProfile.followeeId),
           ),
         )
-        .where(and(eq(pfProfile.followerId, id), ne(pfProfile.followeeId, viewerId))),
+        .where(and(
+          eq(pfProfile.followerId, id),
+          ne(pfProfile.followeeId, viewerId),
+          ne(pfProfile.followeeId, id),
+        )),
       // Preview (3 rows) of mutual following.
       db
         .select({
@@ -1060,7 +1072,11 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
           ),
         )
         .innerJoin(playersTable, eq(playersTable.id, pfProfile.followeeId))
-        .where(and(eq(pfProfile.followerId, id), ne(pfProfile.followeeId, viewerId)))
+        .where(and(
+          eq(pfProfile.followerId, id),
+          ne(pfProfile.followeeId, viewerId),
+          ne(pfProfile.followeeId, id),
+        ))
         .orderBy(playersTable.id)
         .limit(3),
     ]);
@@ -1156,7 +1172,11 @@ router.get("/social/players/:id/mutual-followers", requireAuth, attachPlayer, as
         eq(pfViewer.followeeId, pfProfile.followerId),
       ),
     )
-    .where(and(eq(pfProfile.followeeId, id), ne(pfProfile.followerId, viewerId)));
+    .where(and(
+      eq(pfProfile.followeeId, id),
+      ne(pfProfile.followerId, viewerId),
+      ne(pfProfile.followerId, id),
+    ));
 
   const total = countRow?.count ?? 0;
 
@@ -1177,7 +1197,11 @@ router.get("/social/players/:id/mutual-followers", requireAuth, attachPlayer, as
       ),
     )
     .innerJoin(playersTable, eq(playersTable.id, pfProfile.followerId))
-    .where(and(eq(pfProfile.followeeId, id), ne(pfProfile.followerId, viewerId)))
+    .where(and(
+      eq(pfProfile.followeeId, id),
+      ne(pfProfile.followerId, viewerId),
+      ne(pfProfile.followerId, id),
+    ))
     .orderBy(playersTable.id)
     .limit(limit)
     .offset(cursor);
@@ -1217,6 +1241,10 @@ router.get("/social/players/:id/mutual-following", requireAuth, attachPlayer, as
   const pfProfile = alias(playerFollowsTable, "pf_profile");
   const pfViewer = alias(playerFollowsTable, "pf_viewer");
 
+  // Exclude both the viewer and the profile themselves from the result set:
+  // a pathological profile self-follow (`pf_profile.followee_id = id`) must
+  // never leak the profile back into their own mutual-following list, and the
+  // viewer is never their own "mutual" of anything.
   const [countRow, rows] = await Promise.all([
     db
       .select({ count: sql<number>`count(*)::int` })
@@ -1228,7 +1256,11 @@ router.get("/social/players/:id/mutual-following", requireAuth, attachPlayer, as
           eq(pfViewer.followeeId, pfProfile.followeeId),
         ),
       )
-      .where(and(eq(pfProfile.followerId, id), ne(pfProfile.followeeId, viewerId))),
+      .where(and(
+        eq(pfProfile.followerId, id),
+        ne(pfProfile.followeeId, viewerId),
+        ne(pfProfile.followeeId, id),
+      )),
     db
       .select({
         id: playersTable.id,
@@ -1246,7 +1278,11 @@ router.get("/social/players/:id/mutual-following", requireAuth, attachPlayer, as
         ),
       )
       .innerJoin(playersTable, eq(playersTable.id, pfProfile.followeeId))
-      .where(and(eq(pfProfile.followerId, id), ne(pfProfile.followeeId, viewerId)))
+      .where(and(
+        eq(pfProfile.followerId, id),
+        ne(pfProfile.followeeId, viewerId),
+        ne(pfProfile.followeeId, id),
+      ))
       .orderBy(playersTable.id)
       .limit(limit)
       .offset(cursor),
