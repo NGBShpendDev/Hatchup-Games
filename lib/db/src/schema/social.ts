@@ -75,8 +75,8 @@ export const playerFollowsTable = pgTable("player_follows", {
   followeeId: integer("followee_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
+  unique("player_follows_follower_followee_unique").on(t.followerId, t.followeeId),
   index("player_follows_followee_follower_idx").on(t.followeeId, t.followerId),
-  index("player_follows_follower_followee_idx").on(t.followerId, t.followeeId),
 ]);
 
 export const playerMemoriesTable = pgTable("player_memories", {
