@@ -2202,6 +2202,66 @@ export const GetSocialFeedResponse = zod.object({
 
 
 /**
+ * Returns posts with the most views in the selected window (day or week).
+Posts older than the window are excluded so the surface stays fresh.
+
+ * @summary Get trending posts ranked by recent view counts
+ */
+export const getTrendingPostsQueryWindowDefault = `day`;
+export const getTrendingPostsQueryLimitDefault = 20;
+
+export const GetTrendingPostsQueryParams = zod.object({
+  "playerId": zod.coerce.number(),
+  "window": zod.enum(['day', 'week']).default(getTrendingPostsQueryWindowDefault).describe('Trending window. `day` covers the last 24h, `week` covers the last 7 days.'),
+  "limit": zod.coerce.number().default(getTrendingPostsQueryLimitDefault)
+})
+
+export const GetTrendingPostsResponse = zod.object({
+  "posts": zod.array(zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "authorName": zod.string(),
+  "authorAvatar": zod.string().nullish(),
+  "creatorBadge": zod.string().nullish(),
+  "content": zod.string(),
+  "mediaUrl": zod.string().nullish(),
+  "postType": zod.string(),
+  "creatureId": zod.number().nullish(),
+  "creatureName": zod.string().nullish(),
+  "xpEarned": zod.number(),
+  "energyEarned": zod.number(),
+  "isFlagged": zod.boolean(),
+  "engagementScore": zod.number(),
+  "viewCount": zod.number(),
+  "createdAt": zod.string(),
+  "reactionCounts": zod.object({
+  "like": zod.number().optional(),
+  "encourage": zod.number().optional(),
+  "fire": zod.number().optional(),
+  "flex": zod.number().optional()
+}),
+  "commentCount": zod.number(),
+  "myReaction": zod.string().nullable(),
+  "comments": zod.array(zod.object({
+  "id": zod.number(),
+  "postId": zod.number(),
+  "playerId": zod.number(),
+  "authorName": zod.string(),
+  "authorAvatar": zod.string().nullish(),
+  "content": zod.string(),
+  "isFlagged": zod.boolean(),
+  "createdAt": zod.string(),
+  "likeCount": zod.number(),
+  "myLiked": zod.boolean()
+})).optional()
+}).and(zod.object({
+  "recentViewCount": zod.number().describe('Number of unique views recorded within the trending window.')
+}))),
+  "window": zod.enum(['day', 'week'])
+})
+
+
+/**
  * @summary Create a new post
  */
 export const createPostBodyContentMax = 500;

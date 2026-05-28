@@ -85,6 +85,7 @@ import type {
   GetScopedLeaderboardParams,
   GetSocialFeedParams,
   GetSpeedLeaderboardParams,
+  GetTrendingPostsParams,
   GetUnreadNotificationCount200,
   GetWorkoutPlanParams,
   GroupChallengeProgressInput,
@@ -192,6 +193,7 @@ import type {
   SyncResult,
   TodayGoalProgress,
   ToggleOwnedArtifactBody,
+  TrendingPage,
   UnsubscribePushBody,
   UploadUrlRequest,
   UploadUrlResponse,
@@ -6416,6 +6418,93 @@ export function useGetSocialFeed<TData = Awaited<ReturnType<typeof getSocialFeed
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetSocialFeedQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetTrendingPostsUrl = (params: GetTrendingPostsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/social/trending?${stringifiedParams}` : `/api/social/trending`
+}
+
+/**
+ * Returns posts with the most views in the selected window (day or week).
+Posts older than the window are excluded so the surface stays fresh.
+
+ * @summary Get trending posts ranked by recent view counts
+ */
+export const getTrendingPosts = async (params: GetTrendingPostsParams, options?: RequestInit): Promise<TrendingPage> => {
+
+  return customFetch<TrendingPage>(getGetTrendingPostsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTrendingPostsQueryKey = (params?: GetTrendingPostsParams,) => {
+    return [
+    `/api/social/trending`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetTrendingPostsQueryOptions = <TData = Awaited<ReturnType<typeof getTrendingPosts>>, TError = ErrorType<unknown>>(params: GetTrendingPostsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTrendingPosts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTrendingPostsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTrendingPosts>>> = ({ signal }) => getTrendingPosts(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTrendingPosts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTrendingPostsQueryResult = NonNullable<Awaited<ReturnType<typeof getTrendingPosts>>>
+export type GetTrendingPostsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get trending posts ranked by recent view counts
+ */
+
+export function useGetTrendingPosts<TData = Awaited<ReturnType<typeof getTrendingPosts>>, TError = ErrorType<unknown>>(
+ params: GetTrendingPostsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTrendingPosts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTrendingPostsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

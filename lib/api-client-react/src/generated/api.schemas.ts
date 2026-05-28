@@ -1225,6 +1225,24 @@ export interface FeedPage {
   total?: number;
 }
 
+export type TrendingPost = FeedPost & {
+  /** Number of unique views recorded within the trending window. */
+  recentViewCount: number;
+};
+
+export type TrendingPageWindow = typeof TrendingPageWindow[keyof typeof TrendingPageWindow];
+
+
+export const TrendingPageWindow = {
+  day: 'day',
+  week: 'week',
+} as const;
+
+export interface TrendingPage {
+  posts: TrendingPost[];
+  window: TrendingPageWindow;
+}
+
 export interface CommentLikeResult {
   liked: boolean;
   likeCount: number;
@@ -2139,6 +2157,23 @@ limit?: number;
  */
 shuffle?: boolean;
 };
+
+export type GetTrendingPostsParams = {
+playerId: number;
+/**
+ * Trending window. `day` covers the last 24h, `week` covers the last 7 days.
+ */
+window?: GetTrendingPostsWindow;
+limit?: number;
+};
+
+export type GetTrendingPostsWindow = typeof GetTrendingPostsWindow[keyof typeof GetTrendingPostsWindow];
+
+
+export const GetTrendingPostsWindow = {
+  day: 'day',
+  week: 'week',
+} as const;
 
 export type GetPostParams = {
 playerId?: number;

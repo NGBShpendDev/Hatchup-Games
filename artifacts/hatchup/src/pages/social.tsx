@@ -8,6 +8,8 @@ import { usePlayer } from "@/lib/playerContext";
 import {
   useGetSocialFeed,
   getGetSocialFeedQueryKey,
+  useGetTrendingPosts,
+  getGetTrendingPostsQueryKey,
   useReactToPost,
   useDeletePost,
   useFollowPlayer,
@@ -62,6 +64,8 @@ import {
   Compass,
   Users2,
   X,
+  TrendingUp,
+  Eye,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
@@ -634,6 +638,116 @@ function DiscoverPanel({
   );
 }
 
+function TrendingPanel({
+  playerId,
+  onReact,
+  onDelete,
+  onViewProfile,
+}: {
+  playerId: number;
+  onReact: (postId: number, reactionType: string) => Promise<void>;
+  onDelete: (postId: number) => Promise<void>;
+  onViewProfile: (id: number) => void;
+}) {
+  const [trendingWindow, setTrendingWindow] = useState<"day" | "week">("day");
+  const params = { playerId, window: trendingWindow };
+  const { data, isLoading } = useGetTrendingPosts(
+    params,
+    { query: { queryKey: getGetTrendingPostsQueryKey(params) } }
+  );
+  const posts = data?.posts ?? [];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+          <TrendingUp className="w-3.5 h-3.5 text-primary" />
+          <span>Most-watched posts {trendingWindow === "day" ? "today" : "this week"}</span>
+        </div>
+        <div className="inline-flex rounded-full bg-card/60 backdrop-blur p-1 border border-border">
+          <button
+            type="button"
+            onClick={() => setTrendingWindow("day")}
+            data-testid="trending-window-day"
+            className={`px-3 h-7 text-[11px] font-black rounded-full transition-colors ${
+              trendingWindow === "day"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            24h
+          </button>
+          <button
+            type="button"
+            onClick={() => setTrendingWindow("week")}
+            data-testid="trending-window-week"
+            className={`px-3 h-7 text-[11px] font-black rounded-full transition-colors ${
+              trendingWindow === "week"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            7d
+          </button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <Skeleton key={i} className="h-40 w-full rounded-2xl" />
+          ))}
+        </div>
+      ) : posts.length === 0 ? (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center py-16 bg-card/50 rounded-3xl border border-dashed border-border"
+          data-testid="trending-empty"
+        >
+          <TrendingUp className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-40" />
+          <h3 className="text-xl font-black mb-2">No trends yet</h3>
+          <p className="text-muted-foreground text-sm font-medium max-w-xs mx-auto">
+            {trendingWindow === "day"
+              ? "Nothing has caught fire in the last 24 hours. Check back soon — or try the weekly view."
+              : "The community is quiet this week. Be the spark with a new post!"}
+          </p>
+          {trendingWindow === "day" && (
+            <Button
+              variant="outline"
+              onClick={() => setTrendingWindow("week")}
+              className="rounded-full font-black mt-4"
+              data-testid="trending-switch-week"
+            >
+              See this week
+            </Button>
+          )}
+        </motion.div>
+      ) : (
+        <div className="space-y-3">
+          {posts.map((post, idx) => (
+            <div key={post.id} className="relative" data-testid={`trending-post-${post.id}`}>
+              <div className="absolute -top-2 left-3 z-10 flex items-center gap-1 px-2 h-6 rounded-full bg-primary text-primary-foreground text-[10px] font-black shadow-lg shadow-primary/30">
+                <span>#{idx + 1}</span>
+                <span className="opacity-70">·</span>
+                <Eye className="w-3 h-3" />
+                <span>{post.recentViewCount}</span>
+              </div>
+              <PostCard
+                post={post}
+                playerId={playerId}
+                onReact={onReact}
+                onDelete={onDelete}
+                onViewProfile={onViewProfile}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Social() {
   const { playerId } = usePlayer();
   const pid = playerId ?? 1;
@@ -703,9 +817,12 @@ export default function Social() {
         />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 rounded-full bg-card/60 backdrop-blur p-1 h-10">
+          <TabsList className="grid w-full grid-cols-3 rounded-full bg-card/60 backdrop-blur p-1 h-10">
             <TabsTrigger value="feed" className="rounded-full text-xs font-black" data-testid="tab-feed">
               <Users className="w-3.5 h-3.5 mr-1.5" /> Feed
+            </TabsTrigger>
+            <TabsTrigger value="trending" className="rounded-full text-xs font-black" data-testid="tab-trending">
+              <TrendingUp className="w-3.5 h-3.5 mr-1.5" /> Trending
             </TabsTrigger>
             <TabsTrigger value="discover" className="rounded-full text-xs font-black" data-testid="tab-discover">
               <Compass className="w-3.5 h-3.5 mr-1.5" /> Discover
@@ -750,6 +867,15 @@ export default function Social() {
                 </div>
               </AnimatePresence>
             )}
+          </TabsContent>
+
+          <TabsContent value="trending" className="mt-4">
+            <TrendingPanel
+              playerId={pid}
+              onReact={handleReact}
+              onDelete={handleDelete}
+              onViewProfile={goToProfile}
+            />
           </TabsContent>
 
           <TabsContent value="discover" className="mt-4">

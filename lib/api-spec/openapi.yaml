@@ -1794,6 +1794,40 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeedPage"
 
+  /social/trending:
+    get:
+      operationId: getTrendingPosts
+      tags: [social]
+      summary: Get trending posts ranked by recent view counts
+      description: |
+        Returns posts with the most views in the selected window (day or week).
+        Posts older than the window are excluded so the surface stays fresh.
+      parameters:
+        - name: playerId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: window
+          in: query
+          description: Trending window. `day` covers the last 24h, `week` covers the last 7 days.
+          schema:
+            type: string
+            enum: [day, week]
+            default: day
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Trending posts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrendingPage"
+
   /social/posts:
     post:
       operationId: createPost
@@ -4683,6 +4717,28 @@ components:
             $ref: "#/components/schemas/FeedPost"
         nextCursor: { type: ["integer", "null"] }
         total:      { type: integer }
+
+    TrendingPost:
+      allOf:
+        - $ref: "#/components/schemas/FeedPost"
+        - type: object
+          required: [recentViewCount]
+          properties:
+            recentViewCount:
+              type: integer
+              description: Number of unique views recorded within the trending window.
+
+    TrendingPage:
+      type: object
+      required: [posts, window]
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrendingPost"
+        window:
+          type: string
+          enum: [day, week]
 
     PostComment:
       type: object

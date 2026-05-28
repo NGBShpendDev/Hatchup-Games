@@ -13,7 +13,7 @@ import {
   groupMembersTable,
   groupsTable,
 } from "@workspace/db";
-import { eq, and, desc, sql, or, ne, inArray, ilike } from "drizzle-orm";
+import { eq, and, desc, sql, or, ne, inArray, ilike, gte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
 import { blockMinorSocialWrite } from "../middlewares/minorGuard";
@@ -243,6 +243,62 @@ router.get("/social/feed", requireAuth, attachPlayer, async (req, res) => {
   const enriched = await Promise.all(page.map(({ post }) => enrichPost(post, playerId)));
 
   res.json({ posts: enriched, nextCursor, total: scored.length });
+});
+
+// ── GET /social/trending ────────────────────────────────────────────────────
+// Ranks posts by unique views recorded inside the trending window (24h or 7d).
+// Posts that haven't been viewed in the window are excluded so the surface
+// stays fresh and creators who resonate recently get the spotlight.
+
+router.get("/social/trending", requireAuth, attachPlayer, async (req, res) => {
+  const playerId = req.playerId!;
+  const limit = Math.min(Number(req.query.limit) || 20, 50);
+  const windowParam = req.query.window === "week" ? "week" : "day";
+  const windowMs = windowParam === "week" ? 7 * 24 * 3600_000 : 24 * 3600_000;
+  const cutoff = new Date(Date.now() - windowMs);
+
+  // Aggregate recent view counts per post within the window.
+  const recentViewRows = await db
+    .select({
+      postId: postViewsTable.postId,
+      recentViews: sql<number>`count(*)::int`,
+    })
+    .from(postViewsTable)
+    .where(gte(postViewsTable.createdAt, cutoff))
+    .groupBy(postViewsTable.postId)
+    .orderBy(desc(sql`count(*)`))
+    .limit(limit * 2);
+
+  if (recentViewRows.length === 0) {
+    res.json({ posts: [], window: windowParam });
+    return;
+  }
+
+  const postIds = recentViewRows.map(r => r.postId);
+  const postsForWindow = await db.query.postsTable.findMany({
+    where: and(inArray(postsTable.id, postIds), eq(postsTable.isFlagged, false)),
+  });
+
+  const viewsById = new Map(recentViewRows.map(r => [r.postId, r.recentViews]));
+  const ranked = postsForWindow
+    .map(p => ({ post: p, recentViewCount: viewsById.get(p.id) ?? 0 }))
+    .filter(({ recentViewCount }) => recentViewCount > 0)
+    .sort((a, b) => {
+      if (b.recentViewCount !== a.recentViewCount) {
+        return b.recentViewCount - a.recentViewCount;
+      }
+      return b.post.createdAt.getTime() - a.post.createdAt.getTime();
+    })
+    .slice(0, limit);
+
+  const enriched = await Promise.all(
+    ranked.map(async ({ post, recentViewCount }) => ({
+      ...(await enrichPost(post, playerId)),
+      recentViewCount,
+    })),
+  );
+
+  res.json({ posts: enriched, window: windowParam });
 });
 
 // ── POST /social/posts ──────────────────────────────────────────────────────
