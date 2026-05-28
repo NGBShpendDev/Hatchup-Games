@@ -29,6 +29,22 @@ function addPlayer(): Player {
 const col = (name: string) => ({ __col: name }) as const;
 const playersTable = { id: col("players.id"), clerkId: col("players.clerkId") };
 
+// The aiCoachLimiter is now backed by the shared `rate_limit_attempts`
+// table via `consumeRateLimitBudget`. We mock the table object and back it
+// with an in-memory array so the limiter behaves the same as the old
+// in-process express-rate-limit store across calls within one test.
+const rateLimitAttemptsTable = {
+  __table: "rateLimitAttempts" as const,
+  id: col("rateLimitAttempts.id"),
+  scope: col("rateLimitAttempts.scope"),
+  key: col("rateLimitAttempts.key"),
+  createdAt: col("rateLimitAttempts.createdAt"),
+};
+
+interface RateRow { id: number; scope: string; key: string; createdAt: Date }
+const rateRows: RateRow[] = [];
+let nextRateId = 1;
+
 type Predicate = Record<string, unknown>;
 const fakeDb = {
   query: {
@@ -46,6 +62,51 @@ const fakeDb = {
       },
     },
   },
+  insert(table: unknown) {
+    return {
+      values: async (v: { scope?: string; key?: string }) => {
+        if (table === (rateLimitAttemptsTable as unknown) && v?.scope && v?.key) {
+          rateRows.push({
+            id: nextRateId++,
+            scope: v.scope,
+            key: v.key,
+            createdAt: new Date(Date.now()),
+          });
+        }
+      },
+    };
+  },
+  delete(table: unknown) {
+    return {
+      where: async (pred: Predicate) => {
+        if (table !== (rateLimitAttemptsTable as unknown)) return;
+        const scope = pred["rateLimitAttempts.scope"] as string | undefined;
+        const key = pred["rateLimitAttempts.key"] as string | undefined;
+        const cutoff = pred.__lt_createdAt as Date | undefined;
+        for (let i = rateRows.length - 1; i >= 0; i--) {
+          const r = rateRows[i]!;
+          if (r.scope === scope && r.key === key && (cutoff ? r.createdAt < cutoff : true)) {
+            rateRows.splice(i, 1);
+          }
+        }
+      },
+    };
+  },
+  select(_cols?: unknown) {
+    let _from: unknown;
+    let _where: Predicate = {};
+    const chain = {
+      from(t: unknown) { _from = t; return chain; },
+      where(pred: Predicate) { _where = pred; return chain; },
+      async orderBy(..._args: unknown[]) {
+        if (_from !== (rateLimitAttemptsTable as unknown)) return [];
+        const scope = _where["rateLimitAttempts.scope"];
+        const key = _where["rateLimitAttempts.key"];
+        return rateRows.filter((r) => r.scope === scope && r.key === key).map((r) => ({ id: r.id }));
+      },
+    };
+    return chain;
+  },
 };
 
 mock.module("@workspace/db", {
@@ -53,6 +114,7 @@ mock.module("@workspace/db", {
     db: fakeDb,
     playersTable,
     hatchlingsTable: {},
+    rateLimitAttemptsTable,
   },
 });
 
@@ -60,6 +122,9 @@ mock.module("drizzle-orm", {
   namedExports: {
     eq: (c: { __col: string }, val: unknown): Predicate => ({ [c.__col]: val }),
     and: (...parts: Predicate[]) => Object.assign({}, ...parts),
+    lt: (c: { __col: string }, val: unknown): Predicate =>
+      c.__col === "rateLimitAttempts.createdAt" ? { __lt_createdAt: val } : {},
+    desc: (c: unknown) => ({ __desc: c }),
   },
 });
 
@@ -166,6 +231,8 @@ after(async () => {
 
 beforeEach(() => {
   state.players.clear();
+  rateRows.length = 0;
+  nextRateId = 1;
   nextSeq += 1000; // jump the seq so per-player limiter buckets don't bleed across tests
 });
 

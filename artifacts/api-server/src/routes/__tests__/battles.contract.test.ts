@@ -223,6 +223,7 @@ const fakeDb = {
 mock.module("@workspace/db", {
   namedExports: {
     emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
+    rateLimitAttemptsTable: { id: {}, scope: {}, key: {}, createdAt: {} },
     db: fakeDb,
     battlesTable: { player1Id: { __c: "p1" }, player2Id: { __c: "p2" }, createdAt: { __c: "createdAt" } },
     hatchlingsTable: { id: { __c: "id" } },

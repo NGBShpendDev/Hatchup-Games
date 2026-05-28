@@ -89,6 +89,33 @@ export const emailResendAttemptsTable = pgTable(
 
 export type EmailResendAttempt = typeof emailResendAttemptsTable.$inferSelect;
 
+// Generic durable backing store for per-actor rate limits. Each consumed
+// attempt writes a row keyed by `(scope, key)` where `scope` names the
+// limiter (e.g. "email_resend", "ai_coach", "recap_preview") and `key` is
+// the per-actor identifier the limiter buckets on (`player:<id>` or
+// `ip:<addr>`). Counting rows in the current window decides whether the
+// next call is allowed; rows older than the window are GC'd opportunistically
+// by `consumeRateLimitBudget` on the same `(scope, key)`.
+//
+// This generalizes the original `email_resend_attempts` table so every
+// per-player limiter survives API restarts and is shared across
+// horizontally-scaled instances — the previous in-process limiters reset
+// on every redeploy.
+export const rateLimitAttemptsTable = pgTable(
+  "rate_limit_attempts",
+  {
+    id: serial("id").primaryKey(),
+    scope: text("scope").notNull(),
+    key: text("key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("rate_limit_attempts_scope_key_created_at_idx").on(t.scope, t.key, t.createdAt),
+  ],
+);
+
+export type RateLimitAttempt = typeof rateLimitAttemptsTable.$inferSelect;
+
 // Suspension appeals submitted in-app by suspended players. Status is one of
 // "pending" | "approved" | "denied". A player may have at most one row in the
 // "pending" state at any time — the POST handler enforces this.

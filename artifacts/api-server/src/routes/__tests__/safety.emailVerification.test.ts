@@ -223,6 +223,7 @@ mock.module("@workspace/db", {
     notificationsTable: { id: {}, playerId: {}, type: {}, title: {}, body: {}, link: {}, sourceId: {}, createdAt: {} },
     bouncedEmailsTable: { id: {}, email: {} },
     emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
+    rateLimitAttemptsTable: { id: {}, scope: {}, key: {}, createdAt: {} },
   },
 });
 

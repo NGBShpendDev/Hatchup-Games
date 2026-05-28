@@ -104,6 +104,23 @@ const playersTable = {
   emailVerificationToken: col("players.emailVerificationToken"),
 };
 
+// `consumeEmailResendBudget` is now backed by the shared
+// `rate_limit_attempts` table via `consumeRateLimitBudget` (scope =
+// "email_resend"). The fakeDb below routes the limiter's delete/select/insert
+// against this table to an in-memory array keyed on `(scope, key)` so the
+// 3/hour cap trips deterministically across the integration tests below.
+const rateLimitAttemptsTable = {
+  __table: "rateLimitAttempts" as const,
+  id: col("rateLimitAttempts.id"),
+  scope: col("rateLimitAttempts.scope"),
+  key: col("rateLimitAttempts.key"),
+  createdAt: col("rateLimitAttempts.createdAt"),
+};
+
+// Kept exported alongside the new table so the few other code paths that
+// historically referenced `emailResendAttemptsTable` (and several test
+// stubs) still resolve a value — but it's no longer used by the limiter
+// itself.
 const emailResendAttemptsTable = {
   __table: "emailResendAttempts" as const,
   id: col("emailResendAttempts.id"),
@@ -111,14 +128,31 @@ const emailResendAttemptsTable = {
   createdAt: col("emailResendAttempts.createdAt"),
 };
 
+// And-merge that preserves repeated __eq predicates by collecting them
+// into __eqs[]. The limiter calls eq(scope, ...) and eq(key, ...) inside
+// the same and(), so we need both — `Object.assign` would clobber.
+function mergeAnd(parts: Record<string, unknown>[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const eqs: { col: string; val: unknown }[] = [];
+  for (const p of parts) {
+    for (const [k, v] of Object.entries(p)) {
+      if (k === "__eq") eqs.push(v as { col: string; val: unknown });
+      else out[k] = v;
+    }
+  }
+  if (eqs.length) out.__eqs = eqs;
+  return out;
+}
+
 mock.module("drizzle-orm", {
   namedExports: {
     eq: (c: { __col: string }, val: unknown) => ({ __eq: { col: c.__col, val } }),
     lt: (c: { __col: string }, val: unknown) => ({ __lt: { col: c.__col, val } }),
-    and: (...parts: Record<string, unknown>[]) => Object.assign({}, ...parts),
+    and: (...parts: Record<string, unknown>[]) => mergeAnd(parts),
     or: (...parts: Record<string, unknown>[]) => ({ __or: parts }),
     desc: () => ({}),
     notInArray: () => ({}),
+    inArray: () => ({}),
   },
 });
 
@@ -234,15 +268,19 @@ const fakeDb = {
   },
   insert(table: unknown) {
     return {
-      values: async (v: { key?: string } | undefined) => {
+      values: async (v: { key?: string; scope?: string } | undefined) => {
         if (
-          table === (emailResendAttemptsTable as unknown) &&
+          table === (rateLimitAttemptsTable as unknown) &&
           v &&
-          typeof v.key === "string"
+          typeof v.key === "string" &&
+          typeof v.scope === "string"
         ) {
           state.resendAttempts.push({
             id: state.nextResendId++,
-            key: v.key,
+            // Encode scope + key into the stored key so the unit tests'
+            // single-bucket assertions still make sense, while keeping the
+            // scope value around for later filtering.
+            key: `${v.scope}:${v.key}`,
             // Use Date.now() explicitly so the unit test that swaps Date.now
             // for window-rollover coverage controls the row's timestamp.
             createdAt: new Date(Date.now()),
@@ -255,39 +293,57 @@ const fakeDb = {
   },
   delete(table: unknown) {
     return {
-      where: async (pred: { __lt?: { col: string; val: Date } }) => {
-        if (
-          table === (emailResendAttemptsTable as unknown) &&
-          pred.__lt?.col === "emailResendAttempts.createdAt"
-        ) {
-          const cutoff = (pred.__lt.val as Date).getTime();
-          state.resendAttempts = state.resendAttempts.filter(
-            (a) => a.createdAt.getTime() >= cutoff,
-          );
-        }
+      where: async (
+        pred: {
+          __lt?: { col: string; val: Date };
+          __eqs?: { col: string; val: unknown }[];
+        },
+      ) => {
+        if (table !== (rateLimitAttemptsTable as unknown)) return undefined;
+        if (pred.__lt?.col !== "rateLimitAttempts.createdAt") return undefined;
+        const cutoff = (pred.__lt.val as Date).getTime();
+        const scope = pred.__eqs?.find((e) => e.col === "rateLimitAttempts.scope")?.val as
+          | string
+          | undefined;
+        const key = pred.__eqs?.find((e) => e.col === "rateLimitAttempts.key")?.val as
+          | string
+          | undefined;
+        const tag = scope && key ? `${scope}:${key}` : undefined;
+        state.resendAttempts = state.resendAttempts.filter(
+          (a) =>
+            !(a.createdAt.getTime() < cutoff && (tag == null || a.key === tag)),
+        );
         return undefined;
       },
     };
   },
   select(_cols?: unknown) {
     let _from: unknown;
-    let _where: { __eq?: { col: string; val: unknown } } = {};
+    let _where: {
+      __eq?: { col: string; val: unknown };
+      __eqs?: { col: string; val: unknown }[];
+    } = {};
     const chain = {
       from(t: unknown) {
         _from = t;
         return chain;
       },
-      where(pred: { __eq?: { col: string; val: unknown } }) {
+      where(pred: typeof _where) {
         _where = pred;
         return chain;
       },
       async orderBy(..._args: unknown[]) {
-        if (_from === (emailResendAttemptsTable as unknown)) {
-          const k = _where.__eq?.col === "emailResendAttempts.key" ? _where.__eq.val : undefined;
-          const rows = state.resendAttempts.filter((a) => a.key === k);
-          return rows.map((a) => ({ id: a.id }));
-        }
-        return [];
+        if (_from !== (rateLimitAttemptsTable as unknown)) return [];
+        const scope = _where.__eqs?.find((e) => e.col === "rateLimitAttempts.scope")?.val as
+          | string
+          | undefined;
+        const key = _where.__eqs?.find((e) => e.col === "rateLimitAttempts.key")?.val as
+          | string
+          | undefined;
+        if (scope == null || key == null) return [];
+        const tag = `${scope}:${key}`;
+        const rows = state.resendAttempts.filter((a) => a.key === tag);
+        return rows.map((a) => ({ id: a.id }));
       },
     };
     return chain;
@@ -299,6 +355,7 @@ mock.module("@workspace/db", {
     db: fakeDb,
     playersTable,
     emailResendAttemptsTable,
+    rateLimitAttemptsTable,
     userReportsTable: {
       id: {}, status: {}, createdAt: {}, reportedUserId: {}, contentType: {},
     },
@@ -306,6 +363,7 @@ mock.module("@workspace/db", {
     moderationAuditLogTable: { id: {}, actorId: {}, action: {}, targetPlayerId: {}, targetReportId: {}, reason: {}, metadata: {}, createdAt: {} },
     notificationsTable: { id: {}, playerId: {}, type: {}, createdAt: {} },
     bouncedEmailsTable: { id: {}, email: {} },
+    accountAppealsTable: { id: {}, playerId: {}, status: {}, createdAt: {} },
   },
 });
 

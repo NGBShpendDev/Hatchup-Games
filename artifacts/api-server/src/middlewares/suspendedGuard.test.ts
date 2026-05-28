@@ -22,6 +22,7 @@ mock.module("drizzle-orm", {
 mock.module("@workspace/db", {
   namedExports: {
     emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
+    rateLimitAttemptsTable: { id: {}, scope: {}, key: {}, createdAt: {} },
     db: {
       query: {
         playersTable: {

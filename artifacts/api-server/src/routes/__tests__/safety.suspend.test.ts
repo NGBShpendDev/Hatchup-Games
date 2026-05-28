@@ -140,6 +140,7 @@ const fakeDb = {
 mock.module("@workspace/db", {
   namedExports: {
     emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
+    rateLimitAttemptsTable: { id: {}, scope: {}, key: {}, createdAt: {} },
     db: fakeDb,
     playersTable: { id: {}, clerkId: {}, username: {}, isSuspended: {}, suspendedAt: {}, suspensionReason: {}, suspendedByAdminId: {} },
     userReportsTable: { id: {}, status: {}, createdAt: {}, reportedUserId: {}, contentType: {} },
