@@ -101,16 +101,15 @@ async function enrichPost(
     ? (reactions.find(r => r.playerId === viewerPlayerId)?.reactionType ?? null)
     : null;
 
-  const comments = await db.query.postCommentsTable.findMany({
+  const allComments = await db.query.postCommentsTable.findMany({
     where: eq(postCommentsTable.postId, post.id),
     orderBy: [desc(postCommentsTable.createdAt)],
-    limit: 3,
   });
 
-  const commentIds = comments.map(c => c.id);
-  const commentLikes = commentIds.length
+  const allCommentIds = allComments.map(c => c.id);
+  const commentLikes = allCommentIds.length
     ? await db.query.postCommentReactionsTable.findMany({
-        where: inArray(postCommentReactionsTable.commentId, commentIds),
+        where: inArray(postCommentReactionsTable.commentId, allCommentIds),
       })
     : [];
   const likeCountByComment = new Map<number, number>();
@@ -119,6 +118,15 @@ async function enrichPost(
     likeCountByComment.set(r.commentId, (likeCountByComment.get(r.commentId) ?? 0) + 1);
     if (viewerPlayerId && r.playerId === viewerPlayerId) myLikedByComment.set(r.commentId, true);
   }
+
+  // Sort: most-liked first, ties broken by recency (newer first).
+  const comments = [...allComments]
+    .sort((a, b) => {
+      const likeDiff = (likeCountByComment.get(b.id) ?? 0) - (likeCountByComment.get(a.id) ?? 0);
+      if (likeDiff !== 0) return likeDiff;
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    })
+    .slice(0, 3);
 
   const enrichedComments = await Promise.all(comments.map(async c => {
     const commentAuthor = await db.query.playersTable.findFirst({ where: eq(playersTable.id, c.playerId) });
@@ -179,7 +187,7 @@ async function enrichPost(
     repostCount,
     myReaction,
     myRepost,
-    comments: enrichedComments.reverse(),
+    comments: enrichedComments,
   };
 }
 

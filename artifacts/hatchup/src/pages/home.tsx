@@ -923,7 +923,7 @@ function HighlightCard({
   const myReaction = post.myReaction as string | null;
   const allComments: PostComment[] = post.comments ?? [];
   const commentCount: number = post.commentCount ?? allComments.length;
-  const previewComments = showComments ? allComments : allComments.slice(-2);
+  const previewComments = showComments ? allComments : allComments.slice(0, 2);
   const hiddenCount = Math.max(0, commentCount - previewComments.length);
 
   async function handleSubmit(e: React.FormEvent) {
