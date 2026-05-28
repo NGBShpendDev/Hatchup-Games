@@ -43,6 +43,7 @@ type PlayerContextValue = {
   isLoading: boolean;
   needsProfile: boolean;
   needsOnboarding: boolean;
+  hasError: boolean;
   createProfile: (username: string, displayName: string) => Promise<void>;
   completeOnboarding: () => void;
   refetch: () => Promise<void>;
@@ -56,6 +57,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [player, setPlayer] = useState<PlayerProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [needsProfile, setNeedsProfile] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   const fetchPlayer = async () => {
     if (!user) {
@@ -64,18 +66,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       return;
     }
     setIsLoading(true);
+    setHasError(false);
     try {
       const res = await fetch("/api/players/me", { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setPlayer(data);
         setNeedsProfile(false);
-      } else {
+      } else if (res.status === 404) {
         setNeedsProfile(true);
         setPlayer(null);
+      } else {
+        setHasError(true);
       }
     } catch {
-      setNeedsProfile(true);
+      setHasError(true);
     } finally {
       setIsLoading(false);
     }
@@ -134,6 +139,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         isLoading,
         needsProfile,
         needsOnboarding,
+        hasError,
         createProfile,
         completeOnboarding,
         refetch: fetchPlayer,

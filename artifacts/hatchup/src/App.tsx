@@ -225,13 +225,29 @@ function PassiveXpBanner() {
 }
 
 function AppRoutes() {
-  const { player, isLoading, needsProfile, needsOnboarding, completeOnboarding } = usePlayer();
+  const { player, isLoading, needsProfile, needsOnboarding, completeOnboarding, hasError, refetch } = usePlayer();
   useTimezoneSync();
 
   if (isLoading) {
     return (
       <div className="min-h-[100dvh] bg-[#050508] flex items-center justify-center">
         <div className="w-10 h-10 rounded-full border-2 border-[#ff2d55] border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="min-h-[100dvh] bg-[#050508] flex flex-col items-center justify-center gap-4 px-6 text-center">
+        <div className="text-4xl">⚠️</div>
+        <h2 className="text-white font-bold text-lg">Something went wrong</h2>
+        <p className="text-white/50 text-sm max-w-xs">We couldn't reach the server. Please check your connection and try again.</p>
+        <button
+          onClick={refetch}
+          className="mt-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#ff2d55] to-[#bf00ff] text-white font-semibold text-sm hover:opacity-90 active:scale-95 transition-all"
+        >
+          Tap to retry
+        </button>
       </div>
     );
   }
