@@ -1,7 +1,8 @@
 import { Router } from "express";
+import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import { liveEventsTable, hatchlingsTable, playersTable, eventParticipantsTable } from "@workspace/db";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { ListEventsQueryParams, GetLiveEventParams } from "@workspace/api-zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 
@@ -16,10 +17,26 @@ const XP_PER_LEVEL = 100;
 
 const router = Router();
 
+// Resolve the current player id from the Clerk session without requiring auth.
+// Returns undefined when the request is unauthenticated or the player row
+// doesn't exist yet (e.g. mid-onboarding).
+async function optionalPlayerId(req: Parameters<typeof getAuth>[0]): Promise<number | undefined> {
+  const auth = getAuth(req);
+  if (!auth?.userId) return undefined;
+  const player = await db.query.playersTable.findFirst({
+    where: eq(playersTable.clerkId, auth.userId),
+    columns: { id: true },
+  });
+  return player?.id;
+}
+
 // Map a DB row to the OpenAPI LiveEvent response shape.
 // DB columns  : startsAt, endsAt, participants, reward (text)
 // API contract: startTime, endTime, participantCount, rewardXp
-function toApiEvent(e: typeof liveEventsTable.$inferSelect) {
+function toApiEvent(
+  e: typeof liveEventsTable.$inferSelect,
+  hasJoined = false,
+) {
   return {
     id:               e.id,
     name:             e.name,
@@ -34,6 +51,7 @@ function toApiEvent(e: typeof liveEventsTable.$inferSelect) {
     imageUrl:         e.imageUrl ?? null,
     isFeatured:       e.isFeatured,
     color:            e.color ?? null,
+    hasJoined,
   };
 }
 
@@ -44,7 +62,24 @@ router.get("/events", async (req, res) => {
   let results = await db.query.liveEventsTable.findMany();
   if (query.data.status) results = results.filter(e => e.status === query.data.status);
 
-  res.json(results.map(toApiEvent));
+  const pid = await optionalPlayerId(req);
+
+  let joinedSet = new Set<number>();
+  if (pid && results.length > 0) {
+    const eventIds = results.map(e => e.id);
+    const rows = await db
+      .select({ eventId: eventParticipantsTable.eventId })
+      .from(eventParticipantsTable)
+      .where(
+        and(
+          eq(eventParticipantsTable.playerId, pid),
+          inArray(eventParticipantsTable.eventId, eventIds),
+        ),
+      );
+    joinedSet = new Set(rows.map(r => r.eventId));
+  }
+
+  res.json(results.map(e => toApiEvent(e, joinedSet.has(e.id))));
 });
 
 router.get("/events/:id", async (req, res) => {
@@ -53,7 +88,21 @@ router.get("/events/:id", async (req, res) => {
 
   const event = await db.query.liveEventsTable.findFirst({ where: eq(liveEventsTable.id, params.data.id) });
   if (!event) { res.status(404).json({ error: "Event not found" }); return; }
-  res.json(toApiEvent(event));
+
+  const pid = await optionalPlayerId(req);
+  let hasJoined = false;
+  if (pid) {
+    const row = await db.query.eventParticipantsTable.findFirst({
+      where: and(
+        eq(eventParticipantsTable.eventId, event.id),
+        eq(eventParticipantsTable.playerId, pid),
+      ),
+      columns: { eventId: true },
+    });
+    hasJoined = !!row;
+  }
+
+  res.json(toApiEvent(event, hasJoined));
 });
 
 // Server-side event join. Idempotent — uses the unique

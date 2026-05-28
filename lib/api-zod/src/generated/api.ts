@@ -350,7 +350,10 @@ export const GetPlayerDashboardResponse = zod.object({
   "rewardXp": zod.number().nullish(),
   "rewardCoins": zod.number().nullish(),
   "imageUrl": zod.string().nullish(),
-  "participantCount": zod.number().optional()
+  "participantCount": zod.number().optional(),
+  "isFeatured": zod.boolean().optional(),
+  "color": zod.string().nullish(),
+  "hasJoined": zod.boolean().optional()
 })),
   "topHatchling": zod.object({
   "id": zod.number(),
@@ -1361,7 +1364,10 @@ export const ListEventsResponseItem = zod.object({
   "rewardXp": zod.number().nullish(),
   "rewardCoins": zod.number().nullish(),
   "imageUrl": zod.string().nullish(),
-  "participantCount": zod.number().optional()
+  "participantCount": zod.number().optional(),
+  "isFeatured": zod.boolean().optional(),
+  "color": zod.string().nullish(),
+  "hasJoined": zod.boolean().optional()
 })
 export const ListEventsResponse = zod.array(ListEventsResponseItem)
 
@@ -1384,7 +1390,10 @@ export const GetLiveEventResponse = zod.object({
   "rewardXp": zod.number().nullish(),
   "rewardCoins": zod.number().nullish(),
   "imageUrl": zod.string().nullish(),
-  "participantCount": zod.number().optional()
+  "participantCount": zod.number().optional(),
+  "isFeatured": zod.boolean().optional(),
+  "color": zod.string().nullish(),
+  "hasJoined": zod.boolean().optional()
 })
 
 

@@ -5051,6 +5051,9 @@ components:
         rewardCoins: { type: ["integer", "null"] }
         imageUrl:    { type: ["string", "null"] }
         participantCount: { type: integer }
+        isFeatured:  { type: boolean }
+        color:       { type: ["string", "null"] }
+        hasJoined:   { type: boolean }
 
     # ── Club ─────────────────────────────────────────────────────────────────
     Club:

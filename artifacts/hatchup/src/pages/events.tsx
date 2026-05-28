@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
 import { GlowBadge } from "@/components/ui/glow-badge";
-import { Calendar, Clock, Gift, Users, Phone } from "lucide-react";
+import { Calendar, Clock, Gift, Users, Phone, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { SafetyBanner } from "@/components/safety-banner";
 import { ErrorCard } from "@/components/error-card";
@@ -199,15 +199,25 @@ export default function Events() {
                           )}
                         </div>
                         {event.status === "active" ? (
-                          <NeonButton
-                            size="lg"
-                            className="w-full md:w-auto"
-                            onClick={() => handleJoinEvent(event.id, event.name)}
-                            disabled={joinEventMutation.isPending}
-                            data-testid={`button-join-event-${event.id}`}
-                          >
-                            Join Event
-                          </NeonButton>
+                          event.hasJoined ? (
+                            <div
+                              className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-green-500/40 bg-green-950/30 text-green-400 font-bold text-sm w-full md:w-auto justify-center"
+                              data-testid={`badge-joined-event-${event.id}`}
+                            >
+                              <CheckCircle2 className="w-4 h-4 shrink-0" />
+                              You&apos;re already in!
+                            </div>
+                          ) : (
+                            <NeonButton
+                              size="lg"
+                              className="w-full md:w-auto"
+                              onClick={() => handleJoinEvent(event.id, event.name)}
+                              disabled={joinEventMutation.isPending}
+                              data-testid={`button-join-event-${event.id}`}
+                            >
+                              Join Event
+                            </NeonButton>
+                          )
                         ) : (
                           <Button
                             size="lg"

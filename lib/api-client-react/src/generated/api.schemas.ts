@@ -116,6 +116,10 @@ export interface LiveEvent {
   /** @nullable */
   imageUrl?: string | null;
   participantCount?: number;
+  isFeatured?: boolean;
+  /** @nullable */
+  color?: string | null;
+  hasJoined?: boolean;
 }
 
 /**
