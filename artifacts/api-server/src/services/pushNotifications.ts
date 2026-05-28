@@ -70,6 +70,7 @@ export function isPushConfigured(): boolean {
 
 const CATEGORY_TO_PLAYER_FIELD: Record<PushCategory, keyof typeof playersTable.$inferSelect> = {
   invites: "notifyInvitesPush",
+  social: "notifySocialPush",
   endingSoon: "notifyEndingSoonPush",
   completed: "notifyCompletedPush",
   nutritionRecap: "notifyRecapPush",

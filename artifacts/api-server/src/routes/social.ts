@@ -541,7 +541,7 @@ router.post("/social/posts", requireAuth, attachPlayer, socialWriteLimiter, bloc
         title,
         body,
         link,
-        category: "invites",
+        category: "social",
         tag: `post-mention-${post.id}-${m.id}`,
       });
     }
@@ -925,7 +925,7 @@ router.post("/social/posts/:id/react", requireAuth, attachPlayer, socialWriteLim
         title,
         body: bodyText,
         link,
-        category: "invites",
+        category: "social",
         tag: `post-reaction-${postId}-${playerId}`,
       });
     }
@@ -1118,7 +1118,7 @@ router.post("/social/posts/:id/comments", requireAuth, attachPlayer, socialWrite
       title: replyTitle,
       body: replyBody,
       link: commentLink,
-      category: "invites",
+      category: "social",
       tag: `post-comment-${comment.id}`,
     });
   }
@@ -1142,7 +1142,7 @@ router.post("/social/posts/:id/comments", requireAuth, attachPlayer, socialWrite
       title: mTitle,
       body: mBody,
       link: commentLink,
-      category: "invites",
+      category: "social",
       tag: `comment-mention-${comment.id}-${m.id}`,
     });
   }
@@ -1330,7 +1330,7 @@ router.post(
           title,
           body,
           link,
-          category: "invites",
+          category: "social",
           tag: `comment-like-${commentId}-${playerId}`,
         });
       }
@@ -1408,7 +1408,7 @@ router.post("/social/follow", requireAuth, attachPlayer, socialWriteLimiter, blo
       title,
       body: bodyText,
       link,
-      category: "invites",
+      category: "social",
       tag: `new-follower-${followerId}`,
     });
   }

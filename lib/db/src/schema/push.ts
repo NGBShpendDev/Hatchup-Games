@@ -30,5 +30,5 @@ export type PushVapidKeys = typeof pushVapidKeysTable.$inferSelect;
 
 // Keep these in lockstep with `players.notify*Push` columns. Used as the canonical
 // list of push notification categories players can opt in/out of.
-export const PUSH_CATEGORIES = ["invites", "endingSoon", "completed", "nutritionRecap"] as const;
+export const PUSH_CATEGORIES = ["invites", "social", "endingSoon", "completed", "nutritionRecap"] as const;
 export type PushCategory = (typeof PUSH_CATEGORIES)[number];

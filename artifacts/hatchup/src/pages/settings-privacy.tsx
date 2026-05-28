@@ -137,7 +137,7 @@ export default function SettingsPrivacy() {
 
   // Web push state ──
   const push = usePushSubscription();
-  const [pushPrefs, setPushPrefs] = useState({ invites: true, endingSoon: true, completed: true });
+  const [pushPrefs, setPushPrefs] = useState({ invites: true, social: true, endingSoon: true, completed: true });
   const [pushPrefsLoaded, setPushPrefsLoaded] = useState(false);
 
   useEffect(() => {
@@ -145,13 +145,18 @@ export default function SettingsPrivacy() {
     fetch("/api/push/preferences", { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (data) setPushPrefs({ invites: !!data.invites, endingSoon: !!data.endingSoon, completed: !!data.completed });
+        if (data) setPushPrefs({
+          invites: !!data.invites,
+          social: data.social !== false,
+          endingSoon: !!data.endingSoon,
+          completed: !!data.completed,
+        });
         setPushPrefsLoaded(true);
       })
       .catch(() => setPushPrefsLoaded(true));
   }, [playerId, pushPrefsLoaded]);
 
-  const updatePushPref = async (key: "invites" | "endingSoon" | "completed", value: boolean) => {
+  const updatePushPref = async (key: "invites" | "social" | "endingSoon" | "completed", value: boolean) => {
     setPushPrefs(prev => ({ ...prev, [key]: value }));
     try {
       await fetch("/api/push/preferences", {
@@ -677,6 +682,7 @@ export default function SettingsPrivacy() {
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Categories</p>
               {[
                 { key: "invites" as const, label: "Challenge invites", desc: "Someone invites you to a challenge" },
+                { key: "social" as const, label: "Likes, replies & mentions", desc: "Someone reacts, comments, mentions, or follows you" },
                 { key: "endingSoon" as const, label: "Ending soon", desc: "A joined challenge has under 24 hours left" },
                 { key: "completed" as const, label: "Challenge complete", desc: "A challenge you joined wrapped up" },
               ].map(({ key, label, desc }) => (

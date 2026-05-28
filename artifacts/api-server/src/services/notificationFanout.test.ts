@@ -80,7 +80,7 @@ describe("pushForNotification", () => {
   });
 
   it("maps every expected notification type to a real push category", () => {
-    const expectedCategories = new Set(["invites", "endingSoon", "completed", "nutritionRecap"]);
+    const expectedCategories = new Set(["invites", "social", "endingSoon", "completed", "nutritionRecap"]);
     for (const [type, category] of Object.entries(NOTIFICATION_TYPE_TO_PUSH_CATEGORY)) {
       assert.ok(
         expectedCategories.has(category),

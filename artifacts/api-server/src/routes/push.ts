@@ -79,6 +79,7 @@ router.get("/push/preferences", requireAuth, attachPlayer, async (req, res) => {
 
   res.json({
     invites: player.notifyInvitesPush,
+    social: player.notifySocialPush,
     endingSoon: player.notifyEndingSoonPush,
     completed: player.notifyCompletedPush,
     subscriptionCount: subs.length,
@@ -87,12 +88,13 @@ router.get("/push/preferences", requireAuth, attachPlayer, async (req, res) => {
 
 // ── Update per-category push preferences ───────────────────────────────────
 router.patch("/push/preferences", requireAuth, attachPlayer, async (req, res) => {
-  const { invites, endingSoon, completed } = req.body as {
-    invites?: boolean; endingSoon?: boolean; completed?: boolean;
+  const { invites, social, endingSoon, completed } = req.body as {
+    invites?: boolean; social?: boolean; endingSoon?: boolean; completed?: boolean;
   };
 
   const patch: Record<string, boolean> = {};
   if (typeof invites === "boolean") patch.notifyInvitesPush = invites;
+  if (typeof social === "boolean") patch.notifySocialPush = social;
   if (typeof endingSoon === "boolean") patch.notifyEndingSoonPush = endingSoon;
   if (typeof completed === "boolean") patch.notifyCompletedPush = completed;
 
@@ -103,6 +105,7 @@ router.patch("/push/preferences", requireAuth, attachPlayer, async (req, res) =>
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
   res.json({
     invites: player!.notifyInvitesPush,
+    social: player!.notifySocialPush,
     endingSoon: player!.notifyEndingSoonPush,
     completed: player!.notifyCompletedPush,
   });

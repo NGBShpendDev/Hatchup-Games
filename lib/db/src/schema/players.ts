@@ -92,6 +92,7 @@ export const playersTable = pgTable("players", {
   dailyBattleResetDate: date("daily_battle_reset_date"),
   // Web push notification preferences (per category)
   notifyInvitesPush: boolean("notify_invites_push").notNull().default(true),
+  notifySocialPush: boolean("notify_social_push").notNull().default(true),
   notifyEndingSoonPush: boolean("notify_ending_soon_push").notNull().default(true),
   notifyCompletedPush: boolean("notify_completed_push").notNull().default(true),
   // Weekly nutrition recap delivery preferences
