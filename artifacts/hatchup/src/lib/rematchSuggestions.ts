@@ -26,6 +26,7 @@ export interface RankedHatchling<T extends HatchlingLikeForSort> {
   isBestWinRate: boolean;
   isRecommended: boolean;
   reason: "last-used" | "most-wins" | "best-win-rate" | null;
+  currentStreak: { count: number; type: "win" | "loss" | "draw" } | null;
 }
 
 export function rankHatchlingsForRematch<T extends HatchlingLikeForSort>(
@@ -36,6 +37,7 @@ export function rankHatchlingsForRematch<T extends HatchlingLikeForSort>(
   const lossesById = new Map<number, number>();
   const drawsById = new Map<number, number>();
   const lastUsedById = new Map<number, number>();
+  const battlesByHatchlingId = new Map<number, RematchBattleLike[]>();
 
   for (const b of battles) {
     if (!b.myHatchlingId) continue;
@@ -51,6 +53,26 @@ export function rankHatchlingsForRematch<T extends HatchlingLikeForSort>(
     } else if (b.outcome === "draw") {
       drawsById.set(b.myHatchlingId, (drawsById.get(b.myHatchlingId) ?? 0) + 1);
     }
+    const arr = battlesByHatchlingId.get(b.myHatchlingId) ?? [];
+    arr.push(b);
+    battlesByHatchlingId.set(b.myHatchlingId, arr);
+  }
+
+  // Compute current win/loss/draw streak per hatchling (chronological order).
+  const streakById = new Map<number, { count: number; type: "win" | "loss" | "draw" }>();
+  for (const [id, hBattles] of battlesByHatchlingId) {
+    const chrono = [...hBattles].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+    if (chrono.length === 0) continue;
+    const latestOutcome = chrono[chrono.length - 1].outcome;
+    if (latestOutcome !== "win" && latestOutcome !== "loss" && latestOutcome !== "draw") continue;
+    let count = 0;
+    for (let i = chrono.length - 1; i >= 0; i--) {
+      if (chrono[i].outcome === latestOutcome) count++;
+      else break;
+    }
+    streakById.set(id, { count, type: latestOutcome });
   }
 
   let lastUsedId: number | null = null;
@@ -72,25 +94,61 @@ export function rankHatchlingsForRematch<T extends HatchlingLikeForSort>(
   }
 
   // Best win-rate among hatchlings with enough history (≥ MIN_BATTLES_FOR_WIN_RATE
-  // decisive battles, i.e. wins + losses, against this rival). Ties broken by
-  // recency of last use.
+  // decisive battles, i.e. wins + losses, against this rival). When rates are
+  // within 5 whole percentage points, an active win streak (≥ 2) tips the
+  // balance; otherwise ties are broken by recency of last use.
+  // Comparisons use integer percentage points to avoid floating-point drift.
   let bestWinRateId: number | null = null;
   let bestWinRate = -1;
+  let bestWinRatePct = -1;
   let bestWinRateLastUsed = -Infinity;
+  let bestWinRateIsStreaking = false;
   for (const h of hatchlings) {
     const wins = winsById.get(h.id) ?? 0;
     const losses = lossesById.get(h.id) ?? 0;
     const decisive = wins + losses;
     if (decisive < MIN_BATTLES_FOR_WIN_RATE) continue;
     const rate = wins / decisive;
+    const ratePct = Math.round(rate * 100);
     const lastUsed = lastUsedById.get(h.id) ?? 0;
-    if (
-      rate > bestWinRate ||
-      (rate === bestWinRate && lastUsed > bestWinRateLastUsed)
-    ) {
+    const streak = streakById.get(h.id);
+    const isStreaking = streak?.type === "win" && streak.count >= 2;
+
+    if (bestWinRateId === null) {
       bestWinRate = rate;
+      bestWinRatePct = ratePct;
       bestWinRateId = h.id;
       bestWinRateLastUsed = lastUsed;
+      bestWinRateIsStreaking = isStreaking;
+      continue;
+    }
+
+    const rateDiffPct = ratePct - bestWinRatePct;
+    let update = false;
+
+    if (rateDiffPct > 5) {
+      // Clearly better rate — wins outright.
+      update = true;
+    } else if (rateDiffPct >= -5) {
+      // Within 5 pp — streak tiebreak, then rate, then recency.
+      if (isStreaking && !bestWinRateIsStreaking) {
+        update = true;
+      } else if (!isStreaking && bestWinRateIsStreaking) {
+        update = false;
+      } else if (rateDiffPct > 0) {
+        update = true;
+      } else if (rateDiffPct === 0) {
+        update = lastUsed > bestWinRateLastUsed;
+      }
+    }
+    // rateDiffPct < -5: clearly worse rate — skip.
+
+    if (update) {
+      bestWinRate = rate;
+      bestWinRatePct = ratePct;
+      bestWinRateId = h.id;
+      bestWinRateLastUsed = lastUsed;
+      bestWinRateIsStreaking = isStreaking;
     }
   }
 
@@ -105,6 +163,7 @@ export function rankHatchlingsForRematch<T extends HatchlingLikeForSort>(
     const isLastUsed = lastUsedId === h.id;
     const isBestWinRate = bestWinRateId === h.id && hasWinRate;
     const isMostWins = mostWinsId === h.id && mostWins > 0;
+    const currentStreak = streakById.get(h.id) ?? null;
     const reason: RankedHatchling<T>["reason"] = isBestWinRate
       ? "best-win-rate"
       : isLastUsed
@@ -126,13 +185,25 @@ export function rankHatchlingsForRematch<T extends HatchlingLikeForSort>(
       isBestWinRate,
       isRecommended: false,
       reason,
+      currentStreak,
     };
   });
 
   ranked.sort((a, b) => {
     if (a.isBestWinRate !== b.isBestWinRate) return a.isBestWinRate ? -1 : 1;
-    if (a.hasWinRate && b.hasWinRate && a.winRate !== b.winRate) {
-      return (b.winRate ?? 0) - (a.winRate ?? 0);
+    if (a.hasWinRate && b.hasWinRate) {
+      const aRatePct = Math.round((a.winRate ?? 0) * 100);
+      const bRatePct = Math.round((b.winRate ?? 0) * 100);
+      if (aRatePct !== bRatePct) {
+        // Streak boost: when rates are within 5 whole pp, prefer active win streak ≥ 2.
+        const rateDiffPct = Math.abs(aRatePct - bRatePct);
+        if (rateDiffPct <= 5) {
+          const aStreaking = a.currentStreak?.type === "win" && (a.currentStreak.count ?? 0) >= 2;
+          const bStreaking = b.currentStreak?.type === "win" && (b.currentStreak.count ?? 0) >= 2;
+          if (aStreaking !== bStreaking) return aStreaking ? -1 : 1;
+        }
+        return bRatePct - aRatePct;
+      }
     }
     if (a.isLastUsed !== b.isLastUsed) return a.isLastUsed ? -1 : 1;
     if (b.wins !== a.wins) return b.wins - a.wins;
@@ -166,4 +237,17 @@ export function formatRecord(r: {
   if (r.wins > 0) return `${r.wins}W`;
   if (r.losses > 0) return `${r.losses}L`;
   return "";
+}
+
+/**
+ * Returns a short streak label for streaks of ≥ 2, e.g. "🔥 W3" or "L2".
+ * Returns "" when there is no streak or the streak is only 1 (trivial).
+ */
+export function formatStreak(
+  streak: { count: number; type: "win" | "loss" | "draw" } | null,
+): string {
+  if (!streak || streak.count < 2) return "";
+  if (streak.type === "win") return `🔥 W${streak.count}`;
+  if (streak.type === "loss") return `L${streak.count}`;
+  return `D${streak.count}`;
 }

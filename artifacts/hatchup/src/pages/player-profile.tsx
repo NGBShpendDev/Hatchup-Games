@@ -14,7 +14,7 @@ import { usePlayer } from "@/lib/playerContext";
 import { toast } from "@/hooks/use-toast";
 import { BadgeCheck, Flame, Trophy, Sparkles, ArrowLeft, Settings, GripVertical, X, Plus, Lock, BarChart3, Eye, Heart, MessageCircle, Repeat2, Crown, Ban, Swords, ChevronRight, Star, Share2 } from "lucide-react";
 import { ShareCardDialog, buildPlayerOgImageUrl, buildPlayerShareUrl } from "@/components/share-card-dialog";
-import { rankHatchlingsForRematch, formatRecord } from "@/lib/rematchSuggestions";
+import { rankHatchlingsForRematch, formatRecord, formatStreak } from "@/lib/rematchSuggestions";
 import { useGetMyPostInsights, getGetMyPostInsightsQueryKey } from "@workspace/api-client-react";
 import type { PostInsight } from "@workspace/api-client-react";
 import { useSubscription } from "@/lib/subscription";
@@ -481,6 +481,10 @@ function RivalryCard({ viewerId, opponentId }: { viewerId: number; opponentId: n
               rankHatchlingsForRematch(myHatchlings, data?.battles ?? []).map(r => {
                 const h = r.hatchling;
                 const record = formatRecord(r);
+                const streakLabel = formatStreak(r.currentStreak);
+                const streakTooltip = r.currentStreak && r.currentStreak.count >= 2
+                  ? `${r.currentStreak.count}-${r.currentStreak.type} streak vs this rival`
+                  : undefined;
                 const subLabel = r.reason === "best-win-rate" && record
                   ? `${record} vs this rival`
                   : r.reason === "last-used"
@@ -503,7 +507,7 @@ function RivalryCard({ viewerId, opponentId }: { viewerId: number; opponentId: n
                     data-testid={`button-pick-hatchling-rematch-${h.id}`}
                   >
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="font-bold truncate">{h.name}</p>
                         {r.isRecommended && (
                           <span
@@ -511,6 +515,21 @@ function RivalryCard({ viewerId, opponentId }: { viewerId: number; opponentId: n
                             data-testid={`badge-recommended-rematch-${h.id}`}
                           >
                             <Star className="w-2.5 h-2.5" /> Recommended
+                          </span>
+                        )}
+                        {streakLabel && (
+                          <span
+                            title={streakTooltip}
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-black tabular-nums ${
+                              r.currentStreak?.type === "win"
+                                ? "bg-orange-500/20 text-orange-300"
+                                : r.currentStreak?.type === "loss"
+                                  ? "bg-red-500/20 text-red-400"
+                                  : "bg-yellow-500/20 text-yellow-300"
+                            }`}
+                            data-testid={`badge-streak-rematch-${h.id}`}
+                          >
+                            {streakLabel}
                           </span>
                         )}
                       </div>
