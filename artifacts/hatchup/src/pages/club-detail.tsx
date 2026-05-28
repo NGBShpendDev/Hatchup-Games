@@ -318,7 +318,7 @@ export default function ClubDetail() {
                 <div className="text-center">
                   <div className="flex items-center gap-2 justify-center text-green-500 font-bold">
                     <Trophy className="w-4 h-4" />
-                    <span className="text-2xl">{club.totalXp.toLocaleString()}</span>
+                    <span className="text-2xl">{(club.totalXp ?? 0).toLocaleString()}</span>
                   </div>
                   <div className="text-xs text-muted-foreground font-bold uppercase tracking-wide">Total XP</div>
                 </div>

@@ -70,7 +70,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         const data = await res.json();
         setPlayer(data);
         setNeedsProfile(false);
-      } else if (res.status === 404) {
+      } else {
         setNeedsProfile(true);
         setPlayer(null);
       }
