@@ -262,7 +262,16 @@ export default function SettingsPrivacy() {
         return;
       }
       if (!res.ok) {
-        toast({ title: "Couldn't resend", description: "Save your email first, then try again.", variant: "destructive" });
+        const errBody = await res.json().catch(() => null);
+        if (errBody?.error === "no_email_on_file") {
+          toast({
+            title: "No email on file",
+            description: "Add an email address below and save it before resending.",
+            variant: "destructive",
+          });
+        } else {
+          toast({ title: "Couldn't resend", description: "Please try again in a moment.", variant: "destructive" });
+        }
         return;
       }
       const data = await res.json().catch(() => null);
