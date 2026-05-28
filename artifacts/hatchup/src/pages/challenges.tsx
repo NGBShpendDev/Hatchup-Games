@@ -5,7 +5,11 @@ import {
   useListChallenges,
   getListChallengesQueryKey,
   useJoinChallenge,
+  useGetMyChallengeInvites,
+  getGetMyChallengeInvitesQueryKey,
+  useRespondToChallengeInvite,
   type ChallengeListItem,
+  type ChallengeInvite,
 } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,7 +24,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Trophy, Users, Clock, Flame, Plus, ChevronRight,
   Zap, Coins, Target, Swords, Globe, Lock, MapPin, Users2,
-  TrendingUp,
+  TrendingUp, Mail, Check, X,
 } from "lucide-react";
 
 type Tab = "trending" | "nearby" | "friends" | "my";
@@ -155,6 +159,118 @@ function ChallengeCard({ challenge, onJoin }: {
   );
 }
 
+function InvitesSection() {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: invites, isLoading } = useGetMyChallengeInvites({
+    query: { queryKey: getGetMyChallengeInvitesQueryKey(), refetchInterval: 60000 },
+  });
+
+  const respondMutation = useRespondToChallengeInvite({
+    mutation: {
+      onSuccess: (_, vars) => {
+        toast({
+          title: vars.data.status === "accepted" ? "Joined!" : "Declined",
+          description:
+            vars.data.status === "accepted"
+              ? "You're in the challenge. Good luck!"
+              : "Invite declined.",
+        });
+        queryClient.invalidateQueries({ queryKey: getGetMyChallengeInvitesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListChallengesQueryKey({ tab: "my" }) });
+      },
+      onError: (err: { response?: { data?: { error?: string } } }) => {
+        toast({
+          title: "Could not respond",
+          description: err?.response?.data?.error ?? "Try again",
+          variant: "destructive",
+        });
+      },
+    },
+  });
+
+  if (isLoading) {
+    return <Skeleton className="h-24 rounded-2xl" />;
+  }
+  if (!invites || invites.length === 0) return null;
+
+  return (
+    <Card className="border-primary/30 bg-primary/5">
+      <CardContent className="p-4">
+        <h3 className="font-black text-foreground mb-3 flex items-center gap-2">
+          <Mail className="w-4 h-4 text-primary" />
+          Challenge Invites
+          <Badge variant="default" className="text-xs ml-auto bg-primary">
+            {invites.length}
+          </Badge>
+        </h3>
+        <div className="space-y-3">
+          {invites.map((inv: ChallengeInvite) => {
+            const ch = inv.challenge as
+              | { id?: number; title?: string; metric?: string; targetValue?: number }
+              | undefined;
+            const metric = ch?.metric ? METRIC_META[ch.metric] : undefined;
+            const pendingAccept =
+              respondMutation.isPending &&
+              respondMutation.variables?.id === inv.id &&
+              respondMutation.variables?.data.status === "accepted";
+            const pendingDecline =
+              respondMutation.isPending &&
+              respondMutation.variables?.id === inv.id &&
+              respondMutation.variables?.data.status === "declined";
+            return (
+              <div
+                key={inv.id}
+                className="flex items-center gap-3 p-3 rounded-xl bg-card/60 border border-border/50"
+              >
+                <span className="text-2xl shrink-0">{metric?.icon ?? "🏆"}</span>
+                <div
+                  className="flex-1 min-w-0 cursor-pointer"
+                  onClick={() => ch?.id && navigate(`/challenges/${ch.id}`)}
+                >
+                  <p className="font-bold text-sm text-foreground truncate">
+                    {ch?.title ?? `Challenge #${inv.challengeId}`}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {ch?.targetValue && metric
+                      ? `${ch.targetValue.toLocaleString()} ${metric.label.toLowerCase()}`
+                      : "Tap to view details"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    disabled={respondMutation.isPending}
+                    onClick={() =>
+                      respondMutation.mutate({ id: inv.id, data: { status: "declined" } })
+                    }
+                    aria-label="Decline invite"
+                  >
+                    {pendingDecline ? "…" : <X className="w-4 h-4" />}
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-8 bg-primary hover:bg-primary/90 font-bold"
+                    disabled={respondMutation.isPending}
+                    onClick={() =>
+                      respondMutation.mutate({ id: inv.id, data: { status: "accepted" } })
+                    }
+                  >
+                    {pendingAccept ? "…" : (<><Check className="w-3.5 h-3.5 mr-1" />Accept</>)}
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Challenges() {
   const [tab, setTab] = useState<Tab>("trending");
   const [, navigate] = useLocation();
@@ -193,6 +309,9 @@ export default function Challenges() {
         </div>
 
         {hasMeetupChallenge && <SafetyBanner variant="event" dismissible />}
+
+        {/* Pending invites */}
+        <InvitesSection />
 
         {/* Create CTA */}
         <Button

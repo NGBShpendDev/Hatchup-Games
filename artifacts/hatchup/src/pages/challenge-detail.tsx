@@ -7,7 +7,15 @@ import {
   useJoinChallenge,
   useSubmitChallengeProgress,
   useReportChallenge,
+  useInviteToChallenge,
+  useListFollowing,
+  getListFollowingQueryKey,
+  type PlayerStub,
 } from "@workspace/api-client-react";
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useParams, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -22,7 +30,7 @@ import { motion } from "framer-motion";
 import {
   Trophy, Users, Clock, Zap, Coins, Target, ArrowLeft,
   MapPin, Share2, CheckCircle2, Medal, Crown,
-  Plus, Minus, MoreVertical,
+  Plus, Minus, MoreVertical, UserPlus, Search, Check,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -66,11 +74,19 @@ export default function ChallengeDetail() {
   const [countdown, setCountdown] = useState("");
   const [progressOpen, setProgressOpen] = useState(false);
   const [progressValue, setProgressValue] = useState(100);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteSearch, setInviteSearch] = useState("");
+  const [invitedIds, setInvitedIds] = useState<Set<number>>(new Set());
 
   const challengeId = Number(id);
   const { data: challenge, isLoading } = useGetChallenge(
     challengeId,
     { query: { queryKey: getGetChallengeQueryKey(challengeId), refetchInterval: 30000 } }
+  );
+
+  const { data: following, isLoading: followingLoading } = useListFollowing(
+    player?.id ?? 0,
+    { query: { queryKey: getListFollowingQueryKey(player?.id ?? 0), enabled: !!player?.id && inviteOpen } }
   );
 
   // Live countdown
@@ -107,6 +123,18 @@ export default function ChallengeDetail() {
     },
   });
 
+  const inviteMutation = useInviteToChallenge({
+    mutation: {
+      onSuccess: (_, vars) => {
+        setInvitedIds((prev) => new Set(prev).add(vars.data.inviteeId));
+        toast({ title: "Invite sent!", description: "They'll see it on their challenges page." });
+      },
+      onError: (err: { response?: { data?: { error?: string } } }) => {
+        toast({ title: "Could not invite", description: err?.response?.data?.error ?? "Try again", variant: "destructive" });
+      },
+    },
+  });
+
   const reportMutation = useReportChallenge({
     mutation: {
       onSuccess: () => toast({ title: "Reported", description: "Sent for moderation review." }),
@@ -132,6 +160,15 @@ export default function ChallengeDetail() {
   const isJoined = rich.isJoined ?? false;
   const isCompleted = rich.status === "completed";
   const isExpired = new Date(rich.endAt) < new Date();
+  const isCreator = !!player && rich.creatorId === player.id;
+  const filteredFollowing: PlayerStub[] = (following ?? []).filter((p) => {
+    const q = inviteSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      p.username.toLowerCase().includes(q) ||
+      (p.displayName ?? "").toLowerCase().includes(q)
+    );
+  });
   const leaderboard: LeaderboardEntry[] = rich.leaderboard ?? [];
   const myEntry = leaderboard.find(e => e.playerId === player?.id);
   const targetValue = rich.targetValue;
@@ -272,6 +309,15 @@ export default function ChallengeDetail() {
                 onClick={() => setProgressOpen(true)}
               >
                 <Plus className="w-4 h-4 mr-2" /> Log Progress
+              </Button>
+            )}
+            {isCreator && (
+              <Button
+                variant="outline"
+                className="font-black border-primary/30 text-primary hover:bg-primary/10"
+                onClick={() => setInviteOpen(true)}
+              >
+                <UserPlus className="w-4 h-4 mr-2" /> Invite
               </Button>
             )}
           </div>
@@ -427,6 +473,101 @@ export default function ChallengeDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Invite friends sheet */}
+      <Sheet open={inviteOpen} onOpenChange={setInviteOpen}>
+        <SheetContent side="bottom" className="max-h-[85vh] flex flex-col">
+          <SheetHeader className="text-left">
+            <SheetTitle className="flex items-center gap-2 text-foreground">
+              <UserPlus className="w-5 h-5 text-primary" /> Invite Friends
+            </SheetTitle>
+            <SheetDescription>
+              Invite people you follow to join "{challenge.title}".
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="relative mt-4 px-4">
+            <Search className="w-4 h-4 absolute left-7 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by name or username…"
+              value={inviteSearch}
+              onChange={(e) => setInviteSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          <ScrollArea className="flex-1 mt-3 px-4 pb-4">
+            {followingLoading ? (
+              <div className="space-y-2 py-2">
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}
+              </div>
+            ) : filteredFollowing.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p className="font-bold">
+                  {(following ?? []).length === 0
+                    ? "Follow some players first"
+                    : "No matches"}
+                </p>
+                <p className="text-xs mt-1">
+                  {(following ?? []).length === 0
+                    ? "You can invite anyone you follow."
+                    : "Try a different search."}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2 py-2">
+                {filteredFollowing.map((p) => {
+                  const invited = invitedIds.has(p.id);
+                  const isPending =
+                    inviteMutation.isPending &&
+                    inviteMutation.variables?.data.inviteeId === p.id;
+                  return (
+                    <div
+                      key={p.id}
+                      className="flex items-center gap-3 p-2 rounded-xl hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-black shrink-0 overflow-hidden">
+                        {p.avatarUrl ? (
+                          <img src={p.avatarUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          (p.displayName ?? p.username).charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-foreground truncate">
+                          {p.displayName ?? p.username}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">@{p.username}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={invited ? "secondary" : "default"}
+                        disabled={invited || isPending}
+                        onClick={() =>
+                          inviteMutation.mutate({
+                            id: challengeId,
+                            data: { inviteeId: p.id },
+                          })
+                        }
+                        className={invited ? "" : "bg-primary hover:bg-primary/90"}
+                      >
+                        {invited ? (
+                          <><Check className="w-3.5 h-3.5 mr-1" /> Invited</>
+                        ) : isPending ? (
+                          "Sending…"
+                        ) : (
+                          "Invite"
+                        )}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
     </Layout>
   );
 }
