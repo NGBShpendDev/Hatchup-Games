@@ -90,8 +90,9 @@ const CreateMealPostBody = z.object({
 // - quality >= 7 → +5 happiness, +5 energy (good fuel)
 // - quality <= 4 → -3 happiness (junk food)
 // - 5/6 → neutral
-// The "active" Hatchling is the most recently interacted (lastWorkoutAt desc,
-// then most-recently created) so feeding rewards the creature the player cares about.
+// The "active" Hatchling is the one the player has explicitly chosen as their
+// partner (players.activeHatchlingId). If unset (or stale), we fall back to the
+// most recently interacted (lastWorkoutAt desc, then most-recently created).
 function statDeltaForQuality(qualityScore: number): { happiness: number; energy: number } | null {
   if (qualityScore >= 7) return { happiness: 5, energy: 5 };
   if (qualityScore <= 4) return { happiness: -3, energy: 0 };
@@ -102,12 +103,28 @@ async function applyNutritionStatBuff(playerId: number, qualityScore: number) {
   const delta = statDeltaForQuality(qualityScore);
   if (!delta) return null;
 
-  // NULLS LAST so a hatchling that was never worked out isn't preferred over
-  // one the player just trained with. createdAt is the secondary tiebreaker.
-  const active = await db.query.hatchlingsTable.findFirst({
-    where: eq(hatchlingsTable.playerId, playerId),
-    orderBy: [sql`${hatchlingsTable.lastWorkoutAt} DESC NULLS LAST`, desc(hatchlingsTable.createdAt)],
+  // Prefer the player's explicitly chosen active Hatchling. Verify ownership
+  // in case the row was transferred or deleted, then fall back to the
+  // implicit "most recently worked out" rule.
+  const player = await db.query.playersTable.findFirst({
+    where: eq(playersTable.id, playerId),
+    columns: { activeHatchlingId: true },
   });
+
+  let active = null as Awaited<ReturnType<typeof db.query.hatchlingsTable.findFirst>> | null;
+  if (player?.activeHatchlingId) {
+    active = await db.query.hatchlingsTable.findFirst({
+      where: and(eq(hatchlingsTable.id, player.activeHatchlingId), eq(hatchlingsTable.playerId, playerId)),
+    }) ?? null;
+  }
+  if (!active) {
+    // NULLS LAST so a hatchling that was never worked out isn't preferred over
+    // one the player just trained with. createdAt is the secondary tiebreaker.
+    active = await db.query.hatchlingsTable.findFirst({
+      where: eq(hatchlingsTable.playerId, playerId),
+      orderBy: [sql`${hatchlingsTable.lastWorkoutAt} DESC NULLS LAST`, desc(hatchlingsTable.createdAt)],
+    }) ?? null;
+  }
   if (!active) return null;
 
   const newHappiness = Math.max(0, Math.min(100, active.happiness + delta.happiness));

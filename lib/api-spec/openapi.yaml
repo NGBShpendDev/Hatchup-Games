@@ -2648,6 +2648,7 @@ components:
         totalWins:      { type: integer }
         totalMatches:   { type: integer }
         clubId:         { type: ["integer", "null"] }
+        activeHatchlingId: { type: ["integer", "null"] }
         totalSteps:     { type: integer }
         totalWorkouts:  { type: integer }
         fitnessXp:      { type: integer }
@@ -2675,6 +2676,7 @@ components:
         fitnessRealm:  { type: string }
         dailyStepGoal: { type: integer }
         waterCups:     { type: integer }
+        activeHatchlingId: { type: ["integer", "null"] }
 
     PlayerDashboard:
       type: object

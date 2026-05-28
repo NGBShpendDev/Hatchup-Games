@@ -6,8 +6,10 @@ import {
   useGetHatchling, getGetHatchlingQueryKey,
   useUpdateHatchling,
   useEvolveHatchling,
-  useDeleteHatchling
+  useDeleteHatchling,
+  useUpdatePlayer,
 } from "@workspace/api-client-react";
+import { usePlayer } from "@/lib/playerContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -172,6 +174,23 @@ export default function HatchlingDetail() {
   const updateMutation = useUpdateHatchling();
   const evolveMutation = useEvolveHatchling();
   const deleteMutation = useDeleteHatchling();
+  const updatePlayerMutation = useUpdatePlayer();
+  const { player, refetch: refetchPlayer } = usePlayer();
+  const isActivePartner = player?.activeHatchlingId === hatchlingId;
+
+  const handleSetActive = () => {
+    if (!player || !hatchling || isActivePartner) return;
+    updatePlayerMutation.mutate(
+      { id: player.id, data: { activeHatchlingId: hatchlingId } },
+      {
+        onSuccess: async () => {
+          await refetchPlayer();
+          toast({ title: "Active Partner Set!", description: `${hatchling.name} is now your bonded partner. Nutrition buffs go to them.` });
+        },
+        onError: () => toast({ title: "Couldn't set partner", description: "Try again in a moment.", variant: "destructive" }),
+      }
+    );
+  };
 
   const handleFeed = () => {
     if (!hatchling) return;
@@ -370,8 +389,40 @@ export default function HatchlingDetail() {
                 <Badge variant="outline" className="text-sm font-bold px-3 py-1 uppercase">{hatchling.species}</Badge>
                 <Badge className="text-sm font-bold px-3 py-1 bg-primary/20 text-primary border-0">Level {hatchling.level}</Badge>
                 <Badge variant="outline" className="text-sm font-bold">{hatchling.rarity ?? "Common"}</Badge>
+                {isActivePartner && (
+                  <Badge className="text-sm font-black px-3 py-1 bg-yellow-400 text-black border-0 flex items-center gap-1">
+                    <Star className="w-3 h-3 fill-black" /> Active Partner
+                  </Badge>
+                )}
               </div>
             </div>
+
+            {/* Active partner action */}
+            <Card className={`${isActivePartner ? "bg-yellow-400/10 border-yellow-400/40" : "bg-card/80 border-border"}`}>
+              <CardContent className="p-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-black text-sm flex items-center gap-1.5">
+                    <Star className={`w-4 h-4 ${isActivePartner ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
+                    {isActivePartner ? "Your Active Partner" : "Active Partner"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {isActivePartner
+                      ? "Nutrition buffs and partner perks go to this Pal."
+                      : "Set as your bonded partner so nutrition buffs go here."}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant={isActivePartner ? "secondary" : "default"}
+                  className="font-bold whitespace-nowrap"
+                  onClick={handleSetActive}
+                  disabled={isActivePartner || updatePlayerMutation.isPending}
+                  data-testid="button-set-active-partner"
+                >
+                  {isActivePartner ? "Active" : updatePlayerMutation.isPending ? "Setting…" : "Set Active"}
+                </Button>
+              </CardContent>
+            </Card>
 
             {/* Realm description */}
             <Card className={`border ${realmConfig.border} bg-gradient-to-br ${realmConfig.gradient}`}>

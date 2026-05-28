@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { hatchlingsTable, evolutionTypesTable } from "@workspace/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { hatchlingsTable, evolutionTypesTable, playersTable } from "@workspace/db";
+import { eq, desc, sql, and } from "drizzle-orm";
 import {
   ListHatchlingsQueryParams,
   CreateHatchlingBody,
@@ -212,6 +212,11 @@ router.delete("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => 
   const hatchling = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, params.data.id) });
   if (!hatchling) { res.status(404).json({ error: "Hatchling not found" }); return; }
   if (hatchling.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
+  // Clear the player's active partner pointer if it referenced this hatchling
+  // so we don't leave a dangling FK that the nutrition buff resolver would skip.
+  await db.update(playersTable)
+    .set({ activeHatchlingId: null })
+    .where(and(eq(playersTable.id, hatchling.playerId), eq(playersTable.activeHatchlingId, params.data.id)));
   await db.delete(hatchlingsTable).where(eq(hatchlingsTable.id, params.data.id));
   res.status(204).send();
 });

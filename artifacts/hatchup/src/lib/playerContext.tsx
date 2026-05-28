@@ -30,6 +30,7 @@ export type PlayerProfile = {
   onboardingComplete: boolean;
   streakAtRisk: boolean;
   recoveryMessage: string | null;
+  activeHatchlingId: number | null;
 };
 
 type PlayerContextValue = {

@@ -44,6 +44,8 @@ export interface Player {
   totalMatches: number;
   /** @nullable */
   clubId?: number | null;
+  /** @nullable */
+  activeHatchlingId?: number | null;
   totalSteps: number;
   totalWorkouts?: number;
   fitnessXp: number;
@@ -73,6 +75,8 @@ export interface PlayerUpdate {
   fitnessRealm?: string;
   dailyStepGoal?: number;
   waterCups?: number;
+  /** @nullable */
+  activeHatchlingId?: number | null;
 }
 
 export interface Competition {

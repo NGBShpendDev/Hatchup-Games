@@ -1,9 +1,12 @@
 import { motion } from "framer-motion";
-import { Hatchling } from "@workspace/api-client-react";
+import { Hatchling, useUpdatePlayer } from "@workspace/api-client-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Zap, Heart } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Zap, Heart, Star } from "lucide-react";
 import { Link } from "wouter";
+import { usePlayer } from "@/lib/playerContext";
+import { useToast } from "@/hooks/use-toast";
 
 import lavaDragonImg from "@/assets/images/lava-dragon.png";
 import cyberCreatureImg from "@/assets/images/cyber-creature.png";
@@ -98,6 +101,26 @@ export function HatchlingCard({ hatchling, onClick }: HatchlingCardProps) {
   const rarityKey = (hatchling.rarity ?? "common").toLowerCase();
   const rarityColor = RARITY_COLORS[rarityKey] ?? RARITY_COLORS["common"];
   const moodState = (hatchling.moodState as string | undefined) ?? "happy";
+  const { player, refetch } = usePlayer();
+  const { toast } = useToast();
+  const updatePlayer = useUpdatePlayer();
+  const isActive = player?.activeHatchlingId === hatchling.id;
+
+  const handleSetActive = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!player || isActive) return;
+    updatePlayer.mutate(
+      { id: player.id, data: { activeHatchlingId: hatchling.id } },
+      {
+        onSuccess: async () => {
+          await refetch();
+          toast({ title: "Active Partner Set!", description: `${hatchling.name} is now your bonded partner. Nutrition buffs go to them.` });
+        },
+        onError: () => toast({ title: "Couldn't set partner", description: "Try again in a moment.", variant: "destructive" }),
+      }
+    );
+  };
 
   const getFallbackImage = (category?: string) => {
     switch (category?.toLowerCase()) {
@@ -116,7 +139,7 @@ export function HatchlingCard({ hatchling, onClick }: HatchlingCardProps) {
   const CardContent = (
     <motion.div
       whileHover={{ y: -8, scale: 1.02 }}
-      className={`relative overflow-hidden rounded-2xl border-2 ${realmStyle.border} bg-card p-4 shadow-lg hover:shadow-2xl ${realmStyle.glow} cursor-pointer group transition-all`}
+      className={`relative overflow-hidden rounded-2xl border-2 ${isActive ? "border-yellow-400 shadow-yellow-400/40" : realmStyle.border} bg-card p-4 shadow-lg hover:shadow-2xl ${isActive ? "" : realmStyle.glow} cursor-pointer group transition-all`}
       onClick={onClick}
       data-testid={`hatchling-card-${hatchling.id}`}
     >
@@ -125,6 +148,13 @@ export function HatchlingCard({ hatchling, onClick }: HatchlingCardProps) {
 
       {/* Hover glow */}
       <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br ${realmStyle.gradient}`} />
+
+      {/* Active partner badge */}
+      {isActive && (
+        <div className="absolute top-2 left-2 z-30 flex items-center gap-1 bg-yellow-400 text-black text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider shadow-lg">
+          <Star className="w-2.5 h-2.5 fill-black" /> Active
+        </div>
+      )}
 
       {/* Mood indicator */}
       <MoodIndicator moodState={moodState} />
@@ -201,6 +231,21 @@ export function HatchlingCard({ hatchling, onClick }: HatchlingCardProps) {
           <span className="text-muted-foreground">{hatchling.friendshipLevel ?? 0}/100</span>
         </div>
         <Progress value={hatchling.friendshipLevel ?? 0} className="h-1 [&>div]:bg-pink-500" />
+      </div>
+
+      {/* Active partner toggle */}
+      <div className="mt-3 relative z-10">
+        <Button
+          size="sm"
+          variant={isActive ? "secondary" : "outline"}
+          className="w-full h-7 text-[10px] font-black uppercase tracking-wider"
+          onClick={handleSetActive}
+          disabled={isActive || updatePlayer.isPending}
+          data-testid={`button-set-active-${hatchling.id}`}
+        >
+          <Star className={`w-3 h-3 mr-1 ${isActive ? "fill-yellow-400 text-yellow-400" : ""}`} />
+          {isActive ? "Active Partner" : "Set as Active"}
+        </Button>
       </div>
     </motion.div>
   );

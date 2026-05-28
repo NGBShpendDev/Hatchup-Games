@@ -144,6 +144,7 @@ export const GetPlayerResponse = zod.object({
   "totalWins": zod.number(),
   "totalMatches": zod.number(),
   "clubId": zod.number().nullish(),
+  "activeHatchlingId": zod.number().nullish(),
   "totalSteps": zod.number(),
   "totalWorkouts": zod.number().optional(),
   "fitnessXp": zod.number(),
@@ -169,7 +170,8 @@ export const UpdatePlayerBody = zod.object({
   "avatarUrl": zod.string().optional(),
   "fitnessRealm": zod.string().optional(),
   "dailyStepGoal": zod.number().optional(),
-  "waterCups": zod.number().optional()
+  "waterCups": zod.number().optional(),
+  "activeHatchlingId": zod.number().nullish()
 })
 
 export const UpdatePlayerResponse = zod.object({
@@ -185,6 +187,7 @@ export const UpdatePlayerResponse = zod.object({
   "totalWins": zod.number(),
   "totalMatches": zod.number(),
   "clubId": zod.number().nullish(),
+  "activeHatchlingId": zod.number().nullish(),
   "totalSteps": zod.number(),
   "totalWorkouts": zod.number().optional(),
   "fitnessXp": zod.number(),
@@ -219,6 +222,7 @@ export const GetPlayerDashboardResponse = zod.object({
   "totalWins": zod.number(),
   "totalMatches": zod.number(),
   "clubId": zod.number().nullish(),
+  "activeHatchlingId": zod.number().nullish(),
   "totalSteps": zod.number(),
   "totalWorkouts": zod.number().optional(),
   "fitnessXp": zod.number(),
@@ -1926,6 +1930,7 @@ export const LogGroupWorkoutResponse = zod.object({
   "totalWins": zod.number(),
   "totalMatches": zod.number(),
   "clubId": zod.number().nullish(),
+  "activeHatchlingId": zod.number().nullish(),
   "totalSteps": zod.number(),
   "totalWorkouts": zod.number().optional(),
   "fitnessXp": zod.number(),
