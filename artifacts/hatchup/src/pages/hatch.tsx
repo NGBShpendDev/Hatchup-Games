@@ -21,6 +21,7 @@ import { Egg as EggIcon, Sparkles, Plus, Footprints, Zap } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import { ErrorCard } from "@/components/error-card";
 
 // ── Realm visual config ────────────────────────────────────────────────────────
 const REALM_EGG_STYLES: Record<string, {
@@ -148,12 +149,12 @@ export default function Hatch() {
   const { playerId } = usePlayer();
   const pid = playerId ?? 0;
 
-  const { data: eggs, isLoading: isLoadingEggs } = useListEggs(
+  const { data: eggs, isLoading: isLoadingEggs, isError: isErrorEggs, refetch: refetchEggs } = useListEggs(
     { playerId: pid, hatched: false },
     { query: { queryKey: getListEggsQueryKey({ playerId: pid, hatched: false }), enabled: !!playerId } }
   );
 
-  const { data: hatchlings, isLoading: isLoadingHatchlings } = useListHatchlings(
+  const { data: hatchlings, isLoading: isLoadingHatchlings, isError: isErrorHatchlings, refetch: refetchHatchlings } = useListHatchlings(
     { playerId: pid },
     { query: { queryKey: getListHatchlingsQueryKey({ playerId: pid }), enabled: !!playerId } }
   );
@@ -209,6 +210,9 @@ export default function Hatch() {
         onSuccess: () => {
           toast({ title: "🥚 New egg found!" });
           queryClient.invalidateQueries({ queryKey: getListEggsQueryKey({ playerId: pid, hatched: false }) });
+        },
+        onError: () => {
+          toast({ title: "Couldn't find a new egg", description: "Try again in a moment.", variant: "destructive" });
         }
       }
     );
@@ -248,7 +252,9 @@ export default function Hatch() {
         {/* Active Eggs */}
         <div>
           <h2 className="text-2xl font-black mb-6">Active Eggs</h2>
-          {isLoadingEggs ? (
+          {isErrorEggs && !eggs ? (
+            <ErrorCard title="Couldn't load your eggs" onRetry={() => refetchEggs()} />
+          ) : isLoadingEggs ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-72 w-full rounded-3xl" />)}
             </div>
@@ -324,7 +330,9 @@ export default function Hatch() {
         {/* Your Pals mini-grid */}
         <div>
           <h2 className="text-2xl font-black mb-6">Your Pals</h2>
-          {isLoadingHatchlings ? (
+          {isErrorHatchlings && !hatchlings ? (
+            <ErrorCard title="Couldn't load your Pals" onRetry={() => refetchHatchlings()} />
+          ) : isLoadingHatchlings ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-2xl" />)}
             </div>

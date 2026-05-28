@@ -10,6 +10,7 @@ import { GlowBadge } from "@/components/ui/glow-badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { Zap, Lock } from "lucide-react";
 import { useState } from "react";
+import { ErrorCard } from "@/components/error-card";
 
 // ── Realm visual config ────────────────────────────────────────────────────────
 const REALM_STYLES: Record<string, {
@@ -191,11 +192,11 @@ function RealmEvolutions({ realm, evolutions }: { realm: string; evolutions: any
 export default function Evolutions() {
   const [selectedRealm, setSelectedRealm] = useState<string>("strength");
 
-  const { data: realms, isLoading: isLoadingRealms } = useGetEvolutionRealms({
+  const { data: realms, isLoading: isLoadingRealms, isError: isErrorRealms, refetch: refetchRealms } = useGetEvolutionRealms({
     query: { queryKey: getGetEvolutionRealmsQueryKey() }
   });
 
-  const { data: evolutions, isLoading: isLoadingEvos } = useListEvolutions(
+  const { data: evolutions, isLoading: isLoadingEvos, isError: isErrorEvos, refetch: refetchEvos } = useListEvolutions(
     { realm: selectedRealm },
     { query: { queryKey: getListEvolutionsQueryKey({ realm: selectedRealm }) } }
   );
@@ -217,7 +218,9 @@ export default function Evolutions() {
         </div>
 
         {/* Realm tabs */}
-        {isLoadingRealms ? (
+        {isErrorRealms && !realms ? (
+          <ErrorCard title="Couldn't load realms" onRetry={() => refetchRealms()} />
+        ) : isLoadingRealms ? (
           <div className="flex gap-3 justify-center">
             {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-28 rounded-2xl" />)}
           </div>
@@ -282,7 +285,9 @@ export default function Evolutions() {
         )}
 
         {/* Evolution tree */}
-        {isLoadingEvos ? (
+        {isErrorEvos && !evolutions ? (
+          <ErrorCard title="Couldn't load evolutions" onRetry={() => refetchEvos()} />
+        ) : isLoadingEvos ? (
           <div className="grid grid-cols-3 gap-4">
             {[...Array(9)].map((_, i) => <Skeleton key={i} className="h-40 w-full rounded-2xl" />)}
           </div>

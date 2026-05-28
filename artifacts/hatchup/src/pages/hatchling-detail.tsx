@@ -21,6 +21,7 @@ import { GlowBadge } from "@/components/ui/glow-badge";
 import { motion } from "framer-motion";
 import { ArrowLeft, Zap, Heart, Coffee, Shield, Trash2, ArrowUpCircle, Sword, Star, Share2 } from "lucide-react";
 import { ComposeSheet } from "@/components/compose-sheet";
+import { ErrorCard } from "@/components/error-card";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -148,7 +149,7 @@ export default function HatchlingDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: hatchling, isLoading } = useGetHatchling(hatchlingId, {
+  const { data: hatchling, isLoading, isError, refetch } = useGetHatchling(hatchlingId, {
     query: { enabled: !!hatchlingId, queryKey: getGetHatchlingQueryKey(hatchlingId) }
   });
 
@@ -205,7 +206,8 @@ export default function HatchlingDetail() {
         onSuccess: () => {
           toast({ title: "Yum!", description: `${hatchling.name} enjoyed the meal!` });
           queryClient.invalidateQueries({ queryKey: getGetHatchlingQueryKey(hatchlingId) });
-        }
+        },
+        onError: () => toast({ title: "Couldn't feed", description: "Try again in a moment.", variant: "destructive" }),
       }
     );
   };
@@ -225,7 +227,8 @@ export default function HatchlingDetail() {
         onSuccess: () => {
           toast({ title: "Training Complete!", description: `${hatchling.name} is getting stronger! Bond +5` });
           queryClient.invalidateQueries({ queryKey: getGetHatchlingQueryKey(hatchlingId) });
-        }
+        },
+        onError: () => toast({ title: "Couldn't train", description: "Try again in a moment.", variant: "destructive" }),
       }
     );
   };
@@ -255,7 +258,8 @@ export default function HatchlingDetail() {
           onSuccess: () => {
             toast({ title: "Released", description: `${hatchling.name} has been released into the wild.` });
             setLocation("/hatch");
-          }
+          },
+          onError: () => toast({ title: "Couldn't release Pal", description: "Try again in a moment.", variant: "destructive" }),
         }
       );
     }
@@ -272,6 +276,16 @@ export default function HatchlingDetail() {
               {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 w-full rounded-2xl" />)}
             </div>
           </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (isError && !hatchling) {
+    return (
+      <Layout>
+        <div className="max-w-2xl mx-auto pt-12">
+          <ErrorCard title="Couldn't load this Pal" onRetry={() => refetch()} />
         </div>
       </Layout>
     );

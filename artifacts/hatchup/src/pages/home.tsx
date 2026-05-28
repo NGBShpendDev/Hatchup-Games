@@ -27,6 +27,8 @@ import { ArtifactUnlockOverlay, type UnlockedArtifact } from "@/components/artif
 import { ForYouStrip, type ForYouItem } from "@/components/for-you-strip";
 import { TrendingStrip } from "@/components/trending-strip";
 import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
+import { ErrorCard } from "@/components/error-card";
+import { errorMessage } from "@/lib/errorMessage";
 import { Bot as BotIcon, Salad as SaladIcon, Swords as SwordsIcon, Users as UsersIcon, Trophy as TrophyIcon, Egg as EggLucide } from "lucide-react";
 
 const OVERLAY_RARITIES = new Set(["Legendary", "Mythic", "Ancient", "Celestial"]);
@@ -80,7 +82,7 @@ export default function Home() {
   const { playerId } = usePlayer();
   const pid = playerId ?? 0;
 
-  const { data: dashboard, isLoading } = useGetPlayerDashboard(pid, {
+  const { data: dashboard, isLoading, isError: isDashboardError, refetch: refetchDashboard } = useGetPlayerDashboard(pid, {
     query: { queryKey: getGetPlayerDashboardQueryKey(pid), enabled: !!playerId }
   });
 
@@ -170,6 +172,13 @@ export default function Home() {
     logActivity.mutate(
       { data: { playerId: pid, type, value, distanceMiles: hasDistance ? parsedDistance : undefined } },
       {
+        onError: (err) => {
+          toast({
+            title: "Couldn't log activity",
+            description: errorMessage(err, "Please try again."),
+            variant: "destructive",
+          });
+        },
         onSuccess: (res) => {
           const xpEarned = (res as any).xpEarned ?? (res as any).fitnessXpEarned ?? 0;
           spawnXpPopup(xpEarned);
@@ -248,6 +257,19 @@ export default function Home() {
             <Skeleton className="h-32 rounded-3xl" />
           </div>
           <Skeleton className="h-64 w-full rounded-3xl" />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (isDashboardError && !dashboard) {
+    return (
+      <Layout>
+        <div className="max-w-2xl mx-auto pt-12">
+          <ErrorCard
+            title="Couldn't load your dashboard"
+            onRetry={() => refetchDashboard()}
+          />
         </div>
       </Layout>
     );

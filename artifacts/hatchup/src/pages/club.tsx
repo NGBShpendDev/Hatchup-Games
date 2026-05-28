@@ -7,9 +7,10 @@ import { NeonButton } from "@/components/ui/neon-button";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import { Shield, Users, Trophy } from "lucide-react";
 import { motion } from "framer-motion";
+import { ErrorCard } from "@/components/error-card";
 
 export default function ClubHub() {
-  const { data: clubs, isLoading } = useListClubs(
+  const { data: clubs, isLoading, isError, refetch } = useListClubs(
     { limit: 20 },
     { query: { queryKey: getListClubsQueryKey({ limit: 20 }) } }
   );
@@ -27,7 +28,9 @@ export default function ClubHub() {
           <NeonButton size="lg" className="relative z-10 shrink-0">Create Club</NeonButton>
         </GlassCard>
 
-        {isLoading ? (
+        {isError && !clubs ? (
+          <ErrorCard title="Couldn't load clubs" onRetry={() => refetch()} />
+        ) : isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(6)].map((_, i) => (
               <Skeleton key={i} className="h-48 w-full rounded-2xl" />

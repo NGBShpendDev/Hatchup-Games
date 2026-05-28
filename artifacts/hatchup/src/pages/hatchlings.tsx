@@ -7,11 +7,12 @@ import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
+import { ErrorCard } from "@/components/error-card";
 
 export default function Hatchlings() {
   const { playerId } = usePlayer();
   const pid = playerId ?? 0;
-  const { data: hatchlings, isLoading } = useListHatchlings(
+  const { data: hatchlings, isLoading, isError, refetch } = useListHatchlings(
     { playerId: pid },
     { query: { enabled: !!playerId, queryKey: getListHatchlingsQueryKey({ playerId: pid }) } }
   );
@@ -29,7 +30,12 @@ export default function Hatchlings() {
           </Link>
         </div>
 
-        {isLoading ? (
+        {isError && !hatchlings ? (
+          <ErrorCard
+            title="Couldn't load your Pals"
+            onRetry={() => refetch()}
+          />
+        ) : isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => (
               <Skeleton key={i} className="h-80 w-full rounded-2xl" />

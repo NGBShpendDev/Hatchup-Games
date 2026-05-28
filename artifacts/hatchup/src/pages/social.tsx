@@ -84,6 +84,7 @@ import {
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { motion, AnimatePresence } from "framer-motion";
+import { ErrorCard } from "@/components/error-card";
 
 function ProfileModal({
   playerId: profileId,
@@ -1116,7 +1117,7 @@ function TrendingPanel({
 }) {
   const [trendingWindow, setTrendingWindow] = useState<"day" | "week">("day");
   const params = { playerId, window: trendingWindow };
-  const { data, isLoading } = useGetTrendingPosts(
+  const { data, isLoading, isError, refetch } = useGetTrendingPosts(
     params,
     { query: { queryKey: getGetTrendingPostsQueryKey(params) } }
   );
@@ -1157,7 +1158,9 @@ function TrendingPanel({
         </div>
       </div>
 
-      {isLoading ? (
+      {isError && !data ? (
+        <ErrorCard title="Couldn't load trending posts" onRetry={() => refetch()} />
+      ) : isLoading ? (
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
             <Skeleton key={i} className="h-40 w-full rounded-2xl" />
@@ -1389,7 +1392,7 @@ export default function Social() {
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const { data: feed, isLoading } = useGetSocialFeed(
+  const { data: feed, isLoading, isError: isFeedError, refetch: refetchFeed } = useGetSocialFeed(
     { playerId: pid },
     { query: { queryKey: getGetSocialFeedQueryKey({ playerId: pid }) } }
   );
@@ -1472,7 +1475,9 @@ export default function Social() {
           </TabsList>
 
           <TabsContent value="feed" className="mt-4">
-            {isLoading ? (
+            {isFeedError && !feed ? (
+              <ErrorCard title="Couldn't load your feed" onRetry={() => refetchFeed()} />
+            ) : isLoading ? (
               <div className="space-y-3">
                 {[...Array(3)].map((_, i) => (
                   <Skeleton key={i} className="h-40 w-full rounded-2xl" />

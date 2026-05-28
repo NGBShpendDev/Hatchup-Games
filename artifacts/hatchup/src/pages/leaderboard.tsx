@@ -21,6 +21,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePlayer } from "@/lib/playerContext";
 import { useToast } from "@/hooks/use-toast";
+import { ErrorCard } from "@/components/error-card";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -157,7 +158,7 @@ export default function Leaderboard() {
   }, [myLocation, firstVisitDismissed, dismissFirstVisit]);
 
   // ── Scoped leaderboard ───────────────────────────────────────────────────
-  const { data: scopedBoard, isLoading: scopedLoading } = useQuery<ScopedBoard>({
+  const { data: scopedBoard, isLoading: scopedLoading, isError: scopedError, refetch: refetchScoped } = useQuery<ScopedBoard>({
     queryKey: ["leaderboard-scoped", scope, metric, page],
     queryFn: async () => {
       const res = await fetch(
@@ -172,7 +173,7 @@ export default function Leaderboard() {
 
   // ── Battle ELO ───────────────────────────────────────────────────────────
   interface BattleEloEntry { rank: number; playerId: number; username: string; displayName: string | null; avatarUrl: string | null; battleElo: number; totalBattleWins: number; level: number; isMe: boolean }
-  const { data: eloBoard, isLoading: eloLoading } = useQuery<BattleEloEntry[]>({
+  const { data: eloBoard, isLoading: eloLoading, isError: eloError, refetch: refetchElo } = useQuery<BattleEloEntry[]>({
     queryKey: ["leaderboard-battle-elo"],
     queryFn: () => fetch(`${BASE}/api/leaderboards/battle-elo?limit=100`, { credentials: "include" }).then(r => r.json()),
     enabled: activeTab === "battle",
@@ -181,7 +182,7 @@ export default function Leaderboard() {
   // ── Fitness / Speed ──────────────────────────────────────────────────────
   interface SpeedEntry { position: number; playerId: number; username: string; displayName: string | null; avatarUrl: string | null; rank: string; metricValue: number; metricLabel: string; currentStreak: number }
   const [speedMode, setSpeedMode] = useState<"steps" | "pace">("steps");
-  const { data: speedBoard, isLoading: speedLoading } = useQuery<SpeedEntry[]>({
+  const { data: speedBoard, isLoading: speedLoading, isError: speedError, refetch: refetchSpeed } = useQuery<SpeedEntry[]>({
     queryKey: ["leaderboard-speed", speedMode],
     queryFn: async () => {
       const res = await fetch(`${BASE}/api/leaderboards/speed?mode=${speedMode}&limit=25`, { credentials: "include" });
@@ -192,7 +193,7 @@ export default function Leaderboard() {
   });
 
   // ── Local challenges ─────────────────────────────────────────────────────
-  const { data: localChallenges, isLoading: localLoading } = useQuery<LocalChallenge[]>({
+  const { data: localChallenges, isLoading: localLoading, isError: localError, refetch: refetchLocal } = useQuery<LocalChallenge[]>({
     queryKey: ["local-challenges"],
     queryFn: async () => {
       const res = await fetch(`${BASE}/api/local-challenges`, { credentials: "include" });
@@ -430,7 +431,9 @@ export default function Leaderboard() {
               )}
 
               {/* Rankings list */}
-              {scopedLoading ? (
+              {scopedError && !scopedBoard ? (
+                <ErrorCard title="Couldn't load rankings" onRetry={() => refetchScoped()} />
+              ) : scopedLoading ? (
                 <div className="space-y-2">
                   {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-16 rounded-2xl bg-white/5" />)}
                 </div>
@@ -488,7 +491,9 @@ export default function Leaderboard() {
                   </button>
                 ))}
               </div>
-              {speedLoading ? (
+              {speedError && !speedBoard ? (
+                <ErrorCard title="Couldn't load fitness rankings" onRetry={() => refetchSpeed()} />
+              ) : speedLoading ? (
                 <div className="space-y-2">{[...Array(8)].map((_, i) => <Skeleton key={i} className="h-16 rounded-2xl bg-white/5" />)}</div>
               ) : (
                 <div className="bg-white/5 rounded-3xl border border-white/10 overflow-hidden divide-y divide-white/5">
@@ -531,7 +536,9 @@ export default function Leaderboard() {
                 <Crown className="w-3.5 h-3.5 text-yellow-400" />
                 Top players ranked by Battle ELO. Ranked mode unlocks at Level 10.
               </p>
-              {eloLoading ? (
+              {eloError && !eloBoard ? (
+                <ErrorCard title="Couldn't load battle rankings" onRetry={() => refetchElo()} />
+              ) : eloLoading ? (
                 <div className="space-y-2">{[...Array(8)].map((_, i) => <Skeleton key={i} className="h-16 rounded-2xl bg-white/5" />)}</div>
               ) : (
                 <div className="bg-white/5 rounded-3xl border border-white/10 overflow-hidden divide-y divide-white/5">
@@ -589,7 +596,9 @@ export default function Leaderboard() {
                 Time-limited fitness challenges. Earn XP, coins, and exclusive rewards by finishing at the top.
               </p>
 
-              {localLoading ? (
+              {localError && !localChallenges ? (
+                <ErrorCard title="Couldn't load challenges" onRetry={() => refetchLocal()} />
+              ) : localLoading ? (
                 <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl bg-white/5" />)}</div>
               ) : (localChallenges?.length ?? 0) === 0 ? (
                 <div className="py-10 text-center text-white/30">
@@ -885,7 +894,7 @@ const RARITY_COLORS: Record<string, string> = {
 };
 
 function ArtifactsLeaderboardPanel({ myPlayerId: _myPlayerId }: { myPlayerId: number | null }) {
-  const { data, isLoading } = useGetArtifactsLeaderboard({ limit: 50 });
+  const { data, isLoading, isError, refetch } = useGetArtifactsLeaderboard({ limit: 50 });
 
   return (
     <motion.div key="artifacts" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
@@ -894,7 +903,9 @@ function ArtifactsLeaderboardPanel({ myPlayerId: _myPlayerId }: { myPlayerId: nu
         Top collectors ranked by weighted rarity score. Celestial=7, Ancient=6, Mythic=5, Legendary=4, Epic=3, Rare=2, Common=1.
       </p>
 
-      {isLoading ? (
+      {isError && !data ? (
+        <ErrorCard title="Couldn't load artifact rankings" onRetry={() => refetch()} />
+      ) : isLoading ? (
         <div className="space-y-2">{[...Array(8)].map((_, i) => <Skeleton key={i} className="h-16 rounded-2xl bg-white/5" />)}</div>
       ) : (
         <div className="bg-white/5 rounded-3xl border border-white/10 overflow-hidden divide-y divide-white/5">

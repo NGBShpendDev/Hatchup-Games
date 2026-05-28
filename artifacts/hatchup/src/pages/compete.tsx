@@ -11,6 +11,7 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { Swords, Trophy, Zap, Crown, Salad, Dumbbell, Bot } from "lucide-react";
 import { ForYouStrip } from "@/components/for-you-strip";
+import { ErrorCard } from "@/components/error-card";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -28,7 +29,7 @@ export default function Compete() {
   const { playerId } = usePlayer();
   const pid = playerId ?? 0;
 
-  const { data: modes, isLoading } = useListGameModes({
+  const { data: modes, isLoading, isError, refetch } = useListGameModes({
     query: { queryKey: getListGameModesQueryKey() }
   });
 
@@ -142,7 +143,9 @@ export default function Compete() {
 
         <h2 className="text-2xl font-black">Game Modes</h2>
 
-        {isLoading ? (
+        {isError && !modes ? (
+          <ErrorCard title="Couldn't load game modes" onRetry={() => refetch()} />
+        ) : isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[...Array(4)].map((_, i) => (
               <Skeleton key={i} className="h-48 w-full rounded-3xl" />

@@ -10,10 +10,11 @@ import { GlowBadge } from "@/components/ui/glow-badge";
 import { Calendar, Clock, Gift, Users, Phone } from "lucide-react";
 import { motion } from "framer-motion";
 import { SafetyBanner } from "@/components/safety-banner";
+import { ErrorCard } from "@/components/error-card";
 
 export default function Events() {
   const { player } = usePlayer();
-  const { data: events, isLoading } = useListEvents(
+  const { data: events, isLoading, isError, refetch } = useListEvents(
     {},
     { query: { queryKey: getListEventsQueryKey({}) } }
   );
@@ -80,7 +81,9 @@ export default function Events() {
           </motion.div>
         )}
 
-        {isLoading ? (
+        {isError && !events ? (
+          <ErrorCard title="Couldn't load events" onRetry={() => refetch()} />
+        ) : isLoading ? (
           <div className="space-y-6">
             {[...Array(3)].map((_, i) => (
               <Skeleton key={i} className="h-64 w-full rounded-3xl" />

@@ -9,6 +9,7 @@ import { NeonButton } from "@/components/ui/neon-button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { useToast } from "@/hooks/use-toast";
 import { HatchlingCard } from "@/components/hatchling-card";
+import { ErrorCard } from "@/components/error-card";
 
 export default function Race() {
   const [searchParams] = useState(() => new URLSearchParams(window.location.search));
@@ -22,7 +23,7 @@ export default function Race() {
 
   const { playerId } = usePlayer();
   const pid = playerId ?? 0;
-  const { data: hatchlings } = useListHatchlings(
+  const { data: hatchlings, isError: isHatchlingsError, refetch: refetchHatchlings } = useListHatchlings(
     { playerId: pid },
     { query: { enabled: !!playerId, queryKey: getListHatchlingsQueryKey({ playerId: pid }) } }
   );
@@ -72,6 +73,12 @@ export default function Race() {
                 <h1 className="text-5xl font-black mb-4">Join {modeName}</h1>
                 <p className="text-xl text-muted-foreground font-medium">Select your champion for this event.</p>
               </div>
+
+              {isHatchlingsError && !hatchlings && (
+                <div className="mb-6">
+                  <ErrorCard title="Couldn't load your Pals" onRetry={() => refetchHatchlings()} />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-10">
                 {hatchlings?.map(h => (
