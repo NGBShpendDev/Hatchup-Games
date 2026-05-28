@@ -31,6 +31,10 @@ import {
   markMilestoneSeen,
   type LoyaltyMilestoneData,
 } from "@/components/loyalty-milestone-celebration";
+import {
+  ComebackStreakCelebration,
+  type ComebackStreakData,
+} from "@/components/comeback-streak-celebration";
 
 import lavaDragonImg from "@/assets/images/lava-dragon.png";
 import cyberCreatureImg from "@/assets/images/cyber-creature.png";
@@ -168,6 +172,7 @@ export default function MyPalPage() {
 
   const [reaction, setReaction] = useState<HatchlingReactionData | null>(null);
   const [loyaltyMilestone, setLoyaltyMilestone] = useState<LoyaltyMilestoneData | null>(null);
+  const [comebackStreakCelebration, setComebackStreakCelebration] = useState<ComebackStreakData | null>(null);
   const palImgControls = useAnimation();
 
   type PalSnapshot = { loyaltyScore: number; motivationScore: number; battleWins: number; comebackStreak: number };
@@ -366,10 +371,7 @@ export default function MyPalPage() {
       const newComebackStreak = current.comebackStreak;
       if (newComebackStreak > 0 && newComebackStreak % 3 === 0) {
         setTimeout(() => {
-          toast({
-            title: `🔥 Unstoppable! Comeback Streak ×${newComebackStreak}`,
-            description: `${pal.name} earned +50 XP & +5 Loyalty bonus for ${newComebackStreak} consecutive comebacks!`,
-          });
+          setComebackStreakCelebration({ palName: pal.name, streakCount: newComebackStreak });
         }, 1800);
       }
 
@@ -528,6 +530,7 @@ export default function MyPalPage() {
     <Layout>
       <HatchlingReaction reaction={reaction} onDismiss={() => setReaction(null)} />
       <LoyaltyMilestoneCelebration data={loyaltyMilestone} onDismiss={() => setLoyaltyMilestone(null)} />
+      <ComebackStreakCelebration data={comebackStreakCelebration} onDismiss={() => setComebackStreakCelebration(null)} />
       <div className="max-w-2xl mx-auto pb-20">
 
         {/* Header */}
