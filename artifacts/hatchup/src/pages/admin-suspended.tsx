@@ -1,4 +1,5 @@
 import { AdminGate } from "@/components/admin-gate";
+import { useState } from "react";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
@@ -7,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GlassCard } from "@/components/ui/glass-card";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Shield, Ban, RotateCcw, User as UserIcon, Flag, ScrollText } from "lucide-react";
-import { motion } from "framer-motion";
+import { Shield, Ban, RotateCcw, User as UserIcon, Flag, ScrollText, ChevronDown, ChevronUp } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ModerationHistoryPanel } from "@/components/moderation-history-panel";
 
 interface SuspendedPlayer {
   id: number;
@@ -29,6 +31,7 @@ function AdminSuspendedInner() {
   const { playerId, player } = usePlayer();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const isAdmin = !!(player as { isAdmin?: boolean } | null)?.isAdmin;
 
@@ -158,15 +161,48 @@ function AdminSuspendedInner() {
                       )}
                     </div>
 
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => handleUnsuspend(p)}
-                      data-testid={`button-unsuspend-${p.id}`}
-                    >
-                      <RotateCcw className="w-3 h-3 mr-1" /> Unsuspend
-                    </Button>
+                    <div className="flex flex-col gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => handleUnsuspend(p)}
+                        data-testid={`button-unsuspend-${p.id}`}
+                      >
+                        <RotateCcw className="w-3 h-3 mr-1" /> Unsuspend
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
+                        data-testid={`button-toggle-history-${p.id}`}
+                        className="h-7 text-[11px] font-bold"
+                      >
+                        {expandedId === p.id ? (
+                          <><ChevronUp className="w-3 h-3 mr-1" /> Hide history</>
+                        ) : (
+                          <><ChevronDown className="w-3 h-3 mr-1" /> History</>
+                        )}
+                      </Button>
+                    </div>
                   </div>
+                  <AnimatePresence initial={false}>
+                    {expandedId === p.id && (
+                      <motion.div
+                        key="history"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="relative z-10 overflow-hidden"
+                      >
+                        <div className="pt-4">
+                          <ModerationHistoryPanel
+                            targetPlayerId={p.id}
+                            testIdPrefix={`moderation-history-${p.id}`}
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </GlassCard>
               </motion.div>
             ))}

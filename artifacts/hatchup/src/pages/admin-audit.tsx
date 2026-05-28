@@ -1,5 +1,5 @@
 import { AdminGate } from "@/components/admin-gate";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
@@ -79,6 +79,19 @@ function AdminAuditInner() {
   const [targetFilter, setTargetFilter] = useState("");
   const [actionFilter, setActionFilter] = useState<string>("");
   const [undoError, setUndoError] = useState<string | null>(null);
+
+  // Allow deep links like /admin/audit?targetPlayerId=42 (from the
+  // moderation-history panel on a player's admin view) to pre-fill the filter.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("targetPlayerId");
+    if (t && Number.isFinite(Number(t))) setTargetFilter(t);
+    const a = params.get("actorId");
+    if (a && Number.isFinite(Number(a))) setActorFilter(a);
+    const act = params.get("action");
+    if (act) setActionFilter(act);
+  }, []);
 
   const { data: entries, isLoading } = useQuery<AuditEntry[]>({
     queryKey: ["admin-audit", actorFilter, targetFilter, actionFilter, playerId],

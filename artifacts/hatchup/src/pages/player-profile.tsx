@@ -18,6 +18,7 @@ import { useGetMyPostInsights, getGetMyPostInsightsQueryKey } from "@workspace/a
 import type { PostInsight } from "@workspace/api-client-react";
 import { useSubscription } from "@/lib/subscription";
 import { MutualWorkoutPartnersLine, type MutualPartner } from "@/components/mutual-workout-partners";
+import { ModerationHistoryPanel } from "@/components/moderation-history-panel";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 const MAX_FEATURED = 3;
@@ -242,6 +243,9 @@ export default function PlayerProfilePage() {
               onRemoveFeatured={handleRemoveFeatured}
               isToggling={toggleFeatured.isPending || swapFeatured.isPending}
             />
+            {viewerIsAdmin && !isOwnProfile && (
+              <ModerationHistoryPanel targetPlayerId={profileId} />
+            )}
             {isOwnProfile && <PostInsightsSection />}
           </>
         )}
