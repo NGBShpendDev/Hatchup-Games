@@ -52,6 +52,8 @@ function resetState() {
 
 // ── Table sentinels ──────────────────────────────────────────────────────────
 const postsTable = { __t: "postsTable" };
+const postCommentRevisionsTable = { __t: "postCommentRevisionsTable" };
+const userReportsTable = { __t: "userReportsTable" };
 const postViewsTable = { __t: "postViewsTable" };
 const postCommentsTable = { __t: "postCommentsTable" };
 const postRepostsTable = { __t: "postRepostsTable" };
@@ -102,6 +104,17 @@ mock.module(new URL("../../middlewares/auth.ts", import.meta.url).href, {
 
 mock.module("../../services/pushNotifications.ts", {
   namedExports: { sendPushToPlayer: async () => {} },
+});
+
+mock.module("../../services/postPurgeJob.ts", {
+  namedExports: { hardDeletePosts: async () => 0, RETENTION_DAYS: 30 },
+});
+
+// safety.ts transitively pulls in modules whose imports the strict ESM
+// resolver can't satisfy in the test environment. The trending route only
+// uses getHiddenPlayerIds, so a trivial stub keeps the import graph quiet.
+mock.module("../safety.ts", {
+  namedExports: { getHiddenPlayerIds: async () => [] },
 });
 
 mock.module("../../services/subscriptionGuards.ts", {
@@ -158,18 +171,6 @@ mock.module("drizzle-orm", {
       return {};
     },
   },
-});
-
-// postPurgeJob is loaded transitively by social.ts but is never exercised by
-// the trending route. Stub it so it doesn't try to walk the real drizzle
-// helpers (which the mock above intentionally narrows).
-mock.module("../../services/postPurgeJob.ts", {
-  namedExports: { hardDeletePosts: async () => 0, RETENTION_DAYS: 30 },
-});
-// safety.ts pulls in tables and email services the trending route never
-// touches. Only `getHiddenPlayerIds` is referenced from social.ts.
-mock.module("../safety.ts", {
-  namedExports: { getHiddenPlayerIds: async () => [] },
 });
 
 mock.module("drizzle-orm/pg-core", {
@@ -238,6 +239,8 @@ const fakeDb = {
       const countChain: any = {
         where: () => countChain,
         groupBy: () => countChain,
+        orderBy: () => countChain,
+        limit: () => countChain,
         then: (resolve: any, reject: any) =>
           Promise.resolve([]).then(resolve, reject),
       };
@@ -263,7 +266,7 @@ mock.module("@workspace/db", {
     postViewsTable,
     postReactionsTable,
     postCommentsTable,
-    postCommentRevisionsTable: { __t: "postCommentRevisions" },
+    postCommentRevisionsTable,
     postCommentReactionsTable,
     playerFollowsTable,
     postRepostsTable,
@@ -272,7 +275,7 @@ mock.module("@workspace/db", {
     groupMembersTable,
     groupsTable,
     notificationsTable,
-    userReportsTable: { __t: "userReports" },
+    userReportsTable,
     blockedUsersTable: { __t: "blockedUsers" },
     moderationAuditLogTable: { __t: "moderationAuditLog" },
   },
