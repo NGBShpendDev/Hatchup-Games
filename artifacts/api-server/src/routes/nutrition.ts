@@ -7,7 +7,7 @@ import {
   nutritionChallengeProgressTable,
   playersTable,
 } from "@workspace/db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, asc } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth";
 import { openai } from "@workspace/integrations-openai-ai-server";
@@ -133,10 +133,13 @@ router.post("/nutrition/posts", requireAuth, attachPlayer, requirePlayerOwnershi
 router.get("/nutrition/posts", requireAuth, attachPlayer, async (req, res) => {
   const playerId = Number(req.query.playerId);
   const limit = Math.min(Number(req.query.limit ?? 20), 50);
-  const mode = (req.query.mode as string) ?? "discover";
+  const mode = (req.query.mode as string) ?? "feed";
 
+  // feed = chronological (most recent first); discover = sorted by most liked
   const posts = await db.query.mealPostsTable.findMany({
-    orderBy: [desc(mealPostsTable.createdAt)],
+    orderBy: mode === "discover"
+      ? [desc(mealPostsTable.likesCount), desc(mealPostsTable.createdAt)]
+      : [desc(mealPostsTable.createdAt)],
     limit,
   });
 
@@ -169,14 +172,9 @@ router.get("/nutrition/posts", requireAuth, attachPlayer, async (req, res) => {
 });
 
 // ── POST /nutrition/posts/:id/like ────────────────────────────────────────────
-const LikeBody = z.object({ playerId: z.number() });
-
 router.post("/nutrition/posts/:id/like", requireAuth, attachPlayer, async (req, res) => {
   const postId = Number(req.params.id);
-  const body = LikeBody.safeParse(req.body);
-  if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
-
-  const { playerId } = body.data;
+  const playerId = req.playerId!; // derived server-side from auth token
 
   const existing = await db.query.mealLikesTable.findFirst({
     where: and(eq(mealLikesTable.mealPostId, postId), eq(mealLikesTable.playerId, playerId)),
@@ -221,16 +219,17 @@ router.get("/nutrition/posts/:id/comments", requireAuth, attachPlayer, async (re
 });
 
 // ── POST /nutrition/posts/:id/comments ────────────────────────────────────────
-const AddCommentBody = z.object({ playerId: z.number(), content: z.string().min(1).max(500) });
+const AddCommentBody = z.object({ content: z.string().min(1).max(500) });
 
 router.post("/nutrition/posts/:id/comments", requireAuth, attachPlayer, async (req, res) => {
   const postId = Number(req.params.id);
+  const playerId = req.playerId!; // derived server-side from auth token
   const body = AddCommentBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
   const [comment] = await db.insert(mealCommentsTable).values({
     mealPostId: postId,
-    playerId: body.data.playerId,
+    playerId,
     content: body.data.content,
   }).returning();
 
