@@ -22,7 +22,14 @@ import type { AddressInfo } from "node:net";
 
 process.env.SESSION_SECRET = "test-session-secret-1234567890";
 
-interface PostRow { id: number; viewCount: number; deletedAt?: Date | null }
+interface PostRow {
+  id: number;
+  viewCount: number;
+  deletedAt?: Date | null;
+  createdAt: Date;
+  viewsFrozenAt?: Date | null;
+  viewsFreezeReason?: string | null;
+}
 interface ViewInsert { postId: number; viewerKey: string; viewDate: string }
 interface ViewRecord extends ViewInsert { createdAt: Date }
 
@@ -44,7 +51,7 @@ const state = {
 };
 
 function resetState() {
-  state.posts = new Map([[1, { id: 1, viewCount: 0 }]]);
+  state.posts = new Map([[1, { id: 1, viewCount: 0, createdAt: new Date() }]]);
   state.viewsByKey = new Map();
   state.inserts = [];
   state.recordedViews = [];
@@ -183,14 +190,22 @@ const fakeDb = {
       findFirst: async ({ where }: { where?: Pred }) => {
         const id = findPred(where, "eq", "id")?.val as number | undefined;
         if (id === undefined) return undefined;
-        if (!state.posts.has(id)) state.posts.set(id, { id, viewCount: 0 });
+        if (!state.posts.has(id)) state.posts.set(id, { id, viewCount: 0, createdAt: new Date() });
         return { ...state.posts.get(id)! };
       },
     },
     playersTable: {
-      // Returns a stub player when the route resolves a Clerk session.
-      findFirst: async () =>
-        state.authUserId ? { id: 42, clerkId: state.authUserId } : undefined,
+      // Returns a stub player when the route resolves a Clerk session. The
+      // burst-traffic test sets authUserId to `user_<n>` to simulate many
+      // distinct signed-in viewers from a single IP; we parse the trailing
+      // digits so each clerk id maps to its own playerId (and therefore its
+      // own viewerKey).
+      findFirst: async () => {
+        if (!state.authUserId) return undefined;
+        const m = state.authUserId.match(/(\d+)$/);
+        const id = m ? Number(m[1]) : 42;
+        return { id, clerkId: state.authUserId };
+      },
     },
   },
   insert: (_t: unknown) => ({
@@ -214,28 +229,56 @@ const fakeDb = {
     },
   }),
   update: (_t: unknown) => ({
-    set: (_v: unknown) => ({
-      where: (cond: Pred) => ({
-        returning: async () => {
-          const id = findPred(cond, "eq", "id")?.val as number | undefined;
-          const target = id !== undefined ? state.posts.get(id) : undefined;
-          if (target) target.viewCount += 1;
-          return [{ viewCount: target?.viewCount ?? 0 }];
-        },
-      }),
+    // The route uses two `set` shapes against postsTable: an sql-expression
+    // increment of viewCount (consumed via `.returning()`) and a freeze
+    // update that just `await`s the `.where(...)` chain. Apply the write
+    // eagerly inside `where(...)` and return a value that's both
+    // PromiseLike and has a `.returning()` accessor so either call style
+    // sees the result.
+    set: (vals: Record<string, unknown>) => ({
+      where: (cond: Pred) => {
+        const id = findPred(cond, "eq", "id")?.val as number | undefined;
+        const target = id !== undefined ? state.posts.get(id) : undefined;
+        if (target) {
+          if ("viewsFrozenAt" in vals) {
+            target.viewsFrozenAt = (vals.viewsFrozenAt as Date | null) ?? null;
+            target.viewsFreezeReason = (vals.viewsFreezeReason as string | null) ?? null;
+          } else if ("viewCount" in vals) {
+            // sql template result — the route is incrementing.
+            target.viewCount += 1;
+          }
+        }
+        const result = [{ viewCount: target?.viewCount ?? 0 }];
+        return {
+          returning: async () => result,
+          then: (resolve: (v: unknown) => void) => resolve(result),
+        };
+      },
     }),
   }),
-  // Used by the per-(viewerKey, hour) distinct-posts cap. Filters the
-  // recorded views by viewerKey + createdAt window + excluded post id and
-  // returns the distinct-post-id count.
+  // Used by two queries:
+  //  1. per-(viewerKey, hour) distinct-posts cap → filters by viewerKey +
+  //     createdAt + excluded postId and counts distinct postIds.
+  //  2. per-post recent-views check (abuse detector) → filters by eq(postId)
+  //     + createdAt cutoff and counts matching rows.
   select: (_proj: unknown) => ({
     from: (_t: unknown) => ({
       where: (cond: Pred) =>
         Promise.resolve([
           {
             count: (() => {
-              const viewerKey = findPred(cond, "eq", "viewerKey")?.val as string | undefined;
+              const eqPostId = findPred(cond, "eq", "postId")?.val as number | undefined;
               const cutoff = findPred(cond, "gte", "createdAt")?.val as Date | undefined;
+              if (eqPostId !== undefined) {
+                let n = 0;
+                for (const v of state.recordedViews) {
+                  if (v.postId !== eqPostId) continue;
+                  if (cutoff && v.createdAt < cutoff) continue;
+                  n++;
+                }
+                return n;
+              }
+              const viewerKey = findPred(cond, "eq", "viewerKey")?.val as string | undefined;
               const exclude = findPred(cond, "ne", "postId")?.val as number | undefined;
               const ids = new Set<number>();
               for (const v of state.recordedViews) {
@@ -277,6 +320,7 @@ mock.module("@workspace/db", {
 const express = (await import("express")).default;
 const socialRouter = (await import("../social.ts")).default;
 const { VIEW_DISTINCT_POSTS_PER_HOUR, resolveViewDistinctPostsPerHour } = await import("../social.ts");
+const { BURST_MIN_VIEWS } = await import("../../services/viewAbuseDetection.ts");
 const { postViewLimiter } = await import("../../middlewares/rateLimiters.ts");
 
 let baseUrl: string;
@@ -313,7 +357,7 @@ beforeEach(() => {
 async function postView(
   postId: number,
   headers: Record<string, string> = {},
-): Promise<{ status: number; body: { viewCount?: number; counted?: boolean; error?: string } }> {
+): Promise<{ status: number; body: { viewCount?: number; counted?: boolean; frozen?: boolean; error?: string } }> {
   const res = await fetch(`${baseUrl}/social/posts/${postId}/view`, {
     method: "POST",
     headers: { "content-type": "application/json", ...headers },
@@ -451,6 +495,73 @@ describe("POST /social/posts/:id/view — abuse protection", () => {
     assert.equal(resolveViewDistinctPostsPerHour("0"), 60);
     assert.equal(resolveViewDistinctPostsPerHour("-5"), 60);
     assert.equal(resolveViewDistinctPostsPerHour("12.5"), 60);
+  });
+
+  it("freezes the view counter when a synthetic burst hits a single post from many distinct viewers", async () => {
+    // Mature post (created 24h ago) with no prior views — the detector's
+    // baseline floor is 1/hr, so 60 unique viewers in a single hour trips
+    // the spike-ratio rule (60 >> 20× baseline AND ≥ BURST_MIN_VIEWS).
+    state.posts.set(1, {
+      id: 1,
+      viewCount: 0,
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    });
+
+    let lastBody: { viewCount?: number; counted?: boolean; frozen?: boolean } = {};
+    for (let i = 0; i < BURST_MIN_VIEWS; i++) {
+      state.authUserId = `user_${i}`;
+      const r = await postView(1, { "x-forwarded-for": "127.0.0.1" });
+      assert.equal(r.status, 200);
+      lastBody = r.body as typeof lastBody;
+    }
+    state.authUserId = null;
+
+    assert.equal(lastBody.counted, true, "the burst view itself still counts");
+    assert.equal(
+      lastBody.frozen,
+      true,
+      "the BURST_MIN_VIEWS-th view should trip the anomaly detector",
+    );
+
+    const frozenCount = lastBody.viewCount ?? 0;
+    assert.equal(frozenCount, BURST_MIN_VIEWS);
+
+    // Confirm we persisted the freeze on the post itself.
+    const stored = getPost1();
+    assert.ok(stored.viewsFrozenAt instanceof Date, "viewsFrozenAt must be set on the post");
+    assert.match(stored.viewsFreezeReason ?? "", /spike_ratio/);
+
+    // Subsequent views from a fresh viewer bounce immediately — the counter
+    // is frozen until an admin unfreezes it.
+    state.authUserId = "user_after_freeze";
+    const afterFreeze = await postView(1, { "x-forwarded-for": "127.0.0.1" });
+    assert.equal(afterFreeze.status, 200, "frozen posts still respond 200 so the UI keeps working");
+    assert.equal(afterFreeze.body.counted, false);
+    assert.equal(afterFreeze.body.frozen, true);
+    assert.equal(
+      afterFreeze.body.viewCount,
+      frozenCount,
+      "post-freeze pings must not move the stored viewCount",
+    );
+  });
+
+  it("does not freeze posts on an organic small bump", async () => {
+    // Mature post with 30 unique viewers in an hour — well under the
+    // BURST_MIN_VIEWS absolute floor, even though the spike ratio is large.
+    state.posts.set(1, {
+      id: 1,
+      viewCount: 0,
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    });
+    let lastBody: { frozen?: boolean } = {};
+    for (let i = 0; i < 30; i++) {
+      state.authUserId = `user_${i}`;
+      const r = await postView(1, { "x-forwarded-for": "127.0.0.1" });
+      lastBody = r.body;
+    }
+    state.authUserId = null;
+    assert.notEqual(lastBody.frozen, true, "organic-sized bumps must not trigger a freeze");
+    assert.equal(getPost1().viewsFrozenAt ?? null, null);
   });
 
   it("postViewLimiter blocks bursts above the per-minute threshold", async () => {

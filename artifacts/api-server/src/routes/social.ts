@@ -17,6 +17,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, sql, or, ne, inArray, ilike, gte, isNull, isNotNull, notInArray } from "drizzle-orm";
 import { hardDeletePosts, RETENTION_DAYS } from "../services/postPurgeJob.ts";
+import { detectViewAbuse } from "../services/viewAbuseDetection.ts";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { getHiddenPlayerIds } from "./safety.ts";
@@ -324,6 +325,7 @@ router.get("/social/trending", requireAuth, attachPlayer, async (req, res) => {
       inArray(postsTable.id, postIds),
       eq(postsTable.isFlagged, false),
       isNull(postsTable.deletedAt),
+      isNull(postsTable.viewsFrozenAt),
       ...(trendingHiddenIds.length
         ? [notInArray(postsTable.playerId, trendingHiddenIds)]
         : []),
@@ -529,12 +531,28 @@ logger.info(
   "Configured distinct-posts-per-hour cap",
 );
 
+// How often we run the per-post anomaly check. The detector itself is cheap,
+// but it costs one extra COUNT(*) per view, so we sample once every N
+// successful inserts (plus always on the very first views of a post to catch
+// brand-new spike attacks quickly).
+export const ABUSE_CHECK_SAMPLE_EVERY = 10;
+// Window we count "recent" views over when feeding the detector.
+export const ABUSE_CHECK_WINDOW_HOURS = 1;
+
 router.post("/social/posts/:id/view", postViewLimiter, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) { res.status(404).json({ error: "Post not found" }); return; }
 
   const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, id) });
   if (!post || post.deletedAt != null) { res.status(404).json({ error: "Post not found" }); return; }
+
+  // If the anomaly detector has previously frozen this post, stop counting
+  // immediately so a botnet can't keep inflating the number while the post
+  // sits in the admin moderation queue.
+  if (post.viewsFrozenAt != null) {
+    res.json({ viewCount: post.viewCount, counted: false, frozen: true });
+    return;
+  }
 
   // For anonymous viewers, hash the IP with SESSION_SECRET so we can still
   // dedup per-day without persisting raw IPs (privacy + a small extra cost
@@ -590,6 +608,7 @@ router.post("/social/posts/:id/view", postViewLimiter, async (req, res) => {
 
   let viewCount = post.viewCount;
   const counted = inserted.length > 0;
+  let frozenNow = false;
   if (counted) {
     const [updated] = await db
       .update(postsTable)
@@ -597,9 +616,57 @@ router.post("/social/posts/:id/view", postViewLimiter, async (req, res) => {
       .where(eq(postsTable.id, id))
       .returning({ viewCount: postsTable.viewCount });
     viewCount = updated?.viewCount ?? viewCount + 1;
+
+    // Anomaly check — sampled, but always runs on the first
+    // ABUSE_CHECK_SAMPLE_EVERY views so a brand-new post under attack gets
+    // frozen before its counter is badly inflated.
+    const shouldCheck =
+      viewCount <= ABUSE_CHECK_SAMPLE_EVERY ||
+      viewCount % ABUSE_CHECK_SAMPLE_EVERY === 0;
+    if (shouldCheck) {
+      const windowCutoff = new Date(Date.now() - ABUSE_CHECK_WINDOW_HOURS * 60 * 60 * 1000);
+      const [recentRow] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(postViewsTable)
+        .where(and(
+          eq(postViewsTable.postId, id),
+          gte(postViewsTable.createdAt, windowCutoff),
+        ));
+      const recentViewsInWindow = recentRow?.count ?? 0;
+      const postAgeHours = Math.max(
+        0,
+        (Date.now() - post.createdAt.getTime()) / 3_600_000,
+      );
+      const verdict = detectViewAbuse({
+        postAgeHours,
+        totalViews: viewCount,
+        recentViewsInWindow,
+        windowHours: ABUSE_CHECK_WINDOW_HOURS,
+      });
+      if (verdict.abusive) {
+        await db
+          .update(postsTable)
+          .set({
+            viewsFrozenAt: new Date(),
+            viewsFreezeReason: verdict.reason,
+          })
+          .where(and(eq(postsTable.id, id), isNull(postsTable.viewsFrozenAt)));
+        frozenNow = true;
+        req.log?.warn?.(
+          {
+            postId: id,
+            reason: verdict.reason,
+            recentViewsInWindow,
+            spikeRatio: verdict.spikeRatio,
+            baselineHourlyRate: verdict.baselineHourlyRate,
+          },
+          "post_views_frozen_for_abuse",
+        );
+      }
+    }
   }
 
-  res.json({ viewCount, counted });
+  res.json({ viewCount, counted, frozen: frozenNow });
 });
 
 // ── GET /social/posts/:id/view-series ───────────────────────────────────────
@@ -2101,6 +2168,82 @@ router.post("/admin/social/posts/:id/restore", requireAuth, attachPlayer, async 
 
   req.log.info({ adminId: req.playerId, postId: id }, "admin_restored_post");
   res.json({ success: true, post: { id: updated.id, deletedAt: null } });
+});
+
+// GET /api/admin/social/frozen-posts
+// Lists posts whose view counter has been frozen by the anomaly detector so
+// admins can review burst-attack victims and either confirm or undo the
+// freeze. Newest freezes surface first.
+router.get("/admin/social/frozen-posts", requireAuth, attachPlayer, async (req, res) => {
+  if (!(await requireAdmin(req.playerId))) {
+    res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+
+  const frozen = await db
+    .select()
+    .from(postsTable)
+    .where(and(isNotNull(postsTable.viewsFrozenAt), isNull(postsTable.deletedAt)))
+    .orderBy(desc(postsTable.viewsFrozenAt));
+
+  if (frozen.length === 0) {
+    res.json({ posts: [] });
+    return;
+  }
+
+  const authorIds = Array.from(new Set(frozen.map(p => p.playerId)));
+  const authors = await db.query.playersTable.findMany({
+    where: inArray(playersTable.id, authorIds),
+  });
+  const authorMap = new Map(authors.map(a => [a.id, a]));
+
+  const posts = frozen.map(p => {
+    const author = authorMap.get(p.playerId);
+    return {
+      id: p.id,
+      playerId: p.playerId,
+      authorName: author?.displayName ?? author?.username ?? `Player #${p.playerId}`,
+      authorUsername: author?.username ?? null,
+      authorAvatar: author?.avatarUrl ?? null,
+      content: p.content,
+      mediaUrl: p.mediaUrl ?? null,
+      postType: p.postType,
+      createdAt: p.createdAt.toISOString(),
+      viewCount: p.viewCount,
+      viewsFrozenAt: p.viewsFrozenAt!.toISOString(),
+      viewsFreezeReason: p.viewsFreezeReason ?? null,
+    };
+  });
+
+  res.json({ posts });
+});
+
+// POST /api/admin/social/posts/:id/unfreeze
+// Clears `viewsFrozenAt` so the post starts accruing views again. Use when
+// the anomaly detector caught a real burst that turned out to be legitimate
+// (e.g. a creator went viral on another platform).
+router.post("/admin/social/posts/:id/unfreeze", requireAuth, attachPlayer, async (req, res) => {
+  if (!(await requireAdmin(req.playerId))) {
+    res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, id) });
+  if (!post) { res.status(404).json({ error: "Post not found" }); return; }
+  if (post.viewsFrozenAt == null) {
+    res.status(400).json({ error: "Post is not frozen" });
+    return;
+  }
+
+  await db
+    .update(postsTable)
+    .set({ viewsFrozenAt: null, viewsFreezeReason: null })
+    .where(eq(postsTable.id, id));
+
+  req.log.info({ adminId: req.playerId, postId: id }, "admin_unfroze_post_views");
+  res.json({ success: true });
 });
 
 // DELETE /api/admin/social/posts/:id/purge

@@ -159,6 +159,7 @@ mock.module("drizzle-orm", {
     or: (...args: any[]) => ({ __op: "or", args: args.filter(Boolean) }),
     desc: (col: any) => ({ __desc: true, col }),
     inArray: (col: any, vals: any[]) => ({ __op: "inArray", col, vals }),
+    notInArray: (col: any, vals: any[]) => ({ __op: "notInArray", col, vals }),
     isNull: (col: any) => ({ __op: "isNull", col }),
     isNotNull: (col: any) => ({ __op: "isNotNull", col }),
     ilike: () => ({ __op: "ilike" }),

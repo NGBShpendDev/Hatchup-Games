@@ -14,6 +14,11 @@ export const postsTable = pgTable("posts", {
   isFlagged: boolean("is_flagged").notNull().default(false),
   engagementScore: integer("engagement_score").notNull().default(0),
   viewCount: integer("view_count").notNull().default(0),
+  // Set when the anomaly detector freezes a post's view counter (rotating-IP
+  // botnet, etc). While frozen the view route stops incrementing viewCount and
+  // the post is excluded from trending until an admin unfreezes it.
+  viewsFrozenAt: timestamp("views_frozen_at", { withTimezone: true }),
+  viewsFreezeReason: text("views_freeze_reason"),
   metadata: jsonb("metadata"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

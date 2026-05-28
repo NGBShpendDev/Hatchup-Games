@@ -111,6 +111,7 @@ mock.module("drizzle-orm", {
   namedExports: {
     eq: opEq, ne: opNe, and: opAnd, or: opOr,
     isNull: opIsNull, isNotNull: opIsNotNull, inArray: opInArray,
+    notInArray: (c: { __col: string }, vals: unknown[]) => (row: Row) => !vals.includes(row[c.__col]),
     gte: opGte, lt: () => TRUE_PRED, ilike: opIlike,
     asc: opAsc, desc: opDesc, sql: opSql,
   },

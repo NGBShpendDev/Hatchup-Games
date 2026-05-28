@@ -23,7 +23,7 @@ function makeTable<T extends string>(store: T, columns: readonly string[]) {
 const postsTable = makeTable("posts", [
   "id", "playerId", "content", "mediaUrl", "postType", "creatureId",
   "xpEarned", "energyEarned", "isFlagged", "engagementScore", "viewCount",
-  "metadata", "deletedAt", "createdAt",
+  "metadata", "deletedAt", "createdAt", "viewsFrozenAt", "viewsFreezeReason",
 ]);
 const postCommentRevisionsTable = makeTable("postCommentRevisions", ["id", "commentId", "previousContent", "editedAt"]);
 const userReportsTable = makeTable("userReports", ["id", "reporterId", "contentType", "contentId", "reason", "description", "status", "createdAt", "resolvedAt"]);
@@ -140,6 +140,8 @@ mock.module("drizzle-orm", {
   namedExports: {
     eq: opEq, ne: opNe, and: opAnd, or: opOr,
     isNull: opIsNull, isNotNull: opIsNotNull, inArray: opInArray,
+    notInArray: (c: { __col: string }, vals: unknown[]): Pred =>
+      (row) => !vals.includes(row[c.__col]),
     gte: opGte, lt: opLt, ilike: opIlike, desc: opDesc, sql: opSql,
   },
 });

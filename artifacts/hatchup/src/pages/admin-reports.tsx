@@ -9,7 +9,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Shield, Flag, CheckCircle, X, AlertTriangle, User, Ban, Trash2, RotateCcw, Clock, ScrollText } from "lucide-react";
+import { Shield, Flag, CheckCircle, X, AlertTriangle, User, Ban, Trash2, RotateCcw, Clock, ScrollText, Snowflake } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface AdminReport {
@@ -56,6 +56,19 @@ interface DeletedPostsResponse {
   retentionDays: number;
 }
 
+interface FrozenPost {
+  id: number;
+  playerId: number;
+  authorName: string;
+  authorUsername: string | null;
+  content: string;
+  postType: string;
+  createdAt: string;
+  viewCount: number;
+  viewsFrozenAt: string;
+  viewsFreezeReason: string | null;
+}
+
 const REASON_LABELS: Record<string, string> = {
   spam: "Spam / Advertising",
   harassment: "Harassment / Bullying",
@@ -95,7 +108,7 @@ export default function AdminReports() {
   const { playerId, player } = usePlayer();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [tab, setTab] = useState<"reports" | "deleted">("reports");
+  const [tab, setTab] = useState<"reports" | "deleted" | "frozen">("reports");
   const [filter, setFilter] = useState<"open" | "resolved" | "dismissed" | "all">("open");
 
   const isAdmin = !!(player as { isAdmin?: boolean } | null)?.isAdmin;
@@ -121,6 +134,31 @@ export default function AdminReports() {
     },
     enabled: isAdmin && !!playerId && tab === "deleted",
   });
+
+  const { data: frozenData, isLoading: frozenLoading } = useQuery<{ posts: FrozenPost[] }>({
+    queryKey: ["admin-frozen-posts", playerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/social/frozen-posts`, { credentials: "include" });
+      if (!res.ok) throw new Error("Unauthorized");
+      return res.json();
+    },
+    enabled: isAdmin && !!playerId && tab === "frozen",
+  });
+
+  const handleUnfreeze = async (postId: number) => {
+    if (!confirm(`Unfreeze post #${postId}? Views will start accruing again.`)) return;
+    const res = await fetch(`/api/admin/social/posts/${postId}/unfreeze`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (res.ok) {
+      toast({ title: `Post #${postId} unfrozen`, description: "View counter is live again." });
+      qc.invalidateQueries({ queryKey: ["admin-frozen-posts"] });
+    } else {
+      const err = await res.json().catch(() => ({}));
+      toast({ title: "Failed to unfreeze", description: err.error ?? "Try again later", variant: "destructive" });
+    }
+  };
 
   const handleAction = async (reportId: number, action: "resolved" | "dismissed") => {
     const res = await fetch(`/api/admin/reports/${reportId}`, {
@@ -257,10 +295,19 @@ export default function AdminReports() {
           >
             Deleted Posts
           </button>
+          <button
+            onClick={() => setTab("frozen")}
+            data-testid="tab-frozen"
+            className={`px-4 py-2 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
+              tab === "frozen" ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            Frozen
+          </button>
         </div>
 
         {tab === "reports" ? (
-          <>
+          <>{/* reports panel below */}
             {/* Filter tabs */}
             <div className="flex gap-2 overflow-x-auto">
               {(["open", "resolved", "dismissed", "all"] as const).map((f) => (
@@ -369,7 +416,7 @@ export default function AdminReports() {
               </div>
             )}
           </>
-        ) : (
+        ) : tab === "deleted" ? (
           <>
             <p className="text-xs text-muted-foreground font-medium">
               Deleted posts are kept for {deletedData?.retentionDays ?? 30} days before they're permanently purged.
@@ -480,6 +527,81 @@ export default function AdminReports() {
                           >
                             <Trash2 className="w-3 h-3 mr-1" /> Purge now
                           </Button>
+                        </div>
+                      </div>
+                    </GlassCard>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground font-medium">
+              These posts had their view counts frozen by the automated abuse detector
+              after an anomalous traffic spike. The displayed count is locked and no new
+              views accrue. Unfreeze once you've verified the traffic is legitimate.
+            </p>
+
+            {frozenLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-28 w-full rounded-2xl" />)}
+              </div>
+            ) : !frozenData || frozenData.posts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 gap-2 text-muted-foreground">
+                <Snowflake className="w-10 h-10 opacity-30" />
+                <p className="font-bold">No frozen posts right now</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {frozenData.posts.map((post) => (
+                  <motion.div
+                    key={post.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    <GlassCard className="p-4">
+                      <div className="relative z-10 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Snowflake className="w-4 h-4 text-cyan-400 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="font-black text-sm truncate">
+                                {post.authorName}
+                                {post.authorUsername && (
+                                  <span className="text-muted-foreground font-medium"> @{post.authorUsername}</span>
+                                )}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground font-medium">
+                                Post #{post.id} · {post.postType}
+                              </p>
+                            </div>
+                          </div>
+                          <GlowBadge tone="violet">frozen</GlowBadge>
+                        </div>
+
+                        <p className="text-xs whitespace-pre-wrap break-words bg-muted/30 px-3 py-2 rounded-xl">
+                          {post.content}
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground font-medium">
+                          <div>Posted {formatRelative(post.createdAt)}</div>
+                          <div>Frozen {formatRelative(post.viewsFrozenAt)}</div>
+                          <div>Locked views: {post.viewCount}</div>
+                          <div className="truncate" title={post.viewsFreezeReason ?? ""}>
+                            Reason: {post.viewsFreezeReason ?? "—"}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 pt-1">
+                          <NeonButton
+                            size="sm"
+                            onClick={() => handleUnfreeze(post.id)}
+                            className="flex-1"
+                            data-testid={`button-unfreeze-${post.id}`}
+                          >
+                            <RotateCcw className="w-3 h-3 mr-1" /> Unfreeze
+                          </NeonButton>
                         </div>
                       </div>
                     </GlassCard>
