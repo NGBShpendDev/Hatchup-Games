@@ -19,10 +19,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import {
   Heart, Flame, Zap, Dumbbell, MessageCircle, Share2, Trash2,
-  Send, ChevronDown, ChevronUp, Award, Sparkles, Eye, Crown, Coins, Users,
+  Send, ChevronDown, ChevronUp, Award, Sparkles, Eye, Crown, Coins, Users, MoreHorizontal,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
+import { ReportBlockMenu } from "@/components/report-block-menu";
 
 export const POST_TYPES = [
   { value: "general", label: "General Update", icon: "💬" },
@@ -188,6 +189,25 @@ export function CommentRow({
               >
                 Delete
               </button>
+            </div>
+          )}
+          {!isOwn && !isAnonymous && !isEditing && (
+            <div className="ml-auto">
+              <ReportBlockMenu
+                targetPlayerId={comment.playerId}
+                targetName={comment.authorName ?? "this user"}
+                contentType="comment"
+                contentId={comment.id}
+                trigger={
+                  <button
+                    className="text-muted-foreground hover:text-foreground p-0.5"
+                    aria-label="Report comment"
+                    data-testid={`button-${testIdPrefix}-menu-${comment.id}`}
+                  >
+                    <MoreHorizontal className="w-3.5 h-3.5" />
+                  </button>
+                }
+              />
             </div>
           )}
         </div>
