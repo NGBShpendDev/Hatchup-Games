@@ -12,15 +12,15 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, sql, inArray, notInArray, or } from "drizzle-orm";
 import { z } from "zod";
-import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth";
+import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth.ts";
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { awardBadge } from "../services/badgeService";
-import { getHiddenPlayerIds } from "./safety";
-import { verifyUploadToken } from "./storage";
-import { ObjectStorageService } from "../lib/objectStorage";
-import { computeWeeklyRecap, sendWeeklyRecapNotification, buildRecapMessage, MACRO_GOAL_TARGETS } from "../services/nutritionRecap";
+import { awardBadge } from "../services/badgeService.ts";
+import { getHiddenPlayerIds } from "./safety.ts";
+import { verifyUploadToken } from "./storage.ts";
+import { ObjectStorageService } from "../lib/objectStorage.ts";
+import { computeWeeklyRecap, sendWeeklyRecapNotification, buildRecapMessage, MACRO_GOAL_TARGETS } from "../services/nutritionRecap.ts";
 import { notificationsTable } from "@workspace/db";
-import { recapPreviewLimiter } from "../middlewares/rateLimiters";
+import { recapPreviewLimiter } from "../middlewares/rateLimiters.ts";
 
 const objectStorageService = new ObjectStorageService();
 
