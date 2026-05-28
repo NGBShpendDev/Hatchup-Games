@@ -159,6 +159,7 @@ export default function Race() {
                 {hatchlings?.map(h => (
                   <div
                     key={h.id}
+                    data-testid={`race-hatchling-select-${h.id}`}
                     className={`rounded-3xl border-4 transition-all cursor-pointer ${selectedHatchlingId === h.id ? 'border-primary scale-105 shadow-2xl shadow-primary/20' : 'border-transparent hover:border-border'}`}
                     onClick={() => setSelectedHatchlingId(h.id)}
                   >

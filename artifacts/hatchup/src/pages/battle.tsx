@@ -1083,6 +1083,7 @@ export default function BattlePage() {
                   return (
                     <motion.button
                       key={h.id}
+                      data-testid={`battle-hatchling-select-${h.id}`}
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.97 }}
                       onClick={() => setSelectedHatchling(h)}
