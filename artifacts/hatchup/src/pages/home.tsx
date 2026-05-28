@@ -92,8 +92,17 @@ export default function Home() {
   });
 
   const { data: socialFeed } = useGetSocialFeed(
-    { playerId: pid, limit: 3 },
-    { query: { queryKey: getGetSocialFeedQueryKey({ playerId: pid, limit: 3 }), enabled: !!playerId } }
+    { playerId: pid, limit: 3, shuffle: true },
+    {
+      query: {
+        queryKey: getGetSocialFeedQueryKey({ playerId: pid, limit: 3, shuffle: true }),
+        enabled: !!playerId,
+        // Always refetch on mount so each home visit gets a fresh random sample
+        // of community highlights instead of the same cached cards.
+        staleTime: 0,
+        refetchOnMount: "always",
+      },
+    }
   );
   const reactToPost = useReactToPost();
   const handleHighlightReact = (postId: number, reactionType: string) => {

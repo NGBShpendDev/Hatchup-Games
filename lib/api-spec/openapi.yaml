@@ -1671,6 +1671,12 @@ paths:
           schema:
             type: integer
             default: 20
+        - name: shuffle
+          in: query
+          description: When true, randomly samples `limit` posts from the top-scoring candidates so repeat visits see fresh highlights. Cursor is ignored when shuffling.
+          schema:
+            type: boolean
+            default: false
       responses:
         "200":
           description: Feed posts

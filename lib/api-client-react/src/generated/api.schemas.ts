@@ -1637,6 +1637,10 @@ export type GetSocialFeedParams = {
 playerId: number;
 cursor?: number;
 limit?: number;
+/**
+ * When true, randomly samples `limit` posts from the top-scoring candidates so repeat visits see fresh highlights. Cursor is ignored when shuffling.
+ */
+shuffle?: boolean;
 };
 
 export type GetPostParams = {

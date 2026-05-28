@@ -2041,11 +2041,13 @@ export const SendGroupMessageBody = zod.object({
  * @summary Get social feed (followed + global, scored by algorithm)
  */
 export const getSocialFeedQueryLimitDefault = 20;
+export const getSocialFeedQueryShuffleDefault = false;
 
 export const GetSocialFeedQueryParams = zod.object({
   "playerId": zod.coerce.number(),
   "cursor": zod.coerce.number().optional(),
-  "limit": zod.coerce.number().default(getSocialFeedQueryLimitDefault)
+  "limit": zod.coerce.number().default(getSocialFeedQueryLimitDefault),
+  "shuffle": zod.coerce.boolean().default(getSocialFeedQueryShuffleDefault).describe('When true, randomly samples `limit` posts from the top-scoring candidates so repeat visits see fresh highlights. Cursor is ignored when shuffling.')
 })
 
 export const GetSocialFeedResponse = zod.object({

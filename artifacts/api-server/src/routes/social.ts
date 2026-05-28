@@ -177,6 +177,7 @@ router.get("/social/feed", requireAuth, attachPlayer, async (req, res) => {
   const playerId = req.playerId!;
   const limit = Math.min(Number(req.query.limit) || 20, 50);
   const cursor = req.query.cursor ? Number(req.query.cursor) : null;
+  const shuffle = req.query.shuffle === "true" || req.query.shuffle === "1";
 
   const follows = await db.query.playerFollowsTable.findMany({
     where: eq(playerFollowsTable.followerId, playerId),
@@ -196,11 +197,28 @@ router.get("/social/feed", requireAuth, attachPlayer, async (req, res) => {
 
   scored.sort((a, b) => b.score - a.score);
 
-  const startIdx = cursor ? scored.findIndex(s => s.post.id === cursor) + 1 : 0;
-  const page = scored.slice(startIdx, startIdx + limit);
+  let page: typeof scored;
+  let nextCursor: number | null;
+  if (shuffle) {
+    // Highlights mode: sample `limit` posts from the top candidates so
+    // returning players see fresh picks each visit while still favoring
+    // high-engagement, recent posts.
+    const poolSize = Math.max(limit * 5, 20);
+    const pool = scored.slice(0, poolSize);
+    // Fisher–Yates partial shuffle
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    page = pool.slice(0, limit);
+    nextCursor = null;
+  } else {
+    const startIdx = cursor ? scored.findIndex(s => s.post.id === cursor) + 1 : 0;
+    page = scored.slice(startIdx, startIdx + limit);
+    nextCursor = page.length === limit ? page[page.length - 1].post.id : null;
+  }
 
   const enriched = await Promise.all(page.map(({ post }) => enrichPost(post, playerId)));
-  const nextCursor = page.length === limit ? page[page.length - 1].post.id : null;
 
   res.json({ posts: enriched, nextCursor, total: scored.length });
 });
