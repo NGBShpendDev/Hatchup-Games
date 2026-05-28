@@ -478,6 +478,9 @@ export default function Nutrition() {
           <WeeklySummaryCard summary={weekly} />
         ) : null}
 
+        {/* Today progress strip — how today specifically is shaping up */}
+        {streak && <TodayProgressStrip today={streak.today} />}
+
         {/* Daily macro-target streak */}
         {streak && (
           <div className={`rounded-2xl border p-3 mb-4 flex items-center justify-between ${
@@ -868,6 +871,114 @@ export default function Nutrition() {
         )}
       </AnimatePresence>
     </Layout>
+  );
+}
+
+function TodayProgressStrip({ today }: { today: NutritionStreak["today"] }) {
+  const macros = [
+    { key: "calories", label: "Cals",    actual: today.totals.calories, target: today.target.calories, color: "from-orange-500 to-red-500",   text: "text-orange-300", suffix: "" },
+    { key: "protein",  label: "Protein", actual: today.totals.protein,  target: today.target.protein,  color: "from-red-500 to-pink-500",     text: "text-red-300",    suffix: "g" },
+    { key: "carbs",    label: "Carbs",   actual: today.totals.carbs,    target: today.target.carbs,    color: "from-yellow-500 to-amber-500", text: "text-yellow-300", suffix: "g" },
+    { key: "fat",      label: "Fat",     actual: today.totals.fat,      target: today.target.fat,      color: "from-blue-500 to-indigo-500",  text: "text-blue-300",   suffix: "g" },
+  ];
+
+  const tol = today.tolerance;
+  const statuses = macros.map(m => {
+    if (m.target <= 0) return "pending" as const;
+    const ratio = m.actual / m.target;
+    if (ratio >= 1 - tol && ratio <= 1 + tol) return "on" as const;
+    if (ratio > 1 + tol) return "over" as const;
+    if (ratio >= 0.5) return "close" as const;
+    return "low" as const;
+  });
+
+  const totalCals = today.totals.calories;
+  const onCount = statuses.filter(s => s === "on").length;
+  const overCount = statuses.filter(s => s === "over").length;
+
+  let headlineEmoji = "🌱";
+  let headlineLabel = "Just getting started";
+  let headlineTint = "text-muted-foreground";
+  let ringClass = "ring-border";
+  let bgClass = "from-muted/20 to-muted/5";
+
+  if (totalCals <= 0) {
+    headlineEmoji = "🌱";
+    headlineLabel = "No meals logged yet today";
+  } else if (onCount === 4) {
+    headlineEmoji = "🔥";
+    headlineLabel = "All four macros on target";
+    headlineTint = "text-green-300";
+    ringClass = "ring-green-500/40";
+    bgClass = "from-green-500/15 to-emerald-500/5";
+  } else if (onCount >= 2) {
+    headlineEmoji = "💪";
+    headlineLabel = `${onCount}/4 macros on track`;
+    headlineTint = "text-cyan-300";
+    ringClass = "ring-cyan-500/40";
+    bgClass = "from-cyan-500/15 to-blue-500/5";
+  } else if (overCount > 0) {
+    headlineEmoji = "⚠️";
+    headlineLabel = "Easing off — some macros over target";
+    headlineTint = "text-orange-300";
+    ringClass = "ring-orange-500/40";
+    bgClass = "from-orange-500/15 to-amber-500/5";
+  } else {
+    headlineEmoji = "🍽️";
+    headlineLabel = "Keep eating to hit your targets";
+    headlineTint = "text-yellow-300";
+    ringClass = "ring-yellow-500/40";
+    bgClass = "from-yellow-500/15 to-amber-500/5";
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`rounded-2xl border border-border bg-gradient-to-br ${bgClass} ring-1 ${ringClass} p-4 mb-4`}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Today</p>
+          <p className={`font-black text-sm ${headlineTint}`}>{headlineEmoji} {headlineLabel}</p>
+        </div>
+        <p className="text-[10px] font-bold text-muted-foreground">
+          {Math.round(totalCals)} / {today.target.calories} kcal
+        </p>
+      </div>
+
+      <div className="grid grid-cols-4 gap-2">
+        {macros.map((m, i) => {
+          const status = statuses[i]!;
+          const pct = m.target > 0 ? Math.min(100, Math.round((m.actual / m.target) * 100)) : 0;
+          const statusEmoji = status === "on" ? "✅" : status === "over" ? "⚠️" : status === "close" ? "🟡" : status === "low" ? "·" : "·";
+          const cellBg =
+            status === "on"    ? "bg-green-500/15 ring-1 ring-green-500/40" :
+            status === "over"  ? "bg-orange-500/15 ring-1 ring-orange-500/40" :
+            "bg-black/20";
+          return (
+            <div key={m.key} className={`rounded-xl p-2 ${cellBg}`}>
+              <div className="flex items-baseline justify-between">
+                <p className={`font-black text-sm ${m.text}`}>{Math.round(m.actual)}{m.suffix}</p>
+                <p className="text-[9px] text-muted-foreground font-bold">/{m.target}{m.suffix}</p>
+              </div>
+              <div className="h-1.5 bg-muted/40 rounded-full mt-1 overflow-hidden">
+                <motion.div
+                  className={`h-full rounded-full bg-gradient-to-r ${m.color}`}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct}%` }}
+                  transition={{ duration: 0.6 }}
+                />
+              </div>
+              <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1 flex items-center justify-between">
+                <span>{m.label}</span>
+                <span aria-hidden="true">{statusEmoji}</span>
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </motion.div>
   );
 }
 
