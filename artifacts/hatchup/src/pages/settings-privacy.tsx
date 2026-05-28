@@ -77,6 +77,33 @@ export default function SettingsPrivacy() {
   const [verifyPhotoName, setVerifyPhotoName] = useState<string | null>(null);
   const todayLabel = useMemo(() => new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }), []);
 
+  // Tick once a minute so the "Next recap" line stays accurate without a refresh.
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const nextRecap = useMemo(() => {
+    const now = new Date(nowTick);
+    const candidate = new Date(now);
+    candidate.setHours(recapHour, 0, 0, 0);
+    const daysUntil = (recapDay - now.getDay() + 7) % 7;
+    candidate.setDate(candidate.getDate() + daysUntil);
+    const thisWeekSlotPassed = candidate.getTime() <= now.getTime();
+    if (thisWeekSlotPassed) {
+      candidate.setDate(candidate.getDate() + 7);
+    }
+    const formatted = candidate.toLocaleString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    return { formatted, alreadySentThisWeek: thisWeekSlotPassed };
+  }, [nowTick, recapDay, recapHour]);
+
   // Web push state ──
   const push = usePushSubscription();
   const [pushPrefs, setPushPrefs] = useState({ invites: true, endingSoon: true, completed: true });
@@ -674,6 +701,20 @@ export default function SettingsPrivacy() {
                 <p className="col-span-2 text-[11px] text-muted-foreground italic">
                   Saved in your device's timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone}).
                 </p>
+                </div>
+
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5 flex items-start gap-2.5">
+                  <CalendarClock className="w-4 h-4 text-emerald-300 mt-0.5 shrink-0" />
+                  <div className="min-w-0 text-xs">
+                    {nextRecap.alreadySentThisWeek && (
+                      <p className="font-bold text-emerald-200">
+                        Already sent this week
+                      </p>
+                    )}
+                    <p className={`font-bold ${nextRecap.alreadySentThisWeek ? "text-muted-foreground" : "text-emerald-200"}`}>
+                      Next recap: <span className="text-emerald-100">{nextRecap.formatted}</span>
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
