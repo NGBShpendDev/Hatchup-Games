@@ -316,6 +316,7 @@ mock.module("@workspace/db", {
     groupChallengesTable,
     groupRaidsTable,
     groupMessagesTable,
+    groupNotificationMutesTable: { __t: "groupNotificationMutesTable", groupId: {}, playerId: {} },
     emailResendAttemptsTable: { id: {}, key: {}, createdAt: {} },
     rateLimitAttemptsTable: { id: {}, scope: {}, key: {}, createdAt: {} },
   },

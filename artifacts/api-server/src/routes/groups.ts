@@ -399,7 +399,77 @@ router.post("/groups/:id/workout", requireAuth, attachPlayer, async (req, res) =
   }
 
   const { challengesAdvanced } = await advanceChallenges(params.data.id, body.data.steps ?? 0);
-  const { raidDamage } = await dealRaidDamage(params.data.id, Math.round(activityValue * 0.5));
+  const { raidDamage, raid: defeatedRaid } = await dealRaidDamage(params.data.id, Math.round(activityValue * 0.5));
+
+  // ── Notification fan-out ─────────────────────────────────────────────────
+  // All member IDs for the group (already fetched above).
+  const allMemberIds = members.map(m => m.playerId);
+  const actorId = req.playerId!;
+  const groupLink = `/groups/${params.data.id}`;
+
+  // Batch-resolve which members have muted this group so we can skip them.
+  const mutedRowsW = allMemberIds.length > 0
+    ? await db.select({ playerId: groupNotificationMutesTable.playerId })
+        .from(groupNotificationMutesTable)
+        .where(and(
+          eq(groupNotificationMutesTable.groupId, params.data.id),
+          inArray(groupNotificationMutesTable.playerId, allMemberIds),
+        ))
+    : [];
+  const mutedSetW = new Set(mutedRowsW.map(r => r.playerId));
+
+  // Resolve actor display name once for all notification copy.
+  const actorRow = await db.query.playersTable.findFirst({ where: eq(playersTable.id, actorId) });
+  const actorName = actorRow?.displayName ?? actorRow?.username ?? "A teammate";
+
+  // 1. Workout notification — all members EXCEPT the actor who logged it.
+  const workoutRecipients = allMemberIds.filter(id => id !== actorId && !mutedSetW.has(id));
+  if (workoutRecipients.length > 0) {
+    const workoutChannelMap = await socialChannelsForPlayers(workoutRecipients, "group_workout");
+    const wTitle = "Group workout logged";
+    const wBody = `${actorName} just logged a workout in ${group.name}!`;
+    for (const memberId of workoutRecipients) {
+      const ch = workoutChannelMap.get(memberId) ?? { inbox: true, push: true, email: false };
+      if (!ch.inbox && !ch.push && !ch.email) continue;
+      if (ch.inbox) void db.insert(notificationsTable).values({ playerId: memberId, type: "group_workout", title: wTitle, body: wBody, link: groupLink, sourceId: actorId });
+      if (ch.push) void sendPushToPlayer(memberId, { title: wTitle, body: wBody, link: groupLink, category: "social", tag: `group-workout-${params.data.id}-${memberId}` });
+      if (ch.email) void sendSocialEmail(memberId, { title: wTitle, body: wBody, link: groupLink });
+    }
+  }
+
+  // 2. Challenge completion — ALL members (including actor) when any challenge finishes.
+  if (challengesAdvanced > 0) {
+    const challengeRecipients = allMemberIds.filter(id => !mutedSetW.has(id));
+    if (challengeRecipients.length > 0) {
+      const challengeChannelMap = await socialChannelsForPlayers(challengeRecipients, "group_challenge_completed");
+      const cTitle = "Group challenge completed!";
+      const cBody = `Your group "${group.name}" just completed a challenge!`;
+      for (const memberId of challengeRecipients) {
+        const ch = challengeChannelMap.get(memberId) ?? { inbox: true, push: true, email: false };
+        if (!ch.inbox && !ch.push && !ch.email) continue;
+        if (ch.inbox) void db.insert(notificationsTable).values({ playerId: memberId, type: "group_challenge_completed", title: cTitle, body: cBody, link: groupLink, sourceId: actorId });
+        if (ch.push) void sendPushToPlayer(memberId, { title: cTitle, body: cBody, link: groupLink, category: "completed", tag: `group-challenge-${params.data.id}-${memberId}` });
+        if (ch.email) void sendSocialEmail(memberId, { title: cTitle, body: cBody, link: groupLink });
+      }
+    }
+  }
+
+  // 3. Raid defeat — ALL members (including actor) when the boss HP reaches zero.
+  if (defeatedRaid && defeatedRaid.status === "defeated") {
+    const raidRecipients = allMemberIds.filter(id => !mutedSetW.has(id));
+    if (raidRecipients.length > 0) {
+      const raidChannelMap = await socialChannelsForPlayers(raidRecipients, "group_raid_defeated");
+      const rTitle = "Raid boss defeated!";
+      const rBody = `Your group "${group.name}" defeated ${defeatedRaid.bossName}!`;
+      for (const memberId of raidRecipients) {
+        const ch = raidChannelMap.get(memberId) ?? { inbox: true, push: true, email: false };
+        if (!ch.inbox && !ch.push && !ch.email) continue;
+        if (ch.inbox) void db.insert(notificationsTable).values({ playerId: memberId, type: "group_raid_defeated", title: rTitle, body: rBody, link: groupLink, sourceId: actorId });
+        if (ch.push) void sendPushToPlayer(memberId, { title: rTitle, body: rBody, link: groupLink, category: "completed", tag: `group-raid-${params.data.id}-${memberId}` });
+        if (ch.email) void sendSocialEmail(memberId, { title: rTitle, body: rBody, link: groupLink });
+      }
+    }
+  }
 
   // Partner-based friendship: increment coWorkoutCount for ALL members when any member logs
   // This represents the whole squad working out together in this group session

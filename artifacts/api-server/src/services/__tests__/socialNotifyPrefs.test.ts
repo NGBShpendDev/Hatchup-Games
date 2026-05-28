@@ -52,7 +52,7 @@ const {
   SOCIAL_NOTIFY_PREF_KEYS,
 } = await import("../socialNotifyPrefs.ts");
 
-const BASES = ["Reactions", "Replies", "Mentions", "Followers"] as const;
+const BASES = ["Reactions", "Replies", "Mentions", "Followers", "GroupActivity"] as const;
 
 function defaults(overrides: Record<string, boolean> = {}): PlayerRow {
   const row: PlayerRow = {};
@@ -81,6 +81,10 @@ describe("socialPrefBaseForType", () => {
     assert.equal(socialPrefBaseForType("comment_mention"), "Mentions");
     assert.equal(socialPrefBaseForType("club_mention"), "Mentions");
     assert.equal(socialPrefBaseForType("new_follower"), "Followers");
+    // Group-activity fan-out types all share the GroupActivity bucket.
+    assert.equal(socialPrefBaseForType("group_workout"),             "GroupActivity");
+    assert.equal(socialPrefBaseForType("group_challenge_completed"), "GroupActivity");
+    assert.equal(socialPrefBaseForType("group_raid_defeated"),       "GroupActivity");
   });
 
   it("returns null for non-social types", () => {
@@ -120,11 +124,12 @@ describe("socialChannelsForType", () => {
         [`notifySocial${base}Push`]: true,
         [`notifySocial${base}Email`]: true,
       });
-      // Pick one type for each base.
+      // Pick one representative type for each base.
       const type = base === "Reactions" ? "post_reaction"
         : base === "Replies" ? "post_comment"
         : base === "Mentions" ? "post_mention"
-        : "new_follower";
+        : base === "Followers" ? "new_follower"
+        : "group_workout"; // GroupActivity
       const ch = await socialChannelsForType(1, type);
       assert.deepEqual(ch, { inbox: false, push: false, email: false }, `master off for ${base}`);
     }
@@ -188,14 +193,15 @@ describe("socialChannelsForType", () => {
     assert.deepEqual(ch, { inbox: true, push: false, email: false });
   });
 
-  it("all twelve per-channel toggles act independently", async () => {
+  it("all per-channel toggles act independently across every base", async () => {
     // Sweep: for each base × channel, flip just that single channel off
     // (or, for email, on) and assert nothing else moves.
     for (const base of BASES) {
       const type = base === "Reactions" ? "post_reaction"
         : base === "Replies" ? "post_comment"
         : base === "Mentions" ? "post_mention"
-        : "new_follower";
+        : base === "Followers" ? "new_follower"
+        : "group_workout"; // GroupActivity
 
       // inbox off
       state.player = defaults({ [`notifySocial${base}Inbox`]: false });
@@ -254,6 +260,7 @@ describe("SOCIAL_NOTIFY_PREF_KEYS", () => {
   it("lists every base's master key", () => {
     assert.deepEqual([...SOCIAL_NOTIFY_PREF_KEYS].sort(), [
       "notifySocialFollowers",
+      "notifySocialGroupActivity",
       "notifySocialMentions",
       "notifySocialReactions",
       "notifySocialReplies",

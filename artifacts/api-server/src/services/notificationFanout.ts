@@ -51,6 +51,11 @@ export const NOTIFICATION_TYPE_TO_PUSH_CATEGORY: Record<string, PushCategory> = 
   // Weekly nutrition recap
   nutrition_recap: "nutritionRecap",
   nutrition_recap_preview: "nutritionRecap",
+
+  // Group activity fan-out (workout, challenge, raid)
+  group_workout: "social",
+  group_challenge_completed: "completed",
+  group_raid_defeated: "completed",
 };
 
 export interface NotificationLike {

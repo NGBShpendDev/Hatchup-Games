@@ -112,6 +112,7 @@ export const playersTable = pgTable("players", {
   notifySocialReplies: boolean("notify_social_replies").notNull().default(true),
   notifySocialMentions: boolean("notify_social_mentions").notNull().default(true),
   notifySocialFollowers: boolean("notify_social_followers").notNull().default(true),
+  notifySocialGroupActivity: boolean("notify_social_group_activity").notNull().default(true),
   // Per-channel toggles for each social event type. Inbox/push default ON
   // (matches prior end-to-end behavior); email defaults OFF since social
   // events were never emailed before — opt-in only.
@@ -127,6 +128,9 @@ export const playersTable = pgTable("players", {
   notifySocialFollowersInbox: boolean("notify_social_followers_inbox").notNull().default(true),
   notifySocialFollowersPush: boolean("notify_social_followers_push").notNull().default(true),
   notifySocialFollowersEmail: boolean("notify_social_followers_email").notNull().default(false),
+  notifySocialGroupActivityInbox: boolean("notify_social_group_activity_inbox").notNull().default(true),
+  notifySocialGroupActivityPush: boolean("notify_social_group_activity_push").notNull().default(true),
+  notifySocialGroupActivityEmail: boolean("notify_social_group_activity_email").notNull().default(false),
   // Weekly nutrition recap delivery preferences
   weeklyRecapEnabled: boolean("weekly_recap_enabled").notNull().default(true),
   weeklyRecapDayOfWeek: integer("weekly_recap_day_of_week").notNull().default(0),

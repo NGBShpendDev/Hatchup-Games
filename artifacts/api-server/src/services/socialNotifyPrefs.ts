@@ -13,7 +13,7 @@
 import { db, playersTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 
-export type SocialPrefBase = "Reactions" | "Replies" | "Mentions" | "Followers";
+export type SocialPrefBase = "Reactions" | "Replies" | "Mentions" | "Followers" | "GroupActivity";
 
 const TYPE_TO_BASE: Record<string, SocialPrefBase> = {
   post_reaction: "Reactions",
@@ -23,6 +23,11 @@ const TYPE_TO_BASE: Record<string, SocialPrefBase> = {
   comment_mention: "Mentions",
   club_mention: "Mentions",
   new_follower: "Followers",
+  // Group-activity events fan-out to all members; each player's
+  // notifySocialGroupActivity* columns control the three channels.
+  group_workout: "GroupActivity",
+  group_challenge_completed: "GroupActivity",
+  group_raid_defeated: "GroupActivity",
 };
 
 export function socialPrefBaseForType(type: string): SocialPrefBase | null {
@@ -33,13 +38,15 @@ export type SocialPrefKey =
   | "notifySocialReactions"
   | "notifySocialReplies"
   | "notifySocialMentions"
-  | "notifySocialFollowers";
+  | "notifySocialFollowers"
+  | "notifySocialGroupActivity";
 
 export const SOCIAL_NOTIFY_PREF_KEYS = [
   "notifySocialReactions",
   "notifySocialReplies",
   "notifySocialMentions",
   "notifySocialFollowers",
+  "notifySocialGroupActivity",
 ] as const satisfies readonly SocialPrefKey[];
 
 export interface SocialChannels {
@@ -100,6 +107,7 @@ const PREF_COLUMNS = {
   notifySocialReplies: true,
   notifySocialMentions: true,
   notifySocialFollowers: true,
+  notifySocialGroupActivity: true,
   notifySocialReactionsInbox: true,
   notifySocialReactionsPush: true,
   notifySocialReactionsEmail: true,
@@ -112,6 +120,9 @@ const PREF_COLUMNS = {
   notifySocialFollowersInbox: true,
   notifySocialFollowersPush: true,
   notifySocialFollowersEmail: true,
+  notifySocialGroupActivityInbox: true,
+  notifySocialGroupActivityPush: true,
+  notifySocialGroupActivityEmail: true,
 } as const;
 
 /**
