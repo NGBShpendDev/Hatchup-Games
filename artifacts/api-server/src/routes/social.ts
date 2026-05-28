@@ -456,6 +456,13 @@ router.get("/social/posts/:id", async (req, res) => {
 // view. Dedup is per (post, viewerKey, day) so spamming refresh doesn't inflate
 // the number. viewerKey = playerId for signed-in viewers; otherwise the request
 // IP. Always returns the current viewCount so the client can render it.
+//
+// Defense in depth against bots that rotate through many post IDs from the
+// same IP: in addition to the per-day dedup and the postViewLimiter
+// (120/min/IP), we cap the number of *distinct* posts a single viewerKey can
+// count in any rolling hour. Anything above the cap returns counted=false
+// (still 200) so legitimate browsing UIs keep working.
+export const VIEW_DISTINCT_POSTS_PER_HOUR = 60;
 
 router.post("/social/posts/:id/view", postViewLimiter, async (req, res) => {
   const id = Number(req.params.id);
@@ -487,6 +494,28 @@ router.post("/social/posts/:id/view", postViewLimiter, async (req, res) => {
   }
 
   const viewDate = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+
+  // Second-layer cap: stop bots that rotate through many post IDs from the
+  // same IP. Count distinct posts (other than this one) already viewed by
+  // this viewerKey in the last hour. If the cap is already met, the new
+  // post would push it over — return counted=false without inserting so the
+  // attacker can't inflate a fresh post's counter just by rotating targets.
+  const hourCutoff = new Date(Date.now() - 60 * 60 * 1000);
+  const [distinctRow] = await db
+    .select({ count: sql<number>`count(distinct ${postViewsTable.postId})::int` })
+    .from(postViewsTable)
+    .where(
+      and(
+        eq(postViewsTable.viewerKey, viewerKey),
+        gte(postViewsTable.createdAt, hourCutoff),
+        ne(postViewsTable.postId, id),
+      ),
+    );
+  const distinctPostsThisHour = distinctRow?.count ?? 0;
+  if (distinctPostsThisHour >= VIEW_DISTINCT_POSTS_PER_HOUR) {
+    res.json({ viewCount: post.viewCount, counted: false });
+    return;
+  }
 
   const inserted = await db
     .insert(postViewsTable)

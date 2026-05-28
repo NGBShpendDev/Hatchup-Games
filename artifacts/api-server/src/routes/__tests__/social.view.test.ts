@@ -1,12 +1,15 @@
 // Abuse-protection tests for POST /social/posts/:id/view.
 //
-// The view endpoint has three layers of defense that this file pins down:
+// The view endpoint has four layers of defense that this file pins down:
 //   1. Per-(post, viewerKey, day) dedup so a viewer refreshing the page
 //      doesn't inflate the count.
 //   2. HMAC-hashed IP viewerKey so anonymous viewers are stable but raw IPs
 //      never hit the database.
 //   3. postViewLimiter (120/min/IP) as a second line of defense against
 //      bots cycling through posts.
+//   4. Per-(viewerKey, hour) cap on the number of *distinct* posts that can
+//      be counted, so a bot rotating through many post IDs from the same IP
+//      still can't inflate counts beyond the cap.
 //
 // The route is exercised against a real Express server with the DB / auth /
 // peripheral modules mocked out, but the rate limiter is the real one from
@@ -19,21 +22,41 @@ import type { AddressInfo } from "node:net";
 
 process.env.SESSION_SECRET = "test-session-secret-1234567890";
 
-interface PostRow { id: number; viewCount: number }
+interface PostRow { id: number; viewCount: number; deletedAt?: Date | null }
 interface ViewInsert { postId: number; viewerKey: string; viewDate: string }
+interface ViewRecord extends ViewInsert { createdAt: Date }
 
 const state = {
-  post: { id: 1, viewCount: 0 } as PostRow,
-  views: new Set<string>(),
+  posts: new Map<number, PostRow>(),
+  // Per (postId|viewerKey|viewDate) successful insert — mirrors the unique
+  // index on post_views.
+  viewsByKey: new Map<string, ViewRecord>(),
+  // Every insert attempt (whether or not it conflicted) — lets tests assert
+  // on the keys the route built.
   inserts: [] as ViewInsert[],
+  // Successful inserts in time order — what the distinct-posts cap query
+  // counts against.
+  recordedViews: [] as ViewRecord[],
+  // Override the timestamp the next insert is recorded with. Lets a test
+  // age out previously-recorded views so the hour-window cap resets.
+  nextInsertAt: null as Date | null,
   authUserId: null as string | null,
 };
 
 function resetState() {
-  state.post = { id: 1, viewCount: 0 };
-  state.views = new Set();
+  state.posts = new Map([[1, { id: 1, viewCount: 0 }]]);
+  state.viewsByKey = new Map();
   state.inserts = [];
+  state.recordedViews = [];
+  state.nextInsertAt = null;
   state.authUserId = null;
+}
+
+// Convenience getter for tests that still read `state.post`.
+function getPost1(): PostRow {
+  const p = state.posts.get(1);
+  if (!p) throw new Error("post 1 missing from state");
+  return p;
 }
 
 // Anonymous view path by default. Some tests flip state.authUserId to exercise
@@ -71,18 +94,53 @@ mock.module("../../middlewares/suspendedGuard.ts", {
 mock.module("../../services/pushNotifications.ts", {
   namedExports: { sendPushToPlayer: async () => undefined },
 });
+// postPurgeJob pulls in the api-server logger, which uses a path-style
+// import that doesn't resolve under Node's strict ESM test runner. The view
+// route never actually invokes the purge job, so a no-op stub is enough.
+mock.module("../../services/postPurgeJob.ts", {
+  namedExports: { hardDeletePosts: async () => 0, RETENTION_DAYS: 30 },
+});
+// safety.ts transitively pulls in emailVerification → emailService, which
+// uses an extensionless import that fails resolution under the strict ESM
+// test runner. The view route doesn't touch any of safety's helpers, so a
+// trivial stub keeps the import graph quiet.
+mock.module("../safety.ts", {
+  namedExports: { getHiddenPlayerIds: async () => [] },
+});
+// social.ts imports Zod body schemas from @workspace/api-zod, but its
+// generated bundle isn't built in the test environment. Stub schemas keep
+// the imports satisfied without pulling in generated code the view route
+// never executes.
+const stubSchema = { safeParse: (data: unknown) => ({ success: true, data }) };
+mock.module("@workspace/api-zod", {
+  namedExports: {
+    CreatePostBody: stubSchema,
+    ReactToPostBody: stubSchema,
+    AddPostCommentBody: stubSchema,
+    EditPostCommentBody: stubSchema,
+    FollowPlayerBody: stubSchema,
+    RepostPostBody: stubSchema,
+  },
+});
+
+// drizzle predicate builders are mocked to return tagged objects so the
+// fake db can walk a `where` tree and pull out the values the route passed
+// in (e.g. the viewerKey on the distinct-posts-per-hour cap query).
+interface Pred { __op: string; col?: { __col?: string }; val?: unknown; args?: Pred[] }
+const col = (name: string) => ({ __col: name });
 
 mock.module("drizzle-orm", {
   namedExports: {
-    eq: () => ({}),
-    and: () => ({}),
+    eq: (c: { __col?: string }, v: unknown) => ({ __op: "eq", col: c, val: v }),
+    and: (...args: Pred[]) => ({ __op: "and", args }),
     or: () => ({}),
-    ne: () => ({}),
+    ne: (c: { __col?: string }, v: unknown) => ({ __op: "ne", col: c, val: v }),
     desc: () => ({}),
-    gte: () => ({}),
+    gte: (c: { __col?: string }, v: unknown) => ({ __op: "gte", col: c, val: v }),
     ilike: () => ({}),
     inArray: () => ({}),
     isNull: () => ({}),
+    isNotNull: () => ({}),
     sql: Object.assign(
       (_s: TemplateStringsArray, ..._v: unknown[]) => ({}),
       { raw: () => ({}) },
@@ -93,10 +151,38 @@ mock.module("drizzle-orm/pg-core", {
   namedExports: { alias: () => ({}) },
 });
 
+function findPred(node: Pred | undefined, op: string, colName: string): Pred | undefined {
+  if (!node) return undefined;
+  if (node.__op === "and" && node.args) {
+    for (const a of node.args) {
+      const r = findPred(a, op, colName);
+      if (r) return r;
+    }
+    return undefined;
+  }
+  if (node.__op === op && node.col?.__col === colName) return node;
+  return undefined;
+}
+
+const postsTable = { id: col("id") };
+const postViewsTable = {
+  id: col("id"),
+  postId: col("postId"),
+  viewerKey: col("viewerKey"),
+  viewDate: col("viewDate"),
+  createdAt: col("createdAt"),
+};
+const playersTable = { id: col("id"), clerkId: col("clerkId") };
+
 const fakeDb = {
   query: {
     postsTable: {
-      findFirst: async () => (state.post ? { ...state.post } : undefined),
+      findFirst: async ({ where }: { where?: Pred }) => {
+        const id = findPred(where, "eq", "id")?.val as number | undefined;
+        if (id === undefined) return undefined;
+        if (!state.posts.has(id)) state.posts.set(id, { id, viewCount: 0 });
+        return { ...state.posts.get(id)! };
+      },
     },
     playersTable: {
       // Returns a stub player when the route resolves a Clerk session.
@@ -111,9 +197,14 @@ const fakeDb = {
       return {
         onConflictDoNothing: (_o: unknown) => ({
           returning: async () => {
-            if (state.views.has(key)) return [];
-            state.views.add(key);
-            return [{ id: state.views.size }];
+            if (state.viewsByKey.has(key)) return [];
+            const record: ViewRecord = {
+              ...vals,
+              createdAt: state.nextInsertAt ?? new Date(),
+            };
+            state.viewsByKey.set(key, record);
+            state.recordedViews.push(record);
+            return [{ id: state.recordedViews.size }];
           },
         }),
       };
@@ -121,12 +212,39 @@ const fakeDb = {
   }),
   update: (_t: unknown) => ({
     set: (_v: unknown) => ({
-      where: (_w: unknown) => ({
+      where: (cond: Pred) => ({
         returning: async () => {
-          state.post.viewCount += 1;
-          return [{ viewCount: state.post.viewCount }];
+          const id = findPred(cond, "eq", "id")?.val as number | undefined;
+          const target = id !== undefined ? state.posts.get(id) : undefined;
+          if (target) target.viewCount += 1;
+          return [{ viewCount: target?.viewCount ?? 0 }];
         },
       }),
+    }),
+  }),
+  // Used by the per-(viewerKey, hour) distinct-posts cap. Filters the
+  // recorded views by viewerKey + createdAt window + excluded post id and
+  // returns the distinct-post-id count.
+  select: (_proj: unknown) => ({
+    from: (_t: unknown) => ({
+      where: (cond: Pred) =>
+        Promise.resolve([
+          {
+            count: (() => {
+              const viewerKey = findPred(cond, "eq", "viewerKey")?.val as string | undefined;
+              const cutoff = findPred(cond, "gte", "createdAt")?.val as Date | undefined;
+              const exclude = findPred(cond, "ne", "postId")?.val as number | undefined;
+              const ids = new Set<number>();
+              for (const v of state.recordedViews) {
+                if (viewerKey !== undefined && v.viewerKey !== viewerKey) continue;
+                if (cutoff && v.createdAt < cutoff) continue;
+                if (exclude !== undefined && v.postId === exclude) continue;
+                ids.add(v.postId);
+              }
+              return ids.size;
+            })(),
+          },
+        ]),
     }),
   }),
 };
@@ -134,17 +252,19 @@ const fakeDb = {
 mock.module("@workspace/db", {
   namedExports: {
     db: fakeDb,
-    postsTable: {},
-    postViewsTable: {},
+    postsTable,
+    postViewsTable,
     postReactionsTable: {},
     postCommentsTable: {},
+    postCommentRevisionsTable: {},
     postCommentReactionsTable: {},
     playerFollowsTable: {},
     postRepostsTable: {},
-    playersTable: {},
+    playersTable,
     hatchlingsTable: {},
     groupMembersTable: {},
     groupsTable: {},
+    userReportsTable: {},
     notificationsTable: {},
   },
 });
@@ -152,6 +272,7 @@ mock.module("@workspace/db", {
 // ── Imports that depend on the mocks above ───────────────────────────────────
 const express = (await import("express")).default;
 const socialRouter = (await import("../social.ts")).default;
+const { VIEW_DISTINCT_POSTS_PER_HOUR } = await import("../social.ts");
 const { postViewLimiter } = await import("../../middlewares/rateLimiters.ts");
 
 let baseUrl: string;
@@ -243,6 +364,66 @@ describe("POST /social/posts/:id/view — abuse protection", () => {
     assert.match(a1, /^ip:[0-9a-f]{32}$/, "anonymous viewerKey must be the hashed form");
     assert.ok(!a1.includes("1.2.3.4"), "raw IP must never appear in viewerKey");
     assert.ok(!b.includes("5.6.7.8"), "raw IP must never appear in viewerKey");
+  });
+
+  it("caps distinct posts per viewerKey per hour even when a bot rotates post IDs", async () => {
+    // A bot from a single IP cycles through fresh post IDs. The first
+    // VIEW_DISTINCT_POSTS_PER_HOUR succeed (each becomes a distinct view),
+    // but anything beyond that returns counted=false without recording.
+    for (let i = 0; i < VIEW_DISTINCT_POSTS_PER_HOUR; i++) {
+      const r = await postView(1000 + i, { "x-forwarded-for": "9.9.9.9" });
+      assert.equal(r.status, 200);
+      assert.equal(r.body.counted, true, `post #${i + 1} should still fit under the cap`);
+    }
+
+    const blocked = await postView(9999, { "x-forwarded-for": "9.9.9.9" });
+    assert.equal(blocked.status, 200, "over-cap responses are still 200 so the UI behaves");
+    assert.equal(blocked.body.counted, false, "request past the hourly cap must not count");
+    assert.equal(
+      blocked.body.viewCount,
+      0,
+      "blocked target post's stored viewCount must not be incremented",
+    );
+    assert.equal(
+      state.recordedViews.length,
+      VIEW_DISTINCT_POSTS_PER_HOUR,
+      "no extra view rows should be recorded once the cap is hit",
+    );
+    assert.ok(
+      !state.recordedViews.some((v) => v.postId === 9999),
+      "the over-cap post must not have a recorded view",
+    );
+  });
+
+  it("the distinct-posts cap is per viewerKey — different IPs each get their own budget", async () => {
+    // Saturate one IP's hourly budget.
+    for (let i = 0; i < VIEW_DISTINCT_POSTS_PER_HOUR; i++) {
+      const r = await postView(2000 + i, { "x-forwarded-for": "1.2.3.4" });
+      assert.equal(r.body.counted, true);
+    }
+    const overA = await postView(2999, { "x-forwarded-for": "1.2.3.4" });
+    assert.equal(overA.body.counted, false, "IP A is now over its hourly cap");
+
+    // A different IP for the same post still counts — the cap is keyed per
+    // viewerKey, not globally per post.
+    const otherIp = await postView(2999, { "x-forwarded-for": "5.6.7.8" });
+    assert.equal(otherIp.body.counted, true, "different viewerKey must not share IP A's cap");
+  });
+
+  it("views older than an hour fall outside the cap window and don't count against it", async () => {
+    // Record VIEW_DISTINCT_POSTS_PER_HOUR views aged ~2 hours ago, then
+    // confirm the next fresh view still counts because the stale ones have
+    // dropped out of the rolling window.
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    for (let i = 0; i < VIEW_DISTINCT_POSTS_PER_HOUR; i++) {
+      state.nextInsertAt = twoHoursAgo;
+      const r = await postView(3000 + i, { "x-forwarded-for": "1.2.3.4" });
+      assert.equal(r.body.counted, true);
+    }
+    state.nextInsertAt = null;
+
+    const fresh = await postView(3999, { "x-forwarded-for": "1.2.3.4" });
+    assert.equal(fresh.body.counted, true, "stale views must not consume the current hour's budget");
   });
 
   it("postViewLimiter blocks bursts above the per-minute threshold", async () => {
