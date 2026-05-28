@@ -35,6 +35,7 @@ import {
   KeyRound,
   Baby,
   Bell,
+  CalendarClock,
 } from "lucide-react";
 import { usePushSubscription } from "@/hooks/use-push-subscription";
 
@@ -54,6 +55,9 @@ export default function SettingsPrivacy() {
   const [emergencyName, setEmergencyName] = useState("");
   const [emergencyPhone, setEmergencyPhone] = useState("");
   const [isMinor, setIsMinor] = useState(false);
+  const [recapEnabled, setRecapEnabled] = useState(true);
+  const [recapDay, setRecapDay] = useState(0);
+  const [recapHour, setRecapHour] = useState(9);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
@@ -113,6 +117,9 @@ export default function SettingsPrivacy() {
         setEmergencyName(data.emergencyContactName ?? "");
         setEmergencyPhone(data.emergencyContactPhone ?? "");
         setIsMinor(Boolean(data.isMinor));
+        if (typeof data.weeklyRecapEnabled === "boolean") setRecapEnabled(data.weeklyRecapEnabled);
+        if (typeof data.weeklyRecapDayOfWeek === "number") setRecapDay(data.weeklyRecapDayOfWeek);
+        if (typeof data.weeklyRecapHourLocal === "number") setRecapHour(data.weeklyRecapHourLocal);
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
@@ -158,6 +165,10 @@ export default function SettingsPrivacy() {
           emergencyContactName: emergencyName || null,
           emergencyContactPhone: emergencyPhone || null,
           isMinor,
+          weeklyRecapEnabled: recapEnabled,
+          weeklyRecapDayOfWeek: recapDay,
+          weeklyRecapHourLocal: recapHour,
+          weeklyRecapTzOffsetMinutes: -new Date().getTimezoneOffset(),
         }),
       });
       if (res.ok) {
@@ -447,6 +458,68 @@ export default function SettingsPrivacy() {
             </div>
           </div>
         </GlassCard>
+
+        {/* Weekly nutrition recap */}
+        <Card className="border border-emerald-500/20 bg-emerald-950/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-black flex items-center gap-2">
+              <CalendarClock className="w-4 h-4 text-emerald-400" />
+              Weekly Nutrition Recap
+            </CardTitle>
+            <p className="text-xs text-muted-foreground font-medium">
+              A summary of last week's macros, top foods, and your Hatchling's mood. Pick when (or whether) we send it.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="font-bold text-sm">Send me a weekly recap</p>
+                <p className="text-xs text-muted-foreground font-medium">Delivered to your in-app notifications.</p>
+              </div>
+              <Switch checked={recapEnabled} onCheckedChange={setRecapEnabled} />
+            </div>
+
+            {recapEnabled && (
+              <div className="border-t border-emerald-500/10 pt-3 grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="recap-day" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Day
+                  </Label>
+                  <select
+                    id="recap-day"
+                    value={recapDay}
+                    onChange={(e) => setRecapDay(Number(e.target.value))}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm font-medium"
+                  >
+                    {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((label, i) => (
+                      <option key={label} value={i}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="recap-hour" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Local time
+                  </Label>
+                  <select
+                    id="recap-hour"
+                    value={recapHour}
+                    onChange={(e) => setRecapHour(Number(e.target.value))}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm font-medium"
+                  >
+                    {Array.from({ length: 24 }, (_, h) => {
+                      const suffix = h < 12 ? "AM" : "PM";
+                      const display = h === 0 ? 12 : h > 12 ? h - 12 : h;
+                      return <option key={h} value={h}>{display}:00 {suffix}</option>;
+                    })}
+                  </select>
+                </div>
+                <p className="col-span-2 text-[11px] text-muted-foreground italic">
+                  Saved in your device's timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone}).
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* MFA / account security pointer */}
         <GlassCard interactive className="p-4">

@@ -158,6 +158,10 @@ router.get("/players/:id/privacy-settings", requireAuth, attachPlayer, async (re
     emergencyContactPhone: player.emergencyContactPhone,
     isVerified: player.isVerified,
     isMinor: player.isMinor,
+    weeklyRecapEnabled: player.weeklyRecapEnabled,
+    weeklyRecapDayOfWeek: player.weeklyRecapDayOfWeek,
+    weeklyRecapHourLocal: player.weeklyRecapHourLocal,
+    weeklyRecapTzOffsetMinutes: player.weeklyRecapTzOffsetMinutes,
   });
 });
 
@@ -177,6 +181,10 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     emergencyContactName?: unknown;
     emergencyContactPhone?: unknown;
     isMinor?: unknown;
+    weeklyRecapEnabled?: unknown;
+    weeklyRecapDayOfWeek?: unknown;
+    weeklyRecapHourLocal?: unknown;
+    weeklyRecapTzOffsetMinutes?: unknown;
   };
 
   // Read current player so we know if this is (or will become) a minor account.
@@ -204,6 +212,33 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
   }
   if (body.emergencyContactPhone !== undefined) {
     updates.emergencyContactPhone = body.emergencyContactPhone as string | null;
+  }
+  if (typeof body.weeklyRecapEnabled === "boolean") {
+    updates.weeklyRecapEnabled = body.weeklyRecapEnabled;
+  }
+  if (typeof body.weeklyRecapDayOfWeek === "number") {
+    const d = body.weeklyRecapDayOfWeek;
+    if (!Number.isInteger(d) || d < 0 || d > 6) {
+      res.status(400).json({ error: "Invalid weeklyRecapDayOfWeek" });
+      return;
+    }
+    updates.weeklyRecapDayOfWeek = d;
+  }
+  if (typeof body.weeklyRecapHourLocal === "number") {
+    const h = body.weeklyRecapHourLocal;
+    if (!Number.isInteger(h) || h < 0 || h > 23) {
+      res.status(400).json({ error: "Invalid weeklyRecapHourLocal" });
+      return;
+    }
+    updates.weeklyRecapHourLocal = h;
+  }
+  if (typeof body.weeklyRecapTzOffsetMinutes === "number") {
+    const tz = body.weeklyRecapTzOffsetMinutes;
+    if (!Number.isInteger(tz) || tz < -14 * 60 || tz > 14 * 60) {
+      res.status(400).json({ error: "Invalid weeklyRecapTzOffsetMinutes" });
+      return;
+    }
+    updates.weeklyRecapTzOffsetMinutes = tz;
   }
   if (typeof body.isMinor === "boolean") {
     // Minor status is a one-way self-service toggle: a user can mark

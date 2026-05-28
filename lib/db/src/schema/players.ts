@@ -85,6 +85,11 @@ export const playersTable = pgTable("players", {
   notifyInvitesPush: boolean("notify_invites_push").notNull().default(true),
   notifyEndingSoonPush: boolean("notify_ending_soon_push").notNull().default(true),
   notifyCompletedPush: boolean("notify_completed_push").notNull().default(true),
+  // Weekly nutrition recap delivery preferences
+  weeklyRecapEnabled: boolean("weekly_recap_enabled").notNull().default(true),
+  weeklyRecapDayOfWeek: integer("weekly_recap_day_of_week").notNull().default(0),
+  weeklyRecapHourLocal: integer("weekly_recap_hour_local").notNull().default(9),
+  weeklyRecapTzOffsetMinutes: integer("weekly_recap_tz_offset_minutes").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
