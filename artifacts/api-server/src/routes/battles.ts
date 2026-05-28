@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { battlesTable, hatchlingsTable, notificationsTable, playersTable } from "@workspace/db";
-import { eq, desc, or } from "drizzle-orm";
+import { eq, desc, or, and } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { attachEntitlement, enforceBattleDailyCap } from "../services/subscriptionGuards.ts";
@@ -210,6 +210,84 @@ router.get("/battles/rivals", requireAuth, attachPlayer, async (req, res) => {
       streakCount: r.streakCount,
     };
   }));
+});
+
+// ── GET /battles/rivals/:opponentId ──────────────────────────────────────────
+// Full head-to-head battle log between the viewer and a specific opponent.
+// Reverse-chronological. Includes hatchling names, outcome, mode, ELO change.
+router.get("/battles/rivals/:opponentId", requireAuth, attachPlayer, async (req, res) => {
+  const playerId = req.playerId!;
+  const opponentId = Number(req.params.opponentId);
+  if (!Number.isFinite(opponentId) || opponentId <= 0 || opponentId === playerId) {
+    res.status(400).json({ error: "Invalid opponentId" });
+    return;
+  }
+
+  const battles = await db.query.battlesTable.findMany({
+    where: or(
+      and(eq(battlesTable.player1Id, playerId), eq(battlesTable.player2Id, opponentId)),
+      and(eq(battlesTable.player1Id, opponentId), eq(battlesTable.player2Id, playerId)),
+    ),
+    orderBy: [desc(battlesTable.createdAt)],
+  });
+
+  const opponent = await db.query.playersTable.findFirst({ where: eq(playersTable.id, opponentId) });
+  if (!opponent) { res.status(404).json({ error: "Opponent not found" }); return; }
+
+  const hatchlingIds = [...new Set(
+    battles.flatMap(b => [b.hatchling1Id, b.hatchling2Id].filter(Boolean) as number[])
+  )];
+  const hatchlings = hatchlingIds.length
+    ? await db.query.hatchlingsTable.findMany({ where: (t, { inArray }) => inArray(t.id, hatchlingIds) })
+    : [];
+  const hatchlingMap = new Map(hatchlings.map(h => [h.id, h]));
+
+  let wins = 0, losses = 0, draws = 0;
+  let viewerEloDelta = 0;
+  for (const b of battles) {
+    if (b.winnerId == null) draws += 1;
+    else if (b.winnerId === playerId) wins += 1;
+    else losses += 1;
+    // eloChange is stored from player1's perspective; flip if viewer is player2.
+    viewerEloDelta += b.player1Id === playerId ? b.eloChange : -b.eloChange;
+  }
+
+  const log = battles.map(b => {
+    const viewerIs1 = b.player1Id === playerId;
+    const myHatchlingId = viewerIs1 ? b.hatchling1Id : b.hatchling2Id;
+    const oppHatchlingId = viewerIs1 ? b.hatchling2Id : b.hatchling1Id;
+    const viewerWon = b.winnerId != null && b.winnerId === playerId;
+    const opponentWon = b.winnerId != null && b.winnerId === opponentId;
+    return {
+      id: b.id,
+      createdAt: b.createdAt.toISOString(),
+      battleMode: b.battleMode,
+      outcome: b.winnerId == null ? "draw" : viewerWon ? "win" : opponentWon ? "loss" : "loss",
+      viewerWon,
+      myHatchlingId: myHatchlingId ?? null,
+      myHatchlingName: myHatchlingId ? hatchlingMap.get(myHatchlingId)?.name ?? null : null,
+      opponentHatchlingId: oppHatchlingId ?? null,
+      opponentHatchlingName: oppHatchlingId ? hatchlingMap.get(oppHatchlingId)?.name ?? null : null,
+      eloChange: viewerIs1 ? b.eloChange : -b.eloChange,
+      xpAwarded: b.xpAwarded,
+      coinsAwarded: b.coinsAwarded,
+    };
+  });
+
+  res.json({
+    opponentId,
+    opponentUsername: opponent.username,
+    opponentDisplayName: opponent.displayName ?? opponent.username ?? null,
+    opponentBattleElo: opponent.battleElo,
+    totalBattles: battles.length,
+    wins,
+    losses,
+    draws,
+    viewerEloDelta,
+    lastBattleId: battles[0]?.id ?? null,
+    lastBattleAt: battles[0]?.createdAt.toISOString() ?? null,
+    battles: log,
+  });
 });
 
 // ── GET /battles/:id ─────────────────────────────────────────────────────────

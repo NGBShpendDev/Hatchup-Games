@@ -30,6 +30,7 @@ import Coach from "@/pages/coach";
 import Records from "@/pages/records";
 import Nutrition from "@/pages/nutrition";
 import Battle from "@/pages/battle";
+import RivalsDetail from "@/pages/rivals-detail";
 import ArtifactsPage from "@/pages/artifacts";
 import Challenges from "@/pages/challenges";
 import ChallengeDetail from "@/pages/challenge-detail";
@@ -244,6 +245,7 @@ function AppRoutes() {
         <Route path="/clubs/:id" component={ClubDetail} />
         <Route path="/compete/battle" component={Battle} />
         <Route path="/compete/race" component={Race} />
+        <Route path="/compete/rivals/:opponentId" component={RivalsDetail} />
         <Route path="/rewards" component={Rewards} />
         <Route path="/settings/privacy" component={SettingsPrivacy} />
         <Route path="/admin/reports" component={AdminReports} />

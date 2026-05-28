@@ -229,24 +229,32 @@ export default function Compete() {
                 const tied = r.wins === r.losses;
                 const name = r.opponentDisplayName ?? r.opponentUsername ?? `Player #${r.opponentId}`;
                 return (
-                  <GlassCard key={r.opponentId} className="p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-black truncate">{name}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {r.totalBattles} battle{r.totalBattles === 1 ? "" : "s"} · last {formatRelative(r.lastBattleAt)}
-                        </p>
+                  <GlassCard key={r.opponentId} className="p-0 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/compete/rivals/${r.opponentId}`)}
+                      className="w-full text-left p-4 hover:bg-white/5 transition focus:outline-none focus:ring-2 focus:ring-primary/40 rounded-t-2xl"
+                      data-testid={`card-rival-${r.opponentId}`}
+                      aria-label={`View battle history vs ${name}`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-black truncate">{name}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {r.totalBattles} battle{r.totalBattles === 1 ? "" : "s"} · last {formatRelative(r.lastBattleAt)}
+                          </p>
+                        </div>
+                        <div className={`text-right font-black text-lg leading-none ${
+                          ahead ? "text-green-400" : tied ? "text-yellow-300" : "text-red-400"
+                        }`}>
+                          {r.wins}<span className="text-muted-foreground/60 text-base mx-0.5">–</span>{r.losses}
+                          {r.draws > 0 && (
+                            <span className="text-muted-foreground text-xs font-bold ml-1">({r.draws}D)</span>
+                          )}
+                        </div>
                       </div>
-                      <div className={`text-right font-black text-lg leading-none ${
-                        ahead ? "text-green-400" : tied ? "text-yellow-300" : "text-red-400"
-                      }`}>
-                        {r.wins}<span className="text-muted-foreground/60 text-base mx-0.5">–</span>{r.losses}
-                        {r.draws > 0 && (
-                          <span className="text-muted-foreground text-xs font-bold ml-1">({r.draws}D)</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="mt-3 flex items-center justify-between gap-2">
+                    </button>
+                    <div className="px-4 pb-4 -mt-1 flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
                           ahead ? "bg-green-500/15 text-green-300"
@@ -280,15 +288,26 @@ export default function Compete() {
                           Last: {r.lastEloChange > 0 ? "+" : ""}{r.lastEloChange} ELO
                         </span>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="font-bold"
-                        onClick={() => setRematchTarget(r)}
-                        data-testid={`button-rematch-${r.opponentId}`}
-                      >
-                        <Swords className="w-3.5 h-3.5 mr-1.5" /> Rematch
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="font-bold text-xs"
+                          onClick={() => navigate(`/compete/rivals/${r.opponentId}`)}
+                          data-testid={`button-view-rival-${r.opponentId}`}
+                        >
+                          View log
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="font-bold"
+                          onClick={() => setRematchTarget(r)}
+                          data-testid={`button-rematch-${r.opponentId}`}
+                        >
+                          <Swords className="w-3.5 h-3.5 mr-1.5" /> Rematch
+                        </Button>
+                      </div>
                     </div>
                   </GlassCard>
                 );
