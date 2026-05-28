@@ -79,6 +79,23 @@ function iconFor(type: string) {
   return TYPE_META[type] ?? { icon: Bell, color: "from-primary to-accent" };
 }
 
+type CategoryKey = "moderation" | "recaps" | "tournaments" | "clubs" | "artifacts";
+
+const CATEGORY_TYPES: Record<CategoryKey, readonly string[]> = {
+  moderation: ["account_suspended", "account_restored", "account_verified"],
+  recaps: ["nutrition_recap"],
+  tournaments: ["tournament_advanced", "tournament_eliminated", "tournament_champion"],
+  clubs: ["club_mention", "club_invite"],
+  artifacts: ["artifact_unlock"],
+};
+
+function categoryOf(type: string): CategoryKey | null {
+  for (const [cat, types] of Object.entries(CATEGORY_TYPES) as [CategoryKey, readonly string[]][]) {
+    if (types.includes(type)) return cat;
+  }
+  return null;
+}
+
 function formatRelative(iso: string): string {
   try {
     return formatDistanceToNow(new Date(iso), { addSuffix: true });
@@ -96,8 +113,12 @@ export default function NotificationsPage() {
   const [busy, setBusy] = useState<{ key: BusyKey; action: "accept" | "decline" } | null>(null);
   const [tab, setTab] = useState<"all" | "invites">("all");
   const [inviteFilter, setInviteFilter] = useState<"all" | "challenge" | "rematch" | "club">("all");
+  const [categoryFilter, setCategoryFilter] = useState<
+    "all" | "moderation" | "recaps" | "tournaments" | "clubs" | "artifacts"
+  >("all");
+  const [unreadOnly, setUnreadOnly] = useState(false);
 
-  const listParams = { limit: 50 };
+  const listParams = unreadOnly ? { limit: 50, unread: true } : { limit: 50 };
   const { data, isLoading } = useListNotifications(listParams, {
     query: {
       queryKey: getListNotificationsQueryKey(listParams),
@@ -364,6 +385,28 @@ export default function NotificationsPage() {
   }, [inviteRows, inviteFilter]);
 
   const showClubChip = inviteCounts.club > 0 || inviteFilter === "club";
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<"all" | CategoryKey, number> = {
+      all: items.length,
+      moderation: 0,
+      recaps: 0,
+      tournaments: 0,
+      clubs: 0,
+      artifacts: 0,
+    };
+    for (const n of items) {
+      const cat = categoryOf(n.type);
+      if (cat) counts[cat] += 1;
+    }
+    return counts;
+  }, [items]);
+
+  const filteredItems = useMemo(() => {
+    if (categoryFilter === "all") return items;
+    const allowed = CATEGORY_TYPES[categoryFilter];
+    return items.filter((n) => allowed.includes(n.type));
+  }, [items, categoryFilter]);
 
   const renderNotificationRow = (n: Notification, idx: number) => {
     const meta = iconFor(n.type);
@@ -698,27 +741,98 @@ export default function NotificationsPage() {
           </TabsList>
 
           <TabsContent value="all">
-            {isLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-20 w-full rounded-xl" />
-                ))}
-              </div>
-            ) : items.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="mx-auto w-14 h-14 rounded-full bg-card border border-border/40 flex items-center justify-center mb-3">
-                  <Bell className="w-6 h-6 text-muted-foreground" />
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2" data-testid="category-filter-row">
+                <div className="flex flex-wrap gap-2 flex-1" data-testid="category-filter-chips">
+                  {([
+                    { value: "all", label: "All", count: categoryCounts.all },
+                    { value: "moderation", label: "Moderation", count: categoryCounts.moderation },
+                    { value: "recaps", label: "Recaps", count: categoryCounts.recaps },
+                    { value: "tournaments", label: "Tournaments", count: categoryCounts.tournaments },
+                    { value: "clubs", label: "Clubs", count: categoryCounts.clubs },
+                    { value: "artifacts", label: "Artifacts", count: categoryCounts.artifacts },
+                  ] as const).map((chip) => {
+                    const active = categoryFilter === chip.value;
+                    return (
+                      <button
+                        key={chip.value}
+                        type="button"
+                        onClick={() => setCategoryFilter(chip.value)}
+                        className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs font-bold transition-colors ${
+                          active
+                            ? "bg-primary text-primary-foreground border-primary shadow-[0_0_10px_-2px_hsl(var(--primary)/0.7)]"
+                            : "bg-card/60 backdrop-blur border-border/60 text-muted-foreground hover:text-foreground hover:border-border"
+                        }`}
+                        data-testid={`chip-category-filter-${chip.value}`}
+                        aria-pressed={active}
+                      >
+                        <span>{chip.label}</span>
+                        <span
+                          className={`inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full text-[10px] leading-none ${
+                            active
+                              ? "bg-primary-foreground/20 text-primary-foreground"
+                              : "bg-border/60 text-foreground/80"
+                          }`}
+                          data-testid={`chip-category-filter-${chip.value}-count`}
+                        >
+                          {chip.count}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-                <p className="text-sm font-bold">Nothing here yet</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Challenge invites, alerts, and results will show up here.
-                </p>
+                <button
+                  type="button"
+                  onClick={() => setUnreadOnly((v) => !v)}
+                  className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs font-bold transition-colors ${
+                    unreadOnly
+                      ? "bg-primary text-primary-foreground border-primary shadow-[0_0_10px_-2px_hsl(var(--primary)/0.7)]"
+                      : "bg-card/60 backdrop-blur border-border/60 text-muted-foreground hover:text-foreground hover:border-border"
+                  }`}
+                  data-testid="toggle-unread-only"
+                  aria-pressed={unreadOnly}
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  Unread only
+                </button>
               </div>
-            ) : (
-              <div className="space-y-2">
-                {items.map((n: Notification, idx: number) => renderNotificationRow(n, idx))}
-              </div>
-            )}
+
+              {isLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-20 w-full rounded-xl" />
+                  ))}
+                </div>
+              ) : items.length === 0 ? (
+                <div className="text-center py-16">
+                  <div className="mx-auto w-14 h-14 rounded-full bg-card border border-border/40 flex items-center justify-center mb-3">
+                    <Bell className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm font-bold">
+                    {unreadOnly ? "No unread notifications" : "Nothing here yet"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {unreadOnly
+                      ? "You're all caught up."
+                      : "Challenge invites, alerts, and results will show up here."}
+                  </p>
+                </div>
+              ) : filteredItems.length === 0 ? (
+                <div className="text-center py-12" data-testid="category-filter-empty">
+                  <div className="mx-auto w-14 h-14 rounded-full bg-card border border-border/40 flex items-center justify-center mb-3">
+                    <Bell className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm font-bold">Nothing in this category</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Try another category to see your notifications.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredItems.map((n: Notification, idx: number) => renderNotificationRow(n, idx))}
+                </div>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="invites">
