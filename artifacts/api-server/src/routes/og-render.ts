@@ -303,3 +303,406 @@ export function postTypeLabel(postType: string): string {
 export function ogTruncate(text: string, max: number): string {
   return truncate(text, max);
 }
+
+// ── Player / Club share cards ────────────────────────────────────────────────
+// Reuse the same SVG-to-PNG pipeline as post share cards so every HatchUp link
+// (post, player profile, or club page) unfurls with the same on-brand visual.
+
+export interface OgPlayerInput {
+  id: number;
+  displayName?: string | null;
+  username: string;
+  avatarUrl?: string | null;
+  level: number;
+  rank?: string | null;
+  title?: string | null;
+  totalSteps?: number | null;
+  currentStreak?: number | null;
+  isVerified?: boolean | null;
+}
+
+export interface OgClubInput {
+  id: number;
+  name: string;
+  description?: string | null;
+  emblem?: string | null;
+  memberCount: number;
+  maxMembers?: number | null;
+  level: number;
+  totalWins?: number | null;
+}
+
+export interface RenderPlayerOgHtmlArgs {
+  baseUrl: string;
+  username: string;
+  player: OgPlayerInput | null;
+}
+
+export interface RenderClubOgHtmlArgs {
+  baseUrl: string;
+  id: number | null;
+  club: OgClubInput | null;
+}
+
+function formatNumberCompact(value: number): string {
+  if (!Number.isFinite(value) || value < 0) return "0";
+  if (value < 1000) return String(Math.round(value));
+  if (value < 10_000) return `${(value / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  if (value < 1_000_000) return `${Math.round(value / 1000)}k`;
+  return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+}
+
+export function renderPlayerOgHtml({ baseUrl, username, player }: RenderPlayerOgHtmlArgs): string {
+  const fallbackImage = `${baseUrl}/opengraph.jpg`;
+  const safeUsername = encodeURIComponent(username);
+  // SPA owns `/players/:id` (by id). The api-server owns `/player/:username`
+  // for unfurls. Real browsers are bounced over to the SPA route using the
+  // resolved player id.
+  const appUrl = player
+    ? `${baseUrl}/players/${player.id}`
+    : `${baseUrl}/`;
+  const canonicalUrl = `${baseUrl}/player/${safeUsername}`;
+
+  let title = "HatchUp";
+  let description = "HatchUp Fitness Pals — the fitness RPG where every step hatches a creature.";
+  let imageUrl = fallbackImage;
+
+  if (player) {
+    const displayName = player.displayName || player.username;
+    title = `${displayName} — Level ${player.level} on HatchUp`;
+    const descParts: string[] = [`Level ${player.level}`];
+    if (player.rank) descParts.push(player.rank);
+    if (typeof player.currentStreak === "number" && player.currentStreak > 0) {
+      descParts.push(`🔥 ${player.currentStreak}-day streak`);
+    }
+    if (typeof player.totalSteps === "number" && player.totalSteps > 0) {
+      descParts.push(`${formatNumberCompact(player.totalSteps)} steps`);
+    }
+    description = truncate(descParts.join(" · "), 280);
+    imageUrl = `${baseUrl}/player/${safeUsername}/og.png`;
+  }
+
+  const safeTitle = escapeAttr(title);
+  const safeDescription = escapeAttr(description);
+  const safeImage = escapeAttr(imageUrl);
+  const safeCanonical = escapeAttr(canonicalUrl);
+  const safeAppUrl = escapeAttr(appUrl);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${safeDescription}" />
+  <link rel="canonical" href="${safeCanonical}" />
+
+  <meta property="og:site_name" content="HatchUp" />
+  <meta property="og:type" content="profile" />
+  <meta property="og:url" content="${safeCanonical}" />
+  <meta property="og:title" content="${safeTitle}" />
+  <meta property="og:description" content="${safeDescription}" />
+  <meta property="og:image" content="${safeImage}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="${safeTitle}" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${safeTitle}" />
+  <meta name="twitter:description" content="${safeDescription}" />
+  <meta name="twitter:image" content="${safeImage}" />
+
+  <meta http-equiv="refresh" content="0; url=${safeAppUrl}" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style>
+    body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #0a0a0f; color: #f5f5f7; display: flex; align-items: center; justify-content: center; min-height: 100vh; text-align: center; padding: 24px; }
+    a { color: #ff3d8b; }
+  </style>
+</head>
+<body>
+  <div>
+    <h1>${escapeHtml(title)}</h1>
+    <p>${escapeHtml(description)}</p>
+    <p><a href="${safeAppUrl}">Open in HatchUp →</a></p>
+  </div>
+  <script>window.location.replace(${JSON.stringify(appUrl)});</script>
+</body>
+</html>`;
+}
+
+export function renderClubOgHtml({ baseUrl, id, club }: RenderClubOgHtmlArgs): string {
+  const fallbackImage = `${baseUrl}/opengraph.jpg`;
+  const appUrl = id != null && Number.isFinite(id) && id > 0
+    ? `${baseUrl}/clubs/${id}`
+    : `${baseUrl}/`;
+  const canonicalUrl = `${baseUrl}/club/${id != null && Number.isFinite(id) ? id : ""}`;
+
+  let title = "HatchUp";
+  let description = "HatchUp Fitness Pals — the fitness RPG where every step hatches a creature.";
+  let imageUrl = fallbackImage;
+
+  if (club) {
+    title = `${club.name} — HatchUp Club`;
+    const descParts: string[] = [`Level ${club.level}`, `${club.memberCount} members`];
+    if (typeof club.totalWins === "number" && club.totalWins > 0) {
+      descParts.push(`${club.totalWins} wins`);
+    }
+    if (club.description) descParts.push(club.description);
+    description = truncate(descParts.join(" · "), 280);
+    if (id != null && Number.isFinite(id) && id > 0) {
+      imageUrl = `${baseUrl}/club/${id}/og.png`;
+    }
+  }
+
+  const safeTitle = escapeAttr(title);
+  const safeDescription = escapeAttr(description);
+  const safeImage = escapeAttr(imageUrl);
+  const safeCanonical = escapeAttr(canonicalUrl);
+  const safeAppUrl = escapeAttr(appUrl);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${safeDescription}" />
+  <link rel="canonical" href="${safeCanonical}" />
+
+  <meta property="og:site_name" content="HatchUp" />
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="${safeCanonical}" />
+  <meta property="og:title" content="${safeTitle}" />
+  <meta property="og:description" content="${safeDescription}" />
+  <meta property="og:image" content="${safeImage}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="${safeTitle}" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${safeTitle}" />
+  <meta name="twitter:description" content="${safeDescription}" />
+  <meta name="twitter:image" content="${safeImage}" />
+
+  <meta http-equiv="refresh" content="0; url=${safeAppUrl}" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style>
+    body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #0a0a0f; color: #f5f5f7; display: flex; align-items: center; justify-content: center; min-height: 100vh; text-align: center; padding: 24px; }
+    a { color: #ff3d8b; }
+  </style>
+</head>
+<body>
+  <div>
+    <h1>${escapeHtml(title)}</h1>
+    <p>${escapeHtml(description)}</p>
+    <p><a href="${safeAppUrl}">Open in HatchUp →</a></p>
+  </div>
+  <script>window.location.replace(${JSON.stringify(appUrl)});</script>
+</body>
+</html>`;
+}
+
+// ── Branded share-card SVG (player / club) ───────────────────────────────────
+
+export interface BuildPlayerOgSvgArgs {
+  displayName: string;
+  username: string;
+  level: number;
+  rank: string | null;
+  title: string | null;
+  totalSteps: number | null;
+  currentStreak: number | null;
+  isVerified: boolean;
+  avatarHref: string | null;
+}
+
+export function buildPlayerOgSvg(opts: BuildPlayerOgSvgArgs): string {
+  const width = 1200;
+  const height = 630;
+  const padding = 80;
+  const initials = initialsFor(opts.displayName || opts.username);
+
+  const avatarCx = padding + 110;
+  const avatarCy = 340;
+  const avatarR = 110;
+  const avatarBlock = opts.avatarHref
+    ? `<defs>
+    <clipPath id="avatarClip"><circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}"/></clipPath>
+  </defs>
+  <circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR + 6}" fill="url(#accent)"/>
+  <image href="${escapeXml(opts.avatarHref)}" x="${avatarCx - avatarR}" y="${avatarCy - avatarR}" width="${avatarR * 2}" height="${avatarR * 2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#avatarClip)"/>`
+    : `<circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}" fill="url(#accent)"/>
+  <text x="${avatarCx}" y="${avatarCy + 26}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="80" fill="#ffffff">${escapeXml(initials)}</text>`;
+
+  const verifiedBadge = opts.isVerified
+    ? `<circle cx="${avatarCx + avatarR - 18}" cy="${avatarCy + avatarR - 18}" r="26" fill="#3da6ff" stroke="#0a0a0f" stroke-width="6"/>
+  <text x="${avatarCx + avatarR - 18}" y="${avatarCy + avatarR - 10}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="26" fill="#ffffff">✓</text>`
+    : "";
+
+  const infoX = avatarCx + avatarR + 60;
+  const displayName = opts.displayName || opts.username;
+  const trimmedName = displayName.length > 22 ? displayName.slice(0, 21).trimEnd() + "…" : displayName;
+  const trimmedUser = opts.username.length > 22 ? opts.username.slice(0, 21).trimEnd() + "…" : opts.username;
+
+  const statPills: Array<{ label: string; value: string }> = [
+    { label: "LEVEL", value: String(opts.level) },
+  ];
+  if (opts.rank) statPills.push({ label: "RANK", value: opts.rank });
+  if (typeof opts.currentStreak === "number" && opts.currentStreak > 0) {
+    statPills.push({ label: "STREAK", value: `${opts.currentStreak}d` });
+  }
+  if (typeof opts.totalSteps === "number" && opts.totalSteps > 0) {
+    statPills.push({ label: "STEPS", value: formatNumberCompact(opts.totalSteps) });
+  }
+
+  const pillY = height - padding - 110;
+  const pillHeight = 110;
+  const pillGap = 24;
+  const pillCount = Math.min(statPills.length, 4);
+  const pillWidth = (width - padding * 2 - pillGap * (pillCount - 1)) / pillCount;
+  const pillBlocks = statPills.slice(0, 4).map((pill, i) => {
+    const x = padding + i * (pillWidth + pillGap);
+    return `<rect x="${x}" y="${pillY}" width="${pillWidth}" height="${pillHeight}" rx="20" ry="20" fill="#ffffff" fill-opacity="0.06" stroke="url(#accent)" stroke-width="2"/>
+  <text x="${x + pillWidth / 2}" y="${pillY + 42}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="400" font-size="20" fill="#a1a1aa" letter-spacing="3">${escapeXml(pill.label)}</text>
+  <text x="${x + pillWidth / 2}" y="${pillY + 86}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="40" fill="#ffffff">${escapeXml(pill.value)}</text>`;
+  }).join("\n  ");
+
+  const titleLine = opts.title
+    ? `<text x="${infoX}" y="392" font-family="Inter, sans-serif" font-weight="400" font-size="24" fill="#ff3d8b">${escapeXml(opts.title)}</text>`
+    : "";
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a0a0f"/>
+      <stop offset="100%" stop-color="#1a0a1a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ff3d8b"/>
+      <stop offset="100%" stop-color="#ff6b3d"/>
+    </linearGradient>
+  </defs>
+  <rect width="${width}" height="${height}" fill="url(#bg)"/>
+  <rect x="0" y="0" width="${width}" height="10" fill="url(#accent)"/>
+  <rect x="0" y="${height - 10}" width="${width}" height="10" fill="url(#accent)"/>
+
+  <!-- Brand mark -->
+  <text x="${padding}" y="${padding + 20}" font-family="Inter, sans-serif" font-weight="700" font-size="42" fill="#ffffff" letter-spacing="2">HATCHUP</text>
+  <text x="${padding}" y="${padding + 56}" font-family="Inter, sans-serif" font-weight="400" font-size="20" fill="#a1a1aa">Fitness Pals · Every step hatches a creature</text>
+
+  <!-- Player type tag pill -->
+  <rect x="${padding}" y="180" rx="26" ry="26" width="180" height="52" fill="url(#accent)" opacity="0.9"/>
+  <text x="${padding + 30}" y="215" font-family="Inter, sans-serif" font-weight="700" font-size="22" fill="#ffffff" letter-spacing="3">PLAYER</text>
+
+  <!-- Avatar + verified badge -->
+  ${avatarBlock}
+  ${verifiedBadge}
+
+  <!-- Name + handle -->
+  <text x="${infoX}" y="340" font-family="Inter, sans-serif" font-weight="700" font-size="56" fill="#f5f5f7">${escapeXml(trimmedName)}</text>
+  <text x="${infoX}" y="362" font-family="Inter, sans-serif" font-weight="400" font-size="22" fill="#a1a1aa">@${escapeXml(trimmedUser)}</text>
+  ${titleLine}
+
+  <!-- Stat pills -->
+  ${pillBlocks}
+</svg>`;
+}
+
+export interface BuildClubOgSvgArgs {
+  name: string;
+  description: string | null;
+  level: number;
+  memberCount: number;
+  maxMembers: number | null;
+  totalWins: number | null;
+  emblem: string | null;
+}
+
+export function buildClubOgSvg(opts: BuildClubOgSvgArgs): string {
+  const width = 1200;
+  const height = 630;
+  const padding = 80;
+  const innerWidth = width - padding * 2;
+
+  const nameLines = wrapText(opts.name, innerWidth - 240, 64, 2);
+  const descLines = opts.description ? wrapText(opts.description, innerWidth - 240, 28, 3) : [];
+
+  const nameTspans = nameLines
+    .map((line, i) => `<tspan x="${padding + 200}" y="${260 + i * 78}">${escapeXml(line)}</tspan>`)
+    .join("");
+  const descTspans = descLines
+    .map((line, i) => `<tspan x="${padding + 200}" y="${260 + nameLines.length * 78 + 24 + i * 38}">${escapeXml(line)}</tspan>`)
+    .join("");
+
+  const emblemCx = padding + 90;
+  const emblemCy = 280;
+  const emblemR = 80;
+  const emblemBlock = opts.emblem && /^https?:\/\//i.test(opts.emblem)
+    ? `<defs>
+    <clipPath id="emblemClip"><circle cx="${emblemCx}" cy="${emblemCy}" r="${emblemR}"/></clipPath>
+  </defs>
+  <circle cx="${emblemCx}" cy="${emblemCy}" r="${emblemR + 5}" fill="url(#accent)"/>
+  <image href="${escapeXml(opts.emblem)}" x="${emblemCx - emblemR}" y="${emblemCy - emblemR}" width="${emblemR * 2}" height="${emblemR * 2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#emblemClip)"/>`
+    : `<circle cx="${emblemCx}" cy="${emblemCy}" r="${emblemR}" fill="url(#accent)"/>
+  <text x="${emblemCx}" y="${emblemCy + 22}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="64" fill="#ffffff">${escapeXml(opts.emblem && !/^https?:\/\//i.test(opts.emblem) ? opts.emblem.slice(0, 2) : initialsFor(opts.name))}</text>`;
+
+  const memberLabel = opts.maxMembers && opts.maxMembers > 0
+    ? `${opts.memberCount} / ${opts.maxMembers}`
+    : String(opts.memberCount);
+
+  const statPills: Array<{ label: string; value: string }> = [
+    { label: "LEVEL", value: String(opts.level) },
+    { label: "MEMBERS", value: memberLabel },
+  ];
+  if (typeof opts.totalWins === "number" && opts.totalWins > 0) {
+    statPills.push({ label: "WINS", value: formatNumberCompact(opts.totalWins) });
+  }
+
+  const pillY = height - padding - 110;
+  const pillHeight = 110;
+  const pillGap = 24;
+  const pillCount = statPills.length;
+  const pillWidth = (width - padding * 2 - pillGap * (pillCount - 1)) / pillCount;
+  const pillBlocks = statPills.map((pill, i) => {
+    const x = padding + i * (pillWidth + pillGap);
+    return `<rect x="${x}" y="${pillY}" width="${pillWidth}" height="${pillHeight}" rx="20" ry="20" fill="#ffffff" fill-opacity="0.06" stroke="url(#accent)" stroke-width="2"/>
+  <text x="${x + pillWidth / 2}" y="${pillY + 42}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="400" font-size="20" fill="#a1a1aa" letter-spacing="3">${escapeXml(pill.label)}</text>
+  <text x="${x + pillWidth / 2}" y="${pillY + 86}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="40" fill="#ffffff">${escapeXml(pill.value)}</text>`;
+  }).join("\n  ");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a0a0f"/>
+      <stop offset="100%" stop-color="#1a0a1a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ff3d8b"/>
+      <stop offset="100%" stop-color="#ff6b3d"/>
+    </linearGradient>
+  </defs>
+  <rect width="${width}" height="${height}" fill="url(#bg)"/>
+  <rect x="0" y="0" width="${width}" height="10" fill="url(#accent)"/>
+  <rect x="0" y="${height - 10}" width="${width}" height="10" fill="url(#accent)"/>
+
+  <!-- Brand mark -->
+  <text x="${padding}" y="${padding + 20}" font-family="Inter, sans-serif" font-weight="700" font-size="42" fill="#ffffff" letter-spacing="2">HATCHUP</text>
+  <text x="${padding}" y="${padding + 56}" font-family="Inter, sans-serif" font-weight="400" font-size="20" fill="#a1a1aa">Fitness Pals · Every step hatches a creature</text>
+
+  <!-- Club type tag pill -->
+  <rect x="${padding}" y="180" rx="26" ry="26" width="150" height="52" fill="url(#accent)" opacity="0.9"/>
+  <text x="${padding + 30}" y="215" font-family="Inter, sans-serif" font-weight="700" font-size="22" fill="#ffffff" letter-spacing="3">CLUB</text>
+
+  <!-- Emblem -->
+  ${emblemBlock}
+
+  <!-- Name + description -->
+  <text font-family="Inter, sans-serif" font-weight="700" font-size="64" fill="#f5f5f7">${nameTspans}</text>
+  <text font-family="Inter, sans-serif" font-weight="400" font-size="28" fill="#a1a1aa">${descTspans}</text>
+
+  <!-- Stat pills -->
+  ${pillBlocks}
+</svg>`;
+}

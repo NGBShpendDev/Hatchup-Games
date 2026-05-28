@@ -12,6 +12,8 @@ import {
 } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
 import ogRouter from "./routes/og";
+import ogPlayerRouter from "./routes/og-player";
+import ogClubRouter from "./routes/og-club";
 import { logger } from "./lib/logger";
 import { startPassiveSyncJob } from "./services/passiveSyncJob";
 import { startWeeklyNutritionRecapJob } from "./services/weeklyNutritionRecapJob";
@@ -134,6 +136,8 @@ app.use("/api", (req, res, next) => {
 
 app.use("/api", router);
 app.use(ogRouter);
+app.use(ogPlayerRouter);
+app.use(ogClubRouter);
 
 startPassiveSyncJob();
 startWeeklyNutritionRecapJob();

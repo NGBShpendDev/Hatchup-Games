@@ -10,8 +10,14 @@ import {
   postTypeLabel,
   ogTruncate,
   isOgHidden,
+  buildPlayerOgSvg,
+  buildClubOgSvg,
+  renderPlayerOgHtml,
+  renderClubOgHtml,
   type OgPostInput,
   type OgAuthorInput,
+  type OgPlayerInput,
+  type OgClubInput,
 } from "./og-render.ts";
 
 export interface OgLoadResult {
@@ -20,6 +26,8 @@ export interface OgLoadResult {
 }
 
 export type OgPostLoader = (id: number) => Promise<OgLoadResult>;
+export type OgPlayerLoader = (username: string) => Promise<OgPlayerInput | null>;
+export type OgClubLoader = (id: number) => Promise<OgClubInput | null>;
 
 function getBaseUrl(req: import("express").Request): string {
   const envDomain = process.env.REPLIT_DOMAINS?.split(",")[0]?.trim();
@@ -186,6 +194,206 @@ export function createOgRouter(loader: OgPostLoader): Router {
       author,
     });
 
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.send(html);
+  });
+
+  return router;
+}
+
+// Shared helper that rasterizes an SVG (with optional remote <image> hrefs)
+// to a PNG using the cached Inter fonts. Used by every share-card endpoint
+// so we never drift between post / player / club rendering.
+async function renderSvgToPng(svg: string): Promise<Buffer> {
+  const fontFiles = await getFontFiles();
+  const resvg = new Resvg(svg, {
+    font: {
+      fontFiles,
+      loadSystemFonts: false,
+      defaultFontFamily: "Inter",
+      sansSerifFamily: "Inter",
+    },
+    fitTo: { mode: "width", value: 1200 },
+  });
+  const pending = resvg.imagesToResolve();
+  if (pending.length > 0) {
+    await Promise.all(
+      pending.map(async (href) => {
+        const buf = await fetchAvatar(href);
+        if (buf) {
+          try { resvg.resolveImage(href, buf); } catch { /* ignore */ }
+        }
+      }),
+    );
+  }
+  return Buffer.from(resvg.render().asPng());
+}
+
+// ── GET /player/:username + /player/:username/og.png ────────────────────────
+export function createPlayerOgRouter(loader: OgPlayerLoader): Router {
+  const router = Router();
+
+  router.get("/player/:username/og.png", async (req, res) => {
+    const username = String(req.params.username || "").trim();
+    if (!username) {
+      res.status(400).json({ error: "Invalid username" });
+      return;
+    }
+
+    try {
+      const player = await loader(username);
+      if (!player) {
+        res.status(404).json({ error: "Player not found" });
+        return;
+      }
+
+      const avatarUrl = player.avatarUrl && /^https?:\/\//i.test(player.avatarUrl)
+        ? player.avatarUrl
+        : null;
+      const etag = `W/"${createHash("sha1")
+        .update([
+          player.id,
+          player.username,
+          player.displayName ?? "",
+          player.level,
+          player.rank ?? "",
+          player.title ?? "",
+          player.totalSteps ?? 0,
+          player.currentStreak ?? 0,
+          player.isVerified ? 1 : 0,
+          avatarUrl ?? "",
+        ].join("|"))
+        .digest("hex")}"`;
+
+      if (req.headers["if-none-match"] === etag) {
+        res.status(304).end();
+        return;
+      }
+
+      const svg = buildPlayerOgSvg({
+        displayName: player.displayName || player.username,
+        username: player.username,
+        level: player.level,
+        rank: player.rank ?? null,
+        title: player.title ?? null,
+        totalSteps: player.totalSteps ?? null,
+        currentStreak: player.currentStreak ?? null,
+        isVerified: !!player.isVerified,
+        avatarHref: avatarUrl,
+      });
+      const png = await renderSvgToPng(svg);
+
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=86400, immutable");
+      res.setHeader("ETag", etag);
+      res.send(png);
+    } catch (err) {
+      req.log?.warn(
+        { err: (err as Error).message, username },
+        "player og.png render failed",
+      );
+      res.status(500).json({ error: "Failed to render preview" });
+    }
+  });
+
+  router.get("/player/:username", async (req, res) => {
+    const username = String(req.params.username || "").trim();
+    const baseUrl = getBaseUrl(req);
+    let player: OgPlayerInput | null = null;
+    if (username) {
+      try {
+        player = await loader(username);
+      } catch (err) {
+        req.log?.warn(
+          { err: (err as Error).message, username },
+          "player og preview lookup failed",
+        );
+      }
+    }
+    const html = renderPlayerOgHtml({ baseUrl, username, player });
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.send(html);
+  });
+
+  return router;
+}
+
+// ── GET /club/:id + /club/:id/og.png ────────────────────────────────────────
+export function createClubOgRouter(loader: OgClubLoader): Router {
+  const router = Router();
+
+  router.get("/club/:id/og.png", async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      res.status(400).json({ error: "Invalid club id" });
+      return;
+    }
+
+    try {
+      const club = await loader(id);
+      if (!club) {
+        res.status(404).json({ error: "Club not found" });
+        return;
+      }
+
+      const emblemUrl = club.emblem && /^https?:\/\//i.test(club.emblem) ? club.emblem : null;
+      const etag = `W/"${createHash("sha1")
+        .update([
+          club.id,
+          club.name,
+          club.description ?? "",
+          club.level,
+          club.memberCount,
+          club.maxMembers ?? 0,
+          club.totalWins ?? 0,
+          club.emblem ?? "",
+        ].join("|"))
+        .digest("hex")}"`;
+
+      if (req.headers["if-none-match"] === etag) {
+        res.status(304).end();
+        return;
+      }
+
+      const svg = buildClubOgSvg({
+        name: club.name,
+        description: club.description ?? null,
+        level: club.level,
+        memberCount: club.memberCount,
+        maxMembers: club.maxMembers ?? null,
+        totalWins: club.totalWins ?? null,
+        emblem: emblemUrl ?? (club.emblem ?? null),
+      });
+      const png = await renderSvgToPng(svg);
+
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=86400, immutable");
+      res.setHeader("ETag", etag);
+      res.send(png);
+    } catch (err) {
+      req.log?.warn({ err: (err as Error).message, clubId: id }, "club og.png render failed");
+      res.status(500).json({ error: "Failed to render preview" });
+    }
+  });
+
+  router.get("/club/:id", async (req, res) => {
+    const id = Number(req.params.id);
+    const baseUrl = getBaseUrl(req);
+    let club: OgClubInput | null = null;
+    if (Number.isFinite(id) && id > 0) {
+      try {
+        club = await loader(id);
+      } catch (err) {
+        req.log?.warn({ err: (err as Error).message, clubId: id }, "club og preview lookup failed");
+      }
+    }
+    const html = renderClubOgHtml({
+      baseUrl,
+      id: Number.isFinite(id) ? id : null,
+      club,
+    });
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "public, max-age=300");
     res.send(html);
