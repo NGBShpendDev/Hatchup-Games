@@ -16,6 +16,7 @@ import {
 import { eq, and, desc, sql, or, ne, inArray, ilike, gte, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { getHiddenPlayerIds } from "./safety.ts";
 import { attachEntitlement, requirePremium } from "../services/subscriptionGuards.ts";
 import { blockMinorSocialWrite } from "../middlewares/minorGuard.ts";
 import { blockSuspendedSocialWrite } from "../middlewares/suspendedGuard.ts";
@@ -105,10 +106,14 @@ async function enrichPost(
     ? (reactions.find(r => r.playerId === viewerPlayerId)?.reactionType ?? null)
     : null;
 
-  const allComments = await db.query.postCommentsTable.findMany({
+  const hiddenIds = viewerPlayerId ? await getHiddenPlayerIds(viewerPlayerId) : [];
+  const hiddenSet = new Set(hiddenIds);
+
+  const allCommentsRaw = await db.query.postCommentsTable.findMany({
     where: eq(postCommentsTable.postId, post.id),
     orderBy: [desc(postCommentsTable.createdAt)],
   });
+  const allComments = allCommentsRaw.filter(c => !hiddenSet.has(c.playerId));
 
   const allCommentIds = allComments.map(c => c.id);
   const commentLikes = allCommentIds.length
@@ -150,11 +155,13 @@ async function enrichPost(
     creatureName = creature?.name ?? null;
   }
 
-  const commentCount = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(postCommentsTable)
-    .where(eq(postCommentsTable.postId, post.id))
-    .then(r => r[0]?.count ?? 0);
+  const commentCount = hiddenSet.size === 0
+    ? await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(postCommentsTable)
+        .where(eq(postCommentsTable.postId, post.id))
+        .then(r => r[0]?.count ?? 0)
+    : allComments.length;
 
   const repostCount = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -630,12 +637,16 @@ router.get("/social/posts/:id/comments", requireAuth, attachPlayer, async (req, 
   const postId = Number(req.params.id);
   const parent = await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) });
   if (!parent || parent.deletedAt != null) { res.json([]); return; }
-  const comments = await db.query.postCommentsTable.findMany({
+  const viewerId = req.playerId ?? null;
+  const hiddenIds = viewerId ? await getHiddenPlayerIds(viewerId) : [];
+  const hiddenSet = new Set(hiddenIds);
+
+  const allComments = await db.query.postCommentsTable.findMany({
     where: eq(postCommentsTable.postId, postId),
     orderBy: [desc(postCommentsTable.createdAt)],
   });
+  const comments = allComments.filter(c => !hiddenSet.has(c.playerId));
 
-  const viewerId = req.playerId ?? null;
   const commentIds = comments.map(c => c.id);
   const commentLikes = commentIds.length
     ? await db.query.postCommentReactionsTable.findMany({
