@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Share2, Check, Eye, X, Sparkles } from "lucide-react";
+import { Share2, Check, Eye, X, Sparkles, FastForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RarityBadge } from "@/components/rarity-badge";
 import { useToast } from "@/hooks/use-toast";
@@ -446,6 +446,13 @@ export function LegendaryCinematic({
     advanceTimer.current = setTimeout(() => setPhase(to), delay);
   }, []);
 
+  const skipPhase = useCallback(() => {
+    if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    if (phase === "shaking") setPhase("particles");
+    else if (phase === "particles") setPhase("rarity-reveal");
+    else if (phase === "rarity-reveal") setPhase("creature-reveal");
+  }, [phase]);
+
   const isLegendary = rarity === "Legendary";
   const isMythic = rarity === "Mythic";
   const isAncient = rarity === "Ancient";
@@ -546,14 +553,34 @@ export function LegendaryCinematic({
         </motion.div>
       ))}
 
+      {/* ── Skip icon (top-right, visible during early phases) ── */}
+      <AnimatePresence>
+        {(phase === "shaking" || phase === "particles" || phase === "rarity-reveal") && (
+          <motion.button
+            key="skip-btn"
+            className="absolute top-4 right-4 z-50 flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-white/50 hover:text-white/90 transition-colors bg-black/20 hover:bg-black/40 backdrop-blur-sm border border-white/10 pointer-events-auto"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25 }}
+            onClick={(e) => { e.stopPropagation(); skipPhase(); }}
+            aria-label="Skip cinematic phase"
+          >
+            <FastForward className="w-3 h-3" />
+            Skip
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       {/* ── PHASE: shaking ── */}
       <AnimatePresence mode="wait">
         {phase === "shaking" && (
           <motion.div
             key="shaking"
-            className="hatch-screen-shake absolute inset-0 flex items-center justify-center"
+            className="hatch-screen-shake absolute inset-0 flex items-center justify-center cursor-pointer"
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onClick={skipPhase}
           >
             <motion.div
               className="text-center"
@@ -579,10 +606,11 @@ export function LegendaryCinematic({
         {phase === "particles" && (
           <motion.div
             key="particles"
-            className="absolute inset-0 flex items-center justify-center"
+            className="absolute inset-0 flex items-center justify-center cursor-pointer"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onClick={skipPhase}
           >
             {isAncient ? (
               <AncientJadeBurst />
@@ -611,7 +639,7 @@ export function LegendaryCinematic({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setPhase("creature-reveal")}
+            onClick={skipPhase}
           >
             {/* Rarity label */}
             <motion.p
@@ -686,7 +714,7 @@ export function LegendaryCinematic({
               className={`mt-8 text-xs uppercase tracking-widest ${cfg.textColor} opacity-60`}
               initial={{ opacity: 0 }}
               animate={{ opacity: [0, 0.6, 0] }}
-              transition={{ delay: 1.5, duration: 1.5, repeat: Infinity }}
+              transition={{ delay: 0, duration: 1.5, repeat: Infinity }}
             >
               Tap to reveal
             </motion.p>
