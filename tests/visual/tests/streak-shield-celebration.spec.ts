@@ -198,7 +198,7 @@ test.describe("Streak Shield purchase via coins", () => {
     await buyBtn.click();
 
     // The celebration banner must appear (triggerShieldCelebration fires on buy).
-    const banner = page.getByText("Streak Shield Earned!", { exact: false });
+    const banner = page.getByTestId("shield-celebration-banner");
     await expect(banner).toBeVisible({ timeout: 5_000 });
 
     // After the refetch the shield count badge should show "1".
@@ -230,7 +230,7 @@ test.describe("Streak Shield celebration banner", () => {
     await claimBtn.click();
 
     // The celebration banner must appear.
-    const banner = page.getByText("Streak Shield Earned!", { exact: false });
+    const banner = page.getByTestId("shield-celebration-banner");
     await expect(banner).toBeVisible({ timeout: 5_000 });
 
     // The timer inside the component clears after 2500 ms; allow 5 s.
@@ -252,7 +252,7 @@ test.describe("Streak Shield celebration banner", () => {
 
     // No celebration banner before the claim is triggered.
     await expect(
-      page.getByText("Streak Shield Earned!", { exact: false }),
+      page.getByTestId("shield-celebration-banner"),
     ).toHaveCount(0);
 
     // The shield-day tile should be highlighted in the calendar (data-day attribute).

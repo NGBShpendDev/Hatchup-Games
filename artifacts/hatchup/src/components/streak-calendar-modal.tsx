@@ -183,6 +183,7 @@ export function StreakCalendarModal({ open, onClose, playerId, onClaimed }: Prop
           {shieldCelebrating && (
             <motion.div
               key="shield-celebration"
+              data-testid="shield-celebration-banner"
               initial={{ opacity: 0, scale: 0.85, y: -8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: -8 }}
