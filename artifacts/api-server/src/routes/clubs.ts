@@ -431,6 +431,49 @@ router.patch("/clubs/:id/members/:playerId", requireAuth, attachPlayer, async (r
       .where(eq(playersTable.id, target.id));
   }
 
+  // Notify the target member of their new role. Promotions to officer or
+  // higher also get a push; demotions are in-app only.
+  const ROLE_RANK: Record<string, number> = {
+    member: 0,
+    officer: 1,
+    owner: 2,
+  };
+  const prevRank = ROLE_RANK[targetRole] ?? 0;
+  const nextRank = ROLE_RANK[nextRole] ?? 0;
+  const isPromotion = nextRank > prevRank;
+  const roleLabel =
+    nextRole === "owner" ? "Owner"
+    : nextRole === "officer" ? "Officer"
+    : "Member";
+  const useAn = nextRole === "owner" || nextRole === "officer";
+  const article = useAn ? "an" : "a";
+  const noteTitle = isPromotion
+    ? `You're now ${article} ${roleLabel}`
+    : `Your role in ${club.name} changed`;
+  const noteBody = isPromotion
+    ? `You're now ${article} ${roleLabel} of ${club.name}.`
+    : `You're now a ${roleLabel} of ${club.name}.`;
+  const noteLink = `/club/${club.id}`;
+
+  const [note] = await db.insert(notificationsTable).values({
+    playerId: target.id,
+    type: isPromotion ? "club_role_promoted" : "club_role_demoted",
+    title: noteTitle,
+    body: noteBody,
+    link: noteLink,
+    sourceId: club.id,
+  }).returning();
+
+  if (isPromotion && nextRank >= ROLE_RANK.officer) {
+    void sendPushToPlayer(target.id, {
+      title: noteTitle,
+      body: noteBody,
+      link: noteLink,
+      category: "invites",
+      tag: `club-role-${club.id}-${note?.id ?? ""}`,
+    });
+  }
+
   const updated = await db.query.playersTable.findFirst({
     where: eq(playersTable.id, target.id),
     columns: {
