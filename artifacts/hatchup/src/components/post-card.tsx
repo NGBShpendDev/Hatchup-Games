@@ -42,6 +42,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import { ReportBlockMenu } from "@/components/report-block-menu";
+import { ShareCardDialog } from "@/components/share-card-dialog";
 import { usePlayer } from "@/lib/playerContext";
 
 export const POST_TYPES = [
@@ -568,6 +569,7 @@ export function PostCard({
 }) {
   const [showComments, setShowComments] = useState(defaultShowComments);
   const [commentText, setCommentText] = useState("");
+  const [showShareCard, setShowShareCard] = useState(false);
   const addComment = useAddPostComment();
   const repost = useRepostPost();
   const recordView = useRecordPostView();
@@ -674,29 +676,12 @@ export function PostCard({
     ? ARTIFACT_POST_THEME[artifactMeta.artifactRarity]
     : undefined;
 
-  async function handleNativeShare() {
-    const url = buildPostShareUrl(post.id);
-    const tag = postTypeInfo ? `${postTypeInfo.icon} ${postTypeInfo.label}\n` : "";
-    const text = `${tag}${post.authorName} on HatchUp: ${post.content}`;
-    const canNativeShare =
-      typeof navigator !== "undefined" &&
-      typeof (navigator as any).share === "function";
-    if (canNativeShare) {
-      try {
-        await (navigator as any).share({ title: "HatchUp", text, url });
-        return;
-      } catch (err: any) {
-        if (err?.name === "AbortError") return;
-      }
-    }
-    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      try {
-        await navigator.clipboard.writeText(`${text}\n${url}`);
-        toast({ title: "Link copied to clipboard! 📋", description: "Paste it anywhere to share." });
-        return;
-      } catch {}
-    }
-    toast({ title: "Could not share post", variant: "destructive" });
+  const shareUrl = buildPostShareUrl(post.id);
+  const sharePostTag = postTypeInfo ? `${postTypeInfo.icon} ${postTypeInfo.label}\n` : "";
+  const shareText = `${sharePostTag}${post.authorName} on HatchUp: ${post.content}`;
+
+  function handleOpenShareCard() {
+    setShowShareCard(true);
   }
 
   async function handleComment(e: React.FormEvent) {
@@ -1038,7 +1023,7 @@ export function PostCard({
               {((post as any).repostCount ?? 0) > 0 && <span>{(post as any).repostCount}</span>}
             </button>
             <button
-              onClick={handleNativeShare}
+              onClick={handleOpenShareCard}
               className="flex items-center gap-1 px-2 py-1 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors font-bold"
               data-testid={`button-share-${post.id}`}
             >
@@ -1126,6 +1111,13 @@ export function PostCard({
             )}
           </AnimatePresence>
       </GlassCard>
+      <ShareCardDialog
+        open={showShareCard}
+        onOpenChange={setShowShareCard}
+        postId={post.id}
+        shareUrl={shareUrl}
+        shareText={shareText}
+      />
     </motion.div>
   );
 }

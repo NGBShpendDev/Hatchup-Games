@@ -1,8 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRoute, useLocation, Link } from "wouter";
 import { Show, useClerk } from "@clerk/react";
 import { Layout } from "@/components/layout";
-import { PostCard } from "@/components/post-card";
+import { PostCard, buildPostShareUrl } from "@/components/post-card";
+import { ShareCardDialog } from "@/components/share-card-dialog";
+import { ImageIcon } from "lucide-react";
 import { PlayerProvider, usePlayer } from "@/lib/playerContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -160,16 +162,46 @@ function PostBody({ postId, viewerId }: { postId: number; viewerId: number | nul
           </CardContent>
         </Card>
       ) : post ? (
-        <PostCard
-          post={post}
-          playerId={viewerId}
-          onReact={handleReact}
-          onDelete={handleDelete}
-          defaultShowComments
-          disableViewTracking
-          onAnonymousAction={() => redirectToSignIn()}
-        />
+        <>
+          <PostCard
+            post={post}
+            playerId={viewerId}
+            onReact={handleReact}
+            onDelete={handleDelete}
+            defaultShowComments
+            disableViewTracking
+            onAnonymousAction={() => redirectToSignIn()}
+          />
+          <SharePreviewAffordance post={post} />
+        </>
       ) : null}
+    </div>
+  );
+}
+
+function SharePreviewAffordance({ post }: { post: { id: number; authorName?: string | null; content?: string | null } }) {
+  const [open, setOpen] = useState(false);
+  const shareUrl = buildPostShareUrl(post.id);
+  const shareText = `${post.authorName ?? "A HatchUp player"} on HatchUp: ${post.content ?? ""}`;
+  return (
+    <div className="flex justify-center">
+      <Button
+        variant="outline"
+        size="sm"
+        className="rounded-full font-bold"
+        onClick={() => setOpen(true)}
+        data-testid="button-preview-share-card"
+      >
+        <ImageIcon className="w-4 h-4 mr-2" /> Preview share card
+      </Button>
+      <ShareCardDialog
+        open={open}
+        onOpenChange={setOpen}
+        postId={post.id}
+        shareUrl={shareUrl}
+        shareText={shareText}
+        triggerLabel="Share card preview"
+      />
     </div>
   );
 }
