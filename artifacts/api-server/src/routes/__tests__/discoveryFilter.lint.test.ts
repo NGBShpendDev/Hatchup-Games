@@ -53,14 +53,6 @@ const SKIP_FILES = new Set(["safety.ts"]);
 // message can point reviewers at it.
 const ALLOWED_INLINE: Array<{ file: string; reason: string }> = [
   {
-    file: "social.ts",
-    reason:
-      "Legacy people-search endpoint pre-dates filterDiscoverableCandidates. " +
-      "The visibility + minor checks happen at the SQL layer (ne(...hidden), " +
-      "ne(...isMinor)) so the in-memory filter is only stripping blocked ids. " +
-      "Migrating it to filterDiscoverableCandidates is tracked separately.",
-  },
-  {
     file: "leaderboards.ts",
     reason:
       "Legacy fallback paths in the mode-leaderboard handler (pace fallback + " +
