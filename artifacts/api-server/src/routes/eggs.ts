@@ -9,6 +9,7 @@ import {
   HatchEggBody,
   AddEggBody,
 } from "@workspace/api-zod";
+import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth";
 
 const router = Router();
 
@@ -117,7 +118,7 @@ function derivePersonality(genetics: ReturnType<typeof generateGenetics>): strin
 }
 
 // GET /eggs
-router.get("/eggs", async (req, res) => {
+router.get("/eggs", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const query = ListEggsQueryParams.safeParse({
     playerId: req.query.playerId ? Number(req.query.playerId) : undefined,
     hatched: req.query.hatched !== undefined ? req.query.hatched === "true" : undefined,
@@ -145,12 +146,13 @@ router.get("/eggs", async (req, res) => {
 });
 
 // GET /eggs/:id
-router.get("/eggs/:id", async (req, res) => {
+router.get("/eggs/:id", requireAuth, attachPlayer, async (req, res) => {
   const params = GetEggParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const egg = await db.query.eggsTable.findFirst({ where: eq(eggsTable.id, params.data.id) });
   if (!egg) { res.status(404).json({ error: "Egg not found" }); return; }
+  if (egg.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
 
   res.json({
     ...egg,
@@ -162,7 +164,7 @@ router.get("/eggs/:id", async (req, res) => {
 });
 
 // POST /eggs/:id/hatch
-router.post("/eggs/:id/hatch", async (req, res) => {
+router.post("/eggs/:id/hatch", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const params = HatchEggParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const body = HatchEggBody.safeParse(req.body);
@@ -243,7 +245,7 @@ router.post("/eggs/:id/hatch", async (req, res) => {
 });
 
 // POST /eggs/incubate
-router.post("/eggs/incubate", async (req, res) => {
+router.post("/eggs/incubate", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const body = AddEggBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 

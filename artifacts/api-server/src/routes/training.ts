@@ -10,6 +10,7 @@ import {
   GetWorkoutPlanQueryParams,
   GetMealPlanQueryParams,
 } from "@workspace/api-zod";
+import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth";
 
 const router = Router();
 
@@ -205,7 +206,7 @@ function getMealPlanTemplate(goal: string): MealDay[] {
 // ── Routes ────────────────────────────────────────────────────────────────────
 
 // GET /training/workout-plan
-router.get("/training/workout-plan", async (req, res) => {
+router.get("/training/workout-plan", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const query = GetWorkoutPlanQueryParams.safeParse({ playerId: req.query.playerId ? Number(req.query.playerId) : undefined });
   if (!query.success || !query.data.playerId) { res.status(400).json({ error: "playerId required" }); return; }
 
@@ -223,7 +224,7 @@ router.get("/training/workout-plan", async (req, res) => {
 });
 
 // POST /training/generate-plan
-router.post("/training/generate-plan", async (req, res) => {
+router.post("/training/generate-plan", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const body = GenerateWorkoutPlanBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
@@ -252,7 +253,7 @@ router.post("/training/generate-plan", async (req, res) => {
 });
 
 // POST /training/log-session
-router.post("/training/log-session", async (req, res) => {
+router.post("/training/log-session", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const body = LogWorkoutSessionBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
@@ -290,7 +291,7 @@ router.post("/training/log-session", async (req, res) => {
 });
 
 // GET /training/sessions
-router.get("/training/sessions", async (req, res) => {
+router.get("/training/sessions", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const query = ListWorkoutSessionsQueryParams.safeParse({
     playerId: req.query.playerId ? Number(req.query.playerId) : undefined,
     limit: req.query.limit ? Number(req.query.limit) : 10,
@@ -307,7 +308,7 @@ router.get("/training/sessions", async (req, res) => {
 });
 
 // GET /training/meal-plan
-router.get("/training/meal-plan", async (req, res) => {
+router.get("/training/meal-plan", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const query = GetMealPlanQueryParams.safeParse({ playerId: req.query.playerId ? Number(req.query.playerId) : undefined });
   if (!query.success || !query.data.playerId) { res.status(400).json({ error: "playerId required" }); return; }
 
@@ -325,7 +326,7 @@ router.get("/training/meal-plan", async (req, res) => {
 });
 
 // POST /training/generate-meal-plan
-router.post("/training/generate-meal-plan", async (req, res) => {
+router.post("/training/generate-meal-plan", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const body = GenerateMealPlanBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 

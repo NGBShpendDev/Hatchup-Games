@@ -9,7 +9,7 @@ import {
   UpdatePlayerParams,
   GetPlayerDashboardParams,
 } from "@workspace/api-zod";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, attachPlayer } from "../middlewares/auth";
 
 const router = Router();
 
@@ -77,9 +77,10 @@ router.get("/players/:id", async (req, res) => {
   res.json(player);
 });
 
-router.patch("/players/:id", async (req, res) => {
+router.patch("/players/:id", requireAuth, attachPlayer, async (req, res) => {
   const params = UpdatePlayerParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
+  if (params.data.id !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
   const body = UpdatePlayerBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
   const updated = await db.update(playersTable).set(body.data).where(eq(playersTable.id, params.data.id)).returning();
@@ -87,9 +88,10 @@ router.patch("/players/:id", async (req, res) => {
   res.json(updated[0]);
 });
 
-router.get("/players/:id/dashboard", async (req, res) => {
+router.get("/players/:id/dashboard", requireAuth, attachPlayer, async (req, res) => {
   const params = GetPlayerDashboardParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
+  if (params.data.id !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, params.data.id) });
   if (!player) { res.status(404).json({ error: "Player not found" }); return; }
 

@@ -11,6 +11,7 @@ import {
   ListRealmsQueryParams,
 } from "@workspace/api-zod";
 import { logFitnessActivity } from "../services/fitnessLog";
+import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth";
 
 function getGroupXpBonus(memberCount: number): number {
   if (memberCount >= 6) return 0.5;
@@ -112,9 +113,10 @@ function generateDailyQuests(playerId: number): Array<{
 }
 
 // GET /fitness/stats/:playerId
-router.get("/fitness/stats/:playerId", async (req, res) => {
+router.get("/fitness/stats/:playerId", requireAuth, attachPlayer, async (req, res) => {
   const params = GetFitnessStatsParams.safeParse({ playerId: Number(req.params.playerId) });
   if (!params.success) { res.status(400).json({ error: "Invalid playerId" }); return; }
+  if (params.data.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
 
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, params.data.playerId) });
   if (!player) { res.status(404).json({ error: "Player not found" }); return; }
@@ -165,7 +167,7 @@ router.get("/fitness/stats/:playerId", async (req, res) => {
 });
 
 // POST /fitness/log
-router.post("/fitness/log", async (req, res) => {
+router.post("/fitness/log", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const body = LogActivityBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
@@ -231,7 +233,7 @@ router.post("/fitness/log", async (req, res) => {
 });
 
 // GET /fitness/activities
-router.get("/fitness/activities", async (req, res) => {
+router.get("/fitness/activities", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const query = ListFitnessActivitiesQueryParams.safeParse({
     playerId: req.query.playerId ? Number(req.query.playerId) : undefined,
     limit: req.query.limit ? Number(req.query.limit) : 20,
@@ -248,9 +250,10 @@ router.get("/fitness/activities", async (req, res) => {
 });
 
 // GET /fitness/quests/:playerId
-router.get("/fitness/quests/:playerId", async (req, res) => {
+router.get("/fitness/quests/:playerId", requireAuth, attachPlayer, async (req, res) => {
   const params = GetActiveQuestsParams.safeParse({ playerId: Number(req.params.playerId) });
   if (!params.success) { res.status(400).json({ error: "Invalid playerId" }); return; }
+  if (params.data.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
 
   const todayStart = getTodayStart();
   const quests = await db.query.fitnessQuestsTable.findMany({
@@ -282,12 +285,13 @@ router.get("/fitness/quests/:playerId", async (req, res) => {
 });
 
 // POST /fitness/quests/:id/complete
-router.post("/fitness/quests/:id/complete", async (req, res) => {
+router.post("/fitness/quests/:id/complete", requireAuth, attachPlayer, async (req, res) => {
   const params = CompleteQuestParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const quest = await db.query.fitnessQuestsTable.findFirst({ where: eq(fitnessQuestsTable.id, params.data.id) });
   if (!quest) { res.status(404).json({ error: "Quest not found" }); return; }
+  if (quest.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
   if (quest.isCompleted) { res.status(400).json({ error: "Quest already completed" }); return; }
 
   const updated = await db.update(fitnessQuestsTable)

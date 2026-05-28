@@ -9,6 +9,8 @@ import {
   JoinClubParams,
   JoinClubBody,
 } from "@workspace/api-zod";
+import { requireAuth, attachPlayer } from "../middlewares/auth";
+import type { RequestHandler } from "express";
 
 const router = Router();
 
@@ -19,7 +21,7 @@ router.get("/clubs", async (req, res) => {
   res.json(results.map(c => ({ ...c, createdAt: c.createdAt.toISOString() })));
 });
 
-router.post("/clubs", async (req, res) => {
+router.post("/clubs", requireAuth as RequestHandler, async (req, res) => {
   const body = CreateClubBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
   const club = await db.insert(clubsTable).values(body.data).returning();
@@ -34,7 +36,7 @@ router.get("/clubs/:id", async (req, res) => {
   res.json({ ...club, createdAt: club.createdAt.toISOString() });
 });
 
-router.post("/clubs/:id/join", async (req, res) => {
+router.post("/clubs/:id/join", requireAuth, attachPlayer, async (req, res) => {
   const params = GetClubParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const body = JoinClubBody.safeParse(req.body);

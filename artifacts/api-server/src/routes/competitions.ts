@@ -9,6 +9,7 @@ import {
   SubmitCompetitionResultParams,
   SubmitCompetitionResultBody,
 } from "@workspace/api-zod";
+import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth";
 
 const router = Router();
 
@@ -44,7 +45,7 @@ router.get("/competitions", async (req, res) => {
   res.json(result);
 });
 
-router.post("/competitions", async (req, res) => {
+router.post("/competitions", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const body = CreateCompetitionBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
@@ -76,7 +77,7 @@ router.get("/competitions/:id", async (req, res) => {
   res.json({ ...comp, playerName: player?.username ?? null, hatchlingName: hatchling?.name ?? null });
 });
 
-router.post("/competitions/:id/result", async (req, res) => {
+router.post("/competitions/:id/result", requireAuth, attachPlayer, async (req, res) => {
   const params = SubmitCompetitionResultParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const body = SubmitCompetitionResultBody.safeParse(req.body);
@@ -84,6 +85,7 @@ router.post("/competitions/:id/result", async (req, res) => {
 
   const comp = await db.query.competitionsTable.findFirst({ where: eq(competitionsTable.id, params.data.id) });
   if (!comp) { res.status(404).json({ error: "Competition not found" }); return; }
+  if (comp.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
 
   const xpEarned = body.data.score * 2 + (body.data.rank === 1 ? 200 : body.data.rank === 2 ? 100 : 50);
   const coinsEarned = body.data.rank === 1 ? 50 : body.data.rank === 2 ? 30 : 15;

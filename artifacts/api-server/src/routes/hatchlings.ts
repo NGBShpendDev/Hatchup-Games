@@ -12,6 +12,7 @@ import {
   EvolveHatchlingParams,
   EvolveHatchlingBody,
 } from "@workspace/api-zod";
+import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth";
 
 const router = Router();
 
@@ -26,7 +27,7 @@ function computeMoodState(lastWorkoutAt: Date | null): string {
   return "happy";
 }
 
-router.get("/hatchlings", async (req, res) => {
+router.get("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const query = ListHatchlingsQueryParams.safeParse({ playerId: req.query.playerId ? Number(req.query.playerId) : undefined, limit: req.query.limit ? Number(req.query.limit) : 20 });
   if (!query.success) { res.status(400).json({ error: "Invalid query" }); return; }
   const results = await db.query.hatchlingsTable.findMany({
@@ -42,7 +43,7 @@ router.get("/hatchlings", async (req, res) => {
   })));
 });
 
-router.post("/hatchlings", async (req, res) => {
+router.post("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const body = CreateHatchlingBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
@@ -97,11 +98,12 @@ router.get("/hatchlings/showcase", async (req, res) => {
   })));
 });
 
-router.get("/hatchlings/:id", async (req, res) => {
+router.get("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
   const params = GetHatchlingParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const hatchling = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, params.data.id) });
   if (!hatchling) { res.status(404).json({ error: "Hatchling not found" }); return; }
+  if (hatchling.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
   res.json({
     ...hatchling,
     moodState: computeMoodState(hatchling.lastWorkoutAt),
@@ -110,7 +112,7 @@ router.get("/hatchlings/:id", async (req, res) => {
   });
 });
 
-router.patch("/hatchlings/:id", async (req, res) => {
+router.patch("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
   const params = UpdateHatchlingParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const body = UpdateHatchlingBody.safeParse(req.body);
@@ -121,12 +123,15 @@ router.patch("/hatchlings/:id", async (req, res) => {
     energy?: number; moodState?: string; friendshipLevel?: number; lastWorkoutAt?: Date | null;
   };
 
+  const current = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, params.data.id) });
+  if (!current) { res.status(404).json({ error: "Hatchling not found" }); return; }
+  if (current.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
+
   const { lastWorkoutAt: lastWorkoutAtStr, ...restBody } = body.data;
   const updateData: HatchlingPatch = { ...restBody };
 
   // If a workout is being logged (lastWorkoutAt sent), auto-increment friendship and set mood
   if (body.data.lastWorkoutAt) {
-    const current = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, params.data.id) });
     if (current) {
       updateData.friendshipLevel = Math.min(100, current.friendshipLevel + 5);
       updateData.moodState = "celebrating";
@@ -148,14 +153,17 @@ router.patch("/hatchlings/:id", async (req, res) => {
   });
 });
 
-router.delete("/hatchlings/:id", async (req, res) => {
+router.delete("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
   const params = DeleteHatchlingParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
+  const hatchling = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, params.data.id) });
+  if (!hatchling) { res.status(404).json({ error: "Hatchling not found" }); return; }
+  if (hatchling.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
   await db.delete(hatchlingsTable).where(eq(hatchlingsTable.id, params.data.id));
   res.status(204).send();
 });
 
-router.post("/hatchlings/:id/evolve", async (req, res) => {
+router.post("/hatchlings/:id/evolve", requireAuth, attachPlayer, async (req, res) => {
   const params = EvolveHatchlingParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const body = EvolveHatchlingBody.safeParse(req.body);
@@ -163,6 +171,7 @@ router.post("/hatchlings/:id/evolve", async (req, res) => {
 
   const hatchling = await db.query.hatchlingsTable.findFirst({ where: eq(hatchlingsTable.id, params.data.id) });
   if (!hatchling) { res.status(404).json({ error: "Hatchling not found" }); return; }
+  if (hatchling.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
 
   const evolutionType = await db.query.evolutionTypesTable.findFirst({ where: eq(evolutionTypesTable.id, body.data.triggerId) });
   if (!evolutionType) { res.status(404).json({ error: "Evolution type not found" }); return; }
