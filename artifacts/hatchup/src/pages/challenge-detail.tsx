@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import {
@@ -57,6 +57,19 @@ function formatCountdown(endAt: string): string {
   return `${hours}h ${mins}m left`;
 }
 
+function formatRoundCountdown(endAt: string): string {
+  const diff = new Date(endAt).getTime() - Date.now();
+  if (diff <= 0) return "Cut imminent";
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const mins = Math.floor((diff % 3600000) / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+  if (days > 0) return `${days}d ${hours}h ${mins}m`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  if (mins > 0) return `${mins}m ${secs}s`;
+  return `${secs}s`;
+}
+
 function RankIcon({ rank }: { rank: number }) {
   if (rank === 1) return <Crown className="w-5 h-5 text-yellow-400" />;
   if (rank === 2) return <Medal className="w-5 h-5 text-slate-400" />;
@@ -72,6 +85,9 @@ export default function ChallengeDetail() {
   const queryClient = useQueryClient();
 
   const [countdown, setCountdown] = useState("");
+  const [roundCountdown, setRoundCountdown] = useState("");
+  const prevRoundRef = useRef<number | null>(null);
+  const prevEliminatedRef = useRef<boolean | null>(null);
   const [progressOpen, setProgressOpen] = useState(false);
   const [progressValue, setProgressValue] = useState(100);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -102,14 +118,57 @@ export default function ChallengeDetail() {
     }
   );
 
-  // Live countdown
+  // Live countdown — refresh every second when <1h remains for the round so
+  // the "Next cut in …" banner feels alive in the final stretch.
   useEffect(() => {
     if (!challenge) return;
-    const update = () => setCountdown(formatCountdown(challenge.endAt));
+    const update = () => {
+      setCountdown(formatCountdown(challenge.endAt));
+      setRoundCountdown(formatRoundCountdown(challenge.endAt));
+    };
     update();
-    const t = setInterval(update, 60000);
+    const diff = new Date(challenge.endAt).getTime() - Date.now();
+    const tick = diff > 0 && diff < 3600_000 ? 1000 : 60_000;
+    const t = setInterval(update, tick);
     return () => clearInterval(t);
   }, [challenge]);
+
+  // Round advance / elimination notifications. We diff against the prior
+  // snapshot so the toast only fires when the bracket actually changes
+  // (e.g. the 30s refetch picks up an auto-advanced round).
+  useEffect(() => {
+    if (!challenge || !player) return;
+    const c = challenge as unknown as {
+      isElimination?: boolean;
+      currentRound?: number;
+      leaderboard?: { playerId: number; eliminated: boolean; eliminatedRound?: number | null }[];
+    };
+    if (!c.isElimination) return;
+    const round = c.currentRound ?? 1;
+    const me = (c.leaderboard ?? []).find(e => e.playerId === player.id);
+    if (!me) return;
+
+    const prevRound = prevRoundRef.current;
+    const prevEliminated = prevEliminatedRef.current;
+
+    if (prevRound !== null && prevEliminated !== null) {
+      if (!prevEliminated && me.eliminated) {
+        toast({
+          title: "You were eliminated 💔",
+          description: `Cut in round ${me.eliminatedRound ?? round}. GG — better luck next bracket.`,
+          variant: "destructive",
+        });
+      } else if (!prevEliminated && !me.eliminated && round > prevRound) {
+        toast({
+          title: `Advanced to round ${round} 🏆`,
+          description: "You survived the cut. Progress reset — go again!",
+        });
+      }
+    }
+
+    prevRoundRef.current = round;
+    prevEliminatedRef.current = me.eliminated;
+  }, [challenge, player, toast]);
 
   const joinMutation = useJoinChallenge({
     mutation: {
@@ -296,11 +355,36 @@ export default function ChallengeDetail() {
             {!isCompleted && !isExpired && (
               <div className="flex items-center justify-center gap-1.5 text-sm font-bold text-primary">
                 <Clock className="w-4 h-4" />
-                {countdown}
+                {isElimination ? `Round ${currentRound} ends in ${roundCountdown}` : countdown}
               </div>
             )}
           </CardContent>
         </Card>
+
+        {/* Next cut banner (elimination tournaments only) */}
+        {isElimination && !isCompleted && !isExpired && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-3 rounded-2xl border border-purple-500/30 bg-gradient-to-r from-purple-950/40 via-purple-900/20 to-fuchsia-950/40 px-4 py-3"
+            data-testid="banner-next-cut"
+          >
+            <div className="w-9 h-9 rounded-full bg-purple-500/20 flex items-center justify-center shrink-0">
+              <Swords className="w-4 h-4 text-purple-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] uppercase tracking-wider font-black text-purple-300/80">
+                Next cut in
+              </p>
+              <p className="text-base font-black text-foreground" data-testid="text-next-cut">
+                {roundCountdown}
+              </p>
+            </div>
+            <Badge variant="secondary" className="bg-purple-500/20 text-purple-200 border-purple-500/30 font-black">
+              Round {currentRound}
+            </Badge>
+          </motion.div>
+        )}
 
         {/* Description */}
         {challenge.description && (
@@ -408,16 +492,39 @@ export default function ChallengeDetail() {
                 </Badge>
               </div>
               <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1">
-                {bracketRounds.map(({ round, entries }) => (
-                  <div key={round} className="shrink-0 w-56 space-y-2">
+                {bracketRounds.map(({ round, entries }) => {
+                  const isActive = !isCompleted && round === currentRound;
+                  return (
+                  <div
+                    key={round}
+                    className={`shrink-0 w-56 space-y-2 rounded-xl p-2 transition-all ${
+                      isActive
+                        ? "bg-purple-500/10 ring-2 ring-purple-400/60 shadow-[0_0_20px_-4px_rgba(168,85,247,0.5)]"
+                        : "opacity-80"
+                    }`}
+                    data-testid={isActive ? "round-active" : `round-${round}`}
+                  >
                     <div className="flex items-center justify-between px-1">
-                      <p className="text-xs font-black text-purple-200 uppercase tracking-wider">
-                        Round {round}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <p className={`text-xs font-black uppercase tracking-wider ${isActive ? "text-purple-100" : "text-purple-200"}`}>
+                          Round {round}
+                        </p>
+                        {isActive && (
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="absolute inline-flex h-full w-full rounded-full bg-purple-300 opacity-75 animate-ping" />
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-purple-300" />
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[10px] text-muted-foreground font-bold">
                         {entries.length} {entries.length === 1 ? "player" : "players"}
                       </span>
                     </div>
+                    {isActive && (
+                      <p className="px-1 text-[10px] font-bold text-purple-200/80 flex items-center gap-1">
+                        <Clock className="w-2.5 h-2.5" /> Cut in {roundCountdown}
+                      </p>
+                    )}
                     <div className="space-y-1.5">
                       {entries.map((entry) => {
                         const outThisRound = entry.eliminated && (entry.eliminatedRound ?? 0) === round;
@@ -456,7 +563,8 @@ export default function ChallengeDetail() {
                       })}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               {!isCompleted && (
                 <p className="text-[11px] text-muted-foreground mt-3 text-center">
