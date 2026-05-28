@@ -311,6 +311,7 @@ function ClerkProviderWithRoutes() {
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
           <Route path="/post/:id" component={PostDetail} />
+          <Route path="/p/:id" component={PostDetail} />
           <Route component={HomeRedirect} />
         </Switch>
       </QueryClientProvider>

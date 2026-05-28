@@ -36,8 +36,13 @@ describe("renderOgHtml — meta tag coverage", () => {
     assert.match(html, /<meta property="og:url" content="https:\/\/hatchup\.example\.com\/post\/42"/);
   });
 
-  it("renders the canonical app URL for the meta refresh redirect", () => {
+  it("redirects browsers to the SPA-served /p/:id route via meta refresh", () => {
     const html = renderOgHtml({ baseUrl: BASE_URL, id: 1, post: basicPost(), author: basicAuthor() });
+    assert.match(html, /<meta http-equiv="refresh" content="0; url=https:\/\/hatchup\.example\.com\/p\/1"/);
+  });
+
+  it("falls back to / when there is no valid post id", () => {
+    const html = renderOgHtml({ baseUrl: BASE_URL, id: null, post: null, author: null });
     assert.match(html, /<meta http-equiv="refresh" content="0; url=https:\/\/hatchup\.example\.com\/"/);
   });
 

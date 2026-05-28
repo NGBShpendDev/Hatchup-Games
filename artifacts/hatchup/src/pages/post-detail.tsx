@@ -166,8 +166,9 @@ function SignedOutPostDetail({ postId }: { postId: number }) {
 }
 
 export default function PostDetail() {
-  const [, params] = useRoute("/post/:id");
-  const postId = Number(params?.id);
+  const [, postParams] = useRoute("/post/:id");
+  const [, pParams] = useRoute("/p/:id");
+  const postId = Number(postParams?.id ?? pParams?.id);
 
   return (
     <>

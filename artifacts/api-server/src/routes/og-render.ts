@@ -60,7 +60,13 @@ export interface RenderOgArgs {
  */
 export function renderOgHtml({ baseUrl, id, post, author }: RenderOgArgs): string {
   const fallbackImage = `${baseUrl}/opengraph.jpg`;
-  const appUrl = `${baseUrl}/`;
+  // Real browsers are bounced to the SPA's `/p/:id` route so users actually
+  // land on the post they clicked. The api-server owns the `/post` path
+  // prefix, so the SPA's own `/post/:id` route is unreachable from external
+  // cold links — `/p/:id` is the parallel SPA-served route.
+  const appUrl = id != null && Number.isFinite(id) && id > 0
+    ? `${baseUrl}/p/${id}`
+    : `${baseUrl}/`;
   const canonicalUrl = `${baseUrl}/post/${id != null && Number.isFinite(id) ? id : ""}`;
 
   let title = "HatchUp";

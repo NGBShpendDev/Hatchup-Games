@@ -24,6 +24,7 @@ const defaultLoader: OgPostLoader = async (id: number): Promise<OgLoadResult> =>
 };
 
 const router = createOgRouter(defaultLoader);
+
 export default router;
 export { createOgRouter };
 export type { OgLoadResult, OgPostLoader };
