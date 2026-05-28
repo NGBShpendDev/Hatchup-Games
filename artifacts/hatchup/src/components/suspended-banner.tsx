@@ -8,9 +8,21 @@ export const SUSPENDED_COPY = {
   supportHref: "mailto:support@hatchup.app?subject=Account%20suspension%20appeal",
 } as const;
 
+export function formatSuspendedSince(suspendedAt: string | null | undefined): string | null {
+  if (!suspendedAt) return null;
+  const d = new Date(suspendedAt);
+  if (isNaN(d.getTime())) return null;
+  try {
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
+}
+
 export function SuspendedBanner({ className = "" }: { className?: string }) {
   const { player } = usePlayer();
   if (!player?.isSuspended) return null;
+  const since = formatSuspendedSince(player.suspendedAt);
   return (
     <div
       role="status"
@@ -20,6 +32,14 @@ export function SuspendedBanner({ className = "" }: { className?: string }) {
       <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-destructive" aria-hidden="true" />
       <div className="flex-1 space-y-1">
         <p className="text-sm font-black text-destructive">{SUSPENDED_COPY.title}</p>
+        {since && (
+          <p
+            className="text-[11px] font-black uppercase tracking-wider text-destructive/80"
+            data-testid="text-suspended-since"
+          >
+            Suspended since {since}
+          </p>
+        )}
         <p className="text-xs font-medium leading-relaxed text-destructive/90">
           {SUSPENDED_COPY.body}
         </p>

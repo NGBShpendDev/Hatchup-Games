@@ -105,6 +105,8 @@ function ProfileModal({
   const followPlayer = useFollowPlayer();
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { player: viewerPlayer } = usePlayer();
+  const viewerSuspended = !!viewerPlayer?.isSuspended;
   const [, setLocation] = useLocation();
   const [mutualSheetOpen, setMutualSheetOpen] = useState(false);
   const [mutualFollowingSheetOpen, setMutualFollowingSheetOpen] = useState(false);
@@ -121,6 +123,14 @@ function ProfileModal({
   }
 
   async function handleFollow() {
+    if (viewerSuspended) {
+      toast({
+        title: "Your account is suspended",
+        description: "You can't follow other players. Contact support to appeal.",
+        variant: "destructive",
+      });
+      return;
+    }
     await followPlayer.mutateAsync({ data: { followerId: viewerId, followeeId: profileId } });
     qc.invalidateQueries({ queryKey: getGetPlayerSocialProfileQueryKey(profileId, { viewerId }) });
     toast({ title: "Following! 🤝" });
@@ -197,10 +207,27 @@ function ProfileModal({
             </div>
 
             {profileId !== viewerId && !profile.isFollowing && (
-              <Button onClick={handleFollow} disabled={followPlayer.isPending} className="w-full font-black rounded-xl h-10">
-                <UserPlus className="w-4 h-4 mr-2" />
-                Follow
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  onClick={handleFollow}
+                  disabled={followPlayer.isPending || viewerSuspended}
+                  aria-disabled={followPlayer.isPending || viewerSuspended}
+                  title={viewerSuspended ? "Your account is suspended. You can't follow other players." : undefined}
+                  className="w-full font-black rounded-xl h-10"
+                  data-testid="button-profile-follow"
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  {viewerSuspended ? "Suspended" : "Follow"}
+                </Button>
+                {viewerSuspended && (
+                  <p
+                    className="text-xs text-destructive/90 font-medium text-center"
+                    data-testid="follow-suspended-notice"
+                  >
+                    Your account is suspended — you can't follow other players. Contact support to appeal.
+                  </p>
+                )}
+              </div>
             )}
             {profile.isFollowing && (
               <div className="flex items-center justify-center gap-2 text-sm text-primary font-bold py-2">
@@ -979,6 +1006,8 @@ function PlayerDiscoverCard({
   const followPlayer = useFollowPlayer();
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { player: viewerPlayer } = usePlayer();
+  const viewerSuspended = !!viewerPlayer?.isSuspended;
   const [optimisticFollow, setOptimisticFollow] = useState(player.isFollowing);
 
   const reasonLabel: Record<string, { text: string; icon: React.ReactNode; color: string }> = {
@@ -1010,6 +1039,14 @@ function PlayerDiscoverCard({
 
   async function handleFollow() {
     if (optimisticFollow) return;
+    if (viewerSuspended) {
+      toast({
+        title: "Your account is suspended",
+        description: "You can't follow other players. Contact support to appeal.",
+        variant: "destructive",
+      });
+      return;
+    }
     setOptimisticFollow(true);
     try {
       await followPlayer.mutateAsync({ data: { followerId: viewerId, followeeId: player.id } });
@@ -1072,12 +1109,14 @@ function PlayerDiscoverCard({
           ) : (
             <Button
               onClick={handleFollow}
-              disabled={followPlayer.isPending}
+              disabled={followPlayer.isPending || viewerSuspended}
+              aria-disabled={followPlayer.isPending || viewerSuspended}
+              title={viewerSuspended ? "Your account is suspended. You can't follow other players." : undefined}
               size="sm"
               className="rounded-full h-8 px-3 text-xs font-black"
               data-testid={`button-follow-${player.id}`}
             >
-              <UserPlus className="w-3.5 h-3.5 mr-1" /> Follow
+              <UserPlus className="w-3.5 h-3.5 mr-1" /> {viewerSuspended ? "Suspended" : "Follow"}
             </Button>
           )
         )}

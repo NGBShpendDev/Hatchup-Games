@@ -32,6 +32,7 @@ export type PlayerProfile = {
   recoveryMessage: string | null;
   activeHatchlingId: number | null;
   isSuspended: boolean;
+  suspendedAt: string | null;
 };
 
 type PlayerContextValue = {
