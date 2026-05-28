@@ -325,9 +325,9 @@ export default function Hatch() {
                             </NeonButton>
                           </motion.div>
                         ) : (
-                          <Button className="w-full font-bold mt-4" variant="secondary" disabled>
+                          <NeonButton className="w-full mt-4 h-12" variant="secondary" disabled>
                             Incubating ({Math.round(egg.progressPct ?? 0)}%)
-                          </Button>
+                          </NeonButton>
                         )}
                       </div>
                     </GlassCard>

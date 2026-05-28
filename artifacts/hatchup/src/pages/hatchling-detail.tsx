@@ -425,9 +425,9 @@ export default function HatchlingDetail() {
                 <GlowBadge tone="primary">Level {hatchling.level}</GlowBadge>
                 <GlowBadge tone="cyan">{hatchling.rarity ?? "Common"}</GlowBadge>
                 {isActivePartner && (
-                  <Badge className="text-sm font-black px-3 py-1 bg-yellow-400 text-black border-0 flex items-center gap-1">
-                    <Star className="w-3 h-3 fill-black" /> Active Partner
-                  </Badge>
+                  <GlowBadge tone="yellow" className="text-[11px]">
+                    <Star className="w-3 h-3 fill-yellow-300" /> Active Partner
+                  </GlowBadge>
                 )}
               </div>
             </div>
@@ -601,6 +601,8 @@ export default function HatchlingDetail() {
             </NeonButton>
 
             <div className="flex justify-end">
+              {/* Kept as a low-emphasis destructive ghost button — neon primitives
+                  would over-amplify a rarely-used delete action. */}
               <Button variant="ghost" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 font-bold text-sm" onClick={handleRelease}>
                 <Trash2 className="w-4 h-4 mr-2" /> Release Pal
               </Button>

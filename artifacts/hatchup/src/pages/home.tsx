@@ -811,7 +811,8 @@ export default function Home() {
                 <DialogTitle className="text-2xl font-black">Log Activity</DialogTitle>
               </DialogHeader>
 
-              {/* Mode Toggle */}
+              {/* Mode Toggle — kept as a custom segmented control; neon primitives
+                  would visually over-emphasize a dialog-local mode switch. */}
               <div className="flex gap-1 bg-muted rounded-xl p-1">
                 <button
                   onClick={() => setRepMode(false)}
@@ -836,14 +837,15 @@ export default function Home() {
                 <div className="grid gap-4 py-2">
                   <div className="grid grid-cols-3 gap-2">
                     {CARDIO_TYPES.map(type => (
-                      <Button
+                      <NeonButton
                         key={type}
-                        variant={activityType === type ? "default" : "outline"}
+                        size="sm"
+                        variant={activityType === type ? "primary" : "secondary"}
                         onClick={() => setActivityType(type)}
-                        className="capitalize font-bold text-xs h-12"
+                        className="capitalize text-xs h-12"
                       >
                         {type}
-                      </Button>
+                      </NeonButton>
                     ))}
                   </div>
                   <div className="space-y-2">
@@ -879,14 +881,15 @@ export default function Home() {
                 <div className="grid gap-4 py-2">
                   <div className="grid grid-cols-3 gap-2">
                     {REP_TYPES.map(type => (
-                      <Button
+                      <NeonButton
                         key={type}
-                        variant={repType === type ? "default" : "outline"}
+                        size="sm"
+                        variant={repType === type ? "primary" : "secondary"}
                         onClick={() => setRepType(type)}
-                        className="capitalize font-bold text-xs h-12"
+                        className="capitalize text-xs h-12"
                       >
                         {REP_TYPE_LABELS[type]}
-                      </Button>
+                      </NeonButton>
                     ))}
                   </div>
 
@@ -1322,7 +1325,9 @@ function HighlightCard({
             maxLength={280}
             data-testid={`input-home-comment-${post.id}`}
           />
-          <Button
+          {/* Compact icon-only submit — swapped to NeonButton primary so the
+              comment composer matches the neon look used elsewhere. */}
+          <NeonButton
             type="submit"
             size="sm"
             className="h-8 w-8 p-0 rounded-full"
@@ -1331,7 +1336,7 @@ function HighlightCard({
             data-testid={`button-home-comment-submit-${post.id}`}
           >
             <Send className="w-3.5 h-3.5" />
-          </Button>
+          </NeonButton>
         </form>
       </div>
     </GlassCard>

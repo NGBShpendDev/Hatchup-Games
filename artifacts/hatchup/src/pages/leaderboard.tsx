@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { RankBadge } from "@/components/rank-badge";
 import { Badge } from "@/components/ui/badge";
 import { GlowBadge } from "@/components/ui/glow-badge";
+import { NeonButton } from "@/components/ui/neon-button";
 import { Button } from "@/components/ui/button";
 import { SafetyBanner } from "@/components/safety-banner";
 import {
@@ -635,13 +636,12 @@ export default function Leaderboard() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <h3 className={`font-black text-sm ${isEnded ? "text-white/40" : ""}`}>{c.title}</h3>
-                                <Badge className={`text-[10px] px-1.5 py-0 ${
-                                  c.scope === "world" ? "bg-blue-600/30 text-blue-300" :
-                                  c.scope === "city"  ? "bg-green-600/30 text-green-300" :
-                                  "bg-purple-600/30 text-purple-300"
-                                }`}>
+                                <GlowBadge
+                                  tone={c.scope === "world" ? "cyan" : c.scope === "city" ? "green" : "violet"}
+                                  className="text-[10px] px-1.5 py-0"
+                                >
                                   {c.scope === "world" ? "🌍 Global" : `📍 ${c.scope}`}
-                                </Badge>
+                                </GlowBadge>
                                 {isEnded && <GlowBadge tone="violet" className="text-[10px] px-1.5 py-0">Ended</GlowBadge>}
                               </div>
                               {c.description && <p className="text-xs text-white/50 mt-0.5">{c.description}</p>}
@@ -681,14 +681,14 @@ export default function Leaderboard() {
                             {c.isJoined ? (
                               <GlowBadge tone="primary">✓ Joined</GlowBadge>
                             ) : !isEnded ? (
-                              <Button
+                              <NeonButton
                                 size="sm"
-                                className="bg-gradient-to-r from-[#ff2d55] to-[#bf00ff] text-white text-xs font-bold h-7"
+                                className="h-7 text-[11px]"
                                 onClick={() => joinMutation.mutate(c.id)}
                                 disabled={joinMutation.isPending}
                               >
                                 Join Challenge
-                              </Button>
+                              </NeonButton>
                             ) : null}
                             <button
                               onClick={() => setExpandedChallenge(isExpanded ? null : c.id)}
