@@ -4,9 +4,11 @@ import { TopBar } from "./top-bar";
 import { UniversePalette } from "./universe-palette";
 import { AIAssistantFab } from "./ai-assistant-fab";
 import { useChallengeNotifications } from "@/hooks/use-challenge-notifications";
+import { useNotificationsToast } from "@/hooks/use-notifications-toast";
 
 export function Layout({ children }: { children: ReactNode }) {
   useChallengeNotifications();
+  useNotificationsToast();
   return (
     <div className="min-h-[100dvh] bg-background text-foreground overflow-hidden font-sans flex flex-col relative pb-20 md:pb-24">
       {/* Cinematic noise and gradient backdrop */}
