@@ -17,7 +17,8 @@ import { eq, and, desc, sql, or, ne, inArray, ilike } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
 import { blockMinorSocialWrite } from "../middlewares/minorGuard";
-import { socialWriteLimiter } from "../middlewares/rateLimiters";
+import { socialWriteLimiter, postViewLimiter } from "../middlewares/rateLimiters";
+import { createHmac } from "node:crypto";
 import {
   CreatePostBody,
   ReactToPostBody,
@@ -339,14 +340,22 @@ router.get("/social/posts/:id", async (req, res) => {
 // the number. viewerKey = playerId for signed-in viewers; otherwise the request
 // IP. Always returns the current viewCount so the client can render it.
 
-router.post("/social/posts/:id/view", async (req, res) => {
+router.post("/social/posts/:id/view", postViewLimiter, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) { res.status(404).json({ error: "Post not found" }); return; }
 
   const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, id) });
   if (!post) { res.status(404).json({ error: "Post not found" }); return; }
 
-  let viewerKey = `ip:${req.ip ?? "unknown"}`;
+  // For anonymous viewers, hash the IP with SESSION_SECRET so we can still
+  // dedup per-day without persisting raw IPs (privacy + a small extra cost
+  // for anyone trying to brute-force viewerKeys).
+  const sessionSecret = process.env.SESSION_SECRET ?? "";
+  const rawIp = req.ip ?? "unknown";
+  const ipHash = sessionSecret
+    ? createHmac("sha256", sessionSecret).update(rawIp).digest("hex").slice(0, 32)
+    : rawIp;
+  let viewerKey = `ip:${ipHash}`;
   try {
     const { getAuth } = await import("@clerk/express");
     const auth = getAuth(req);

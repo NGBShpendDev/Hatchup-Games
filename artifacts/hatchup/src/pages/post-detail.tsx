@@ -45,19 +45,26 @@ function PostBody({ postId, viewerId }: { postId: number; viewerId: number | nul
   useEffect(() => {
     if (!Number.isFinite(postId) || postId <= 0) return;
     if (viewedRef.current === postId) return;
-    viewedRef.current = postId;
-    recordView.mutate(
-      { id: postId },
-      {
-        onSuccess: (data) => {
-          if (data?.counted) {
-            qc.invalidateQueries({
-              queryKey: getGetPostQueryKey(postId, viewerId != null ? { playerId: viewerId } : undefined),
-            });
-          }
+    // Require a short dwell time before firing the view ping so accidental
+    // taps, prefetches, and refresh loops don't inflate the counter.
+    const DWELL_MS = 2500;
+    const timer = setTimeout(() => {
+      if (document.visibilityState === "hidden") return;
+      viewedRef.current = postId;
+      recordView.mutate(
+        { id: postId },
+        {
+          onSuccess: (data) => {
+            if (data?.counted) {
+              qc.invalidateQueries({
+                queryKey: getGetPostQueryKey(postId, viewerId != null ? { playerId: viewerId } : undefined),
+              });
+            }
+          },
         },
-      },
-    );
+      );
+    }, DWELL_MS);
+    return () => clearTimeout(timer);
     // recordView is a stable mutation; we intentionally only re-run when postId/viewer changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId, viewerId]);

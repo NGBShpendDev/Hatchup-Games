@@ -43,6 +43,19 @@ export const aiCoachLimiter = rateLimit({
   message: { error: "Too many coach requests. Please wait a moment." },
 });
 
+// Post views: more permissive than other social writes since legitimate
+// browsing can fire many of these in a short window (feed scrolls, opening
+// permalinks across tabs). Server-side dedup is per (post, viewerKey, day),
+// so this limiter is the second line of defense against refresh-loop / bot
+// inflation that rotates target posts.
+export const postViewLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many view pings, slow down." },
+});
+
 // Body / meal scan uploads: expensive vision calls.
 export const scanLimiter = rateLimit({
   windowMs: 60 * 1000,
