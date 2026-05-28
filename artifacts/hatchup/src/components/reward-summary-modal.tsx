@@ -28,16 +28,66 @@ const COLORS = {
   challenge: "from-violet-500/20 to-indigo-500/10 border-violet-500/40 text-violet-300",
 };
 
+function WinnerHpBar({ pct }: { pct: number }) {
+  const clamped = Math.max(0, Math.min(1, pct));
+  const pctDisplay = Math.round(clamped * 100);
+
+  // Interpolate colour: red at 0 → yellow at 0.5 → green at 1
+  let barColor: string;
+  if (clamped <= 0.5) {
+    // red → yellow
+    const t = clamped / 0.5;
+    const r = 255;
+    const g = Math.round(t * 200);
+    barColor = `rgb(${r},${g},0)`;
+  } else {
+    // yellow → green
+    const t = (clamped - 0.5) / 0.5;
+    const r = Math.round((1 - t) * 255);
+    barColor = `rgb(${r},200,0)`;
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.15 }}
+      className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-1.5"
+    >
+      <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase tracking-wide">
+        <span>Winner's remaining HP</span>
+        <span style={{ color: barColor }}>{pctDisplay}%</span>
+      </div>
+      <div className="h-3 rounded-full bg-black/40 overflow-hidden">
+        <motion.div
+          className="h-full rounded-full"
+          style={{ backgroundColor: barColor }}
+          initial={{ width: 0 }}
+          animate={{ width: `${pctDisplay}%` }}
+          transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
+        />
+      </div>
+      {clamped <= 0.15 && (
+        <p className="text-[11px] text-muted-foreground text-center italic">
+          So close — one more hit would've done it!
+        </p>
+      )}
+    </motion.div>
+  );
+}
+
 export function RewardSummaryModal({
   open,
   onClose,
   title = "Reward Summary",
   rewards,
+  winnerHpPct,
 }: {
   open: boolean;
   onClose: () => void;
   title?: string;
   rewards: RewardEntry[];
+  winnerHpPct?: number;
 }) {
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -58,6 +108,10 @@ export function RewardSummaryModal({
               Your moves rippled through the universe.
             </p>
           </div>
+
+          {typeof winnerHpPct === "number" && (
+            <WinnerHpBar pct={winnerHpPct} />
+          )}
 
           <div className="space-y-2">
             <AnimatePresence>

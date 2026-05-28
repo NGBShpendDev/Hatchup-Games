@@ -376,7 +376,7 @@ export default function BattlePage() {
   const [palXp, setPalXp] = useState<{ xpDelta: number; prevLevel: number; newLevel: number; newXp: number } | null>(null);
   const [artifactXpGains, setArtifactXpGains] = useState<ArtifactXpGain[]>([]);
   const [queueSecs, setQueueSecs] = useState(0);
-  const [rewardSummary, setRewardSummary] = useState<{ open: boolean; entries: RewardEntry[]; title?: string }>({ open: false, entries: [] });
+  const [rewardSummary, setRewardSummary] = useState<{ open: boolean; entries: RewardEntry[]; title?: string; winnerHpPct?: number }>({ open: false, entries: [] });
   const queryClient = useQueryClient();
 
   // Rematch invite state — when set, join_queue carries this id and the server
@@ -589,7 +589,7 @@ export default function BattlePage() {
         }
         if (stageUps > 0) entries.push({ kind: "hatchling", label: `${stageUps} artifact stage-up${stageUps === 1 ? "" : "s"}`, detail: "Power scaled up." });
         if (entries.length === 0) entries.push({ kind: "xp", label: "Victory!", detail: "GG — keep the streak alive." });
-        setRewardSummary({ open: true, entries, title: "Victory Rewards" });
+        setRewardSummary({ open: true, entries, title: "Victory Rewards", winnerHpPct: typeof msg.winnerHpPct === "number" ? msg.winnerHpPct : undefined });
       } else {
         // Consolation summary for the losing player — encouraging, not punishing.
         const isCloseMatch = typeof msg.winnerHpPct === "number" && msg.winnerHpPct <= 0.2;
@@ -610,12 +610,13 @@ export default function BattlePage() {
           if (g.newStage > 1) stageUps += 1;
         }
         if (stageUps > 0) entries.push({ kind: "hatchling", label: `${stageUps} artifact stage-up${stageUps === 1 ? "" : "s"}`, detail: "Power scaled up regardless." });
+        const hpPct = typeof msg.winnerHpPct === "number" ? msg.winnerHpPct : undefined;
         if (isCloseMatch) {
           if (entries.length === 0) entries.push({ kind: "xp", label: "So close — they were nearly down!", detail: "A tiny bit more and it's yours. Rematch!" });
-          setRewardSummary({ open: true, entries, title: "So Close! Almost Had It" });
+          setRewardSummary({ open: true, entries, title: "So Close! Almost Had It", winnerHpPct: hpPct });
         } else {
           if (entries.length === 0) entries.push({ kind: "xp", label: "Almost!", detail: "One more match — you've got this." });
-          setRewardSummary({ open: true, entries, title: "Almost! Keep Going" });
+          setRewardSummary({ open: true, entries, title: "Almost! Keep Going", winnerHpPct: hpPct });
         }
       }
 
@@ -1712,6 +1713,7 @@ export default function BattlePage() {
         onClose={() => setRewardSummary({ open: false, entries: [] })}
         title={rewardSummary.title ?? "Victory Rewards"}
         rewards={rewardSummary.entries}
+        winnerHpPct={rewardSummary.winnerHpPct}
       />
 
       {/* ── Saved Builds Sheet ─────────────────────────────────────────────── */}
