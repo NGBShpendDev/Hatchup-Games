@@ -23,6 +23,7 @@ import { ArrowLeft, Zap, Heart, Coffee, Shield, Trash2, ArrowUpCircle, Sword, St
 import { ComposeSheet } from "@/components/compose-sheet";
 import { ErrorCard } from "@/components/error-card";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEpicMomentQueue } from "@/components/epic-moment-overlay";
 
@@ -284,7 +285,7 @@ export default function HatchlingDetail() {
           const stageLine = toStageName
             ? `Stage ${preStage} → Stage ${newStage} (${toStageName})`
             : `Stage ${preStage} → Stage ${newStage}`;
-          setEvolutionShare({
+          const shareData = {
             content: `${headline}\n${stageLine}`,
             metadata: {
               hatchlingId: hatchling.id,
@@ -297,9 +298,25 @@ export default function HatchlingDetail() {
               ...(result?.imageUrl ? { imageUrl: result.imageUrl as string } : hatchling.imageUrl ? { imageUrl: hatchling.imageUrl } : {}),
               statDeltas,
             },
+          };
+          setEvolutionShare(shareData);
+          const evolvedLabel = toStageName ? `Stage ${newStage} (${toStageName})` : `Stage ${newStage}`;
+          toast({
+            title: "Evolution Complete!",
+            description: `${hatchling.name} reached ${evolvedLabel}. Share the moment!`,
+            action: (
+              <ToastAction
+                altText="Share this evolution"
+                onClick={() => {
+                  setEvolutionShare(shareData);
+                  setComposeOpen(true);
+                }}
+                data-testid="toast-action-share-evolution"
+              >
+                Share this evolution!
+              </ToastAction>
+            ),
           });
-          setComposeOpen(true);
-          toast({ title: "Evolution Complete!", description: `${hatchling.name} has reached Stage ${newStage}!` });
           queryClient.invalidateQueries({ queryKey: getGetHatchlingQueryKey(hatchlingId) });
         },
         onError: () => {
