@@ -40,6 +40,7 @@ import { Input } from "@/components/ui/input";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, ArrowDown, ArrowUp, Check, Crown, LogOut, Mail, Search, Shield, ShieldCheck, Trophy, UserMinus, UserPlus, Users, X } from "lucide-react";
 import { motion } from "framer-motion";
@@ -79,6 +80,7 @@ export default function ClubDetail() {
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferTargetId, setTransferTargetId] = useState<number | null>(null);
+  const [transferAlsoLeave, setTransferAlsoLeave] = useState(false);
   const [confirmTransferId, setConfirmTransferId] = useState<number | null>(null);
   const [kickTarget, setKickTarget] = useState<{ id: number; name: string } | null>(null);
   const [inviteSearch, setInviteSearch] = useState("");
@@ -161,15 +163,23 @@ export default function ClubDetail() {
 
   const transferOwnership = useTransferClubOwnership({
     mutation: {
-      onSuccess: () => {
+      onSuccess: (_data, vars) => {
+        const left = vars.data.alsoLeave === true;
         toast({
-          title: "Ownership transferred",
-          description: "You're now an Officer. You can leave the club if you'd like.",
+          title: left ? "Ownership transferred and you left the club" : "Ownership transferred",
+          description: left
+            ? "The new owner has been notified. You're no longer a member of this club."
+            : "You're now an Officer. You can leave the club if you'd like.",
         });
+        queryClient.invalidateQueries({ queryKey: getGetClubQueryKey(id) });
         queryClient.invalidateQueries({ queryKey: getListClubMembersQueryKey(id) });
         setConfirmTransferId(null);
         setTransferTargetId(null);
+        setTransferAlsoLeave(false);
         setTransferOpen(false);
+        if (left) {
+          navigate("/club");
+        }
       },
       onError: (err: { response?: { data?: { error?: string } } }) => {
         toast({
@@ -327,14 +337,23 @@ export default function ClubDetail() {
           </div>
         )}
 
-        <Sheet open={transferOpen} onOpenChange={setTransferOpen}>
+        <Sheet
+          open={transferOpen}
+          onOpenChange={(open) => {
+            setTransferOpen(open);
+            if (!open) setTransferAlsoLeave(false);
+          }}
+        >
           <SheetContent side="bottom" className="max-h-[85vh] flex flex-col">
             <SheetHeader className="text-left">
               <SheetTitle className="flex items-center gap-2 text-foreground">
                 <Crown className="w-5 h-5 text-yellow-400" /> Transfer ownership
               </SheetTitle>
               <SheetDescription>
-                Pick a member to become the new owner of {club?.name ?? "this club"}. You'll be demoted to Officer and can then leave the club if you'd like.
+                Pick a member to become the new owner of {club?.name ?? "this club"}.{" "}
+                {transferAlsoLeave
+                  ? "You'll be removed from the club in the same step."
+                  : "You'll be demoted to Officer and can then leave the club if you'd like."}
               </SheetDescription>
             </SheetHeader>
             <ScrollArea className="flex-1 mt-3 px-4 pb-4">
@@ -384,18 +403,37 @@ export default function ClubDetail() {
                 );
               })()}
             </ScrollArea>
-            <div className="flex justify-end gap-2 px-4 pb-4 pt-2 border-t border-border">
-              <Button variant="outline" onClick={() => setTransferOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                disabled={transferTargetId === null || transferOwnership.isPending}
-                onClick={() => setConfirmTransferId(transferTargetId)}
-                className="bg-primary hover:bg-primary/90 font-bold"
-                data-testid="button-transfer-ownership"
+            <div className="flex flex-col gap-3 px-4 pb-4 pt-3 border-t border-border">
+              <label
+                htmlFor="transfer-also-leave"
+                className="flex items-start justify-between gap-3 rounded-xl border border-border bg-muted/20 p-3 cursor-pointer"
               >
-                Transfer ownership
-              </Button>
+                <div className="min-w-0">
+                  <div className="font-bold text-sm">Also leave the club after transferring</div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Hand off ownership and exit the club in one step. You won't stay behind as an Officer.
+                  </p>
+                </div>
+                <Switch
+                  id="transfer-also-leave"
+                  checked={transferAlsoLeave}
+                  onCheckedChange={setTransferAlsoLeave}
+                  data-testid="switch-transfer-also-leave"
+                />
+              </label>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setTransferOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  disabled={transferTargetId === null || transferOwnership.isPending}
+                  onClick={() => setConfirmTransferId(transferTargetId)}
+                  className="bg-primary hover:bg-primary/90 font-bold"
+                  data-testid="button-transfer-ownership"
+                >
+                  {transferAlsoLeave ? "Transfer & leave" : "Transfer ownership"}
+                </Button>
+              </div>
             </div>
           </SheetContent>
         </Sheet>
@@ -406,12 +444,18 @@ export default function ClubDetail() {
         >
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Transfer ownership?</AlertDialogTitle>
+              <AlertDialogTitle>
+                {transferAlsoLeave ? "Transfer ownership and leave?" : "Transfer ownership?"}
+              </AlertDialogTitle>
               <AlertDialogDescription>
                 {(() => {
                   const t = sortedMembers.find((m) => m.id === confirmTransferId);
                   const name = t ? (t.displayName || t.username) : "this member";
-                  return `${name} will become the new owner of ${club?.name ?? "this club"}. You'll be demoted to Officer and won't be able to undo this on your own.`;
+                  const clubName = club?.name ?? "this club";
+                  if (transferAlsoLeave) {
+                    return `${name} will become the new owner of ${clubName} and you'll be removed from the club in the same step. You won't be able to undo this on your own.`;
+                  }
+                  return `${name} will become the new owner of ${clubName}. You'll be demoted to Officer and won't be able to undo this on your own.`;
                 })()}
               </AlertDialogDescription>
             </AlertDialogHeader>
@@ -421,14 +465,19 @@ export default function ClubDetail() {
                 onClick={(e) => {
                   e.preventDefault();
                   if (confirmTransferId !== null) {
-                    transferOwnership.mutate({ id, data: { newOwnerId: confirmTransferId } });
+                    transferOwnership.mutate({
+                      id,
+                      data: { newOwnerId: confirmTransferId, alsoLeave: transferAlsoLeave },
+                    });
                   }
                 }}
                 disabled={transferOwnership.isPending}
                 className="bg-primary hover:bg-primary/90 text-primary-foreground"
                 data-testid="button-confirm-transfer-ownership"
               >
-                {transferOwnership.isPending ? "Transferring…" : "Yes, transfer"}
+                {transferOwnership.isPending
+                  ? (transferAlsoLeave ? "Transferring & leaving…" : "Transferring…")
+                  : (transferAlsoLeave ? "Yes, transfer & leave" : "Yes, transfer")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -4995,6 +4995,10 @@ components:
           type: integer
           minimum: 1
           description: Player ID of the member who should become the new owner.
+        alsoLeave:
+          type: boolean
+          default: false
+          description: If true, the current owner is also removed from the club in the same transaction after the new owner is assigned.
 
     ClubInput:
       type: object

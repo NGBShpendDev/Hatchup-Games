@@ -1458,10 +1458,11 @@ export const TransferClubOwnershipParams = zod.object({
 })
 
 
-
+export const transferClubOwnershipBodyAlsoLeaveDefault = false;
 
 export const TransferClubOwnershipBody = zod.object({
-  "newOwnerId": zod.number().min(1).describe('Player ID of the member who should become the new owner.')
+  "newOwnerId": zod.number().min(1).describe('Player ID of the member who should become the new owner.'),
+  "alsoLeave": zod.boolean().default(transferClubOwnershipBodyAlsoLeaveDefault).describe('If true, the current owner is also removed from the club in the same transaction after the new owner is assigned.')
 })
 
 export const TransferClubOwnershipResponse = zod.object({

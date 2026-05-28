@@ -414,6 +414,8 @@ export interface TransferClubOwnershipInput {
      * @minimum 1
      */
   newOwnerId: number;
+  /** If true, the current owner is also removed from the club in the same transaction after the new owner is assigned. */
+  alsoLeave?: boolean;
 }
 
 export interface ClubInput {

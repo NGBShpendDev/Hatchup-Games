@@ -387,13 +387,24 @@ router.post("/clubs/:id/transfer-ownership", requireAuth, attachPlayer, async (r
     return;
   }
 
+  const alsoLeave = body.data.alsoLeave === true;
+
   await db.transaction(async (tx) => {
-    await tx.update(playersTable)
-      .set({ clubRole: "officer" })
-      .where(eq(playersTable.id, viewer.id));
     await tx.update(playersTable)
       .set({ clubRole: "owner" })
       .where(eq(playersTable.id, target.id));
+    if (alsoLeave) {
+      await tx.update(playersTable)
+        .set({ clubId: null, clubRole: null })
+        .where(eq(playersTable.id, viewer.id));
+      await tx.update(clubsTable)
+        .set({ memberCount: Math.max(0, club.memberCount - 1) })
+        .where(eq(clubsTable.id, club.id));
+    } else {
+      await tx.update(playersTable)
+        .set({ clubRole: "officer" })
+        .where(eq(playersTable.id, viewer.id));
+    }
   });
 
   const noteTitle = `You're now an Owner`;
@@ -415,7 +426,7 @@ router.post("/clubs/:id/transfer-ownership", requireAuth, attachPlayer, async (r
     tag: `club-role-${club.id}-${note?.id ?? ""}`,
   });
 
-  res.json({ success: true, newOwnerId: target.id });
+  res.json({ success: true, newOwnerId: target.id, leftClub: alsoLeave });
 });
 
 // ── Kick a member from the club (owner/officer only) ─────────────────────
