@@ -1,5 +1,9 @@
 import { Feather } from "@expo/vector-icons";
-import { useListFollowers } from "@workspace/api-client-react";
+import {
+  useFollowPlayer,
+  useListFollowers,
+  useListFollowing,
+} from "@workspace/api-client-react";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -17,6 +21,30 @@ import { useColors } from "@/hooks/useColors";
 
 const PLAYER_ID = 1;
 
+function useAllFollowingIds(playerId: number): Set<number> {
+  const [cursor, setCursor] = useState(0);
+  const [ids, setIds] = useState<Set<number>>(new Set());
+  const [done, setDone] = useState(false);
+
+  const { data } = useListFollowing(playerId, { cursor, limit: 100 });
+
+  useEffect(() => {
+    if (!data) return;
+    setIds((prev) => {
+      const next = new Set(prev);
+      for (const p of data.players) next.add(p.id);
+      return next;
+    });
+    if (data.nextCursor != null) {
+      setCursor(data.nextCursor);
+    } else {
+      setDone(true);
+    }
+  }, [data]);
+
+  return ids;
+}
+
 export default function FollowersScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -27,15 +55,22 @@ export default function FollowersScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [cursor, setCursor] = useState(0);
   const [accumulated, setAccumulated] = useState<any[]>([]);
-
-  const { data, isLoading, isFetching } = useListFollowers(
-    PLAYER_ID,
-    { cursor, limit: 20 },
+  const [localFollowedIds, setLocalFollowedIds] = useState<Set<number>>(
+    new Set(),
   );
+
+  const followingIds = useAllFollowingIds(PLAYER_ID);
+
+  const { data, isLoading, isFetching } = useListFollowers(PLAYER_ID, {
+    cursor,
+    limit: 20,
+  });
+
+  const followMutation = useFollowPlayer();
 
   useEffect(() => {
     if (!data) return;
-    setAccumulated(prev => {
+    setAccumulated((prev) => {
       const seen = new Set(prev.map((p: any) => p.id));
       const next = [...prev];
       for (const p of data.players) {
@@ -66,24 +101,63 @@ export default function FollowersScreen() {
   const total = data?.total ?? accumulated.length;
   const hasMore = data?.nextCursor != null;
 
+  function isFollowingBack(playerId: number): boolean {
+    return followingIds.has(playerId) || localFollowedIds.has(playerId);
+  }
+
+  function handleFollowBack(playerId: number) {
+    setLocalFollowedIds((prev) => new Set([...prev, playerId]));
+    followMutation.mutate(
+      { data: { followerId: PLAYER_ID, followeeId: playerId } },
+      {
+        onError: () => {
+          setLocalFollowedIds((prev) => {
+            const next = new Set(prev);
+            next.delete(playerId);
+            return next;
+          });
+        },
+      },
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
+      <View
+        style={[
+          styles.header,
+          { paddingTop: topPad + 12, borderBottomColor: colors.border },
+        ]}
+      >
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color={colors.foreground} />
         </Pressable>
         <View style={styles.titleBlock}>
-          <Text style={[styles.title, { color: colors.foreground }]}>Followers</Text>
+          <Text style={[styles.title, { color: colors.foreground }]}>
+            Followers
+          </Text>
           {total > 0 && (
-            <Text style={[styles.count, { color: colors.mutedForeground }]}>{total}</Text>
+            <Text style={[styles.count, { color: colors.mutedForeground }]}>
+              {total}
+            </Text>
           )}
         </View>
         <View style={{ width: 34 }} />
       </View>
 
       <View style={[styles.searchRow, { borderBottomColor: colors.border }]}>
-        <View style={[styles.searchBox, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-          <Feather name="search" size={15} color={colors.mutedForeground} style={styles.searchIcon} />
+        <View
+          style={[
+            styles.searchBox,
+            { backgroundColor: colors.muted, borderColor: colors.border },
+          ]}
+        >
+          <Feather
+            name="search"
+            size={15}
+            color={colors.mutedForeground}
+            style={styles.searchIcon}
+          />
           <TextInput
             style={[styles.searchInput, { color: colors.foreground }]}
             placeholder="Search followers…"
@@ -95,7 +169,10 @@ export default function FollowersScreen() {
             testID="input-search-followers"
           />
           {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery("")} style={styles.clearBtn}>
+            <Pressable
+              onPress={() => setSearchQuery("")}
+              style={styles.clearBtn}
+            >
               <Feather name="x" size={14} color={colors.mutedForeground} />
             </Pressable>
           )}
@@ -117,26 +194,41 @@ export default function FollowersScreen() {
           keyExtractor={(p) => String(p.id)}
           contentContainerStyle={{ padding: 16, paddingBottom: bottomPad + 40 }}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item: player }) => (
-            <Pressable
-              style={[styles.playerCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-              testID={`follower-row-${player.id}`}
-              onPress={() => router.push(`/social/${player.id}` as any)}
-            >
-              <View style={[styles.avatar, { backgroundColor: colors.primary + "22", borderColor: colors.primary }]}>
-                <Feather name="user" size={20} color={colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.displayName, { color: colors.foreground }]}>
-                  {player.displayName ?? player.username}
-                </Text>
-                <Text style={[styles.username, { color: colors.mutedForeground }]}>@{player.username}</Text>
-              </View>
-              <Pressable style={styles.menuBtn}>
-                <Feather name="more-vertical" size={16} color={colors.mutedForeground} />
+          renderItem={({ item: player }) => {
+            const alreadyFollowing = isFollowingBack(player.id);
+            return (
+              <Pressable
+                style={[styles.playerCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                testID={`follower-row-${player.id}`}
+                onPress={() => router.push(`/social/${player.id}` as any)}
+              >
+                <View style={[styles.avatar, { backgroundColor: colors.primary + "22", borderColor: colors.primary }]}>
+                  <Feather name="user" size={20} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.displayName, { color: colors.foreground }]}>
+                    {player.displayName ?? player.username}
+                  </Text>
+                  <Text style={[styles.username, { color: colors.mutedForeground }]}>@{player.username}</Text>
+                </View>
+                {!alreadyFollowing ? (
+                  <Pressable
+                    style={[styles.followBtn, { borderColor: colors.primary }]}
+                    onPress={() => handleFollowBack(player.id)}
+                    testID={`follow-back-btn-${player.id}`}
+                  >
+                    <Text style={[styles.followBtnText, { color: colors.primary }]}>
+                      Follow back
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Pressable style={styles.menuBtn}>
+                    <Feather name="more-vertical" size={16} color={colors.mutedForeground} />
+                  </Pressable>
+                )}
               </Pressable>
-            </Pressable>
-          )}
+            );
+          }}
           ListFooterComponent={
             hasMore ? (
               <Pressable
@@ -146,7 +238,9 @@ export default function FollowersScreen() {
                   if (data?.nextCursor != null) setCursor(data.nextCursor);
                 }}
               >
-                <Text style={[styles.loadMoreText, { color: colors.primary }]}>
+                <Text
+                  style={[styles.loadMoreText, { color: colors.primary }]}
+                >
                   {isFetching ? "Loading…" : "Load more"}
                 </Text>
               </Pressable>
@@ -188,7 +282,13 @@ const styles = StyleSheet.create({
   searchIcon: { marginRight: 6 },
   searchInput: { flex: 1, fontSize: 14, paddingVertical: 0 },
   clearBtn: { padding: 4 },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, paddingHorizontal: 32 },
+  empty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingHorizontal: 32,
+  },
   emptyText: { fontSize: 14, textAlign: "center" },
   playerCard: {
     flexDirection: "row",
@@ -199,10 +299,23 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
-  avatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   displayName: { fontSize: 14, fontWeight: "700" },
   username: { fontSize: 12, marginTop: 1 },
-  menuBtn: { padding: 4 },
+  followBtn: {
+    borderWidth: 1.5,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  followBtnText: { fontSize: 12, fontWeight: "700" },
   loadMoreBtn: {
     borderWidth: 1,
     borderRadius: 12,
@@ -210,5 +323,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 4,
   },
+  menuBtn: { padding: 4 },
   loadMoreText: { fontSize: 13, fontWeight: "700" },
 });

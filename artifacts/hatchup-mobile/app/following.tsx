@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useListFollowing } from "@workspace/api-client-react";
+import { useListFollowing, useUnfollowPlayer } from "@workspace/api-client-react";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -27,15 +27,20 @@ export default function FollowingScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [cursor, setCursor] = useState(0);
   const [accumulated, setAccumulated] = useState<any[]>([]);
-
-  const { data, isLoading, isFetching } = useListFollowing(
-    PLAYER_ID,
-    { cursor, limit: 20 },
+  const [localUnfollowedIds, setLocalUnfollowedIds] = useState<Set<number>>(
+    new Set(),
   );
+
+  const { data, isLoading, isFetching } = useListFollowing(PLAYER_ID, {
+    cursor,
+    limit: 20,
+  });
+
+  const unfollowMutation = useUnfollowPlayer();
 
   useEffect(() => {
     if (!data) return;
-    setAccumulated(prev => {
+    setAccumulated((prev) => {
       const seen = new Set(prev.map((p: any) => p.id));
       const next = [...prev];
       for (const p of data.players) {
@@ -54,36 +59,72 @@ export default function FollowingScreen() {
     setSearchQuery("");
   }, []);
 
+  function handleUnfollow(playerId: number) {
+    setLocalUnfollowedIds((prev) => new Set([...prev, playerId]));
+    unfollowMutation.mutate(
+      { data: { followerId: PLAYER_ID, followeeId: playerId } },
+      {
+        onError: () => {
+          setLocalUnfollowedIds((prev) => {
+            const next = new Set(prev);
+            next.delete(playerId);
+            return next;
+          });
+        },
+      },
+    );
+  }
+
   const q = searchQuery.trim().toLowerCase();
+  const visible = accumulated.filter((p: any) => !localUnfollowedIds.has(p.id));
   const filtered = q
-    ? accumulated.filter(
+    ? visible.filter(
         (p: any) =>
           p.username.toLowerCase().includes(q) ||
           (p.displayName ?? "").toLowerCase().includes(q),
       )
-    : accumulated;
+    : visible;
 
   const total = data?.total ?? accumulated.length;
   const hasMore = data?.nextCursor != null;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
+      <View
+        style={[
+          styles.header,
+          { paddingTop: topPad + 12, borderBottomColor: colors.border },
+        ]}
+      >
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color={colors.foreground} />
         </Pressable>
         <View style={styles.titleBlock}>
-          <Text style={[styles.title, { color: colors.foreground }]}>Following</Text>
+          <Text style={[styles.title, { color: colors.foreground }]}>
+            Following
+          </Text>
           {total > 0 && (
-            <Text style={[styles.count, { color: colors.mutedForeground }]}>{total}</Text>
+            <Text style={[styles.count, { color: colors.mutedForeground }]}>
+              {total}
+            </Text>
           )}
         </View>
         <View style={{ width: 34 }} />
       </View>
 
       <View style={[styles.searchRow, { borderBottomColor: colors.border }]}>
-        <View style={[styles.searchBox, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-          <Feather name="search" size={15} color={colors.mutedForeground} style={styles.searchIcon} />
+        <View
+          style={[
+            styles.searchBox,
+            { backgroundColor: colors.muted, borderColor: colors.border },
+          ]}
+        >
+          <Feather
+            name="search"
+            size={15}
+            color={colors.mutedForeground}
+            style={styles.searchIcon}
+          />
           <TextInput
             style={[styles.searchInput, { color: colors.foreground }]}
             placeholder="Search following…"
@@ -95,7 +136,10 @@ export default function FollowingScreen() {
             testID="input-search-following"
           />
           {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery("")} style={styles.clearBtn}>
+            <Pressable
+              onPress={() => setSearchQuery("")}
+              style={styles.clearBtn}
+            >
               <Feather name="x" size={14} color={colors.mutedForeground} />
             </Pressable>
           )}
@@ -123,17 +167,45 @@ export default function FollowingScreen() {
               testID={`following-row-${player.id}`}
               onPress={() => router.push(`/social/${player.id}` as any)}
             >
-              <View style={[styles.avatar, { backgroundColor: colors.primary + "22", borderColor: colors.primary }]}>
+              <View
+                style={[
+                  styles.avatar,
+                  {
+                    backgroundColor: colors.primary + "22",
+                    borderColor: colors.primary,
+                  },
+                ]}
+              >
                 <Feather name="user" size={20} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.displayName, { color: colors.foreground }]}>
+                <Text
+                  style={[styles.displayName, { color: colors.foreground }]}
+                >
                   {player.displayName ?? player.username}
                 </Text>
-                <Text style={[styles.username, { color: colors.mutedForeground }]}>@{player.username}</Text>
+                <Text
+                  style={[styles.username, { color: colors.mutedForeground }]}
+                >
+                  @{player.username}
+                </Text>
               </View>
-              <Pressable style={styles.menuBtn}>
-                <Feather name="more-vertical" size={16} color={colors.mutedForeground} />
+              <Pressable
+                style={[
+                  styles.unfollowBtn,
+                  { borderColor: colors.mutedForeground },
+                ]}
+                onPress={() => handleUnfollow(player.id)}
+                testID={`unfollow-btn-${player.id}`}
+              >
+                <Text
+                  style={[
+                    styles.unfollowBtnText,
+                    { color: colors.mutedForeground },
+                  ]}
+                >
+                  Unfollow
+                </Text>
               </Pressable>
             </Pressable>
           )}
@@ -146,7 +218,9 @@ export default function FollowingScreen() {
                   if (data?.nextCursor != null) setCursor(data.nextCursor);
                 }}
               >
-                <Text style={[styles.loadMoreText, { color: colors.primary }]}>
+                <Text
+                  style={[styles.loadMoreText, { color: colors.primary }]}
+                >
                   {isFetching ? "Loading…" : "Load more"}
                 </Text>
               </Pressable>
@@ -188,7 +262,13 @@ const styles = StyleSheet.create({
   searchIcon: { marginRight: 6 },
   searchInput: { flex: 1, fontSize: 14, paddingVertical: 0 },
   clearBtn: { padding: 4 },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, paddingHorizontal: 32 },
+  empty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingHorizontal: 32,
+  },
   emptyText: { fontSize: 14, textAlign: "center" },
   playerCard: {
     flexDirection: "row",
@@ -199,10 +279,23 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
-  avatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   displayName: { fontSize: 14, fontWeight: "700" },
   username: { fontSize: 12, marginTop: 1 },
-  menuBtn: { padding: 4 },
+  unfollowBtn: {
+    borderWidth: 1.5,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  unfollowBtnText: { fontSize: 12, fontWeight: "700" },
   loadMoreBtn: {
     borderWidth: 1,
     borderRadius: 12,
