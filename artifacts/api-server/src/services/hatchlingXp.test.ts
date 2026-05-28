@@ -34,7 +34,7 @@ await mock.module("@workspace/db", {
   },
 });
 
-const { applyHatchlingXp, XP_PER_LEVEL } = await import("./hatchlingXp.ts");
+const { applyHatchlingXp, XP_PER_LEVEL, shouldTriggerSharePrompt, EVOLUTION_LEVELS } = await import("./hatchlingXp.ts");
 
 describe("XP_PER_LEVEL constant", () => {
   it("is 100", () => {
@@ -139,6 +139,93 @@ describe("applyHatchlingXp — level-up logic", () => {
     assert.ok(lastSetArgs);
     // 1 + floor(250 / 100) = 3
     assert.equal(lastSetArgs!.level, 3);
+  });
+});
+
+describe("applyHatchlingXp — evolution threshold crossings (share prompt triggers)", () => {
+  beforeEach(() => {
+    lastSetArgs = null;
+  });
+
+  it("crosses level 5 threshold (level 4 → 5) and newLevel equals 5", async () => {
+    // XP formula: newLevel = 1 + floor(newXp / 100)
+    // At xp=300, level=4. Adding 100 → newXp=400, newLevel=max(4, 1+4)=5
+    fakeHatchling = { id: 1, xp: 300, level: 4, playerId: 1 };
+    const result = await applyHatchlingXp(1, 100);
+    assert.ok(result);
+    assert.equal(result!.prevLevel, 4);
+    assert.equal(result!.newLevel, 5, "Pal should reach level 5 (first evolution threshold)");
+  });
+
+  it("crosses level 15 threshold (level 14 → 15) and newLevel equals 15", async () => {
+    // At xp=1300, level=14. Adding 100 → newXp=1400, newLevel=max(14, 1+14)=15
+    fakeHatchling = { id: 1, xp: 1300, level: 14, playerId: 1 };
+    const result = await applyHatchlingXp(1, 100);
+    assert.ok(result);
+    assert.equal(result!.prevLevel, 14);
+    assert.equal(result!.newLevel, 15, "Pal should reach level 15 (second evolution threshold)");
+  });
+
+  it("can cross level 5 threshold mid-award (e.g. level 3 → 5 skips cleanly)", async () => {
+    // xp=200, level=3. Adding 300 → newXp=500, newLevel=max(3,6)=6 (crosses 5)
+    fakeHatchling = { id: 1, xp: 200, level: 3, playerId: 1 };
+    const result = await applyHatchlingXp(1, 300);
+    assert.ok(result);
+    assert.equal(result!.prevLevel, 3);
+    assert.ok(result!.newLevel >= 5, "newLevel should be at or above the level-5 evolution threshold");
+  });
+
+  it("does NOT cross level 5 threshold when staying below level 5 (level 1 + 99 XP)", async () => {
+    fakeHatchling = { id: 1, xp: 0, level: 1, playerId: 1 };
+    const result = await applyHatchlingXp(1, 99);
+    assert.ok(result);
+    assert.ok(result!.newLevel < 5, "no evolution threshold should be crossed");
+  });
+});
+
+describe("shouldTriggerSharePrompt", () => {
+  const makeResult = (prevLevel: number, newLevel: number): Parameters<typeof shouldTriggerSharePrompt>[0] => ({
+    hatchlingId: 1,
+    prevLevel,
+    newLevel,
+    newXp: newLevel * XP_PER_LEVEL,
+    xpDelta: (newLevel - prevLevel) * XP_PER_LEVEL,
+  });
+
+  it("returns true when Pal crosses level 5 (4 → 5)", () => {
+    assert.equal(shouldTriggerSharePrompt(makeResult(4, 5)), true);
+  });
+
+  it("returns true when Pal crosses level 5 mid-award (3 → 6)", () => {
+    assert.equal(shouldTriggerSharePrompt(makeResult(3, 6)), true);
+  });
+
+  it("returns true when Pal crosses level 15 (14 → 15)", () => {
+    assert.equal(shouldTriggerSharePrompt(makeResult(14, 15)), true);
+  });
+
+  it("returns true when Pal crosses level 15 mid-award (12 → 16)", () => {
+    assert.equal(shouldTriggerSharePrompt(makeResult(12, 16)), true);
+  });
+
+  it("returns false when already at level 5 and gaining more levels (5 → 6)", () => {
+    assert.equal(shouldTriggerSharePrompt(makeResult(5, 6)), false);
+  });
+
+  it("returns false when already at level 15 and gaining more levels (15 → 16)", () => {
+    assert.equal(shouldTriggerSharePrompt(makeResult(15, 16)), false);
+  });
+
+  it("returns false when staying below level 5 (1 → 4)", () => {
+    assert.equal(shouldTriggerSharePrompt(makeResult(1, 4)), false);
+  });
+
+  it("returns false when staying between thresholds (6 → 10)", () => {
+    assert.equal(shouldTriggerSharePrompt(makeResult(6, 10)), false);
+  });
+
+  it("EVOLUTION_LEVELS contains exactly 5 and 15", () => {
+    assert.deepEqual([...EVOLUTION_LEVELS], [5, 15]);
   });
 });
 

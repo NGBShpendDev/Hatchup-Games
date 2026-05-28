@@ -18,6 +18,22 @@ export interface HatchlingXpResult {
 }
 
 /**
+ * Evolution thresholds: crossing level 5 or 15 triggers a share prompt so
+ * players can celebrate their Pal's milestone with friends.
+ */
+export const EVOLUTION_LEVELS = [5, 15] as const;
+
+/**
+ * Returns true when the XP result crosses one of the evolution level
+ * thresholds (5 or 15), meaning the caller should surface a share prompt.
+ */
+export function shouldTriggerSharePrompt(result: HatchlingXpResult): boolean {
+  return EVOLUTION_LEVELS.some(
+    (threshold) => result.prevLevel < threshold && result.newLevel >= threshold,
+  );
+}
+
+/**
  * Award XP to a hatchling and monotonically bump its level when the threshold
  * is crossed. Returns a result object so callers can detect evolution triggers,
  * or null when the hatchling row is not found.
