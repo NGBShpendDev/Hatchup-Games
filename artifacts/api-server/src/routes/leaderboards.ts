@@ -7,10 +7,10 @@ import {
 } from "@workspace/db";
 import { desc, eq, notInArray, gte, and } from "drizzle-orm";
 import { GetGlobalLeaderboardQueryParams, GetModeLeaderboardQueryParams } from "@workspace/api-zod";
-import { getHiddenPlayerIds } from "./safety";
-import { requireAuth, attachPlayer } from "../middlewares/auth";
-import { attachEntitlement } from "../services/subscriptionGuards";
-import { canAppearInScope } from "./locations";
+import { getHiddenPlayerIds } from "./safety.ts";
+import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { attachEntitlement } from "../services/subscriptionGuards.ts";
+import { canAppearInScope } from "./locations.ts";
 
 const router = Router();
 
@@ -142,7 +142,10 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, attachEntitlement,
   //   exact                 → every scope
   // This respects whatever the user set in /settings/privacy.
   const allPlayers = await db.query.playersTable.findMany();
-  const basePlayers = allPlayers.filter(p => canAppearInScope(p.locationVisibility, scope));
+  // Apply visibility policy (canAppearInScope) AND exclude minors entirely
+  // from people-discovery leaderboard surfaces — matches the rule applied on
+  // /players/nearby and /players/search.
+  const basePlayers = allPlayers.filter(p => canAppearInScope(p.locationVisibility, scope) && !p.isMinor);
 
   // Also exclude blocked/hidden users (block list applies to all scopes)
   const hiddenIds = req.playerId ? await getHiddenPlayerIds(req.playerId) : [];

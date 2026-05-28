@@ -104,11 +104,22 @@ router.get("/players/search", requireAuth, attachPlayer, async (req, res) => {
       )
     : or(ilike(playersTable.username, needle), ilike(playersTable.displayName, needle));
 
-  const rows = await db.query.playersTable.findMany({
+  // Pull a larger candidate window so we still return up to `limit` results
+  // after the privacy filter removes blocked/hidden/minor accounts.
+  const rawRows = await db.query.playersTable.findMany({
     where: whereExpr,
-    limit,
+    limit: limit * 4,
     orderBy: (t, { asc }) => [asc(t.username)],
   });
+
+  // Apply the same canAppearInScope-style filtering used by /players/nearby:
+  //   - exclude users blocked by the viewer or who have blocked the viewer
+  //   - exclude visibility=hidden (they opted out of people-discovery surfaces)
+  //   - exclude minors entirely from people-discovery surfaces
+  const hiddenIds = viewerId ? new Set(await getHiddenPlayerIds(viewerId)) : new Set<number>();
+  const rows = rawRows
+    .filter(p => !hiddenIds.has(p.id) && p.locationVisibility !== "hidden" && !p.isMinor)
+    .slice(0, limit);
 
   // Compute shared groups (viewer ∩ each match) so the invite picker can
   // surface "Also in <group> with you" — same trust signal as the social
