@@ -21,8 +21,47 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Bell, CheckCheck, Mail, Trophy, Clock, Sparkles, Users, Swords, Check, X, Loader2, ShieldAlert, ShieldCheck, BadgeCheck, Apple, Crown, Medal } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { usePlayer } from "@/lib/playerContext";
+
+type CategoryFilter = "all" | "moderation" | "recaps" | "tournaments" | "clubs" | "artifacts";
+
+const CATEGORY_FILTER_VALUES: readonly CategoryFilter[] = [
+  "all",
+  "moderation",
+  "recaps",
+  "tournaments",
+  "clubs",
+  "artifacts",
+] as const;
+
+function inboxPrefsStorageKey(playerId: number | null): string | null {
+  if (playerId == null) return null;
+  return `hatchup:notifications:prefs:${playerId}`;
+}
+
+type StoredInboxPrefs = {
+  categoryFilter: CategoryFilter;
+  unreadOnly: boolean;
+};
+
+function readStoredInboxPrefs(playerId: number | null): StoredInboxPrefs | null {
+  const key = inboxPrefsStorageKey(playerId);
+  if (!key || typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StoredInboxPrefs>;
+    const categoryFilter = CATEGORY_FILTER_VALUES.includes(parsed.categoryFilter as CategoryFilter)
+      ? (parsed.categoryFilter as CategoryFilter)
+      : "all";
+    const unreadOnly = typeof parsed.unreadOnly === "boolean" ? parsed.unreadOnly : false;
+    return { categoryFilter, unreadOnly };
+  } catch {
+    return null;
+  }
+}
 
 const POLL_MS = 30_000;
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
@@ -113,10 +152,42 @@ export default function NotificationsPage() {
   const [busy, setBusy] = useState<{ key: BusyKey; action: "accept" | "decline" } | null>(null);
   const [tab, setTab] = useState<"all" | "invites">("all");
   const [inviteFilter, setInviteFilter] = useState<"all" | "challenge" | "rematch" | "club">("all");
-  const [categoryFilter, setCategoryFilter] = useState<
-    "all" | "moderation" | "recaps" | "tournaments" | "clubs" | "artifacts"
-  >("all");
+  const { playerId } = usePlayer();
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [prefsHydratedFor, setPrefsHydratedFor] = useState<number | null>(null);
+
+  // Hydrate from localStorage once we know which player is viewing. Defaults
+  // ("All" + unread off) stay in place for first-time users.
+  useEffect(() => {
+    if (playerId == null) return;
+    if (prefsHydratedFor === playerId) return;
+    const stored = readStoredInboxPrefs(playerId);
+    if (stored) {
+      setCategoryFilter(stored.categoryFilter);
+      setUnreadOnly(stored.unreadOnly);
+    } else {
+      setCategoryFilter("all");
+      setUnreadOnly(false);
+    }
+    setPrefsHydratedFor(playerId);
+  }, [playerId, prefsHydratedFor]);
+
+  // Persist after hydration so we never overwrite stored prefs with defaults.
+  useEffect(() => {
+    if (playerId == null) return;
+    if (prefsHydratedFor !== playerId) return;
+    const key = inboxPrefsStorageKey(playerId);
+    if (!key || typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        key,
+        JSON.stringify({ categoryFilter, unreadOnly }),
+      );
+    } catch {
+      // Ignore quota/serialization errors — prefs are best-effort.
+    }
+  }, [playerId, prefsHydratedFor, categoryFilter, unreadOnly]);
 
   const listParams = unreadOnly ? { limit: 50, unread: true } : { limit: 50 };
   const { data, isLoading } = useListNotifications(listParams, {
