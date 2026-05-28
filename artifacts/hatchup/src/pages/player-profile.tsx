@@ -8,7 +8,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { motion, Reorder } from "framer-motion";
 import { usePlayer } from "@/lib/playerContext";
 import { toast } from "@/hooks/use-toast";
-import { BadgeCheck, Flame, Trophy, Sparkles, ArrowLeft, Settings, GripVertical, X, Plus, Lock, BarChart3, Eye, Heart, MessageCircle, Repeat2, Crown, Ban } from "lucide-react";
+import { BadgeCheck, Flame, Trophy, Sparkles, ArrowLeft, Settings, GripVertical, X, Plus, Lock, BarChart3, Eye, Heart, MessageCircle, Repeat2, Crown, Ban, Swords, ChevronRight } from "lucide-react";
 import { useGetMyPostInsights, getGetMyPostInsightsQueryKey } from "@workspace/api-client-react";
 import type { PostInsight } from "@workspace/api-client-react";
 import { useSubscription } from "@/lib/subscription";
@@ -213,6 +213,9 @@ export default function PlayerProfilePage() {
         ) : (
           <>
             <ProfileHeader profile={profile} viewerIsAdmin={viewerIsAdmin} />
+            {!isOwnProfile && viewerId && (
+              <RivalryCard viewerId={viewerId} opponentId={profileId} />
+            )}
             <ShowcaseStrip
               artifacts={profile.artifactShowcase}
               totalCount={profile.artifactCount}
@@ -276,6 +279,70 @@ function ProfileHeader({ profile, viewerIsAdmin }: { profile: PlayerProfile; vie
         <Stat icon={<Sparkles className="w-3.5 h-3.5" />} label="Artifacts" value={profile.artifactCount} />
       </div>
     </motion.div>
+  );
+}
+
+interface RivalrySummary {
+  totalBattles: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  viewerEloDelta: number;
+  lastBattleAt: string | null;
+}
+
+function RivalryCard({ viewerId, opponentId }: { viewerId: number; opponentId: number }) {
+  const { data } = useQuery<RivalrySummary>({
+    queryKey: ["rival-summary", viewerId, opponentId],
+    queryFn: () =>
+      fetch(`${BASE}/api/battles/rivals/${opponentId}`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : Promise.reject(new Error("Failed to load rivalry"))),
+    enabled: !!viewerId && opponentId > 0 && viewerId !== opponentId,
+  });
+
+  if (!data || data.totalBattles === 0) return null;
+
+  const { wins, losses, draws, viewerEloDelta, totalBattles } = data;
+  const eloLabel = viewerEloDelta > 0 ? `+${viewerEloDelta}` : `${viewerEloDelta}`;
+  const eloClass = viewerEloDelta > 0 ? "text-green-400" : viewerEloDelta < 0 ? "text-red-400" : "text-muted-foreground";
+
+  return (
+    <Link href={`/compete/rivals/${opponentId}`}>
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="block bg-card border border-border rounded-3xl p-4 hover:border-primary/60 transition-colors cursor-pointer"
+        data-testid="card-rivalry"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Swords className="w-4 h-4 text-primary" />
+            <h2 className="font-black text-base text-white">Head to Head</h2>
+          </div>
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        </div>
+        <div className="grid grid-cols-4 gap-2 mt-3">
+          <RivalStat label="Battles" value={String(totalBattles)} className="text-white" testId="rivalry-total" />
+          <RivalStat label="Wins" value={String(wins)} className="text-green-400" testId="rivalry-wins" />
+          <RivalStat label="Losses" value={String(losses)} className="text-red-400" testId="rivalry-losses" />
+          <RivalStat label="ELO" value={eloLabel} className={eloClass} testId="rivalry-elo" />
+        </div>
+        {draws > 0 && (
+          <p className="text-[10px] text-muted-foreground mt-2 text-center font-bold uppercase tracking-wider">
+            {draws} {draws === 1 ? "draw" : "draws"}
+          </p>
+        )}
+      </motion.div>
+    </Link>
+  );
+}
+
+function RivalStat({ label, value, className, testId }: { label: string; value: string; className: string; testId: string }) {
+  return (
+    <div className="bg-muted/30 rounded-2xl py-2 px-2 text-center" data-testid={testId}>
+      <p className="text-[9px] uppercase font-black tracking-wider text-muted-foreground mb-0.5">{label}</p>
+      <p className={`text-base font-black ${className}`}>{value}</p>
+    </div>
   );
 }
 
