@@ -6,6 +6,7 @@ import {
   groupChallengesTable,
   groupRaidsTable,
   groupMessagesTable,
+  notificationsTable,
   playersTable,
 } from "@workspace/db";
 import { eq, and, desc, sql, notInArray, inArray } from "drizzle-orm";
@@ -22,6 +23,10 @@ import { logFitnessActivity } from "../services/fitnessLog.ts";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { blockMinorSocialWrite } from "../middlewares/minorGuard.ts";
 import { blockSuspendedSocialWrite } from "../middlewares/suspendedGuard.ts";
+import { resolveMentionedPlayers } from "../services/mentions.ts";
+import { socialChannelsForPlayers } from "../services/socialNotifyPrefs.ts";
+import { sendPushToPlayer } from "../services/pushNotifications.ts";
+import { sendSocialEmail } from "../services/socialEmail.ts";
 
 const router = Router();
 
@@ -496,6 +501,47 @@ router.post("/groups/:id/messages", requireAuth, attachPlayer, blockSuspendedSoc
     content,
     isFiltered,
   }).returning();
+
+  // Fan-out club_mention notifications using a single batch query for all
+  // recipients instead of one query per recipient (N-query pattern avoided).
+  const mentioned = await resolveMentionedPlayers(content, req.playerId!);
+  if (mentioned.length > 0) {
+    const senderName = player?.displayName ?? player?.username ?? "Someone";
+    const snippet = content.slice(0, 80);
+    const link = `/groups/${params.data.id}`;
+    const title = "You were mentioned";
+    const body = `${senderName} mentioned you in a group: "${snippet}"`;
+
+    const channelMap = await socialChannelsForPlayers(
+      mentioned.map(m => m.id),
+      "club_mention",
+    );
+
+    for (const m of mentioned) {
+      const ch = channelMap.get(m.id) ?? null;
+      if (!ch || (!ch.inbox && !ch.push && !ch.email)) continue;
+      if (ch.inbox) {
+        void db.insert(notificationsTable).values({
+          playerId: m.id,
+          type: "club_mention",
+          title,
+          body,
+          link,
+          sourceId: req.playerId!,
+        });
+      }
+      if (ch.push) {
+        void sendPushToPlayer(m.id, {
+          title,
+          body,
+          link,
+          category: "social",
+          tag: `club-mention-${msg.id}-${m.id}`,
+        });
+      }
+      if (ch.email) void sendSocialEmail(m.id, { title, body, link });
+    }
+  }
 
   res.status(201).json({ ...msg, createdAt: msg.createdAt.toISOString() });
 });
