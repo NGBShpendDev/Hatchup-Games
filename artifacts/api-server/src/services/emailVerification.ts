@@ -2,9 +2,26 @@ import crypto from "node:crypto";
 import { db, playersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { isEmailConfigured, sendTransactionalEmail } from "./emailService.ts";
+import { isEmailBouncing, normalizeEmail } from "./bouncedEmails.ts";
 import { logger } from "../lib/logger.ts";
 
 export const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Result of attempting to issue a verification email.
+ *
+ * - `sent`: email handed off to provider successfully.
+ * - `skipped_unconfigured`: provider not wired up — token saved but no email sent.
+ * - `skipped_failed`: provider returned an error (logged) — token saved.
+ * - `bouncing`: address is on the bounce list, NO token issued, NO email sent.
+ *   Callers should surface this as a user-facing "email_bouncing" error so the
+ *   user knows to update their address.
+ */
+export type IssueVerificationResult =
+  | "sent"
+  | "skipped_unconfigured"
+  | "skipped_failed"
+  | "bouncing";
 
 function appOrigin(): string {
   const domain = (process.env.REPLIT_DOMAINS ?? "").split(",")[0]?.trim();
@@ -36,14 +53,29 @@ function renderVerificationEmailHtml(name: string, link: string): string {
 
 /**
  * Issue a fresh verification token for the player's current email and email
- * them a confirmation link. Best-effort: returns false (and logs) if email
- * isn't configured or the send fails, but never throws.
+ * them a confirmation link. Best-effort: logs and returns a non-"sent" status
+ * if email isn't configured or the send fails, but never throws.
+ *
+ * If the address is on the bounce list, the function short-circuits without
+ * issuing a token or touching the player row, and returns `"bouncing"`. This
+ * keeps us from burning sender reputation re-sending to a known-bad mailbox.
  */
 export async function issueEmailVerification(
   playerId: number,
   email: string,
   displayName: string | null,
-): Promise<boolean> {
+): Promise<IssueVerificationResult> {
+  // Bounce list check FIRST — never issue a token or hit the provider for an
+  // address that has been hard-bouncing. Doing it before the row update means
+  // we don't clobber an existing valid token either.
+  if (await isEmailBouncing(email)) {
+    logger.info(
+      { playerId, email: normalizeEmail(email) },
+      "refusing to issue verification — address is on bounce list",
+    );
+    return "bouncing";
+  }
+
   const token = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + VERIFICATION_TTL_MS);
 
@@ -58,14 +90,15 @@ export async function issueEmailVerification(
 
   if (!isEmailConfigured()) {
     logger.debug({ playerId }, "email verification token issued but provider not configured");
-    return false;
+    return "skipped_unconfigured";
   }
 
   const link = `${appOrigin()}/api/email/verify?token=${token}`;
   const html = renderVerificationEmailHtml(displayName ?? "", link);
-  return sendTransactionalEmail({
+  const ok = await sendTransactionalEmail({
     to: email,
     subject: "Confirm your HatchUp email",
     html,
   });
+  return ok ? "sent" : "skipped_failed";
 }

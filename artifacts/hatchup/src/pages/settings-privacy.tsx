@@ -261,6 +261,19 @@ export default function SettingsPrivacy() {
         });
         return;
       }
+      if (res.status === 400) {
+        const data = await res.json().catch(() => null);
+        if (data?.error === "email_bouncing") {
+          toast({
+            title: "Email keeps bouncing",
+            description: data.message ?? "That address has been rejecting our confirmation emails. Update your email to a different inbox.",
+            variant: "destructive",
+          });
+          return;
+        }
+        toast({ title: "Couldn't resend", description: data?.message ?? "Save your email first, then try again.", variant: "destructive" });
+        return;
+      }
       if (!res.ok) {
         const errBody = await res.json().catch(() => null);
         if (errBody?.error === "no_email_on_file") {
@@ -359,7 +372,13 @@ export default function SettingsPrivacy() {
             setEmailVerifiedAt(typeof data.emailVerifiedAt === "string" ? data.emailVerifiedAt : null);
           }
         }
-        if (data?.emailVerificationRateLimited) {
+        if (data?.emailVerificationBouncing) {
+          toast({
+            title: "Email keeps bouncing",
+            description: "We saved your address but couldn't send a confirmation — it has been rejecting our emails. Try a different inbox.",
+            variant: "destructive",
+          });
+        } else if (data?.emailVerificationRateLimited) {
           toast({
             title: "Email saved, confirmation throttled",
             description: "You've hit the limit of 3 confirmation emails per hour. Use Resend later to send a new link.",
@@ -378,6 +397,13 @@ export default function SettingsPrivacy() {
         if (data?.error === "Invalid email") {
           setEmailError("Please enter a valid email address.");
           toast({ title: "Invalid email", description: "Please enter a valid email address.", variant: "destructive" });
+        } else if (data?.error === "email_bouncing") {
+          setEmailError("That address has been bouncing our emails. Try a different inbox.");
+          toast({
+            title: "Email keeps bouncing",
+            description: data.message ?? "That address has been rejecting our confirmation emails. Try a different inbox.",
+            variant: "destructive",
+          });
         } else {
           toast({ title: "Error", description: data?.message ?? data?.error ?? "Could not save settings.", variant: "destructive" });
         }

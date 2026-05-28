@@ -46,3 +46,28 @@ export const moderationAuditLogTable = pgTable("moderation_audit_log", {
 export const insertModerationAuditLogSchema = createInsertSchema(moderationAuditLogTable).omit({ id: true, createdAt: true });
 export type InsertModerationAuditLog = z.infer<typeof insertModerationAuditLogSchema>;
 export type ModerationAuditLog = typeof moderationAuditLogTable.$inferSelect;
+
+// Bounced / undeliverable email addresses reported by the provider webhook.
+// `issueEmailVerification` consults this list and refuses to send another
+// confirmation to an address that is on it, protecting our sender reputation.
+// The address is normalized (trimmed + lowercased) at write time so lookups
+// are simple equality checks.
+export const bouncedEmailsTable = pgTable("bounced_emails", {
+  id: serial("id").primaryKey(),
+  // Lowercased, trimmed email address. Unique so the webhook can upsert.
+  email: text("email").notNull().unique(),
+  // "hard" / "soft" / "complaint" / "unknown" — kept as text so a future
+  // provider's vocabulary doesn't force a schema migration.
+  bounceType: text("bounce_type").notNull().default("hard"),
+  // Free-form provider-supplied reason (smtp message, etc). Useful for
+  // diagnostics when a user reports they can't get verification emails.
+  reason: text("reason"),
+  // Source identifier for the bounce — e.g. "resend.webhook" or "manual".
+  source: text("source").notNull().default("resend.webhook"),
+  bouncedAt: timestamp("bounced_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertBouncedEmailSchema = createInsertSchema(bouncedEmailsTable).omit({ id: true, createdAt: true });
+export type InsertBouncedEmail = z.infer<typeof insertBouncedEmailSchema>;
+export type BouncedEmail = typeof bouncedEmailsTable.$inferSelect;

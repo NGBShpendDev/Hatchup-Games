@@ -57,7 +57,7 @@ const state = {
   callerClerkId: "u_caller",
   players: [] as PlayerRow[],
   issueCalls: [] as IssueCall[],
-  issueResult: true,
+  issueResult: "sent" as "sent" | "skipped_unconfigured" | "skipped_failed" | "bouncing",
   issueThrows: false,
 };
 
@@ -65,7 +65,7 @@ function resetState() {
   state.callerClerkId = "u_caller";
   state.players = [];
   state.issueCalls = [];
-  state.issueResult = true;
+  state.issueResult = "sent";
   state.issueThrows = false;
 }
 
@@ -117,7 +117,7 @@ mock.module("../../services/emailVerification.ts", {
       playerId: number,
       email: string,
       displayName: string | null,
-    ): Promise<boolean> => {
+    ): Promise<typeof state.issueResult> => {
       state.issueCalls.push({ playerId, email, displayName });
       if (state.issueThrows) throw new Error("boom");
       return state.issueResult;
@@ -216,6 +216,20 @@ mock.module("@workspace/db", {
     },
     blockedUsersTable: { blockerId: {}, blockedId: {}, createdAt: {} },
     moderationAuditLogTable: { id: {}, actorId: {}, action: {}, targetPlayerId: {}, targetReportId: {}, reason: {}, metadata: {}, createdAt: {} },
+    bouncedEmailsTable: { id: {}, email: {} },
+  },
+});
+
+// Stub the bounce-list helpers so the patch / resend routes don't try to
+// hit the (mocked-out) DB through unconfigured query paths. These tests
+// cover the non-bouncing happy path; dedicated coverage for bounce-blocked
+// behavior lives in `bouncedEmails.test.ts`.
+mock.module("../../services/bouncedEmails.ts", {
+  namedExports: {
+    isEmailBouncing: async () => false,
+    recordEmailBounce: async () => false,
+    clearEmailBounce: async () => false,
+    normalizeEmail: (s: string) => s.trim().toLowerCase(),
   },
 });
 

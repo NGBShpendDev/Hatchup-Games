@@ -6,6 +6,7 @@ import type { SQL } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { emailResendLimiter, consumeEmailResendBudget } from "../middlewares/rateLimiters.ts";
 import { issueEmailVerification } from "../services/emailVerification.ts";
+import { isEmailBouncing, recordEmailBounce, clearEmailBounce } from "../services/bouncedEmails.ts";
 
 const router = Router();
 
@@ -547,6 +548,16 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
       }
     } else if (typeof raw === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw.trim())) {
       const normalized = raw.trim().toLowerCase();
+      // Refuse to even save an address that's on the bounce list — there's no
+      // point storing it since every send will be skipped. The user gets a
+      // clear `email_bouncing` error so they know to pick another address.
+      if (await isEmailBouncing(normalized)) {
+        res.status(400).json({
+          error: "email_bouncing",
+          message: "That address has been bouncing our confirmation emails. Please use a different inbox.",
+        });
+        return;
+      }
       updates.email = normalized;
       if (normalized !== (current.email ?? null)) {
         // Address changed — clear any prior verification. issueEmailVerification
@@ -612,6 +623,7 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
   // unverified state with no usable token.
   let verificationSent = false;
   let verificationRateLimited = false;
+  let verificationBouncing = false;
   if (newEmailToVerify) {
     // Share the per-player budget with POST /email/resend-verification so a
     // noisy client can't bypass the cap by toggling the email field on PATCH.
@@ -623,11 +635,13 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
       verificationRateLimited = true;
     } else {
       try {
-        verificationSent = await issueEmailVerification(
+        const result = await issueEmailVerification(
           urlId,
           newEmailToVerify,
           updated.displayName ?? updated.username,
         );
+        verificationSent = result === "sent";
+        verificationBouncing = result === "bouncing";
       } catch (err) {
         req.log.warn({ err, playerId: urlId }, "failed to issue email verification");
       }
@@ -643,6 +657,7 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     emailVerifiedAt: updated.emailVerifiedAt?.toISOString() ?? null,
     emailVerificationSent: verificationSent,
     emailVerificationRateLimited: verificationRateLimited,
+    emailVerificationBouncing: verificationBouncing,
     notifyRecapEmail: updated.notifyRecapEmail,
     notifyChampionEmail: updated.notifyChampionEmail,
     notifyRecapPush: updated.notifyRecapPush,
@@ -700,16 +715,120 @@ router.post("/email/resend-verification", requireAuth, attachPlayer, emailResend
     return;
   }
   try {
-    const sent = await issueEmailVerification(
+    const result = await issueEmailVerification(
       player.id,
       player.email,
       player.displayName ?? player.username,
     );
-    res.json({ alreadyVerified: false, sent });
+    if (result === "bouncing") {
+      // Bounce list short-circuited the send. Tell the user clearly so they
+      // can update their email instead of retrying into the void.
+      res.status(400).json({
+        error: "email_bouncing",
+        message: "That address has been bouncing our confirmation emails. Update your email in privacy settings to use a different inbox.",
+      });
+      return;
+    }
+    res.json({ alreadyVerified: false, sent: result === "sent" });
   } catch (err) {
     req.log.error(err, "resend email verification failed");
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+// POST /api/email/bounce-webhook
+// Resend-compatible webhook endpoint. The provider POSTs JSON like:
+//   { type: "email.bounced", data: { to: ["a@b.com"], bounce: { type: "hard", message: "..." } } }
+//   { type: "email.complained", data: { to: ["a@b.com"] } }
+// We authenticate via a shared secret in the `x-webhook-secret` header
+// (configured both on the provider and in `RESEND_WEBHOOK_SECRET`). Anything
+// without a configured secret rejects with 401 so we don't accidentally
+// accept anonymous writes to the bounce list.
+router.post("/email/bounce-webhook", async (req, res) => {
+  const expected = process.env.RESEND_WEBHOOK_SECRET;
+  if (!expected) {
+    req.log.warn("bounce webhook hit but RESEND_WEBHOOK_SECRET is not configured");
+    res.status(401).json({ error: "webhook_not_configured" });
+    return;
+  }
+  const provided = req.headers["x-webhook-secret"];
+  const providedStr = Array.isArray(provided) ? provided[0] : provided;
+  if (providedStr !== expected) {
+    res.status(401).json({ error: "invalid_signature" });
+    return;
+  }
+
+  const body = req.body as {
+    type?: unknown;
+    data?: {
+      to?: unknown;
+      email?: unknown;
+      bounce?: { type?: unknown; message?: unknown; subType?: unknown } | null;
+    } | null;
+  } | null;
+  const eventType = typeof body?.type === "string" ? body.type : "";
+
+  // Map provider event types to our internal bounce categories. We only
+  // persist durable failures — soft/transient bounces are filtered inside
+  // `recordEmailBounce`.
+  let bounceType: string | null = null;
+  if (eventType === "email.bounced") {
+    const providerType = typeof body?.data?.bounce?.type === "string"
+      ? body.data.bounce.type.toLowerCase()
+      : "hard";
+    bounceType = providerType;
+  } else if (eventType === "email.complained" || eventType === "email.complaint") {
+    bounceType = "complaint";
+  }
+  if (!bounceType) {
+    // Other event types (delivered, opened, clicked, ...) are acknowledged
+    // but not acted on. 200 keeps the provider from retrying.
+    res.json({ ignored: true });
+    return;
+  }
+
+  // Provider sends `to` as an array of strings; older payloads use `email`.
+  const rawTo = body?.data?.to;
+  const recipients: string[] = Array.isArray(rawTo)
+    ? rawTo.filter((x): x is string => typeof x === "string")
+    : typeof body?.data?.email === "string"
+      ? [body.data.email]
+      : [];
+  const reason = typeof body?.data?.bounce?.message === "string"
+    ? body.data.bounce.message.slice(0, 500)
+    : null;
+
+  let recorded = 0;
+  for (const addr of recipients) {
+    const ok = await recordEmailBounce({
+      email: addr,
+      bounceType,
+      reason,
+      source: "resend.webhook",
+    });
+    if (ok) recorded += 1;
+  }
+  req.log.info({ eventType, recorded, total: recipients.length }, "bounce webhook processed");
+  res.json({ received: true, recorded });
+});
+
+// POST /api/email/bounce-clear
+// Admin escape hatch: wipe an address from the bounce list (e.g. after a user
+// reports the bounce was a transient outage). Admin-only.
+router.post("/email/bounce-clear", requireAuth, attachPlayer, async (req, res) => {
+  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!caller?.isAdmin) {
+    res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+  const body = req.body as { email?: unknown };
+  const email = typeof body.email === "string" ? body.email : "";
+  if (!email) {
+    res.status(400).json({ error: "email is required" });
+    return;
+  }
+  const cleared = await clearEmailBounce(email);
+  res.json({ cleared });
 });
 
 // ── Admin: list suspended accounts ──────────────────────────────────────────
