@@ -385,6 +385,8 @@ export interface LogActivityInput {
   value: number;
   note?: string;
   groupId?: number;
+  /** Optional distance in miles (for running/cycling pace tracking) */
+  distanceMiles?: number;
 }
 
 export type ActivityLogResultPrResult = {
@@ -807,8 +809,17 @@ limit?: number;
 };
 
 export type GetSpeedLeaderboardParams = {
+mode?: GetSpeedLeaderboardMode;
 limit?: number;
 };
+
+export type GetSpeedLeaderboardMode = typeof GetSpeedLeaderboardMode[keyof typeof GetSpeedLeaderboardMode];
+
+
+export const GetSpeedLeaderboardMode = {
+  steps: 'steps',
+  pace: 'pace',
+} as const;
 
 export type ListItemsParams = {
 category?: string;

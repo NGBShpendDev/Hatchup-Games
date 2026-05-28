@@ -1957,7 +1957,7 @@ export const getGetSpeedLeaderboardUrl = (params?: GetSpeedLeaderboardParams,) =
 }
 
 /**
- * @summary Get speed/fitness leaderboard ranked by total steps and reps
+ * @summary Get speed/fitness leaderboard (mode=steps for top daily steps, mode=pace for fastest runners)
  */
 export const getSpeedLeaderboard = async (params?: GetSpeedLeaderboardParams, options?: RequestInit): Promise<SpeedLeaderboardEntry[]> => {
 
@@ -2004,7 +2004,7 @@ export type GetSpeedLeaderboardQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Get speed/fitness leaderboard ranked by total steps and reps
+ * @summary Get speed/fitness leaderboard (mode=steps for top daily steps, mode=pace for fastest runners)
  */
 
 export function useGetSpeedLeaderboard<TData = Awaited<ReturnType<typeof getSpeedLeaderboard>>, TError = ErrorType<unknown>>(

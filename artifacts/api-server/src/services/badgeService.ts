@@ -162,7 +162,7 @@ export async function checkAndAwardBadges(playerId: number, triggers: {
   // Running triggers
   cumulativeRunMiles?: number;
   monthlyRunMiles?: number;
-  paceMinsPerMile?: number;
+  paceSecsPerMile?: number;
 }): Promise<BadgeDefinition[]> {
   const awarded: BadgeDefinition[] = [];
   const tryAward = async (key: string) => {
@@ -175,7 +175,7 @@ export async function checkAndAwardBadges(playerId: number, triggers: {
     hatchlingCount, hasEvolved, hasMythicHatchling, hasPrestige,
     activityHour, hasNamedDragon, dailyRewardStreak,
     totalReps, lifetimePushups, lifetimeSquats, sessionReps, activityType,
-    cumulativeRunMiles, monthlyRunMiles, paceMinsPerMile,
+    cumulativeRunMiles, monthlyRunMiles, paceSecsPerMile,
   } = triggers;
 
   if (totalSteps !== undefined) {
@@ -238,9 +238,9 @@ export async function checkAndAwardBadges(playerId: number, triggers: {
   if (monthlyRunMiles !== undefined) {
     if (monthlyRunMiles >= 50) await tryAward("ENDURANCE_KING"); // 50+ miles in a month
   }
-  if (paceMinsPerMile !== undefined) {
-    if (paceMinsPerMile < 8)  await tryAward("SPEED_DEMON");
-    if (paceMinsPerMile < 6)  await tryAward("SUB_6_MILE");
+  if (paceSecsPerMile !== undefined) {
+    if (paceSecsPerMile < 480) await tryAward("SPEED_DEMON");  // sub-8 min/mile = 480 sec
+    if (paceSecsPerMile < 360) await tryAward("SUB_6_MILE");   // sub-6 min/mile = 360 sec
   }
 
   return awarded;

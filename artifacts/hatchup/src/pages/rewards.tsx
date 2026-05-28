@@ -6,9 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, Star, Flame, Zap, Gift, Lock, CheckCircle2, Crown, TrendingUp, Dumbbell, Footprints } from "lucide-react";
+import { Trophy, Star, Flame, Zap, Gift, Lock, CheckCircle2, Crown, TrendingUp, Dumbbell, Footprints, Timer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 
 const TIER_COLORS: Record<string, string> = {
   Common:    "from-gray-500 to-gray-400 border-gray-400",
@@ -118,6 +119,37 @@ export default function Rewards() {
   const filteredBadges = badges.filter(b =>
     activeCategory === "all" || b.category === activeCategory
   );
+
+  const { data: recordsData } = useQuery<any>({
+    queryKey: ["my-records", playerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/records/${playerId}`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!playerId,
+  });
+
+  const topPrs: { label: string; value: string; icon: React.ReactNode }[] = [];
+  if (recordsData?.records) {
+    const prs = recordsData.records as any[];
+    const strengthPr = prs.find((r: any) => r.metric === "reps");
+    const runPr = prs.find((r: any) => r.metric === "pace_seconds_per_mile");
+    const cyclingPr = prs.find((r: any) => r.metric === "speed_mph_x10");
+    if (strengthPr) {
+      topPrs.push({ label: `${strengthPr.activityType} PR`, value: `${strengthPr.value} reps`, icon: <Dumbbell className="w-4 h-4 text-primary" /> });
+    }
+    if (runPr) {
+      const s = runPr.value;
+      topPrs.push({ label: "Best Mile Pace", value: `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")} /mi`, icon: <Timer className="w-4 h-4 text-blue-400" /> });
+    }
+    if (cyclingPr) {
+      topPrs.push({ label: "Best Cycling Speed", value: `${(cyclingPr.value / 10).toFixed(1)} mph`, icon: <Zap className="w-4 h-4 text-yellow-400" /> });
+    }
+  }
+  if (recordsData?.strengthTotals?.totalReps) {
+    topPrs.push({ label: "Lifetime Reps", value: recordsData.strengthTotals.totalReps.toLocaleString(), icon: <Footprints className="w-4 h-4 text-orange-400" /> });
+  }
 
   const earnedCount = badges.filter(b => earnedKeys.has(b.key)).length;
 

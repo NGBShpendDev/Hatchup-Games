@@ -50,6 +50,7 @@ export type LogActivityParams = {
   note?: string | null;
   externalId?: string | null;
   isPassiveSync?: boolean;
+  distanceMiles?: number | null;
 };
 
 export type PrResult = {
@@ -133,7 +134,7 @@ async function getMonthlyRunMiles(playerId: number): Promise<number> {
 export async function logFitnessActivity(
   params: LogActivityParams,
 ): Promise<LogActivityResult> {
-  const { playerId, type, value, note, externalId, isPassiveSync } = params;
+  const { playerId, type, value, note, externalId, isPassiveSync, distanceMiles } = params;
 
   if (externalId) {
     const existing = await db.query.fitnessActivitiesTable.findFirst({
@@ -266,26 +267,28 @@ export async function logFitnessActivity(
   if (isStrength) {
     // Track best reps in a single session per exercise
     prResult = await detectAndSavePr(playerId, type, "reps", value, true);
-  } else if (type === "running") {
-    // Track best single running session (minutes = proxy for distance)
-    prResult = await detectAndSavePr(playerId, "running", "session_minutes", value, true);
-  } else if (type === "cycling") {
-    // Track best single cycling session
-    prResult = await detectAndSavePr(playerId, "cycling", "session_minutes", value, true);
+  } else if (type === "running" && distanceMiles && distanceMiles > 0) {
+    // Compute actual pace in seconds per mile (lower = faster = better PR)
+    const paceSecondsPerMile = Math.round((value * 60) / distanceMiles);
+    prResult = await detectAndSavePr(playerId, "running", "pace_seconds_per_mile", paceSecondsPerMile, false);
+  } else if (type === "cycling" && distanceMiles && distanceMiles > 0) {
+    // Compute speed in mph × 10 (higher = faster = better PR)
+    const speedMphX10 = Math.round((distanceMiles / value) * 60 * 10);
+    prResult = await detectAndSavePr(playerId, "cycling", "speed_mph_x10", speedMphX10, true);
   }
 
   // Compute cumulative and monthly running miles for badge checks
   let cumulativeRunMiles: number | undefined;
   let monthlyRunMiles: number | undefined;
+  let paceSecsPerMile: number | undefined;
   if (type === "running") {
     cumulativeRunMiles = await getCumulativeRunMiles(playerId);
     monthlyRunMiles = await getMonthlyRunMiles(playerId);
+    // Only award pace badges when actual distance was provided
+    if (distanceMiles && distanceMiles > 0) {
+      paceSecsPerMile = Math.round((value * 60) / distanceMiles);
+    }
   }
-
-  // Estimate pace badge based on session effort (longer sustained run → better endurance)
-  // >= 60 min session proxy for sub-6 min/mile effort; >= 45 min for sub-8 min/mile
-  const runPaceBadgeTrigger =
-    type === "running" ? (value >= 60 ? 5.9 : value >= 45 ? 7.9 : undefined) : undefined;
 
   // Check and award badges
   const activityHour = new Date().getHours();
@@ -301,7 +304,7 @@ export async function logFitnessActivity(
     activityType: type,
     cumulativeRunMiles,
     monthlyRunMiles,
-    paceMinsPerMile: runPaceBadgeTrigger,
+    paceSecsPerMile,
   });
 
   return {

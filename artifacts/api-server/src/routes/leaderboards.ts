@@ -137,41 +137,64 @@ router.get("/leaderboards/speed", requireAuth, attachPlayer, async (req, res) =>
   const hiddenIds = req.playerId ? await getHiddenPlayerIds(req.playerId) : [];
 
   if (mode === "pace") {
-    // Best single running session ranked by session_minutes PR (longer = better endurance)
+    // Fastest pace per mile (lower seconds/mile = better) from personal_records
     const runPrs = await db.query.personalRecordsTable.findMany({
       where: and(
         eq(personalRecordsTable.activityType, "running"),
-        eq(personalRecordsTable.metric, "session_minutes"),
+        eq(personalRecordsTable.metric, "pace_seconds_per_mile"),
       ),
     });
 
-    // Sort and limit
-    const sorted = runPrs
-      .sort((a, b) => b.value - a.value)
-      .slice(0, limit * 2); // fetch extras to account for blocked players
-
-    const playerIds = sorted.map(r => r.playerId);
     const players = await db.query.playersTable.findMany();
     const playerMap = Object.fromEntries(players.map(p => [p.id, p]));
 
-    const result = sorted
+    // Sort ascending (lower pace = faster)
+    const sorted = runPrs
       .filter(r => !hiddenIds.includes(r.playerId))
-      .slice(0, limit)
-      .map((r, i) => {
-        const p = playerMap[r.playerId];
-        return {
+      .sort((a, b) => a.value - b.value)
+      .slice(0, limit);
+
+    const result = sorted.map((r, i) => {
+      const p = playerMap[r.playerId];
+      const totalSecs = r.value;
+      const mins = Math.floor(totalSecs / 60);
+      const secs = totalSecs % 60;
+      const paceLabel = `${mins}:${String(secs).padStart(2, "0")} /mi`;
+      return {
+        position: i + 1,
+        playerId: r.playerId,
+        username: p?.username ?? "Unknown",
+        displayName: p?.displayName ?? null,
+        avatarUrl: p?.avatarUrl ?? null,
+        rank: p?.rank ?? "Bronze",
+        metricValue: r.value,
+        metricLabel: paceLabel,
+        achievedAt: r.achievedAt.toISOString(),
+        currentStreak: p?.currentStreak ?? 0,
+      };
+    });
+
+    if (result.length === 0) {
+      // Fallback: show players sorted by total steps if no pace PRs exist yet
+      const fallback = players
+        .filter(p => !hiddenIds.includes(p.id))
+        .sort((a, b) => b.totalSteps - a.totalSteps)
+        .slice(0, limit)
+        .map((p, i) => ({
           position: i + 1,
-          playerId: r.playerId,
-          username: p?.username ?? "Unknown",
-          displayName: p?.displayName ?? null,
-          avatarUrl: p?.avatarUrl ?? null,
-          rank: p?.rank ?? "Bronze",
-          metricValue: r.value,
-          metricLabel: `${r.value} min run`,
-          achievedAt: r.achievedAt.toISOString(),
-          currentStreak: p?.currentStreak ?? 0,
-        };
-      });
+          playerId: p.id,
+          username: p.username,
+          displayName: p.displayName ?? null,
+          avatarUrl: p.avatarUrl ?? null,
+          rank: p.rank,
+          metricValue: p.totalSteps,
+          metricLabel: "No pace data yet",
+          achievedAt: new Date().toISOString(),
+          currentStreak: p.currentStreak,
+        }));
+      res.json(fallback);
+      return;
+    }
 
     res.json(result);
     return;

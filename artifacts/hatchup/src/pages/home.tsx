@@ -54,6 +54,7 @@ export default function Home() {
   const [repMode, setRepMode] = useState(false);
   const [repType, setRepType] = useState("pushups");
   const [repCount, setRepCount] = useState(10);
+  const [distanceMiles, setDistanceMiles] = useState("");
   const [levelUpShow, setLevelUpShow] = useState(false);
   const [levelUpData, setLevelUpData] = useState<{ level: number; newBadges: any[] }>({ level: 1, newBadges: [] });
   const [xpPopups, setXpPopups] = useState<{ id: number; amount: number }[]>([]);
@@ -72,9 +73,11 @@ export default function Home() {
     if (repMode && (repCount < 1)) return;
 
     const prevLevel = (dashboard as any)?.levelProgress?.level ?? 1;
+    const parsedDistance = distanceMiles ? parseFloat(distanceMiles) : undefined;
+    const hasDistance = parsedDistance && parsedDistance > 0 && (type === "running" || type === "cycling");
 
     logActivity.mutate(
-      { data: { playerId: pid, type, value } },
+      { data: { playerId: pid, type, value, distanceMiles: hasDistance ? parsedDistance : undefined } },
       {
         onSuccess: (res) => {
           const xpEarned = (res as any).xpEarned ?? (res as any).fitnessXpEarned ?? 0;
@@ -82,12 +85,18 @@ export default function Home() {
           setLogModalOpen(false);
           setActivityValue("");
           setRepCount(10);
+          setDistanceMiles("");
 
           const prResult = (res as any).prResult;
           if (prResult?.isNew) {
+            const paceDesc = prResult.metric === "pace_seconds_per_mile"
+              ? (() => { const s = prResult.value; return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")} /mi pace`; })()
+              : prResult.metric === "speed_mph_x10"
+              ? `${(prResult.value / 10).toFixed(1)} mph avg`
+              : `${prResult.value} reps`;
             toast({
               title: "🏆 New Personal Record!",
-              description: `${REP_TYPE_LABELS[prResult.activityType] ?? prResult.activityType}: ${prResult.value} reps`,
+              description: `${REP_TYPE_LABELS[prResult.activityType] ?? prResult.activityType}: ${paceDesc}`,
             });
           } else {
             toast({ title: "Activity Logged! 🔥", description: "Keep moving, your Pals are thriving!" });
@@ -291,7 +300,7 @@ export default function Home() {
           {/* Log Activity Dialog */}
           <Dialog open={logModalOpen} onOpenChange={(open) => {
             setLogModalOpen(open);
-            if (!open) { setRepMode(false); setRepCount(10); setActivityValue(""); }
+            if (!open) { setRepMode(false); setRepCount(10); setActivityValue(""); setDistanceMiles(""); }
           }}>
             <DialogTrigger asChild>
               <Card className="bg-card border-2 hover:border-accent/50 transition-colors cursor-pointer group active-elevate h-full">
@@ -358,6 +367,21 @@ export default function Home() {
                       className="h-14 text-xl font-bold font-mono"
                     />
                   </div>
+                  {(activityType === "running" || activityType === "cycling") && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1">
+                        Distance (miles) <span className="text-muted-foreground font-normal">— optional, enables pace PR tracking</span>
+                      </label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={distanceMiles}
+                        onChange={e => setDistanceMiles(e.target.value)}
+                        placeholder="e.g. 3.1"
+                        className="h-10 font-bold font-mono"
+                      />
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Rep Counter Mode */

@@ -532,8 +532,14 @@ paths:
     get:
       operationId: getSpeedLeaderboard
       tags: [leaderboards]
-      summary: Get speed/fitness leaderboard ranked by total steps and reps
+      summary: Get speed/fitness leaderboard (mode=steps for top daily steps, mode=pace for fastest runners)
       parameters:
+        - name: mode
+          in: query
+          schema:
+            type: string
+            enum: [steps, pace]
+            default: steps
         - name: limit
           in: query
           schema:
@@ -1802,11 +1808,12 @@ components:
       type: object
       required: [playerId, type, value]
       properties:
-        playerId: { type: integer }
-        type:     { type: string }
-        value:    { type: integer }
-        note:     { type: string }
-        groupId:  { type: integer }
+        playerId:      { type: integer }
+        type:          { type: string }
+        value:         { type: integer }
+        note:          { type: string }
+        groupId:       { type: integer }
+        distanceMiles: { type: number, description: "Optional distance in miles (for running/cycling pace tracking)" }
 
     ActivityLogResult:
       type: object

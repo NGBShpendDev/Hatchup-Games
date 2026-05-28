@@ -177,6 +177,7 @@ router.post("/fitness/log", requireAuth, attachPlayer, requirePlayerOwnership, a
     value: body.data.value,
     note: body.data.note ?? null,
     isPassiveSync: false,
+    distanceMiles: body.data.distanceMiles ?? null,
   });
 
   if (!result.updatedPlayer) {

@@ -753,11 +753,13 @@ export const GetModeLeaderboardResponse = zod.array(GetModeLeaderboardResponseIt
 
 
 /**
- * @summary Get speed/fitness leaderboard ranked by total steps and reps
+ * @summary Get speed/fitness leaderboard (mode=steps for top daily steps, mode=pace for fastest runners)
  */
+export const getSpeedLeaderboardQueryModeDefault = `steps`;
 export const getSpeedLeaderboardQueryLimitDefault = 25;
 
 export const GetSpeedLeaderboardQueryParams = zod.object({
+  "mode": zod.enum(['steps', 'pace']).default(getSpeedLeaderboardQueryModeDefault),
   "limit": zod.coerce.number().default(getSpeedLeaderboardQueryLimitDefault)
 })
 
@@ -1162,7 +1164,8 @@ export const LogActivityBody = zod.object({
   "type": zod.string(),
   "value": zod.number(),
   "note": zod.string().optional(),
-  "groupId": zod.number().optional()
+  "groupId": zod.number().optional(),
+  "distanceMiles": zod.number().optional().describe('Optional distance in miles (for running\/cycling pace tracking)')
 })
 
 
