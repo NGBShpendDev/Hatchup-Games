@@ -20,6 +20,7 @@ import { startWeeklyNutritionRecapJob } from "./services/weeklyNutritionRecapJob
 import { startPostPurgeJob } from "./services/postPurgeJob.ts";
 import { startEmailVerificationSweepJob } from "./services/emailVerificationSweepJob.ts";
 import { WebhookHandlers } from "./webhookHandlers.ts";
+import { clerkOrIpKey } from "./middlewares/rateLimiters.ts";
 
 const app: Express = express();
 
@@ -56,11 +57,18 @@ app.use(
 );
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
+// Both the broad read and write limiters key on the authenticated identity
+// (player → clerk user → IP) so one noisy phone on a shared NAT (corporate
+// Wi-Fi, school networks, cellular CGNAT) can't 429 every other user on the
+// same egress IP. `attachPlayer` runs per-route, so at this point in the
+// pipeline `req.playerId` is unset and `clerkOrIpKey` resolves to the Clerk
+// user id for signed-in traffic and falls back to IP for true anons.
 const generalLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: clerkOrIpKey,
   message: { error: "Too many requests, please try again later." },
 });
 
@@ -69,6 +77,7 @@ const mutationLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: clerkOrIpKey,
   message: { error: "Too many write requests, please slow down." },
 });
 

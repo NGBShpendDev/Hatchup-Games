@@ -20,16 +20,17 @@ import { desc, eq, lt } from "drizzle-orm";
  */
 
 /** Key on the authenticated player id, falling back to the request IP. */
-const playerOrIpKey = (req: Request): string =>
+export const playerOrIpKey = (req: Request): string =>
   req.playerId != null ? `player:${req.playerId}` : ipKeyGenerator(req.ip ?? "");
 
 /**
  * Key generator for routes that allow anonymous traffic (e.g. post view
- * pings). Prefers `req.playerId` if `attachPlayer` ran, then the Clerk
- * user id from the global `clerkMiddleware` (so signed-in viewers behind
- * the same NAT don't block each other), then the request IP.
+ * pings) or run BEFORE `attachPlayer` (e.g. the global /api limiters).
+ * Prefers `req.playerId` if `attachPlayer` ran, then the Clerk user id
+ * from the global `clerkMiddleware` (so signed-in users behind the same
+ * NAT don't block each other), then the request IP.
  */
-const clerkOrIpKey = (req: Request): string => {
+export const clerkOrIpKey = (req: Request): string => {
   if (req.playerId != null) return `player:${req.playerId}`;
   try {
     const auth = getAuth(req);
