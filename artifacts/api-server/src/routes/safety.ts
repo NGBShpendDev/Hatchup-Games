@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { userReportsTable, blockedUsersTable, playersTable } from "@workspace/db";
 import { eq, and, desc, or, notInArray } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { emailResendLimiter, consumeEmailResendBudget } from "../middlewares/rateLimiters.ts";
 import { issueEmailVerification } from "../services/emailVerification.ts";
 
 const router = Router();
@@ -349,15 +350,26 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
   // send (e.g. provider unconfigured) still leaves the row in a consistent
   // unverified state with no usable token.
   let verificationSent = false;
+  let verificationRateLimited = false;
   if (newEmailToVerify) {
-    try {
-      verificationSent = await issueEmailVerification(
-        urlId,
-        newEmailToVerify,
-        updated.displayName ?? updated.username,
-      );
-    } catch (err) {
-      req.log.warn({ err, playerId: urlId }, "failed to issue email verification");
+    // Share the per-player budget with POST /email/resend-verification so a
+    // noisy client can't bypass the cap by toggling the email field on PATCH.
+    // We consume programmatically (rather than mounting the limiter) so the
+    // rest of the privacy update still commits if the implicit send is over
+    // the limit — the new address is saved and the user can hit the explicit
+    // Resend button later once the window resets.
+    if (!consumeEmailResendBudget({ playerId: req.playerId, ip: req.ip })) {
+      verificationRateLimited = true;
+    } else {
+      try {
+        verificationSent = await issueEmailVerification(
+          urlId,
+          newEmailToVerify,
+          updated.displayName ?? updated.username,
+        );
+      } catch (err) {
+        req.log.warn({ err, playerId: urlId }, "failed to issue email verification");
+      }
     }
   }
 
@@ -369,6 +381,7 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     email: updated.email,
     emailVerifiedAt: updated.emailVerifiedAt?.toISOString() ?? null,
     emailVerificationSent: verificationSent,
+    emailVerificationRateLimited: verificationRateLimited,
     notifyRecapEmail: updated.notifyRecapEmail,
     notifyChampionEmail: updated.notifyChampionEmail,
     notifyRecapPush: updated.notifyRecapPush,
@@ -411,7 +424,7 @@ router.get("/email/verify", async (req, res) => {
 
 // POST /api/email/resend-verification
 // Re-issues the verification email for the signed-in player's current address.
-router.post("/email/resend-verification", requireAuth, attachPlayer, async (req, res) => {
+router.post("/email/resend-verification", requireAuth, attachPlayer, emailResendLimiter, async (req, res) => {
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
   if (!player) {
     res.status(404).json({ error: "Player not found" });

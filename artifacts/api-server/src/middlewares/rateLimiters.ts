@@ -75,6 +75,52 @@ export const recapPreviewLimiter = rateLimit({
   message: { error: "You can only send one recap preview per hour." },
 });
 
+// Email verification resends: each send hits the player's inbox and burns
+// sender reputation if abused. Cap at 3/hour per authenticated player (falling
+// back to IP for unauthenticated edge cases). Covers both the explicit
+// POST /email/resend-verification and the implicit send fired from
+// PATCH /players/:id/privacy-settings when the email changes.
+const EMAIL_RESEND_WINDOW_MS = 60 * 60 * 1000;
+const EMAIL_RESEND_MAX = 3;
+const emailResendKey = (req: { playerId?: number; ip?: string }) =>
+  req.playerId ? `player:${req.playerId}` : `ip:${req.ip ?? "unknown"}`;
+
+export const emailResendLimiter = rateLimit({
+  windowMs: EMAIL_RESEND_WINDOW_MS,
+  max: EMAIL_RESEND_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => emailResendKey(req as { playerId?: number; ip?: string }),
+  message: {
+    error: "too_many_email_resends",
+    message: "You can only send 3 confirmation emails per hour. Please try again later.",
+  },
+});
+
+/**
+ * Programmatic check used by handlers that want to consume the same per-player
+ * resend budget without letting the rate limiter take over the response (e.g.
+ * PATCH /privacy-settings, which has other side effects we still want to
+ * commit even if the implicit email send is throttled).
+ *
+ * Lightweight in-memory bucket keyed identically to the express-rate-limit
+ * middleware above so totals are coherent across both call sites.
+ */
+const emailResendHits = new Map<string, number[]>();
+export function consumeEmailResendBudget(req: { playerId?: number; ip?: string }): boolean {
+  const key = emailResendKey(req);
+  const now = Date.now();
+  const cutoff = now - EMAIL_RESEND_WINDOW_MS;
+  const hits = (emailResendHits.get(key) ?? []).filter((t) => t > cutoff);
+  if (hits.length >= EMAIL_RESEND_MAX) {
+    emailResendHits.set(key, hits);
+    return false;
+  }
+  hits.push(now);
+  emailResendHits.set(key, hits);
+  return true;
+}
+
 // Body / meal scan uploads: expensive vision calls.
 export const scanLimiter = rateLimit({
   windowMs: 60 * 1000,

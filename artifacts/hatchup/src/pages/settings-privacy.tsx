@@ -222,6 +222,14 @@ export default function SettingsPrivacy() {
         method: "POST",
         credentials: "include",
       });
+      if (res.status === 429) {
+        toast({
+          title: "Slow down",
+          description: "You can only send 3 confirmation emails per hour. Please try again later.",
+          variant: "destructive",
+        });
+        return;
+      }
       if (!res.ok) {
         toast({ title: "Couldn't resend", description: "Save your email first, then try again.", variant: "destructive" });
         return;
@@ -311,7 +319,13 @@ export default function SettingsPrivacy() {
             setEmailVerifiedAt(typeof data.emailVerifiedAt === "string" ? data.emailVerifiedAt : null);
           }
         }
-        if (data?.emailVerificationSent) {
+        if (data?.emailVerificationRateLimited) {
+          toast({
+            title: "Email saved, confirmation throttled",
+            description: "You've hit the limit of 3 confirmation emails per hour. Use Resend later to send a new link.",
+            variant: "destructive",
+          });
+        } else if (data?.emailVerificationSent) {
           toast({
             title: "Confirm your email",
             description: `We sent a confirmation link to ${data.email}. Click it to start receiving recap emails.`,
