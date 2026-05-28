@@ -1,9 +1,11 @@
 import { Feather } from "@expo/vector-icons";
-import { useGetPlayer, useGetFitnessStats, useGetPlayerSocialProfile } from "@workspace/api-client-react";
+import { useGetPlayer, useGetFitnessStats, useGetPlayerSocialProfile, useGetDailyStreak, useBuyStreakShield, getGetDailyStreakQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -15,6 +17,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+
+const SHIELD_COST = 200;
 
 const PLAYER_ID = 1;
 
@@ -42,6 +46,83 @@ const MENU_ITEMS = [
   { label: "Subscription", icon: "star", color: "#f59e0b", route: "/subscription" },
   { label: "Privacy & Settings", icon: "shield", color: "#9ca3af", route: "/settings" },
 ];
+
+function StreakProtectionCard() {
+  const colors = useColors();
+  const queryClient = useQueryClient();
+  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+
+  const { data: streakData } = useGetDailyStreak();
+  const shieldCount = streakData?.streakShields ?? 0;
+
+  const buyShield = useBuyStreakShield({
+    mutation: {
+      onSuccess: (data) => {
+        queryClient.invalidateQueries({ queryKey: getGetDailyStreakQueryKey() });
+        setMessage({ text: `Shield purchased! You now have ${data.streakShields} shield${data.streakShields !== 1 ? "s" : ""}.`, ok: true });
+        setTimeout(() => setMessage(null), 3000);
+      },
+      onError: (err: any) => {
+        const msg = err?.response?.data?.error ?? "Could not purchase shield.";
+        setMessage({ text: msg, ok: false });
+        setTimeout(() => setMessage(null), 3000);
+      },
+    },
+  });
+
+  function handleBuy() {
+    Alert.alert(
+      "Buy Streak Shield",
+      `Spend ${SHIELD_COST} coins to protect your streak for one missed day?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Buy", onPress: () => buyShield.mutate() },
+      ]
+    );
+  }
+
+  return (
+    <View style={[shieldStyles.card, { backgroundColor: colors.card, borderColor: "#22d3ee44" }]}>
+      <View style={shieldStyles.header}>
+        <View style={[shieldStyles.iconWrap, { backgroundColor: "#22d3ee18" }]}>
+          <Feather name="shield" size={18} color="#22d3ee" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[shieldStyles.title, { color: colors.foreground }]}>Streak Protection</Text>
+          <Text style={[shieldStyles.subtitle, { color: colors.mutedForeground }]}>
+            A shield auto-saves your streak if you miss a day
+          </Text>
+        </View>
+        <View style={[shieldStyles.countBadge, { backgroundColor: "#22d3ee18" }]}>
+          <Text style={shieldStyles.countText}>{shieldCount}</Text>
+          <Text style={shieldStyles.countLabel}>{shieldCount === 1 ? "shield" : "shields"}</Text>
+        </View>
+      </View>
+
+      {message && (
+        <View style={[shieldStyles.message, { backgroundColor: message.ok ? "#22d3ee18" : "#ef444418", borderColor: message.ok ? "#22d3ee44" : "#ef444444" }]}>
+          <Text style={[shieldStyles.messageText, { color: message.ok ? "#22d3ee" : "#ef4444" }]}>{message.text}</Text>
+        </View>
+      )}
+
+      <Pressable
+        onPress={handleBuy}
+        disabled={buyShield.isPending}
+        style={[shieldStyles.buyBtn, { opacity: buyShield.isPending ? 0.6 : 1 }]}
+        testID="button-buy-shield"
+      >
+        {buyShield.isPending ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <>
+            <Feather name="shopping-cart" size={14} color="#fff" />
+            <Text style={shieldStyles.buyBtnText}>Buy Shield · {SHIELD_COST} coins</Text>
+          </>
+        )}
+      </Pressable>
+    </View>
+  );
+}
 
 function MenuItem({ item }: { item: typeof MENU_ITEMS[0] }) {
   const colors = useColors();
@@ -160,6 +241,11 @@ export default function ProfileScreen() {
         )}
       </View>
 
+      {/* Streak Protection */}
+      <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+        <StreakProtectionCard />
+      </View>
+
       {/* Menu */}
       <View style={[styles.menuCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {MENU_ITEMS.map((item, i) => (
@@ -205,4 +291,19 @@ const styles = StyleSheet.create({
   joinedAt: { textAlign: "center", fontSize: 12, marginTop: 16 },
   shareBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 14, paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5 },
   shareBtnText: { fontSize: 13, fontWeight: "700" },
+});
+
+const shieldStyles = StyleSheet.create({
+  card: { borderRadius: 16, borderWidth: 1, padding: 14, gap: 10 },
+  header: { flexDirection: "row", alignItems: "center", gap: 10 },
+  iconWrap: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  title: { fontSize: 14, fontWeight: "700" },
+  subtitle: { fontSize: 12, marginTop: 2 },
+  countBadge: { alignItems: "center", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
+  countText: { fontSize: 20, fontWeight: "900", color: "#22d3ee" },
+  countLabel: { fontSize: 10, color: "#22d3ee", fontWeight: "600" },
+  message: { borderRadius: 8, borderWidth: 1, padding: 10 },
+  messageText: { fontSize: 13, fontWeight: "600" },
+  buyBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#22d3ee", borderRadius: 12, paddingVertical: 11 },
+  buyBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
 });
