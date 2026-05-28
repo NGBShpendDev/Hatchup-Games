@@ -57,6 +57,20 @@ describe("validateGpsUpdate", () => {
     assert.equal(v.verdict, "suspicious");
     assert.equal(v.reason, "low_accuracy_fix");
   });
+
+  it("rejects impossible velocity even when client claims low accuracy (bypass guard)", () => {
+    // Attacker tries to mask a teleport by sending accuracyMeters=1000.
+    // Velocity must be evaluated FIRST and reject must win.
+    const v = validateGpsUpdate({
+      prevLat: 40.7128, prevLng: -74.006,
+      prevTimestamp: new Date("2026-01-01T00:00:00Z"),
+      newLat: 34.0522, newLng: -118.2437,
+      newTimestamp: new Date("2026-01-01T00:01:00Z"),
+      accuracyMeters: 1000,
+    });
+    assert.equal(v.verdict, "reject");
+    assert.equal(v.reason, "impossible_velocity");
+  });
 });
 
 describe("validateStepDelta", () => {

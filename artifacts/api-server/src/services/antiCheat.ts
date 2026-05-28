@@ -54,6 +54,34 @@ export function validateGpsUpdate(args: {
 }): CheatResult {
   const { prevLat, prevLng, prevTimestamp, newLat, newLng, newTimestamp, accuracyMeters } = args;
 
+  // Always evaluate physical velocity FIRST when we have a prior fix.
+  // Otherwise a client could submit a teleport with a deliberately bad
+  // accuracyMeters to short-circuit the reject path.
+  if (prevLat != null && prevLng != null && prevTimestamp) {
+    const distKm = haversineKm(prevLat, prevLng, newLat, newLng);
+    const elapsedHours = Math.max(
+      0.0001,
+      (newTimestamp.getTime() - prevTimestamp.getTime()) / 3_600_000,
+    );
+    const speedKmh = distKm / elapsedHours;
+
+    if (speedKmh > 300) {
+      return {
+        verdict: "reject",
+        reason: "impossible_velocity",
+        details: { speedKmh: Math.round(speedKmh), distKm: Number(distKm.toFixed(2)) },
+      };
+    }
+    if (speedKmh > 120) {
+      return {
+        verdict: "suspicious",
+        reason: "vehicular_velocity",
+        details: { speedKmh: Math.round(speedKmh) },
+      };
+    }
+  }
+
+  // Low-accuracy fix is only flagged AFTER the velocity check has cleared.
   if (accuracyMeters != null && accuracyMeters > 500) {
     return {
       verdict: "suspicious",
@@ -62,31 +90,6 @@ export function validateGpsUpdate(args: {
     };
   }
 
-  if (prevLat == null || prevLng == null || !prevTimestamp) {
-    return { verdict: "ok" };
-  }
-
-  const distKm = haversineKm(prevLat, prevLng, newLat, newLng);
-  const elapsedHours = Math.max(
-    0.0001,
-    (newTimestamp.getTime() - prevTimestamp.getTime()) / 3_600_000,
-  );
-  const speedKmh = distKm / elapsedHours;
-
-  if (speedKmh > 300) {
-    return {
-      verdict: "reject",
-      reason: "impossible_velocity",
-      details: { speedKmh: Math.round(speedKmh), distKm: Number(distKm.toFixed(2)) },
-    };
-  }
-  if (speedKmh > 120) {
-    return {
-      verdict: "suspicious",
-      reason: "vehicular_velocity",
-      details: { speedKmh: Math.round(speedKmh) },
-    };
-  }
   return { verdict: "ok" };
 }
 
