@@ -33,6 +33,11 @@ import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summar
 import { ChampionVictoryOverlay } from "@/components/champion-victory-overlay";
 import { PodiumFinishOverlay } from "@/components/podium-finish-overlay";
 import {
+  decideCelebration,
+  championSeenKey,
+  podiumSeenKey,
+} from "@/lib/celebrationTrigger";
+import {
   Trophy, Users, Users2, Clock, Zap, Coins, Target, ArrowLeft,
   MapPin, Share2, CheckCircle2, Medal, Crown,
   Plus, Minus, MoreVertical, UserPlus, Search, Check, Swords, XCircle,
@@ -358,25 +363,19 @@ export default function ChallengeDetail() {
       isElimination?: boolean;
       leaderboard?: { playerId: number; rank?: number }[];
     };
-    if (c.status !== "completed" || c.isElimination !== true) return;
-    const me = (c.leaderboard ?? []).find((e) => e.playerId === player.id);
-    const rank = me?.rank;
-    if (rank === 1) {
-      const key = `champion-overlay-seen:${player.id}:${challengeId}`;
+    const decision = decideCelebration(c, player.id, challengeId, (key) => {
       try {
-        if (localStorage.getItem(key)) return;
+        return localStorage.getItem(key) != null;
       } catch {
-        // localStorage unavailable — still show this session.
+        // localStorage unavailable — treat as never-seen so the overlay
+        // still has a chance to fire this session.
+        return false;
       }
+    });
+    if (decision.kind === "champion") {
       setChampionOverlayOpen(true);
-    } else if (rank === 2 || rank === 3) {
-      const key = `podium-overlay-seen:${player.id}:${challengeId}`;
-      try {
-        if (localStorage.getItem(key)) return;
-      } catch {
-        // localStorage unavailable — still show this session.
-      }
-      setPodiumRank(rank);
+    } else if (decision.kind === "podium") {
+      setPodiumRank(decision.rank);
       setPodiumOverlayOpen(true);
     }
   }, [challenge, player, challengeId]);
@@ -420,7 +419,7 @@ export default function ChallengeDetail() {
     setChampionOverlayOpen(false);
     if (player) {
       try {
-        localStorage.setItem(`champion-overlay-seen:${player.id}:${challengeId}`, "1");
+        localStorage.setItem(championSeenKey(player.id, challengeId), "1");
       } catch {
         // ignore — the overlay just won't be suppressed across reloads
       }
@@ -488,7 +487,7 @@ export default function ChallengeDetail() {
     setPodiumOverlayOpen(false);
     if (player) {
       try {
-        localStorage.setItem(`podium-overlay-seen:${player.id}:${challengeId}`, "1");
+        localStorage.setItem(podiumSeenKey(player.id, challengeId), "1");
       } catch {
         // ignore — the overlay just won't be suppressed across reloads
       }
