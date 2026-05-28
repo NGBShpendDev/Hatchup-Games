@@ -132,12 +132,23 @@ router.get("/battles/rivals", requireAuth, attachPlayer, async (req, res) => {
     draws: number;
     lastBattleAt: Date;
     lastBattleId: number;
+    lastEloChange: number;       // most recent battle's ELO delta, from viewer's perspective
+    streakType: "W" | "L" | "D"; // outcome type of the current streak
+    streakCount: number;         // length of the current streak (most recent run of same outcome)
+    streakBuilding: boolean;     // internal: still extending the streak while iterating
   };
   const byOpponent = new Map<number, RivalAgg>();
 
+  // `battles` is ordered desc by createdAt — so the first time we see an opponent
+  // is their most-recent battle, and the streak is the leading run of same outcomes.
   for (const b of battles) {
     const opponentId = b.player1Id === playerId ? b.player2Id : b.player1Id;
     if (!opponentId) continue; // skip bots
+
+    const outcome: "W" | "L" | "D" =
+      b.winnerId == null ? "D" : b.winnerId === playerId ? "W" : "L";
+    const viewerEloDelta = b.player1Id === playerId ? b.eloChange : -b.eloChange;
+
     let agg = byOpponent.get(opponentId);
     if (!agg) {
       agg = {
@@ -148,16 +159,21 @@ router.get("/battles/rivals", requireAuth, attachPlayer, async (req, res) => {
         draws: 0,
         lastBattleAt: b.createdAt,
         lastBattleId: b.id,
+        lastEloChange: viewerEloDelta,
+        streakType: outcome,
+        streakCount: 0,
+        streakBuilding: true,
       };
       byOpponent.set(opponentId, agg);
     }
     agg.totalBattles += 1;
-    if (b.winnerId == null) agg.draws += 1;
-    else if (b.winnerId === playerId) agg.wins += 1;
+    if (outcome === "D") agg.draws += 1;
+    else if (outcome === "W") agg.wins += 1;
     else agg.losses += 1;
-    if (b.createdAt > agg.lastBattleAt) {
-      agg.lastBattleAt = b.createdAt;
-      agg.lastBattleId = b.id;
+
+    if (agg.streakBuilding) {
+      if (outcome === agg.streakType) agg.streakCount += 1;
+      else agg.streakBuilding = false;
     }
   }
 
@@ -189,6 +205,9 @@ router.get("/battles/rivals", requireAuth, attachPlayer, async (req, res) => {
       draws: r.draws,
       lastBattleAt: r.lastBattleAt.toISOString(),
       lastBattleId: r.lastBattleId,
+      lastEloChange: r.lastEloChange,
+      streakType: r.streakType,
+      streakCount: r.streakCount,
     };
   }));
 });

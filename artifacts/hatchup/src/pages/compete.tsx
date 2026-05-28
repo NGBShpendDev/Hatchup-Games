@@ -39,6 +39,9 @@ interface RivalItem {
   draws: number;
   lastBattleAt: string;
   lastBattleId: number;
+  lastEloChange: number;
+  streakType: "W" | "L" | "D";
+  streakCount: number;
 }
 
 interface HatchlingLite {
@@ -244,13 +247,39 @@ export default function Compete() {
                       </div>
                     </div>
                     <div className="mt-3 flex items-center justify-between gap-2">
-                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
-                        ahead ? "bg-green-500/15 text-green-300"
-                          : tied ? "bg-yellow-500/15 text-yellow-300"
-                          : "bg-red-500/15 text-red-300"
-                      }`}>
-                        {ahead ? "Ahead" : tied ? "Tied" : "Behind"}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                          ahead ? "bg-green-500/15 text-green-300"
+                            : tied ? "bg-yellow-500/15 text-yellow-300"
+                            : "bg-red-500/15 text-red-300"
+                        }`}>
+                          {ahead ? "Ahead" : tied ? "Tied" : "Behind"}
+                        </span>
+                        {r.streakCount > 0 && (
+                          <span
+                            className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                              r.streakType === "W" ? "bg-green-500/20 text-green-300"
+                                : r.streakType === "L" ? "bg-red-500/20 text-red-300"
+                                : "bg-yellow-500/20 text-yellow-300"
+                            }`}
+                            data-testid={`text-rival-streak-${r.opponentId}`}
+                            title={`Current ${r.streakType === "W" ? "win" : r.streakType === "L" ? "loss" : "draw"} streak`}
+                          >
+                            {r.streakType}{r.streakCount}
+                          </span>
+                        )}
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                            r.lastEloChange > 0 ? "bg-green-500/10 text-green-300"
+                              : r.lastEloChange < 0 ? "bg-red-500/10 text-red-300"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                          data-testid={`text-rival-last-elo-${r.opponentId}`}
+                          title="ELO swing from your most recent battle"
+                        >
+                          Last: {r.lastEloChange > 0 ? "+" : ""}{r.lastEloChange} ELO
+                        </span>
+                      </div>
                       <Button
                         size="sm"
                         variant="secondary"
