@@ -546,11 +546,13 @@ function FollowersListSheet({
 }) {
   const [cursor, setCursor] = useState(0);
   const [accumulated, setAccumulated] = useState<PlayerStubRow[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (open) {
       setCursor(0);
       setAccumulated([]);
+      setSearchQuery("");
     }
   }, [open, profileId]);
 
@@ -583,6 +585,15 @@ function FollowersListSheet({
   const total = data?.total ?? accumulated.length;
   const hasMore = data?.nextCursor != null;
 
+  const q = searchQuery.trim().toLowerCase();
+  const filtered = q
+    ? accumulated.filter(
+        p =>
+          p.username.toLowerCase().includes(q) ||
+          (p.displayName ?? "").toLowerCase().includes(q),
+      )
+    : accumulated;
+
   return (
     <Sheet open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-3xl" data-testid="sheet-followers-list">
@@ -596,6 +607,17 @@ function FollowersListSheet({
           </SheetTitle>
         </SheetHeader>
 
+        <div className="mt-3 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search followers…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-9 rounded-xl"
+            data-testid="input-search-followers"
+          />
+        </div>
+
         <div className="mt-4 space-y-2">
           {isLoading && accumulated.length === 0 ? (
             <>
@@ -603,12 +625,12 @@ function FollowersListSheet({
               <Skeleton className="h-14 w-full rounded-2xl" />
               <Skeleton className="h-14 w-full rounded-2xl" />
             </>
-          ) : accumulated.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              No followers yet.
+              {q ? "No followers match your search." : "No followers yet."}
             </p>
           ) : (
-            accumulated.map(p => (
+            filtered.map(p => (
               <PlayerListRow
                 key={p.id}
                 player={p}
@@ -652,11 +674,13 @@ function FollowingListSheet({
 }) {
   const [cursor, setCursor] = useState(0);
   const [accumulated, setAccumulated] = useState<PlayerStubRow[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (open) {
       setCursor(0);
       setAccumulated([]);
+      setSearchQuery("");
     }
   }, [open, profileId]);
 
@@ -689,6 +713,15 @@ function FollowingListSheet({
   const total = data?.total ?? accumulated.length;
   const hasMore = data?.nextCursor != null;
 
+  const q = searchQuery.trim().toLowerCase();
+  const filtered = q
+    ? accumulated.filter(
+        p =>
+          p.username.toLowerCase().includes(q) ||
+          (p.displayName ?? "").toLowerCase().includes(q),
+      )
+    : accumulated;
+
   return (
     <Sheet open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-3xl" data-testid="sheet-following-list">
@@ -702,6 +735,17 @@ function FollowingListSheet({
           </SheetTitle>
         </SheetHeader>
 
+        <div className="mt-3 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search following…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-9 rounded-xl"
+            data-testid="input-search-following"
+          />
+        </div>
+
         <div className="mt-4 space-y-2">
           {isLoading && accumulated.length === 0 ? (
             <>
@@ -709,12 +753,12 @@ function FollowingListSheet({
               <Skeleton className="h-14 w-full rounded-2xl" />
               <Skeleton className="h-14 w-full rounded-2xl" />
             </>
-          ) : accumulated.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              Not following anyone yet.
+              {q ? "No results match your search." : "Not following anyone yet."}
             </p>
           ) : (
-            accumulated.map(p => (
+            filtered.map(p => (
               <PlayerListRow
                 key={p.id}
                 player={p}
