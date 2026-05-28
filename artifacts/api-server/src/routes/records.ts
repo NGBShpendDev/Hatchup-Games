@@ -33,8 +33,11 @@ router.get("/records/:playerId", requireAuth, attachPlayer, async (req, res) => 
       gte(fitnessActivitiesTable.createdAt, monthStart),
     ),
   });
-  // running: 1 minute ≈ 0.1 mile at avg pace
-  const monthlyRunMiles = monthlyRunActivities.reduce((sum, a) => sum + a.value * 0.1, 0);
+  // Use persisted distance when available; fall back to minute proxy only for legacy rows
+  const monthlyRunMiles = monthlyRunActivities.reduce(
+    (sum, a) => sum + (a.distanceMiles ?? a.value * 0.1),
+    0,
+  );
 
   res.json({
     personalRecords: records.map(r => ({

@@ -131,17 +131,21 @@ export default function Rewards() {
   });
 
   const topPrs: { label: string; value: string; icon: React.ReactNode }[] = [];
-  if (recordsData?.records) {
-    const prs = recordsData.records as any[];
+  if (recordsData?.personalRecords) {
+    const prs = recordsData.personalRecords as any[];
     const strengthPr = prs.find((r: any) => r.metric === "reps");
-    const runPr = prs.find((r: any) => r.metric === "pace_seconds_per_mile");
+    const runPacePr = prs.find((r: any) => r.metric === "pace_seconds_per_mile");
+    const longRunPr = prs.find((r: any) => r.metric === "longest_distance_miles_x100");
     const cyclingPr = prs.find((r: any) => r.metric === "speed_mph_x10");
     if (strengthPr) {
       topPrs.push({ label: `${strengthPr.activityType} PR`, value: `${strengthPr.value} reps`, icon: <Dumbbell className="w-4 h-4 text-primary" /> });
     }
-    if (runPr) {
-      const s = runPr.value;
+    if (runPacePr) {
+      const s = runPacePr.value;
       topPrs.push({ label: "Best Mile Pace", value: `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")} /mi`, icon: <Timer className="w-4 h-4 text-blue-400" /> });
+    }
+    if (longRunPr) {
+      topPrs.push({ label: "Longest Run", value: `${(longRunPr.value / 100).toFixed(2)} mi`, icon: <Footprints className="w-4 h-4 text-green-400" /> });
     }
     if (cyclingPr) {
       topPrs.push({ label: "Best Cycling Speed", value: `${(cyclingPr.value / 10).toFixed(1)} mph`, icon: <Zap className="w-4 h-4 text-yellow-400" /> });

@@ -105,7 +105,9 @@ async function detectAndSavePr(
   return { activityType, metric, value, isNew };
 }
 
-/** Compute cumulative running miles for a player from all activity logs. */
+/** Compute cumulative running miles for a player from all activity logs.
+ *  Prefers persisted distance_miles when provided; falls back to a minute
+ *  proxy only for legacy rows that pre-date the distance column. */
 async function getCumulativeRunMiles(playerId: number): Promise<number> {
   const rows = await db.query.fitnessActivitiesTable.findMany({
     where: and(
@@ -113,10 +115,14 @@ async function getCumulativeRunMiles(playerId: number): Promise<number> {
       eq(fitnessActivitiesTable.type, "running"),
     ),
   });
-  return rows.reduce((s, r) => s + r.value * RUNNING_MILES_PER_MINUTE, 0);
+  return rows.reduce(
+    (s, r) => s + (r.distanceMiles ?? r.value * RUNNING_MILES_PER_MINUTE),
+    0,
+  );
 }
 
-/** Compute monthly running miles for a player (current calendar month). */
+/** Compute monthly running miles for a player (current calendar month).
+ *  Same fallback semantics as getCumulativeRunMiles. */
 async function getMonthlyRunMiles(playerId: number): Promise<number> {
   const monthStart = new Date();
   monthStart.setDate(1);
@@ -128,7 +134,10 @@ async function getMonthlyRunMiles(playerId: number): Promise<number> {
       gte(fitnessActivitiesTable.createdAt, monthStart),
     ),
   });
-  return rows.reduce((s, r) => s + r.value * RUNNING_MILES_PER_MINUTE, 0);
+  return rows.reduce(
+    (s, r) => s + (r.distanceMiles ?? r.value * RUNNING_MILES_PER_MINUTE),
+    0,
+  );
 }
 
 export async function logFitnessActivity(
@@ -173,6 +182,7 @@ export async function logFitnessActivity(
       realm: config.realm,
       note: note ?? null,
       externalId: externalId ?? null,
+      distanceMiles: distanceMiles ?? null,
     })
     .returning();
 
@@ -268,11 +278,16 @@ export async function logFitnessActivity(
     // Track best reps in a single session per exercise
     prResult = await detectAndSavePr(playerId, type, "reps", value, true);
   } else if (type === "running" && distanceMiles && distanceMiles > 0) {
-    // Compute actual pace in seconds per mile (lower = faster = better PR)
+    // Pace PR in seconds per mile (lower = faster = better PR)
     const paceSecondsPerMile = Math.round((value * 60) / distanceMiles);
-    prResult = await detectAndSavePr(playerId, "running", "pace_seconds_per_mile", paceSecondsPerMile, false);
+    const pacePr = await detectAndSavePr(playerId, "running", "pace_seconds_per_mile", paceSecondsPerMile, false);
+    // Longest single-run distance PR (stored as miles × 100 for integer precision)
+    const distanceX100 = Math.round(distanceMiles * 100);
+    const distPr = await detectAndSavePr(playerId, "running", "longest_distance_miles_x100", distanceX100, true);
+    // Prefer surfacing whichever PR was newly set
+    prResult = distPr.isNew ? distPr : pacePr;
   } else if (type === "cycling" && distanceMiles && distanceMiles > 0) {
-    // Compute speed in mph × 10 (higher = faster = better PR)
+    // Speed PR in mph × 10 (higher = faster = better PR)
     const speedMphX10 = Math.round((distanceMiles / value) * 60 * 10);
     prResult = await detectAndSavePr(playerId, "cycling", "speed_mph_x10", speedMphX10, true);
   }

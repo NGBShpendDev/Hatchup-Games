@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, unique, doublePrecision } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -12,6 +12,7 @@ export const fitnessActivitiesTable = pgTable("fitness_activities", {
   realm: text("realm").notNull().default("strength"),
   note: text("note"),
   externalId: text("external_id"),
+  distanceMiles: doublePrecision("distance_miles"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
