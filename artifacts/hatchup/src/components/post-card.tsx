@@ -1,6 +1,8 @@
 import { useState } from "react";
 import {
   useAddPostComment,
+  useEditPostComment,
+  useDeletePostComment,
   useRepostPost,
   getGetSocialFeedQueryKey,
   type FeedPost,
@@ -73,7 +75,11 @@ export function PostCard({
 }) {
   const [showComments, setShowComments] = useState(defaultShowComments);
   const [commentText, setCommentText] = useState("");
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState("");
   const addComment = useAddPostComment();
+  const editComment = useEditPostComment();
+  const deleteComment = useDeletePostComment();
   const repost = useRepostPost();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -138,6 +144,55 @@ export function PostCard({
   function handleReactClick(type: string) {
     if (isAnonymous) { onAnonymousAction?.(); return; }
     onReact?.(post.id, type);
+  }
+
+  function startEditComment(c: PostComment) {
+    setEditingCommentId(c.id);
+    setEditingText(c.content);
+  }
+
+  function cancelEditComment() {
+    setEditingCommentId(null);
+    setEditingText("");
+  }
+
+  async function handleSaveEditComment(commentId: number) {
+    if (isAnonymous || !playerId) return;
+    if (!editingText.trim()) return;
+    try {
+      await editComment.mutateAsync({
+        id: post.id,
+        commentId,
+        data: { playerId, content: editingText.trim() },
+      });
+      qc.invalidateQueries({ queryKey: ["/api/social/feed"] });
+      qc.invalidateQueries({ queryKey: getGetSocialFeedQueryKey({ playerId }) });
+      cancelEditComment();
+      toast({ title: "Comment updated ✏️" });
+    } catch (err: any) {
+      if (err?.response?.status === 422) {
+        toast({ title: "Keep it positive! 🌟", description: "That content doesn't meet our community guidelines.", variant: "destructive" });
+      } else {
+        toast({ title: "Could not update comment", variant: "destructive" });
+      }
+    }
+  }
+
+  async function handleDeleteComment(commentId: number) {
+    if (isAnonymous || !playerId) return;
+    if (typeof window !== "undefined" && !window.confirm("Delete this comment?")) return;
+    try {
+      await deleteComment.mutateAsync({
+        id: post.id,
+        commentId,
+        params: { playerId },
+      });
+      qc.invalidateQueries({ queryKey: ["/api/social/feed"] });
+      qc.invalidateQueries({ queryKey: getGetSocialFeedQueryKey({ playerId }) });
+      toast({ title: "Comment deleted" });
+    } catch {
+      toast({ title: "Could not delete comment", variant: "destructive" });
+    }
   }
 
   return (
@@ -281,18 +336,81 @@ export function PostCard({
                 exit={{ opacity: 0, height: 0 }}
                 className="space-y-2"
               >
-                {(post.comments ?? []).map((c: PostComment) => (
-                  <div key={c.id} className="flex gap-2">
-                    <Avatar className="h-6 w-6 flex-shrink-0">
-                      <AvatarImage src={c.authorAvatar ?? undefined} />
-                      <AvatarFallback className="text-[9px] bg-muted">{(c.authorName ?? "?").substring(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div className="bg-muted/50 rounded-xl px-2.5 py-1.5 flex-1">
-                      <span className="font-bold text-[11px]">{c.authorName}</span>
-                      <p className="text-xs text-muted-foreground">{c.content}</p>
+                {(post.comments ?? []).map((c: PostComment) => {
+                  const isOwn = !isAnonymous && c.playerId === playerId;
+                  const isEditing = editingCommentId === c.id;
+                  return (
+                    <div key={c.id} className="flex gap-2" data-testid={`comment-${c.id}`}>
+                      <Avatar className="h-6 w-6 flex-shrink-0">
+                        <AvatarImage src={c.authorAvatar ?? undefined} />
+                        <AvatarFallback className="text-[9px] bg-muted">{(c.authorName ?? "?").substring(0, 2).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="bg-muted/50 rounded-xl px-2.5 py-1.5 flex-1 min-w-0">
+                        <div className="flex items-start gap-2">
+                          <span className="font-bold text-[11px]">{c.authorName}</span>
+                          {isOwn && !isEditing && (
+                            <div className="ml-auto flex items-center gap-1">
+                              <button
+                                onClick={() => startEditComment(c)}
+                                className="text-[10px] font-bold text-muted-foreground hover:text-primary"
+                                aria-label="Edit comment"
+                                data-testid={`button-edit-comment-${c.id}`}
+                              >
+                                Edit
+                              </button>
+                              <span className="text-muted-foreground/40">·</span>
+                              <button
+                                onClick={() => handleDeleteComment(c.id)}
+                                disabled={deleteComment.isPending}
+                                className="text-[10px] font-bold text-muted-foreground hover:text-destructive disabled:opacity-50"
+                                aria-label="Delete comment"
+                                data-testid={`button-delete-comment-${c.id}`}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {isEditing ? (
+                          <form
+                            onSubmit={e => { e.preventDefault(); handleSaveEditComment(c.id); }}
+                            className="flex gap-1 pt-1"
+                          >
+                            <Input
+                              value={editingText}
+                              onChange={e => setEditingText(e.target.value)}
+                              className="h-7 text-xs rounded-full bg-background/60"
+                              maxLength={280}
+                              autoFocus
+                              data-testid={`input-edit-comment-${c.id}`}
+                            />
+                            <Button
+                              type="submit"
+                              size="sm"
+                              className="h-7 px-2 text-[10px] rounded-full"
+                              disabled={editComment.isPending || !editingText.trim() || editingText.trim() === c.content}
+                              data-testid={`button-save-edit-comment-${c.id}`}
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-[10px] rounded-full"
+                              onClick={cancelEditComment}
+                              data-testid={`button-cancel-edit-comment-${c.id}`}
+                            >
+                              Cancel
+                            </Button>
+                          </form>
+                        ) : (
+                          <p className="text-xs text-muted-foreground break-words">{c.content}</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {isAnonymous ? (
                   <button
                     onClick={() => onAnonymousAction?.()}

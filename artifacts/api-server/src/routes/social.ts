@@ -20,6 +20,7 @@ import {
   CreatePostBody,
   ReactToPostBody,
   AddPostCommentBody,
+  EditPostCommentBody,
   FollowPlayerBody,
   RepostPostBody,
 } from "@workspace/api-zod";
@@ -556,6 +557,43 @@ router.post("/social/posts/:id/comments", socialWriteLimiter, requireAuth, attac
     authorName: author?.displayName ?? author?.username ?? "Trainer",
     authorAvatar: author?.avatarUrl ?? null,
     createdAt: comment.createdAt.toISOString(),
+  });
+});
+
+// ── PATCH /social/posts/:id/comments/:commentId ─────────────────────────────
+
+router.patch("/social/posts/:id/comments/:commentId", socialWriteLimiter, requireAuth, attachPlayer, blockMinorSocialWrite, async (req, res) => {
+  const commentId = Number(req.params.commentId);
+  const playerId = req.playerId!;
+  const body = EditPostCommentBody.safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
+
+  const { content } = body.data;
+
+  const existing = await db.query.postCommentsTable.findFirst({ where: eq(postCommentsTable.id, commentId) });
+  if (!existing) { res.status(404).json({ error: "Comment not found" }); return; }
+  if (existing.playerId !== playerId) { res.status(403).json({ error: "Not your comment" }); return; }
+
+  const mod = moderateContent(content);
+  if (mod.flagged) {
+    res.status(422).json({
+      error: "Your comment contains content that goes against our community guidelines.",
+      flaggedTerms: mod.matched,
+    });
+    return;
+  }
+
+  const [updated] = await db.update(postCommentsTable)
+    .set({ content: content.trim().slice(0, 280) })
+    .where(eq(postCommentsTable.id, commentId))
+    .returning();
+
+  const author = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
+  res.json({
+    ...updated,
+    authorName: author?.displayName ?? author?.username ?? "Trainer",
+    authorAvatar: author?.avatarUrl ?? null,
+    createdAt: updated.createdAt.toISOString(),
   });
 });
 

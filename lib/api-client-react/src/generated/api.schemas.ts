@@ -1346,6 +1346,15 @@ export interface AddCommentInput {
   content: string;
 }
 
+export interface EditCommentInput {
+  playerId: number;
+  /**
+     * @minLength 1
+     * @maxLength 280
+     */
+  content: string;
+}
+
 export interface FollowInput {
   followerId: number;
   followeeId: number;

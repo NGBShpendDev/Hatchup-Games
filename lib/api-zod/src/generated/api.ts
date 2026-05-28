@@ -2284,6 +2284,35 @@ export const AddPostCommentBody = zod.object({
 
 
 /**
+ * @summary Edit own comment
+ */
+export const EditPostCommentParams = zod.object({
+  "id": zod.coerce.number(),
+  "commentId": zod.coerce.number()
+})
+
+export const editPostCommentBodyContentMax = 280;
+
+
+
+export const EditPostCommentBody = zod.object({
+  "playerId": zod.number(),
+  "content": zod.string().min(1).max(editPostCommentBodyContentMax)
+})
+
+export const EditPostCommentResponse = zod.object({
+  "id": zod.number(),
+  "postId": zod.number(),
+  "playerId": zod.number(),
+  "authorName": zod.string(),
+  "authorAvatar": zod.string().nullish(),
+  "content": zod.string(),
+  "isFlagged": zod.boolean(),
+  "createdAt": zod.string()
+})
+
+
+/**
  * @summary Delete own comment
  */
 export const DeletePostCommentParams = zod.object({

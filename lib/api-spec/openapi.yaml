@@ -1894,6 +1894,40 @@ paths:
                 $ref: "#/components/schemas/ModerationError"
 
   /social/posts/{id}/comments/{commentId}:
+    patch:
+      operationId: editPostComment
+      tags: [social]
+      summary: Edit own comment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditCommentInput"
+      responses:
+        "200":
+          description: Comment updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostComment"
+        "422":
+          description: Content flagged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationError"
     delete:
       operationId: deletePostComment
       tags: [social]
@@ -4717,6 +4751,13 @@ components:
         reactionType: { type: string, enum: [like, encourage, fire, flex] }
 
     AddCommentInput:
+      type: object
+      required: [playerId, content]
+      properties:
+        playerId: { type: integer }
+        content:  { type: string, minLength: 1, maxLength: 280 }
+
+    EditCommentInput:
       type: object
       required: [playerId, content]
       properties:

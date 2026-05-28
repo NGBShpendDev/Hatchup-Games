@@ -55,6 +55,7 @@ import type {
   DeletePostParams,
   DiscoverPlayersParams,
   DiscoverablePlayer,
+  EditCommentInput,
   Egg,
   EvolutionCategory,
   EvolutionType,
@@ -6788,6 +6789,80 @@ export const useAddPostComment = <TError = ErrorType<ModerationError>,
         TContext
       > => {
       return useMutation(getAddPostCommentMutationOptions(options));
+    }
+
+export const getEditPostCommentUrl = (id: number,
+    commentId: number,) => {
+
+
+
+
+  return `/api/social/posts/${id}/comments/${commentId}`
+}
+
+/**
+ * @summary Edit own comment
+ */
+export const editPostComment = async (id: number,
+    commentId: number,
+    editCommentInput: EditCommentInput, options?: RequestInit): Promise<PostComment> => {
+
+  return customFetch<PostComment>(getEditPostCommentUrl(id,commentId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      editCommentInput,)
+  }
+);}
+
+
+
+
+export const getEditPostCommentMutationOptions = <TError = ErrorType<ModerationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editPostComment>>, TError,{id: number;commentId: number;data: BodyType<EditCommentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof editPostComment>>, TError,{id: number;commentId: number;data: BodyType<EditCommentInput>}, TContext> => {
+
+const mutationKey = ['editPostComment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof editPostComment>>, {id: number;commentId: number;data: BodyType<EditCommentInput>}> = (props) => {
+          const {id,commentId,data} = props ?? {};
+
+          return  editPostComment(id,commentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EditPostCommentMutationResult = NonNullable<Awaited<ReturnType<typeof editPostComment>>>
+    export type EditPostCommentMutationBody = BodyType<EditCommentInput>
+    export type EditPostCommentMutationError = ErrorType<ModerationError>
+
+    /**
+ * @summary Edit own comment
+ */
+export const useEditPostComment = <TError = ErrorType<ModerationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editPostComment>>, TError,{id: number;commentId: number;data: BodyType<EditCommentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof editPostComment>>,
+        TError,
+        {id: number;commentId: number;data: BodyType<EditCommentInput>},
+        TContext
+      > => {
+      return useMutation(getEditPostCommentMutationOptions(options));
     }
 
 export const getDeletePostCommentUrl = (id: number,
