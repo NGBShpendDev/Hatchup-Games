@@ -1193,6 +1193,60 @@ export const GetMyFitnessBarsResponse = zod.array(GetMyFitnessBarsResponseItem)
 
 
 /**
+ * @summary Get the player's daily login streak state and 30-day reward calendar
+ */
+export const GetDailyStreakResponse = zod.object({
+  "currentDay": zod.number().describe('Current streak day (1-30), or 1 if streak was just reset'),
+  "streakBroken": zod.boolean().describe('True if the streak reset today due to a missed day'),
+  "alreadyClaimed": zod.boolean().describe('Whether today has already been claimed'),
+  "lastClaimedAt": zod.coerce.date().nullable(),
+  "todayReward": zod.object({
+  "day": zod.number().describe('Day number (1-30)'),
+  "coins": zod.number(),
+  "xp": zod.number(),
+  "bonus": zod.string().optional().describe('Optional bonus reward key e.g. rare_egg, streak_freeze, legendary_chest'),
+  "kind": zod.enum(['coins', 'xp', 'egg', 'artifact', 'chest']),
+  "label": zod.string(),
+  "icon": zod.string()
+}).optional(),
+  "schedule": zod.array(zod.object({
+  "day": zod.number().describe('Day number (1-30)'),
+  "coins": zod.number(),
+  "xp": zod.number(),
+  "bonus": zod.string().optional().describe('Optional bonus reward key e.g. rare_egg, streak_freeze, legendary_chest'),
+  "kind": zod.enum(['coins', 'xp', 'egg', 'artifact', 'chest']),
+  "label": zod.string(),
+  "icon": zod.string()
+}))
+})
+
+
+/**
+ * @summary Claim today's daily login reward
+ */
+export const ClaimDailyRewardResponse = zod.object({
+  "ok": zod.boolean(),
+  "day": zod.number(),
+  "coinsGranted": zod.number(),
+  "xpGranted": zod.number(),
+  "streakDay": zod.number().describe('Streak day after claim'),
+  "newStreakDay": zod.number().describe('Next unclaimed day (for badge\/UI purposes)'),
+  "eggAdded": zod.boolean(),
+  "bonus": zod.string().nullish(),
+  "artifactGranted": zod.object({
+  "artifactId": zod.number(),
+  "artifactName": zod.string()
+}).nullish(),
+  "newBadges": zod.array(zod.object({
+  "key": zod.string(),
+  "name": zod.string(),
+  "icon": zod.string(),
+  "tier": zod.string()
+}))
+})
+
+
+/**
  * @summary Get recent world notifications for Mythic+ artifact drops
  */
 export const getArtifactWorldNotificationsQueryLimitDefault = 10;

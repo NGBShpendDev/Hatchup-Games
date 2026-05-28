@@ -57,6 +57,7 @@ import type {
   ChallengeParticipant,
   ChallengeProgressInput,
   ChallengeProgressResult,
+  ClaimDailyReward400,
   Club,
   ClubInput,
   ClubInvite,
@@ -74,6 +75,8 @@ import type {
   CreateMealPostInput,
   CreateMealPostResult,
   CreatePostInput,
+  DailyClaimResult,
+  DailyStreakState,
   DeleteMealPostResult,
   DeletePostCommentParams,
   DeletePostParams,
@@ -3305,6 +3308,153 @@ export function useGetMyFitnessBars<TData = Awaited<ReturnType<typeof getMyFitne
 
 
 
+
+export const getGetDailyStreakUrl = () => {
+
+
+
+
+  return `/api/players/me/daily-streak`
+}
+
+/**
+ * @summary Get the player's daily login streak state and 30-day reward calendar
+ */
+export const getDailyStreak = async ( options?: RequestInit): Promise<DailyStreakState> => {
+
+  return customFetch<DailyStreakState>(getGetDailyStreakUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDailyStreakQueryKey = () => {
+    return [
+    `/api/players/me/daily-streak`
+    ] as const;
+    }
+
+
+export const getGetDailyStreakQueryOptions = <TData = Awaited<ReturnType<typeof getDailyStreak>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDailyStreak>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDailyStreakQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDailyStreak>>> = ({ signal }) => getDailyStreak({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDailyStreak>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDailyStreakQueryResult = NonNullable<Awaited<ReturnType<typeof getDailyStreak>>>
+export type GetDailyStreakQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the player's daily login streak state and 30-day reward calendar
+ */
+
+export function useGetDailyStreak<TData = Awaited<ReturnType<typeof getDailyStreak>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDailyStreak>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDailyStreakQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getClaimDailyRewardUrl = () => {
+
+
+
+
+  return `/api/players/me/daily-claim`
+}
+
+/**
+ * @summary Claim today's daily login reward
+ */
+export const claimDailyReward = async ( options?: RequestInit): Promise<DailyClaimResult> => {
+
+  return customFetch<DailyClaimResult>(getClaimDailyRewardUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getClaimDailyRewardMutationOptions = <TError = ErrorType<ClaimDailyReward400>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimDailyReward>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof claimDailyReward>>, TError,void, TContext> => {
+
+const mutationKey = ['claimDailyReward'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof claimDailyReward>>, void> = () => {
+
+
+          return  claimDailyReward(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClaimDailyRewardMutationResult = NonNullable<Awaited<ReturnType<typeof claimDailyReward>>>
+
+    export type ClaimDailyRewardMutationError = ErrorType<ClaimDailyReward400>
+
+    /**
+ * @summary Claim today's daily login reward
+ */
+export const useClaimDailyReward = <TError = ErrorType<ClaimDailyReward400>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof claimDailyReward>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof claimDailyReward>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getClaimDailyRewardMutationOptions(options));
+    }
 
 export const getGetArtifactWorldNotificationsUrl = (params?: GetArtifactWorldNotificationsParams,) => {
   const normalizedParams = new URLSearchParams();

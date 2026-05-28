@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
-import { useGetPlayerDashboard, getGetPlayerDashboardQueryKey, useLogActivity, useGetSocialFeed, getGetSocialFeedQueryKey, useReactToPost, useAddPostComment, useGetHatchling, getGetHatchlingQueryKey } from "@workspace/api-client-react";
-import type { PostComment, ActivityLogResult, BadgeDefinition, ArtifactUnlock } from "@workspace/api-client-react";
+import { useGetPlayerDashboard, getGetPlayerDashboardQueryKey, useLogActivity, useGetSocialFeed, getGetSocialFeedQueryKey, useReactToPost, useAddPostComment, useGetHatchling, getGetHatchlingQueryKey, useGetDailyStreak, getGetDailyStreakQueryKey } from "@workspace/api-client-react";
+import type { PostComment, ActivityLogResult, BadgeDefinition, ArtifactUnlock, DailyClaimResult } from "@workspace/api-client-react";
 import { ComposeSheet } from "@/components/compose-sheet";
 import { REACTION_ICONS, CommentRow } from "@/components/post-card";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,6 +27,7 @@ import { useEpicMomentQueue, type EpicMomentEvent } from "@/components/epic-mome
 import { ForYouStrip, type ForYouItem } from "@/components/for-you-strip";
 import { TrendingStrip } from "@/components/trending-strip";
 import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
+import { StreakCalendarModal } from "@/components/streak-calendar-modal";
 import { ErrorCard } from "@/components/error-card";
 import { errorMessage } from "@/lib/errorMessage";
 import { Bot as BotIcon, Salad as SaladIcon, Swords as SwordsIcon, Users as UsersIcon, Trophy as TrophyIcon, Egg as EggLucide } from "lucide-react";
@@ -250,6 +251,26 @@ export default function Home() {
   const [xpPopups, setXpPopups] = useState<{ id: number; amount: number }[]>([]);
   const [rewardSummary, setRewardSummary] = useState<{ open: boolean; entries: RewardEntry[] }>({ open: false, entries: [] });
 
+  // Daily streak modal
+  const [streakModalOpen, setStreakModalOpen] = useState(false);
+  const streakAutoShownRef = useRef(false);
+  const { data: dailyStreak } = useGetDailyStreak({
+    query: {
+      queryKey: getGetDailyStreakQueryKey(),
+      enabled: !!playerId,
+      staleTime: 60_000,
+    },
+  });
+
+  // Auto-open the streak modal once per session when today's reward is unclaimed
+  useEffect(() => {
+    if (!dailyStreak || streakAutoShownRef.current || !playerId) return;
+    if (!dailyStreak.alreadyClaimed) {
+      streakAutoShownRef.current = true;
+      setStreakModalOpen(true);
+    }
+  }, [dailyStreak, playerId]);
+
   const spawnXpPopup = (amount: number) => {
     const id = Date.now();
     setXpPopups(prev => [...prev, { id, amount }]);
@@ -442,6 +463,26 @@ export default function Home() {
         rewards={rewardSummary.entries}
       />
 
+      <StreakCalendarModal
+        open={streakModalOpen}
+        onClose={() => setStreakModalOpen(false)}
+        playerId={pid}
+        onClaimed={(result: DailyClaimResult) => {
+          const entries: RewardEntry[] = [];
+          if (result.coinsGranted > 0) entries.push({ kind: "challenge", label: `Day ${result.day} Reward`, value: `+${result.coinsGranted} coins`, detail: `+${result.xpGranted} XP earned` });
+          if (result.eggAdded) {
+            const eggLabel = result.bonus === "epic_egg" || result.bonus === "epic_chest" ? "Epic Mystery Egg" : result.bonus === "legendary_chest" ? "Legendary Mystery Egg" : "Rare Mystery Egg";
+            entries.push({ kind: "hatchling", label: "Egg added to incubator!", detail: `${eggLabel} is now incubating.` });
+          }
+          if (result.artifactGranted) entries.push({ kind: "challenge", label: `Artifact unlocked: ${result.artifactGranted.artifactName}!`, detail: "Check your artifact collection." });
+          for (const badge of result.newBadges ?? []) {
+            entries.push({ kind: "challenge", label: `Badge: ${badge.name}`, value: badge.tier, detail: badge.icon });
+          }
+          if (entries.length > 0) setRewardSummary({ open: true, entries });
+          setStreakModalOpen(false);
+        }}
+      />
+
       {/* Floating XP popups */}
       <div className="fixed top-20 right-4 z-50 pointer-events-none">
         <AnimatePresence>
@@ -501,6 +542,23 @@ export default function Home() {
                 <span className="font-black text-xs text-blue-400">{streakFreezes}</span>
               </div>
             )}
+            {/* Daily login streak badge */}
+            <button
+              onClick={() => setStreakModalOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all active:scale-95 ${
+                dailyStreak && !dailyStreak.alreadyClaimed
+                  ? "bg-gradient-to-r from-orange-500/30 to-red-500/20 border-orange-500/60 shadow-[0_0_8px_rgba(251,146,60,0.4)] animate-pulse"
+                  : "bg-card/80 backdrop-blur border-border"
+              }`}
+            >
+              <span className="text-sm">🔥</span>
+              <span className="font-black text-sm">
+                {dailyStreak ? (dailyStreak.alreadyClaimed ? dailyStreak.currentDay : (dailyStreak.currentDay + 1)) : (dash.dailyReward?.streak ?? 0)}d
+              </span>
+              {dailyStreak && !dailyStreak.alreadyClaimed && (
+                <span className="text-[9px] font-black text-orange-300 uppercase tracking-wide">Claim!</span>
+              )}
+            </button>
             <div className="flex items-center gap-1.5 bg-card/80 backdrop-blur px-3 py-1.5 rounded-full border border-border">
               <Flame className={`w-4 h-4 ${(dashboard as any).fitness?.currentStreak >= 7 ? "text-orange-400" : "text-orange-500/70"}`} />
               <span className="font-black text-sm">{(dashboard as any).fitness?.currentStreak ?? 0}d</span>

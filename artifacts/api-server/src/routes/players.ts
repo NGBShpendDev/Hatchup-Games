@@ -2,7 +2,7 @@ import { Router } from "express";
 import { createDecipheriv, createHash } from "crypto";
 import { db } from "@workspace/db";
 import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable, eggsTable, fitnessActivitiesTable, playerBadgesTable, playerArtifactsTable, artifactsTable, playerLocationTable, groupMembersTable, groupsTable, challengeInvitesTable, playerFollowsTable } from "@workspace/db";
-import { eq, desc, and, gte, or, ilike, ne, inArray } from "drizzle-orm";
+import { eq, desc, and, gte, or, ilike, ne, inArray, sql } from "drizzle-orm";
 import { filterDiscoverableCandidates, getHiddenPlayerIds } from "./safety.ts";
 import {
   loadMutualWorkoutPartnersForViewer,
@@ -16,7 +16,7 @@ import {
   GetPlayerDashboardParams,
 } from "@workspace/api-zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
-import { BADGE_MAP, computeLevelProgress, getDailyReward } from "../services/badgeService.ts";
+import { BADGE_MAP, DAILY_REWARD_SCHEDULE, computeLevelProgress, getDailyReward, checkAndAwardBadges } from "../services/badgeService.ts";
 
 const router = Router();
 
@@ -431,6 +431,196 @@ router.get("/players/nearby", requireAuth, attachPlayer, async (req, res) => {
   });
 
   res.json({ entries, city: viewerLoc.city, locationRequired: false });
+});
+
+function isSameDayUTC(a: Date, b: Date): boolean {
+  return a.toISOString().slice(0, 10) === b.toISOString().slice(0, 10);
+}
+
+function isYesterdayUTC(yesterday: Date, today: Date): boolean {
+  const d = new Date(today);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10) === yesterday.toISOString().slice(0, 10);
+}
+
+// GET /players/me/daily-streak — streak state + 30-day schedule
+router.get("/players/me/daily-streak", requireAuth, attachPlayer, async (req, res) => {
+  const playerId = req.playerId!;
+  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
+  if (!player) { res.status(404).json({ error: "Player not found" }); return; }
+
+  const now = new Date();
+  const lastClaimed = player.lastRewardClaimedAt ? new Date(player.lastRewardClaimedAt) : null;
+  const alreadyClaimed = lastClaimed ? isSameDayUTC(lastClaimed, now) : false;
+
+  let currentDay = player.dailyRewardStreak ?? 0;
+  let streakBroken = false;
+
+  if (!alreadyClaimed && lastClaimed) {
+    // If last claim was NOT yesterday and NOT today, streak is broken
+    const wasYesterday = isYesterdayUTC(lastClaimed, now);
+    if (!wasYesterday) {
+      currentDay = 0;
+      streakBroken = true;
+    }
+  }
+
+  // Current unclaimed day index
+  const nextDay = currentDay + 1;
+  const todayReward = getDailyReward(nextDay);
+
+  res.json({
+    currentDay,
+    streakBroken,
+    alreadyClaimed,
+    lastClaimedAt: lastClaimed ? lastClaimed.toISOString() : null,
+    todayReward,
+    schedule: DAILY_REWARD_SCHEDULE,
+  });
+});
+
+// POST /players/me/daily-claim — claim today's daily reward
+router.post("/players/me/daily-claim", requireAuth, attachPlayer, async (req, res) => {
+  const playerId = req.playerId!;
+  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
+  if (!player) { res.status(404).json({ error: "Player not found" }); return; }
+
+  const now = new Date();
+  const lastClaimed = player.lastRewardClaimedAt ? new Date(player.lastRewardClaimedAt) : null;
+  const alreadyClaimed = lastClaimed ? isSameDayUTC(lastClaimed, now) : false;
+
+  if (alreadyClaimed) {
+    res.status(400).json({ error: "already_claimed_today" });
+    return;
+  }
+
+  // Compute new streak day
+  let newStreakDay: number;
+  let streakBroken = false;
+  if (!lastClaimed) {
+    // First ever claim
+    newStreakDay = 1;
+  } else {
+    const wasYesterday = isYesterdayUTC(lastClaimed, now);
+    if (wasYesterday) {
+      newStreakDay = (player.dailyRewardStreak ?? 0) + 1;
+    } else {
+      // Missed one or more days — reset
+      newStreakDay = 1;
+      streakBroken = true;
+    }
+  }
+
+  const reward = getDailyReward(newStreakDay);
+
+  // Grant coins + XP
+  const coinsGranted = reward.coins;
+  const xpGranted = reward.xp;
+
+  // Apply base reward grants (coins + XP)
+  await db.update(playersTable)
+    .set({
+      coins: sql`${playersTable.coins} + ${coinsGranted}`,
+      xp: sql`${playersTable.xp} + ${xpGranted}`,
+      dailyRewardStreak: newStreakDay,
+      lastRewardClaimedAt: now,
+    })
+    .where(eq(playersTable.id, playerId));
+
+  // Helper: add an egg to incubator if there's space (max 6 active)
+  async function tryAddEgg(rarity: "Rare" | "Epic" | "Legendary"): Promise<boolean> {
+    const activeEggs = await db.query.eggsTable.findMany({
+      where: and(eq(eggsTable.playerId, playerId), eq(eggsTable.isHatched, false)),
+    });
+    if (activeEggs.length >= 6) return false;
+    const stepsMap: Record<string, number> = { Rare: 5000, Epic: 8000, Legendary: 12000 };
+    await db.insert(eggsTable).values({
+      playerId,
+      rarity,
+      eggType: "balanced",
+      stepsRequired: stepsMap[rarity] ?? 5000,
+      name: `${rarity} Mystery Egg`,
+      description: "Hatched from your daily login reward!",
+      realm: "balance",
+    });
+    return true;
+  }
+
+  // Helper: mint a random fitness_streak artifact the player doesn't own yet.
+  // Falls back to granting extra coins if no eligible artifact exists.
+  async function tryMintArtifact(rarity?: string): Promise<{ artifactId: number; artifactName: string } | null> {
+    const owned = await db.query.playerArtifactsTable.findMany({
+      where: eq(playerArtifactsTable.playerId, playerId),
+      columns: { artifactId: true },
+    });
+    const ownedIds = owned.map(o => o.artifactId);
+
+    const eligibleArtifacts = await db.query.artifactsTable.findMany({
+      where: and(
+        eq(artifactsTable.isHidden, false),
+        eq(artifactsTable.type, "fitness_streak"),
+        ...(ownedIds.length > 0 ? [sql`${artifactsTable.id} NOT IN (${sql.join(ownedIds.map(id => sql`${id}`), sql`, `)})`] : []),
+        ...(rarity ? [eq(artifactsTable.rarity, rarity)] : []),
+      ),
+    });
+
+    if (eligibleArtifacts.length === 0) {
+      // Fallback: grant bonus coins
+      await db.update(playersTable)
+        .set({ coins: sql`${playersTable.coins} + 200` })
+        .where(eq(playersTable.id, playerId));
+      return null;
+    }
+
+    const chosen = eligibleArtifacts[Math.floor(Math.random() * eligibleArtifacts.length)]!;
+    await db.insert(playerArtifactsTable).values({ playerId, artifactId: chosen.id }).onConflictDoNothing();
+    return { artifactId: chosen.id, artifactName: chosen.name };
+  }
+
+  let eggAdded = false;
+  let artifactGranted: { artifactId: number; artifactName: string } | null = null;
+
+  // Handle bonus rewards
+  if (reward.bonus === "rare_egg") {
+    eggAdded = await tryAddEgg("Rare");
+  } else if (reward.bonus === "epic_egg") {
+    eggAdded = await tryAddEgg("Epic");
+  } else if (reward.bonus === "artifact") {
+    artifactGranted = await tryMintArtifact();
+  } else if (reward.bonus === "rare_chest") {
+    // Rare Chest: add Rare egg
+    eggAdded = await tryAddEgg("Rare");
+  } else if (reward.bonus === "epic_chest") {
+    // Epic Chest: add Epic egg
+    eggAdded = await tryAddEgg("Epic");
+  } else if (reward.bonus === "legendary_chest") {
+    // Legendary Chest: add Legendary egg + mint a legendary/mythic artifact
+    eggAdded = await tryAddEgg("Legendary");
+    artifactGranted = await tryMintArtifact("Legendary");
+    if (!artifactGranted) {
+      // Try any rarity if no Legendary artifact available
+      artifactGranted = await tryMintArtifact();
+    }
+  }
+
+  // Check and award badges (daily devotee at 7-day streak)
+  const newBadges = await checkAndAwardBadges(playerId, {
+    dailyRewardStreak: newStreakDay,
+  });
+
+  res.json({
+    ok: true,
+    day: reward.day,
+    coinsGranted,
+    xpGranted,
+    streakDay: newStreakDay,
+    newStreakDay,
+    eggAdded,
+    artifactGranted,
+    bonus: reward.bonus ?? null,
+    streakBroken,
+    newBadges: newBadges.map(b => ({ key: b.key, name: b.name, icon: b.icon, tier: b.tier })),
+  });
 });
 
 router.get("/players/:id", requireAuth, attachPlayer, async (req, res) => {

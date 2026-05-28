@@ -120,19 +120,56 @@ export function computeLevelProgress(totalXp: number) {
   };
 }
 
-/** Daily reward schedule — cycles every 7 days */
-export function getDailyReward(dayStreak: number) {
-  const day = ((dayStreak - 1) % 7) + 1;
-  const rewards: Record<number, { coins: number; xp: number; bonus?: string }> = {
-    1: { coins: 50,  xp: 25,  },
-    2: { coins: 75,  xp: 50,  },
-    3: { coins: 100, xp: 75,  bonus: "streak_freeze" },
-    4: { coins: 100, xp: 100, },
-    5: { coins: 125, xp: 125, },
-    6: { coins: 150, xp: 150, },
-    7: { coins: 250, xp: 300, bonus: "rare_egg_voucher" },
-  };
-  return { ...rewards[day]!, day };
+export type DailyRewardKind = "coins" | "xp" | "egg" | "artifact" | "chest";
+
+export interface DailyRewardDay {
+  day: number;
+  coins: number;
+  xp: number;
+  bonus?: string;
+  kind: DailyRewardKind;
+  label: string;
+  icon: string;
+}
+
+/** Full 30-day login reward schedule. After day 30 the cycle resets. */
+export const DAILY_REWARD_SCHEDULE: DailyRewardDay[] = [
+  { day:  1, coins:  50, xp:  25,                          kind: "coins",    label: "50 Coins",           icon: "🪙" },
+  { day:  2, coins:   0, xp: 100,                          kind: "xp",       label: "100 XP Boost",       icon: "⚡" },
+  { day:  3, coins: 100, xp: 100,                          kind: "xp",       label: "Coin + XP Boost",    icon: "⚡" },
+  { day:  4, coins: 100, xp: 100, bonus: "artifact",       kind: "artifact", label: "Artifact",           icon: "🏺" },
+  { day:  5, coins: 125, xp: 100, bonus: "rare_egg",       kind: "egg",      label: "Rare Egg",           icon: "🥚" },
+  { day:  6, coins: 150, xp: 250,                          kind: "xp",       label: "250 XP Boost",       icon: "⚡" },
+  { day:  7, coins: 250, xp: 300, bonus: "rare_chest",     kind: "chest",    label: "Rare Chest",         icon: "🎁" },
+  { day:  8, coins:  75, xp:  75,                          kind: "coins",    label: "75 Coins",           icon: "🪙" },
+  { day:  9, coins: 100, xp: 150,                          kind: "xp",       label: "150 XP Boost",       icon: "⚡" },
+  { day: 10, coins: 125, xp: 125, bonus: "artifact",       kind: "artifact", label: "Artifact",           icon: "🏺" },
+  { day: 11, coins: 150, xp: 150,                          kind: "coins",    label: "150 Coins",          icon: "🪙" },
+  { day: 12, coins: 175, xp: 200,                          kind: "xp",       label: "200 XP Boost",       icon: "⚡" },
+  { day: 13, coins: 200, xp: 200,                          kind: "coins",    label: "200 Coins",          icon: "🪙" },
+  { day: 14, coins: 400, xp: 500, bonus: "epic_chest",     kind: "chest",    label: "Epic Chest",         icon: "💜" },
+  { day: 15, coins: 100, xp: 100,                          kind: "coins",    label: "100 Coins",          icon: "🪙" },
+  { day: 16, coins: 125, xp: 175,                          kind: "xp",       label: "175 XP Boost",       icon: "⚡" },
+  { day: 17, coins: 150, xp: 150, bonus: "artifact",       kind: "artifact", label: "Artifact",           icon: "🏺" },
+  { day: 18, coins: 175, xp: 175,                          kind: "coins",    label: "175 Coins",          icon: "🪙" },
+  { day: 19, coins: 200, xp: 225,                          kind: "xp",       label: "225 XP Boost",       icon: "⚡" },
+  { day: 20, coins: 225, xp: 225,                          kind: "coins",    label: "225 Coins",          icon: "🪙" },
+  { day: 21, coins: 250, xp: 250, bonus: "epic_egg",       kind: "egg",      label: "Epic Egg",           icon: "🟣" },
+  { day: 22, coins: 125, xp: 125,                          kind: "coins",    label: "125 Coins",          icon: "🪙" },
+  { day: 23, coins: 150, xp: 200,                          kind: "xp",       label: "200 XP Boost",       icon: "⚡" },
+  { day: 24, coins: 175, xp: 175, bonus: "artifact",       kind: "artifact", label: "Artifact",           icon: "🏺" },
+  { day: 25, coins: 200, xp: 200,                          kind: "coins",    label: "200 Coins",          icon: "🪙" },
+  { day: 26, coins: 225, xp: 275,                          kind: "xp",       label: "275 XP Boost",       icon: "⚡" },
+  { day: 27, coins: 250, xp: 250,                          kind: "coins",    label: "250 Coins",          icon: "🪙" },
+  { day: 28, coins: 275, xp: 275,                          kind: "xp",       label: "275 XP Boost",       icon: "⚡" },
+  { day: 29, coins: 300, xp: 300,                          kind: "coins",    label: "300 Coins",          icon: "🪙" },
+  { day: 30, coins: 1000, xp: 1000, bonus: "legendary_chest", kind: "chest", label: "Legendary Chest",   icon: "🏆" },
+];
+
+/** Get the reward for a given streak day (1-indexed). After 30 days it cycles. */
+export function getDailyReward(dayStreak: number): DailyRewardDay {
+  const day = ((dayStreak - 1) % 30) + 1;
+  return DAILY_REWARD_SCHEDULE[day - 1]!;
 }
 
 /** Award a badge if not already earned. Returns definition if newly awarded. */

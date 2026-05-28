@@ -910,6 +910,41 @@ paths:
                 items:
                   $ref: "#/components/schemas/FitnessBar"
 
+  /players/me/daily-streak:
+    get:
+      operationId: getDailyStreak
+      tags: [players]
+      summary: Get the player's daily login streak state and 30-day reward calendar
+      responses:
+        "200":
+          description: Daily streak state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyStreakState"
+
+  /players/me/daily-claim:
+    post:
+      operationId: claimDailyReward
+      tags: [players]
+      summary: Claim today's daily login reward
+      responses:
+        "200":
+          description: Reward claimed and granted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyClaimResult"
+        "400":
+          description: Already claimed today or invalid request
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error: { type: string }
+
   /artifacts/world-notifications:
     get:
       operationId: getArtifactWorldNotifications
@@ -5832,6 +5867,63 @@ components:
         order:
           type: array
           items: { type: integer }
+
+    DailyRewardDay:
+      type: object
+      required: [day, coins, xp, kind, label, icon]
+      properties:
+        day:   { type: integer, description: "Day number (1-30)" }
+        coins: { type: integer }
+        xp:    { type: integer }
+        bonus: { type: string, description: "Optional bonus reward key e.g. rare_egg, streak_freeze, legendary_chest" }
+        kind:  { type: string, enum: [coins, xp, egg, artifact, chest] }
+        label: { type: string }
+        icon:  { type: string }
+
+    DailyStreakState:
+      type: object
+      required: [currentDay, streakBroken, alreadyClaimed, lastClaimedAt, schedule]
+      properties:
+        currentDay:    { type: integer, description: "Current streak day (1-30), or 1 if streak was just reset" }
+        streakBroken:  { type: boolean, description: "True if the streak reset today due to a missed day" }
+        alreadyClaimed: { type: boolean, description: "Whether today has already been claimed" }
+        lastClaimedAt: { type: ["string", "null"], format: date-time }
+        todayReward:
+          $ref: "#/components/schemas/DailyRewardDay"
+        schedule:
+          type: array
+          items:
+            $ref: "#/components/schemas/DailyRewardDay"
+
+    DailyClaimResult:
+      type: object
+      required: [ok, day, coinsGranted, xpGranted, streakDay, newStreakDay, eggAdded, newBadges]
+      properties:
+        ok:                { type: boolean }
+        day:               { type: integer }
+        coinsGranted:      { type: integer }
+        xpGranted:         { type: integer }
+        streakDay:         { type: integer, description: "Streak day after claim" }
+        newStreakDay:       { type: integer, description: "Next unclaimed day (for badge/UI purposes)" }
+        eggAdded:          { type: boolean }
+        bonus:             { type: ["string", "null"] }
+        artifactGranted:
+          nullable: true
+          type: object
+          required: [artifactId, artifactName]
+          properties:
+            artifactId:   { type: integer }
+            artifactName: { type: string }
+        newBadges:
+          type: array
+          items:
+            type: object
+            required: [key, name, icon, tier]
+            properties:
+              key:  { type: string }
+              name: { type: string }
+              icon: { type: string }
+              tier: { type: string }
 
     FitnessBar:
       type: object

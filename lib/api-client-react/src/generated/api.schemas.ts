@@ -995,6 +995,70 @@ export interface ReorderFeaturedArtifactsResponse {
   order: number[];
 }
 
+export type DailyRewardDayKind = typeof DailyRewardDayKind[keyof typeof DailyRewardDayKind];
+
+
+export const DailyRewardDayKind = {
+  coins: 'coins',
+  xp: 'xp',
+  egg: 'egg',
+  artifact: 'artifact',
+  chest: 'chest',
+} as const;
+
+export interface DailyRewardDay {
+  /** Day number (1-30) */
+  day: number;
+  coins: number;
+  xp: number;
+  /** Optional bonus reward key e.g. rare_egg, streak_freeze, legendary_chest */
+  bonus?: string;
+  kind: DailyRewardDayKind;
+  label: string;
+  icon: string;
+}
+
+export interface DailyStreakState {
+  /** Current streak day (1-30), or 1 if streak was just reset */
+  currentDay: number;
+  /** True if the streak reset today due to a missed day */
+  streakBroken: boolean;
+  /** Whether today has already been claimed */
+  alreadyClaimed: boolean;
+  /** @nullable */
+  lastClaimedAt: string | null;
+  todayReward?: DailyRewardDay;
+  schedule: DailyRewardDay[];
+}
+
+export type DailyClaimResultArtifactGranted = {
+  artifactId: number;
+  artifactName: string;
+} | null;
+
+export type DailyClaimResultNewBadgesItem = {
+  key: string;
+  name: string;
+  icon: string;
+  tier: string;
+};
+
+export interface DailyClaimResult {
+  ok: boolean;
+  day: number;
+  coinsGranted: number;
+  xpGranted: number;
+  /** Streak day after claim */
+  streakDay: number;
+  /** Next unclaimed day (for badge/UI purposes) */
+  newStreakDay: number;
+  eggAdded: boolean;
+  /** @nullable */
+  bonus?: string | null;
+  artifactGranted?: DailyClaimResultArtifactGranted;
+  newBadges: DailyClaimResultNewBadgesItem[];
+}
+
 export interface FitnessBar {
   barType: string;
   level: number;
@@ -3487,6 +3551,10 @@ export const GetSpeedLeaderboardMode = {
 
 export type GetArtifactsLeaderboardParams = {
 limit?: number;
+};
+
+export type ClaimDailyReward400 = {
+  error: string;
 };
 
 export type GetArtifactWorldNotificationsParams = {
