@@ -20,6 +20,7 @@ import { attachEntitlement, requirePremium } from "../services/subscriptionGuard
 import { blockMinorSocialWrite } from "../middlewares/minorGuard.ts";
 import { blockSuspendedSocialWrite } from "../middlewares/suspendedGuard.ts";
 import { socialWriteLimiter, postViewLimiter } from "../middlewares/rateLimiters.ts";
+import { selectTopComments } from "./socialCommentOrdering.ts";
 import { sendPushToPlayer } from "../services/pushNotifications.ts";
 import { notificationsTable } from "@workspace/db";
 import { createHmac } from "node:crypto";
@@ -122,14 +123,7 @@ async function enrichPost(
     if (viewerPlayerId && r.playerId === viewerPlayerId) myLikedByComment.set(r.commentId, true);
   }
 
-  // Sort: most-liked first, ties broken by recency (newer first).
-  const comments = [...allComments]
-    .sort((a, b) => {
-      const likeDiff = (likeCountByComment.get(b.id) ?? 0) - (likeCountByComment.get(a.id) ?? 0);
-      if (likeDiff !== 0) return likeDiff;
-      return b.createdAt.getTime() - a.createdAt.getTime();
-    })
-    .slice(0, 3);
+  const comments = selectTopComments(allComments, likeCountByComment, 3);
 
   const enrichedComments = await Promise.all(comments.map(async c => {
     const commentAuthor = await db.query.playersTable.findFirst({ where: eq(playersTable.id, c.playerId) });
