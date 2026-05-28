@@ -446,6 +446,7 @@ export default function Home() {
   const recentBadges: any[] = dash.recentBadges ?? [];
   const badgeCount = dash.badgeCount ?? 0;
   const streakFreezes = dash.streakFreezes ?? 0;
+  const streakShields = dash.streakShields ?? (dailyStreak?.streakShields ?? 0);
 
   return (
     <Layout>
@@ -540,6 +541,12 @@ export default function Home() {
               <div className="flex items-center gap-1 bg-blue-500/20 border border-blue-500/40 px-2 py-1 rounded-full">
                 <span className="text-sm">❄️</span>
                 <span className="font-black text-xs text-blue-400">{streakFreezes}</span>
+              </div>
+            )}
+            {streakShields > 0 && (
+              <div className="flex items-center gap-1 bg-cyan-500/10 border border-cyan-500/30 px-2 py-1 rounded-full" data-testid="home-shield-chip">
+                <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="font-black text-xs text-cyan-400">{streakShields}</span>
               </div>
             )}
             {/* Daily login streak badge */}
