@@ -4769,6 +4769,47 @@ export const AnalyzeMealImageResponse = zod.object({
 
 
 /**
+ * Sends a previously uploaded photo to a vision model for a physique
+assessment — estimated body fat %, muscle mass tier, a 1-10 physique
+score, observations, and personalised recommendations. Requires Premium
+entitlement. Returns `recognized=false` with a disclaimer when the
+model cannot reliably assess the image. Always includes a medical
+disclaimer reminding users this is an AI estimate, not clinical advice.
+
+ * @summary Estimate body fat % and physique score from a photo (Premium only)
+ */
+export const analyzeBodyScanBodyImageUrlMax = 500;
+
+
+export const analyzeBodyScanBodyImageUrlRegExp = new RegExp('^\/objects');
+export const analyzeBodyScanBodyUploadTokenMax = 256;
+
+
+
+export const AnalyzeBodyScanBody = zod.object({
+  "imageUrl": zod.string().max(analyzeBodyScanBodyImageUrlMax).regex(analyzeBodyScanBodyImageUrlRegExp),
+  "uploadToken": zod.string().min(1).max(analyzeBodyScanBodyUploadTokenMax),
+  "heightCm": zod.number().optional().describe('Optional — improves body fat estimate accuracy'),
+  "weightKg": zod.number().optional().describe('Optional — improves body fat estimate accuracy'),
+  "gender": zod.string().optional().describe('Optional — male\/female\/other')
+})
+
+export const analyzeBodyScanResponsePhysiqueScoreMax = 10;
+
+
+
+export const AnalyzeBodyScanResponse = zod.object({
+  "recognized": zod.boolean(),
+  "bodyFatPct": zod.number().optional().describe('Estimated body fat percentage'),
+  "muscleTier": zod.string().optional().describe('lean \/ average \/ above_average \/ athletic'),
+  "physiqueScore": zod.number().min(1).max(analyzeBodyScanResponsePhysiqueScoreMax).optional(),
+  "observations": zod.array(zod.string()).optional(),
+  "recommendations": zod.array(zod.string()).optional(),
+  "disclaimer": zod.string()
+})
+
+
+/**
  * @summary List nutrition challenges with the player's current progress
  */
 export const ListNutritionChallengesResponseItem = zod.object({

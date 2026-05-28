@@ -26,7 +26,8 @@ import {
   todayUtcDateString,
 } from "../services/dailyMacroReward.ts";
 import { notificationsTable } from "@workspace/db";
-import { recapPreviewLimiter } from "../middlewares/rateLimiters.ts";
+import { recapPreviewLimiter, scanLimiter } from "../middlewares/rateLimiters.ts";
+import { isPremium } from "../services/entitlement.ts";
 import { applyHatchlingXp } from "../services/hatchlingXp.ts";
 import { resolveActivePartner } from "../services/activePartner.ts";
 
@@ -1216,7 +1217,12 @@ const FALLBACK_ANALYSIS = {
 // meal photo needs after the client-side 8 MB upload cap.
 const MAX_IMAGE_BYTES_FOR_VISION = 6 * 1024 * 1024;
 
-router.post("/nutrition/analyze-image", requireAuth, attachPlayer, async (req, res) => {
+router.post("/nutrition/analyze-image", requireAuth, attachPlayer, scanLimiter, async (req, res) => {
+  if (!isPremium(req.player!)) {
+    res.status(403).json({ error: "premium_required", message: "AI photo scan is a Premium feature. Upgrade to unlock it." });
+    return;
+  }
+
   const body = AnalyzeImageBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "imageUrl and uploadToken required" }); return; }
 
@@ -1250,12 +1256,12 @@ router.post("/nutrition/analyze-image", requireAuth, attachPlayer, async (req, r
 
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-5-mini",
-      max_completion_tokens: 400,
+      model: "gpt-5.2",
+      max_completion_tokens: 500,
       messages: [
         {
           role: "system",
-          content: `You are a sports nutritionist analyzing a real food photo. Return ONLY valid JSON with these fields: recognized (boolean — false if the photo isn't food or you can't identify it), food_name (short string, e.g. "Grilled chicken, rice, broccoli"), description (1 short sentence describing the meal), calories (number), protein_g (number), carbs_g (number), fat_g (number), quality_score (1-10 integer reflecting protein density and macro balance), suggestions (array of 1-3 short improvement tips). If recognized=false, you may omit the macro fields. No markdown, no extra text.`,
+          content: `You are an elite sports nutritionist analyzing a real food photo. Return ONLY valid JSON with these fields: recognized (boolean — false if the photo isn't food or you can't identify it), food_name (short string, e.g. "Grilled chicken, rice, broccoli"), description (1 short sentence describing the meal), calories (number — be precise based on visible portion sizes), protein_g (number), carbs_g (number), fat_g (number), quality_score (1-10 integer: 9-10=optimal macros for athletes, 7-8=good, 5-6=average, 1-4=poor nutritional value), suggestions (array of 2-3 specific, actionable improvement tips). If recognized=false, you may omit the macro fields. No markdown, no extra text.`,
         },
         {
           role: "user",
@@ -1291,6 +1297,125 @@ router.post("/nutrition/analyze-image", requireAuth, attachPlayer, async (req, r
     res.json({ recognized: true, ...parsed });
   } catch (err) {
     req.log.error({ err }, "AI analyze-image error");
+    res.status(503).json({ error: "AI service unavailable" });
+  }
+});
+
+// ── POST /nutrition/body-scan ─────────────────────────────────────────────────
+// Vision-based body composition assessment from a full-body photo.
+// Premium only. Uses GPT-5.2 vision for best accuracy.
+const BodyScanBody = z.object({
+  imageUrl:    z.string().regex(/^\/objects\//, "imageUrl must be an /objects/ path").max(500),
+  uploadToken: z.string().min(1).max(256),
+  heightCm:    z.number().min(100).max(250).optional(),
+  weightKg:    z.number().min(30).max(300).optional(),
+  gender:      z.enum(["male", "female", "other"]).optional(),
+});
+
+const BODY_SCAN_DISCLAIMER =
+  "This is an AI visual estimate, not a medical measurement. Body fat % estimates from photos can vary by ±3–8%. For clinical accuracy, use DEXA, hydrostatic weighing, or skinfold calipers with a professional.";
+
+const BODY_SCAN_FALLBACK = {
+  recognized: false as const,
+  disclaimer: BODY_SCAN_DISCLAIMER,
+  observations: ["Photo wasn't clear enough for a reliable assessment. For best results, use a full-body photo in form-fitting clothing with good lighting."],
+  recommendations: ["Try again with a full-body photo in good lighting, standing straight, wearing form-fitting or minimal clothing."],
+};
+
+router.post("/nutrition/body-scan", requireAuth, attachPlayer, scanLimiter, async (req, res) => {
+  if (!isPremium(req.player!)) {
+    res.status(403).json({ error: "premium_required", message: "Body composition scan is a Premium feature. Upgrade to unlock it." });
+    return;
+  }
+
+  const body = BodyScanBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "imageUrl and uploadToken required" });
+    return;
+  }
+
+  const { imageUrl, uploadToken, heightCm, weightKg, gender } = body.data;
+
+  if (!verifyUploadToken(imageUrl, req.clerkUserId!, uploadToken)) {
+    res.status(403).json({ error: "Invalid uploadToken for imageUrl" });
+    return;
+  }
+
+  let base64: string;
+  let contentType: string;
+  try {
+    const file = await objectStorageService.getObjectEntityFile(imageUrl);
+    const [metadata] = await file.getMetadata();
+    contentType = (metadata.contentType as string) || "image/jpeg";
+    const size = Number(metadata.size ?? 0);
+    if (size > MAX_IMAGE_BYTES_FOR_VISION) {
+      res.status(400).json({ error: "Image too large for analysis" });
+      return;
+    }
+    const [buf] = await file.download();
+    base64 = buf.toString("base64");
+  } catch {
+    res.status(404).json({ error: "Image not found or expired" });
+    return;
+  }
+
+  // Build context string from optional measurements for improved accuracy.
+  const measurementContext = [
+    heightCm ? `Height: ${heightCm} cm` : null,
+    weightKg ? `Weight: ${weightKg} kg` : null,
+    gender ? `Gender: ${gender}` : null,
+  ].filter(Boolean).join(", ");
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5.2",
+      max_completion_tokens: 600,
+      messages: [
+        {
+          role: "system",
+          content: `You are an elite certified personal trainer and body composition specialist. Analyze the body photo and return ONLY valid JSON with these fields:
+- recognized (boolean — false if the photo does not clearly show a person or is unsuitable for assessment)
+- bodyFatPct (number — estimated body fat percentage, e.g. 18.5; omit if not recognized)
+- muscleTier (string — one of: "lean", "average", "above_average", "athletic"; omit if not recognized)
+- physiqueScore (integer 1-10 — 10=elite athlete, 8-9=very fit, 6-7=fit/active, 4-5=average, 1-3=needs significant work; omit if not recognized)
+- observations (array of 2-4 specific, non-judgmental observations about visible muscle groups, body composition, posture)
+- recommendations (array of 2-3 specific, actionable training/nutrition recommendations tailored to the visible physique)
+- disclaimer (string — always include: "${BODY_SCAN_DISCLAIMER}")
+
+Be conservative and precise. Use body fat ranges appropriate for the observed physique. Do NOT make comments about attractiveness. Focus only on composition and fitness metrics. No markdown, no extra text.`,
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: measurementContext
+                ? `Analyze this body composition photo. Known measurements: ${measurementContext}.`
+                : "Analyze this body composition photo.",
+            },
+            { type: "image_url", image_url: { url: `data:${contentType};base64,${base64}` } },
+          ],
+        },
+      ],
+    });
+
+    const raw = completion.choices[0]?.message?.content ?? "{}";
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      res.json({ ...BODY_SCAN_FALLBACK });
+      return;
+    }
+
+    if (!parsed.recognized) {
+      res.json({ ...BODY_SCAN_FALLBACK, ...(parsed.observations ? { observations: parsed.observations } : {}) });
+      return;
+    }
+
+    res.json({ disclaimer: BODY_SCAN_DISCLAIMER, ...parsed });
+  } catch (err) {
+    req.log.error({ err }, "AI body-scan error");
     res.status(503).json({ error: "AI service unavailable" });
   }
 });

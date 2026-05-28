@@ -94,6 +94,24 @@ export default function NutritionScreen() {
             <MacroCircle label="Fat" current={summary?.averages.fat ?? 0} target={summary?.targets.fat ?? 70} color="#a855f7" />
           </View>
 
+          {/* Body Composition Scan — Premium feature promo card */}
+          <View style={[styles.scanPromoCard, { backgroundColor: colors.card, borderColor: colors.primary + "55" }]}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
+              <Text style={{ fontSize: 22 }}>🔬</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.scanPromoTitle, { color: colors.foreground }]}>Body Composition Scan</Text>
+                <Text style={[styles.scanPromoSub, { color: colors.mutedForeground }]}>AI estimates body fat % from a photo · Premium</Text>
+              </View>
+            </View>
+            <Pressable
+              onPress={() => router.push("/")}
+              style={[styles.scanPromoBtn, { backgroundColor: colors.primary }]}
+            >
+              <Feather name="camera" size={14} color="#fff" />
+              <Text style={styles.scanPromoBtnText}>Scan</Text>
+            </Pressable>
+          </View>
+
           {/* Recent meals */}
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Meals</Text>
           {(posts?.posts?.length ?? 0) === 0 ? (
@@ -157,4 +175,9 @@ const styles = StyleSheet.create({
   mealTime: { fontSize: 11 },
   emptyCard: { borderRadius: 12, borderWidth: 1, padding: 24, alignItems: "center", gap: 8 },
   emptyText: { fontSize: 13 },
+  scanPromoCard: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 14, borderWidth: 1.5, padding: 14, marginBottom: 20 },
+  scanPromoTitle: { fontSize: 13, fontWeight: "700", marginBottom: 2 },
+  scanPromoSub: { fontSize: 11 },
+  scanPromoBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
+  scanPromoBtnText: { color: "#fff", fontSize: 12, fontWeight: "700" },
 });

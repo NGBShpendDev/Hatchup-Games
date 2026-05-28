@@ -201,6 +201,8 @@ import type {
   NutritionAnalyzeImageResult,
   NutritionAnalyzeInput,
   NutritionAnalyzeResult,
+  NutritionBodyScanInput,
+  NutritionBodyScanResult,
   NutritionChallenge,
   NutritionMacroTarget,
   NutritionNextMealSuggestion,
@@ -13907,6 +13909,84 @@ export const useAnalyzeMealImage = <TError = ErrorType<StorageErrorEnvelope>,
         TContext
       > => {
       return useMutation(getAnalyzeMealImageMutationOptions(options));
+    }
+
+export const getAnalyzeBodyScanUrl = () => {
+
+
+
+
+  return `/api/nutrition/body-scan`
+}
+
+/**
+ * Sends a previously uploaded photo to a vision model for a physique
+assessment — estimated body fat %, muscle mass tier, a 1-10 physique
+score, observations, and personalised recommendations. Requires Premium
+entitlement. Returns `recognized=false` with a disclaimer when the
+model cannot reliably assess the image. Always includes a medical
+disclaimer reminding users this is an AI estimate, not clinical advice.
+
+ * @summary Estimate body fat % and physique score from a photo (Premium only)
+ */
+export const analyzeBodyScan = async (nutritionBodyScanInput: NutritionBodyScanInput, options?: RequestInit): Promise<NutritionBodyScanResult> => {
+
+  return customFetch<NutritionBodyScanResult>(getAnalyzeBodyScanUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      nutritionBodyScanInput,)
+  }
+);}
+
+
+
+
+export const getAnalyzeBodyScanMutationOptions = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeBodyScan>>, TError,{data: BodyType<NutritionBodyScanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof analyzeBodyScan>>, TError,{data: BodyType<NutritionBodyScanInput>}, TContext> => {
+
+const mutationKey = ['analyzeBodyScan'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof analyzeBodyScan>>, {data: BodyType<NutritionBodyScanInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  analyzeBodyScan(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AnalyzeBodyScanMutationResult = NonNullable<Awaited<ReturnType<typeof analyzeBodyScan>>>
+    export type AnalyzeBodyScanMutationBody = BodyType<NutritionBodyScanInput>
+    export type AnalyzeBodyScanMutationError = ErrorType<StorageErrorEnvelope>
+
+    /**
+ * @summary Estimate body fat % and physique score from a photo (Premium only)
+ */
+export const useAnalyzeBodyScan = <TError = ErrorType<StorageErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof analyzeBodyScan>>, TError,{data: BodyType<NutritionBodyScanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof analyzeBodyScan>>,
+        TError,
+        {data: BodyType<NutritionBodyScanInput>},
+        TContext
+      > => {
+      return useMutation(getAnalyzeBodyScanMutationOptions(options));
     }
 
 export const getListNutritionChallengesUrl = () => {

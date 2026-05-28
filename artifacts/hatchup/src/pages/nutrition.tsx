@@ -50,6 +50,7 @@ import {
   useAddMealPostComment,
   useAnalyzeMealDescription,
   useAnalyzeMealImage,
+  useAnalyzeBodyScan,
   useListNutritionChallenges,
   useIncrementNutritionChallengeProgress,
   useGetNutritionMacroTarget,
@@ -73,7 +74,9 @@ import {
   type NutritionNextMealSuggestion,
   type NutritionAnalyzeResult,
   type NutritionAnalyzeImageResult,
+  type NutritionBodyScanResult,
 } from "@workspace/api-client-react";
+import { useSubscription } from "@/lib/subscription";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -144,6 +147,21 @@ export default function Nutrition() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Subscription / entitlement
+  const { data: sub } = useSubscription();
+  const isPremiumUser = sub?.tier === "premium";
+
+  // Body scan state
+  const [showBodyScan, setShowBodyScan] = useState(false);
+  const [bodyScanPreview, setBodyScanPreview] = useState<string | null>(null);
+  const [bodyScanImageUrl, setBodyScanImageUrl] = useState<string | null>(null);
+  const [bodyScanToken, setBodyScanToken] = useState<string | null>(null);
+  const [uploadingBodyScan, setUploadingBodyScan] = useState(false);
+  const [analyzingBodyScan, setAnalyzingBodyScan] = useState(false);
+  const [bodyScanResult, setBodyScanResult] = useState<NutritionBodyScanResult | null>(null);
+  const [bodyScanMeta, setBodyScanMeta] = useState<{ heightCm: string; weightKg: string; gender: "" | "male" | "female" | "other" }>({ heightCm: "", weightKg: "", gender: "" });
+  const bodyScanFileRef = useRef<HTMLInputElement>(null);
 
   const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB
   const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -438,6 +456,7 @@ export default function Nutrition() {
 
   const analyzeMutation = useAnalyzeMealDescription();
   const analyzeImageMutation = useAnalyzeMealImage();
+  const analyzeBodyScanMutation = useAnalyzeBodyScan();
 
   const handleAnalyzeImage = async () => {
     if (!imageUrl || !uploadToken) return;
@@ -493,6 +512,71 @@ export default function Nutrition() {
       toast({ title: "Analysis failed", description: errorMessage(err, "Try again in a moment."), variant: "destructive" });
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  // ── Body scan handlers ────────────────────────────────────────────────────
+  const handleBodyScanImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      toast({ title: "Unsupported image", description: "Use JPG, PNG, or WebP.", variant: "destructive" });
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast({ title: "Image too large", description: "Max size is 8 MB.", variant: "destructive" });
+      return;
+    }
+    setUploadingBodyScan(true);
+    setBodyScanPreview(URL.createObjectURL(file));
+    setBodyScanResult(null);
+    try {
+      const res = await fetch(`${BASE}/api/storage/uploads/request-url`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+      });
+      if (!res.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath, uploadToken: token } = await res.json();
+      const putRes = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      if (!putRes.ok) throw new Error("Upload failed");
+      setBodyScanImageUrl(objectPath);
+      setBodyScanToken(token ?? null);
+      toast({ title: "Photo uploaded!", description: "Ready to analyze." });
+    } catch {
+      setBodyScanPreview(null);
+      setBodyScanImageUrl(null);
+      setBodyScanToken(null);
+      toast({ title: "Upload failed", description: "Try a different photo.", variant: "destructive" });
+    } finally {
+      setUploadingBodyScan(false);
+      if (bodyScanFileRef.current) bodyScanFileRef.current.value = "";
+    }
+  };
+
+  const handleBodyScan = async () => {
+    if (!bodyScanImageUrl || !bodyScanToken) return;
+    setAnalyzingBodyScan(true);
+    try {
+      const payload = {
+        imageUrl: bodyScanImageUrl,
+        uploadToken: bodyScanToken,
+        ...(bodyScanMeta.heightCm ? { heightCm: Number(bodyScanMeta.heightCm) } : {}),
+        ...(bodyScanMeta.weightKg ? { weightKg: Number(bodyScanMeta.weightKg) } : {}),
+        ...(bodyScanMeta.gender   ? { gender: bodyScanMeta.gender }             : {}),
+      };
+      const data = await analyzeBodyScanMutation.mutateAsync({ data: payload });
+      setBodyScanResult(data as NutritionBodyScanResult);
+      if (!(data as NutritionBodyScanResult).recognized) {
+        toast({ title: "Photo not suitable", description: "Try a clearer full-body photo in good lighting.", variant: "destructive" });
+      } else {
+        toast({ title: "Scan complete!", description: `Est. body fat: ${(data as NutritionBodyScanResult).bodyFatPct ?? "?"}%` });
+      }
+    } catch (err) {
+      toast({ title: "Scan failed", description: errorMessage(err, "Try again in a moment."), variant: "destructive" });
+    } finally {
+      setAnalyzingBodyScan(false);
     }
   };
 
@@ -568,6 +652,151 @@ export default function Nutrition() {
         ) : weekly ? (
           <WeeklySummaryCard summary={weekly} />
         ) : null}
+
+        {/* Body Composition Scan card */}
+        <GlassCard glow="primary" className="p-4 mb-4">
+          <button
+            className="flex items-center justify-between w-full"
+            onClick={() => { if (isPremiumUser) setShowBodyScan(v => !v); }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🔬</span>
+              <div className="text-left">
+                <p className="font-black text-sm">Body Composition Scan</p>
+                <p className="text-[11px] text-muted-foreground">AI estimates body fat % from a photo</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {!isPremiumUser && (
+                <span className="text-[10px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full px-2 py-0.5">PREMIUM</span>
+              )}
+              <Sparkles className="w-4 h-4 text-primary" />
+            </div>
+          </button>
+
+          {!isPremiumUser && (
+            <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-300 flex items-center gap-2">
+              <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
+              <span>Upgrade to Premium to unlock AI body scans.</span>
+              <a href="/subscription" className="ml-auto font-black text-amber-400 hover:underline shrink-0">Upgrade →</a>
+            </div>
+          )}
+
+          {isPremiumUser && showBodyScan && (
+            <div className="mt-4 space-y-3">
+              {/* Photo upload */}
+              <input ref={bodyScanFileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleBodyScanImagePick} />
+              {!bodyScanPreview ? (
+                <button
+                  onClick={() => bodyScanFileRef.current?.click()}
+                  disabled={uploadingBodyScan}
+                  className="w-full rounded-xl border-2 border-dashed border-primary/30 py-8 flex flex-col items-center gap-2 hover:border-primary/60 transition-colors disabled:opacity-50"
+                >
+                  {uploadingBodyScan ? (
+                    <><Loader2 className="w-5 h-5 animate-spin text-primary" /><p className="text-xs text-muted-foreground">Uploading…</p></>
+                  ) : (
+                    <><Camera className="w-6 h-6 text-primary" /><p className="text-xs font-bold">Upload full-body photo</p><p className="text-[10px] text-muted-foreground">JPG, PNG, WebP · max 8 MB</p></>
+                  )}
+                </button>
+              ) : (
+                <div className="relative">
+                  <img src={bodyScanPreview} alt="Body scan preview" className="w-full max-h-64 object-contain rounded-xl" />
+                  <button
+                    onClick={() => { setBodyScanPreview(null); setBodyScanImageUrl(null); setBodyScanToken(null); setBodyScanResult(null); }}
+                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 text-white flex items-center justify-center"
+                  ><X className="w-3.5 h-3.5" /></button>
+                </div>
+              )}
+
+              {/* Optional measurements */}
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: "Height (cm)", key: "heightCm" as const, placeholder: "175" },
+                  { label: "Weight (kg)", key: "weightKg" as const, placeholder: "75" },
+                ].map(f => (
+                  <input
+                    key={f.key}
+                    type="number"
+                    placeholder={f.placeholder}
+                    value={bodyScanMeta[f.key]}
+                    onChange={e => setBodyScanMeta(m => ({ ...m, [f.key]: e.target.value }))}
+                    className="col-span-1 rounded-xl bg-muted/40 border border-border px-3 py-2 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                ))}
+                <select
+                  value={bodyScanMeta.gender}
+                  onChange={e => setBodyScanMeta(m => ({ ...m, gender: e.target.value as typeof m.gender }))}
+                  className="col-span-1 rounded-xl bg-muted/40 border border-border px-2 py-2 text-xs text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="">Gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <Button
+                size="sm"
+                className="w-full font-black"
+                onClick={handleBodyScan}
+                disabled={!bodyScanImageUrl || analyzingBodyScan}
+              >
+                {analyzingBodyScan ? (
+                  <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Scanning…</>
+                ) : (
+                  <><Sparkles className="w-3.5 h-3.5 mr-1.5" /> Run Body Composition Scan</>
+                )}
+              </Button>
+
+              {/* Results */}
+              {bodyScanResult && (
+                <div className={`rounded-xl border px-3 py-3 space-y-2 text-xs ${bodyScanResult.recognized ? "border-primary/30 bg-primary/5" : "border-yellow-500/30 bg-yellow-500/5"}`}>
+                  {bodyScanResult.recognized ? (
+                    <>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        {bodyScanResult.bodyFatPct != null && (
+                          <div className="rounded-lg bg-muted/30 py-2">
+                            <p className="font-black text-base text-primary">{bodyScanResult.bodyFatPct}%</p>
+                            <p className="text-[10px] text-muted-foreground font-bold">Body Fat</p>
+                          </div>
+                        )}
+                        {bodyScanResult.muscleTier && (
+                          <div className="rounded-lg bg-muted/30 py-2">
+                            <p className="font-black text-sm capitalize">{bodyScanResult.muscleTier.replace("_", " ")}</p>
+                            <p className="text-[10px] text-muted-foreground font-bold">Muscle Tier</p>
+                          </div>
+                        )}
+                        {bodyScanResult.physiqueScore != null && (
+                          <div className="rounded-lg bg-muted/30 py-2">
+                            <p className="font-black text-base text-primary">{bodyScanResult.physiqueScore}/10</p>
+                            <p className="text-[10px] text-muted-foreground font-bold">Physique</p>
+                          </div>
+                        )}
+                      </div>
+                      {(bodyScanResult.observations ?? []).length > 0 && (
+                        <div>
+                          <p className="font-black text-[10px] text-muted-foreground uppercase mb-1">Observations</p>
+                          <ul className="space-y-0.5">{(bodyScanResult.observations ?? []).map((o, i) => <li key={i} className="text-[11px] text-foreground/80">· {o}</li>)}</ul>
+                        </div>
+                      )}
+                      {(bodyScanResult.recommendations ?? []).length > 0 && (
+                        <div>
+                          <p className="font-black text-[10px] text-muted-foreground uppercase mb-1">Recommendations</p>
+                          <ul className="space-y-0.5">{(bodyScanResult.recommendations ?? []).map((r, i) => <li key={i} className="text-[11px] text-primary/80">→ {r}</li>)}</ul>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-yellow-300 text-[11px]">{(bodyScanResult.observations ?? ["Photo not suitable for analysis."])[0]}</p>
+                  )}
+                  {bodyScanResult.disclaimer && (
+                    <p className="text-[10px] text-muted-foreground/60 border-t border-border/30 pt-2 mt-1">{bodyScanResult.disclaimer}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </GlassCard>
 
         {/* Today progress strip — how today specifically is shaping up */}
         {streakError && !streak && (
@@ -880,19 +1109,27 @@ export default function Nutrition() {
                         </button>
                       </div>
                       {imageUrl && !uploadingImage && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-full text-purple-400 border-purple-500/40 hover:bg-purple-500/10 text-xs font-black"
-                          onClick={handleAnalyzeImage}
-                          disabled={analyzingImage}
-                        >
-                          {analyzingImage ? (
-                            <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Analyzing photo...</>
-                          ) : (
-                            <><Sparkles className="w-3 h-3 mr-1" /> {imageAiResult ? "Re-analyze photo" : "Analyze photo with AI"}</>
-                          )}
-                        </Button>
+                        isPremiumUser ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full text-purple-400 border-purple-500/40 hover:bg-purple-500/10 text-xs font-black"
+                            onClick={handleAnalyzeImage}
+                            disabled={analyzingImage}
+                          >
+                            {analyzingImage ? (
+                              <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Analyzing photo...</>
+                            ) : (
+                              <><Sparkles className="w-3 h-3 mr-1" /> {imageAiResult ? "Re-analyze photo" : "Analyze photo with AI"}</>
+                            )}
+                          </Button>
+                        ) : (
+                          <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                            <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
+                            <p className="text-[11px] text-amber-300 flex-1">AI photo analysis is Premium-only.</p>
+                            <a href="/subscription" className="text-[11px] font-black text-amber-400 hover:underline shrink-0">Upgrade →</a>
+                          </div>
+                        )
                       )}
                       {imageAiResult && (
                         <div className={`rounded-xl border px-3 py-2 text-[11px] ${

@@ -2670,6 +2670,41 @@ export interface NutritionAnalyzeImageResult {
   suggestions?: string[];
 }
 
+export interface NutritionBodyScanInput {
+  /**
+     * @maxLength 500
+     * @pattern ^/objects/
+     */
+  imageUrl: string;
+  /**
+     * @minLength 1
+     * @maxLength 256
+     */
+  uploadToken: string;
+  /** Optional — improves body fat estimate accuracy */
+  heightCm?: number;
+  /** Optional — improves body fat estimate accuracy */
+  weightKg?: number;
+  /** Optional — male/female/other */
+  gender?: string;
+}
+
+export interface NutritionBodyScanResult {
+  recognized: boolean;
+  /** Estimated body fat percentage */
+  bodyFatPct?: number;
+  /** lean / average / above_average / athletic */
+  muscleTier?: string;
+  /**
+     * @minimum 1
+     * @maximum 10
+     */
+  physiqueScore?: number;
+  observations?: string[];
+  recommendations?: string[];
+  disclaimer: string;
+}
+
 export interface NutritionChallenge {
   key: string;
   name: string;
