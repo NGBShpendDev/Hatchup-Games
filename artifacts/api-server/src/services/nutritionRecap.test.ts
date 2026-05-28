@@ -189,7 +189,21 @@ const {
   deriveHatchlingMood,
   buildRecapMessage,
   sendWeeklyRecapNotification,
+  computeWeeklyRecap,
 } = await import("./nutritionRecap.ts");
+
+function makePost(overrides: Partial<MealPost> & { playerId: number }): MealPost {
+  return {
+    name: "Meal",
+    emoji: "🍽️",
+    calories: 0,
+    proteinG: 0,
+    carbsG: 0,
+    fatG: 0,
+    createdAt: new Date(),
+    ...overrides,
+  };
+}
 
 describe("isoWeekKey", () => {
   it("returns year*100 + week for a mid-year date", () => {
@@ -449,5 +463,128 @@ describe("sendWeeklyRecapNotification", () => {
     assert.match(n.body, /didn't log any meals/);
     assert.equal(n.type, "nutrition_recap");
     assert.equal(n.link, "/nutrition");
+  });
+});
+
+describe("computeWeeklyRecap", () => {
+  beforeEach(() => {
+    reset();
+  });
+
+  it("averages macros per day logged, not per 7 calendar days", async () => {
+    state.players.set(1, { id: 1, physiqueGoal: "lean_athlete" });
+    // Two distinct days, 3000 total calories => avg 1500 per day logged
+    // (not 3000/7 ≈ 429)
+    state.posts = [
+      makePost({
+        playerId: 1,
+        calories: 1000, proteinG: 100, carbsG: 100, fatG: 30,
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      }),
+      makePost({
+        playerId: 1,
+        calories: 2000, proteinG: 200, carbsG: 200, fatG: 60,
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      }),
+    ];
+
+    const recap = await computeWeeklyRecap(1);
+    assert.ok(recap);
+    assert.equal(recap.daysLogged, 2);
+    assert.equal(recap.mealsLogged, 2);
+    assert.equal(recap.averages.calories, 1500);
+    assert.equal(recap.averages.protein, 150);
+    assert.equal(recap.averages.carbs, 150);
+    assert.equal(recap.averages.fat, 45);
+  });
+
+  it("caps each macro ratio at 1.5 so binge weeks don't inflate adherence", async () => {
+    state.players.set(1, { id: 1, physiqueGoal: "lean_athlete" });
+    // lean_athlete targets: 2200 cal, 170 p, 230 c, 65 f.
+    // Log a single huge day so averages = totals, all well above 1.5x targets.
+    state.posts = [
+      makePost({
+        playerId: 1,
+        calories: 100000, proteinG: 10000, carbsG: 10000, fatG: 10000,
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      }),
+    ];
+
+    const recap = await computeWeeklyRecap(1);
+    assert.ok(recap);
+    assert.equal(recap.ratios.calories, 1.5);
+    assert.equal(recap.ratios.protein, 1.5);
+    assert.equal(recap.ratios.carbs, 1.5);
+    assert.equal(recap.ratios.fat, 1.5);
+    // All four ratios capped at 1.5 → adherence = 1.5
+    assert.equal(recap.adherence, 1.5);
+  });
+
+  it("ranks top foods by frequency, case-insensitively, capped at 5", async () => {
+    state.players.set(1, { id: 1, physiqueGoal: "lean_athlete" });
+    const base = Date.now() - 1 * 24 * 60 * 60 * 1000;
+    // 6 distinct foods (after case folding) so we can see the cap kick in.
+    // Chicken: 3 entries with varied casing → should collapse to one with count 3.
+    state.posts = [
+      makePost({ playerId: 1, name: "Chicken", emoji: "🍗", createdAt: new Date(base) }),
+      makePost({ playerId: 1, name: "chicken", emoji: "🍗", createdAt: new Date(base + 1) }),
+      makePost({ playerId: 1, name: "CHICKEN", emoji: "🍗", createdAt: new Date(base + 2) }),
+      makePost({ playerId: 1, name: "Egg", emoji: "🥚", createdAt: new Date(base + 3) }),
+      makePost({ playerId: 1, name: "Egg", emoji: "🥚", createdAt: new Date(base + 4) }),
+      makePost({ playerId: 1, name: "Toast", emoji: "🍞", createdAt: new Date(base + 5) }),
+      makePost({ playerId: 1, name: "Salad", emoji: "🥗", createdAt: new Date(base + 6) }),
+      makePost({ playerId: 1, name: "Burger", emoji: "🍔", createdAt: new Date(base + 7) }),
+      makePost({ playerId: 1, name: "Pizza", emoji: "🍕", createdAt: new Date(base + 8) }),
+    ];
+
+    const recap = await computeWeeklyRecap(1);
+    assert.ok(recap);
+    assert.equal(recap.topFoods.length, 5, "top foods is capped at 5");
+    assert.equal(recap.topFoods[0]!.name, "Chicken");
+    assert.equal(recap.topFoods[0]!.count, 3);
+    assert.equal(recap.topFoods[1]!.name, "Egg");
+    assert.equal(recap.topFoods[1]!.count, 2);
+    // Remaining three slots are count-1 foods (Pizza was the 6th distinct → cut)
+    const restNames = recap.topFoods.slice(2).map((f) => f.name).sort();
+    assert.deepEqual(restNames, ["Burger", "Salad", "Toast"].sort());
+    assert.ok(!recap.topFoods.some((f) => f.name === "Pizza"));
+  });
+
+  it("fallback tip says 'short on calories' (no 'g') when calories is the biggest gap below target", async () => {
+    state.players.set(1, { id: 1, physiqueGoal: "lean_athlete" });
+    // lean_athlete: 2200 cal, 170 p, 230 c, 65 f. Hit targets on macros,
+    // but eat way under on calories so calories is the biggest |gap|.
+    state.posts = [
+      makePost({
+        playerId: 1,
+        calories: 200, proteinG: 170, carbsG: 230, fatG: 65,
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      }),
+    ];
+
+    const recap = await computeWeeklyRecap(1);
+    assert.ok(recap);
+    assert.equal(recap.aiSource, "fallback");
+    assert.match(recap.aiTip, /short on calories/);
+    assert.match(recap.aiTip, /2000 short on calories/);
+    assert.ok(!/g short on calories/.test(recap.aiTip), "no 'g' unit for calories");
+  });
+
+  it("fallback tip says 'over target on protein' with a 'g' unit when protein is the biggest gap above target", async () => {
+    state.players.set(1, { id: 1, physiqueGoal: "lean_athlete" });
+    // Stay near calorie/carb/fat targets, but blow past protein.
+    state.posts = [
+      makePost({
+        playerId: 1,
+        calories: 2200, proteinG: 320, carbsG: 230, fatG: 65,
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      }),
+    ];
+
+    const recap = await computeWeeklyRecap(1);
+    assert.ok(recap);
+    assert.equal(recap.aiSource, "fallback");
+    assert.match(recap.aiTip, /150g over target on protein/);
+    assert.ok(!/short on/.test(recap.aiTip));
   });
 });
