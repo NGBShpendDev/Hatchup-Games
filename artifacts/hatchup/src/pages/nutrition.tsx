@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Heart, MessageCircle, Zap, ChefHat, Plus, X, Sparkles, Droplets, Flame, Dumbbell, MoreHorizontal, Compass, Trophy, Camera, Loader2 } from "lucide-react";
+import { Heart, MessageCircle, Zap, ChefHat, Plus, X, Sparkles, Droplets, Flame, Dumbbell, MoreHorizontal, Compass, Trophy, Camera, Loader2, Target } from "lucide-react";
 import { ReportBlockMenu } from "@/components/report-block-menu";
 import { HatchlingReaction, type HatchlingReactionData } from "@/components/hatchling-reaction";
 
@@ -104,6 +104,19 @@ const MOOD_STYLES: Record<WeeklySummary["hatchlingMood"], { ring: string; bg: st
   hungry:   { ring: "ring-orange-500/60", bg: "from-orange-500/15 to-red-500/5",      label: "Hungry",      tint: "text-orange-300" },
   sad:      { ring: "ring-rose-500/60",   bg: "from-rose-500/15 to-pink-500/5",       label: "Underfed",    tint: "text-rose-300"   },
 };
+
+interface NutritionStreak {
+  currentStreak: number;
+  longestStreak: number;
+  lastHitDate: string | null;
+  hitToday: boolean;
+  today: {
+    totals: { calories: number; protein: number; carbs: number; fat: number };
+    target: { calories: number; protein: number; carbs: number; fat: number };
+    tolerance: number;
+  };
+}
+
 
 export default function Nutrition() {
   const { playerId, player } = usePlayer();
@@ -216,6 +229,12 @@ export default function Nutrition() {
     enabled: !!pid,
   });
 
+  const { data: streak } = useQuery<NutritionStreak>({
+    queryKey: ["nutrition-streak", pid],
+    queryFn: () => fetch(`${BASE}/api/nutrition/streak`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!pid,
+  });
+
   // ── Mutations ────────────────────────────────────────────────────────────────
   const likeMutation = useMutation({
     mutationFn: (postId: number) =>
@@ -285,6 +304,7 @@ export default function Nutrition() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["nutrition-posts", pid] });
       qc.invalidateQueries({ queryKey: ["nutrition-summary", pid] });
+      qc.invalidateQueries({ queryKey: ["nutrition-streak", pid] });
       // Refresh hatchling stats since nutrition can buff/debuff the active Hatchling.
       // Generated query keys are arrays starting with "/api/hatchlings" (list) or
       // "/api/hatchlings/:id" (detail) — match either by prefix.
@@ -300,7 +320,14 @@ export default function Nutrition() {
       setImageUrl(null);
       setUploadToken(null);
       setImagePreview(null);
-      if (data.newBadges?.length > 0) {
+      if (data.dailyMacroReward) {
+        const r = data.dailyMacroReward;
+        const nameBit = r.hatchlingReward ? `${r.hatchlingReward.hatchlingName} +${r.hatchlingReward.bondDelta} bond · ` : "";
+        toast({
+          title: `Daily macros hit! 🎯 ${r.currentStreak}-day streak`,
+          description: `${nameBit}+${r.playerXpDelta} XP · +${r.playerCoinsDelta} coins`,
+        });
+      } else if (data.newBadges?.length > 0) {
         toast({ title: "New badge unlocked! 🏅", description: data.newBadges.join(", ") });
       } else if (data.hatchlingStatChange) {
         const c = data.hatchlingStatChange;
@@ -385,17 +412,22 @@ export default function Nutrition() {
             </div>
             <div className="grid grid-cols-4 gap-2 mt-3">
               {[
-                { label: "Cals", val: macroTarget.calories, icon: <Flame className="w-3 h-3" />, color: "text-orange-400" },
-                { label: "Protein", val: `${macroTarget.protein}g`, icon: <Dumbbell className="w-3 h-3" />, color: "text-red-400" },
-                { label: "Carbs",   val: `${macroTarget.carbs}g`,   icon: <Zap className="w-3 h-3" />,      color: "text-yellow-400" },
-                { label: "Fat",     val: `${macroTarget.fat}g`,     icon: <Droplets className="w-3 h-3" />, color: "text-blue-400" },
-              ].map(m => (
-                <div key={m.label} className="bg-muted/30 rounded-xl p-2 text-center">
-                  <div className={`flex justify-center mb-1 ${m.color}`}>{m.icon}</div>
-                  <p className="font-black text-sm">{m.val}</p>
-                  <p className="text-[9px] text-muted-foreground font-bold uppercase">{m.label}</p>
-                </div>
-              ))}
+                { label: "Cals", val: macroTarget.calories, actual: streak?.today.totals.calories ?? 0, target: macroTarget.calories, icon: <Flame className="w-3 h-3" />, color: "text-orange-400" },
+                { label: "Protein", val: `${macroTarget.protein}g`, actual: streak?.today.totals.protein ?? 0, target: macroTarget.protein, icon: <Dumbbell className="w-3 h-3" />, color: "text-red-400" },
+                { label: "Carbs",   val: `${macroTarget.carbs}g`,   actual: streak?.today.totals.carbs ?? 0, target: macroTarget.carbs, icon: <Zap className="w-3 h-3" />,      color: "text-yellow-400" },
+                { label: "Fat",     val: `${macroTarget.fat}g`,     actual: streak?.today.totals.fat ?? 0, target: macroTarget.fat, icon: <Droplets className="w-3 h-3" />, color: "text-blue-400" },
+              ].map(m => {
+                const tol = streak?.today.tolerance ?? 0.10;
+                const ratio = m.target > 0 ? m.actual / m.target : 0;
+                const onTarget = ratio >= 1 - tol && ratio <= 1 + tol;
+                return (
+                  <div key={m.label} className={`rounded-xl p-2 text-center ${onTarget ? "bg-green-500/15 ring-1 ring-green-500/40" : "bg-muted/30"}`}>
+                    <div className={`flex justify-center mb-1 ${m.color}`}>{m.icon}</div>
+                    <p className="font-black text-sm">{Math.round(m.actual)}<span className="text-[9px] text-muted-foreground">/{m.val}</span></p>
+                    <p className="text-[9px] text-muted-foreground font-bold uppercase">{m.label}</p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -406,6 +438,41 @@ export default function Nutrition() {
         ) : weekly ? (
           <WeeklySummaryCard summary={weekly} />
         ) : null}
+
+        {/* Daily macro-target streak */}
+        {streak && (
+          <div className={`rounded-2xl border p-3 mb-4 flex items-center justify-between ${
+            streak.hitToday
+              ? "border-green-500/40 bg-gradient-to-r from-green-500/15 to-emerald-500/10"
+              : streak.currentStreak > 0
+                ? "border-orange-500/40 bg-gradient-to-r from-orange-500/15 to-amber-500/10"
+                : "border-border bg-card"
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${streak.hitToday ? "bg-green-500/30" : streak.currentStreak > 0 ? "bg-orange-500/30" : "bg-muted/40"}`}>
+                <Target className={`w-5 h-5 ${streak.hitToday ? "text-green-300" : streak.currentStreak > 0 ? "text-orange-300" : "text-muted-foreground"}`} />
+              </div>
+              <div>
+                <p className="font-black text-sm flex items-center gap-1.5">
+                  {streak.currentStreak > 0 ? `🔥 ${streak.currentStreak}-Day Macro Streak` : "Macro Streak"}
+                </p>
+                <p className="text-[11px] text-muted-foreground font-medium">
+                  {streak.hitToday
+                    ? "All four macros hit today — Hatchling bonus claimed."
+                    : streak.currentStreak > 0
+                      ? "Hit all four macros today to keep your streak alive."
+                      : "Hit all four macros within ±10% to start a streak."}
+                </p>
+              </div>
+            </div>
+            {streak.longestStreak > 0 && (
+              <div className="text-right">
+                <p className="text-[9px] uppercase font-bold text-muted-foreground">Best</p>
+                <p className="font-black text-sm">{streak.longestStreak}d</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-1 bg-muted/30 rounded-xl p-1 mb-4">

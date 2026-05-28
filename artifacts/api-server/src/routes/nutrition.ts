@@ -5,6 +5,7 @@ import {
   mealLikesTable,
   mealCommentsTable,
   nutritionChallengeProgressTable,
+  nutritionDailyStreaksTable,
   playersTable,
   groupMembersTable,
   hatchlingsTable,
@@ -186,6 +187,132 @@ function deriveQualityScoreFromMacros(
   return Math.max(1, Math.min(10, Math.round(score)));
 }
 
+// ── Daily macro-target streak reward ─────────────────────────────────────────
+// Sums today's meal macros for the player, compares against their daily target
+// (static fallback only — keeps the check deterministic and avoids burning an
+// AI call on every meal post). If all four macros are within ±10% of target and
+// we haven't already rewarded today, increment the streak and grant a bond/XP/
+// coins bonus to the active Hatchling. Idempotent per UTC date.
+const MACRO_TOLERANCE = 0.10;
+const STREAK_PLAYER_XP = 200;
+const STREAK_PLAYER_COINS = 50;
+const STREAK_HATCHLING_XP = 25;
+const STREAK_HATCHLING_BOND = 1;
+
+function todayUtcDateString(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function withinTolerance(actual: number, target: number): boolean {
+  if (target <= 0) return false;
+  const ratio = actual / target;
+  return ratio >= 1 - MACRO_TOLERANCE && ratio <= 1 + MACRO_TOLERANCE;
+}
+
+async function checkAndRewardDailyMacroTarget(playerId: number, player: typeof playersTable.$inferSelect) {
+  const today = todayUtcDateString();
+
+  // Short-circuit: already rewarded today
+  const existingStreak = await db.query.nutritionDailyStreaksTable.findFirst({
+    where: eq(nutritionDailyStreaksTable.playerId, playerId),
+  });
+  if (existingStreak?.rewardedOnDate && existingStreak.rewardedOnDate.toString() === today) {
+    return null;
+  }
+
+  const goal = player.physiqueGoal ?? "lean_athlete";
+  const target = MACRO_GOAL_TARGETS[goal] ?? MACRO_GOAL_TARGETS["lean_athlete"]!;
+
+  // Sum today's intake (UTC day) from meal_posts.
+  const totalsResult = await db.execute(sql`
+    SELECT
+      COALESCE(SUM(calories), 0)::float  AS calories,
+      COALESCE(SUM(protein_g), 0)::float AS protein,
+      COALESCE(SUM(carbs_g), 0)::float   AS carbs,
+      COALESCE(SUM(fat_g), 0)::float     AS fat
+    FROM meal_posts
+    WHERE player_id = ${playerId}
+      AND created_at >= (CURRENT_DATE AT TIME ZONE 'UTC')
+      AND created_at <  (CURRENT_DATE AT TIME ZONE 'UTC') + INTERVAL '1 day'
+  `);
+  const row = totalsResult.rows[0] as { calories: number; protein: number; carbs: number; fat: number };
+
+  const hit =
+    withinTolerance(row.calories, target.calories) &&
+    withinTolerance(row.protein,  target.protein)  &&
+    withinTolerance(row.carbs,    target.carbs)    &&
+    withinTolerance(row.fat,      target.fat);
+
+  if (!hit) return null;
+
+  // Compute new streak: +1 if yesterday was the previous hit, else reset to 1.
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const prevHit = existingStreak?.lastHitDate?.toString() ?? null;
+  const newCurrent = prevHit === yesterday ? (existingStreak!.currentStreak + 1) : 1;
+  const newLongest = Math.max(existingStreak?.longestStreak ?? 0, newCurrent);
+
+  if (existingStreak) {
+    await db.update(nutritionDailyStreaksTable)
+      .set({
+        currentStreak: newCurrent,
+        longestStreak: newLongest,
+        lastHitDate: today,
+        rewardedOnDate: today,
+        updatedAt: new Date(),
+      })
+      .where(eq(nutritionDailyStreaksTable.playerId, playerId));
+  } else {
+    await db.insert(nutritionDailyStreaksTable).values({
+      playerId,
+      currentStreak: newCurrent,
+      longestStreak: newLongest,
+      lastHitDate: today,
+      rewardedOnDate: today,
+    });
+  }
+
+  // Reward player.
+  await db.update(playersTable)
+    .set({
+      xp:    sql`xp + ${STREAK_PLAYER_XP}`,
+      coins: sql`coins + ${STREAK_PLAYER_COINS}`,
+    })
+    .where(eq(playersTable.id, playerId));
+
+  // Reward active Hatchling with bond + XP (same "active" selection as buff logic).
+  const active = await db.query.hatchlingsTable.findFirst({
+    where: eq(hatchlingsTable.playerId, playerId),
+    orderBy: [sql`${hatchlingsTable.lastWorkoutAt} DESC NULLS LAST`, desc(hatchlingsTable.createdAt)],
+  });
+
+  let hatchlingReward: { hatchlingId: number; hatchlingName: string; bondDelta: number; xpDelta: number } | null = null;
+  if (active) {
+    await db.update(hatchlingsTable)
+      .set({
+        friendshipLevel: sql`friendship_level + ${STREAK_HATCHLING_BOND}`,
+        xp: sql`xp + ${STREAK_HATCHLING_XP}`,
+      })
+      .where(eq(hatchlingsTable.id, active.id));
+    hatchlingReward = {
+      hatchlingId: active.id,
+      hatchlingName: active.name,
+      bondDelta: STREAK_HATCHLING_BOND,
+      xpDelta: STREAK_HATCHLING_XP,
+    };
+  }
+
+  return {
+    currentStreak: newCurrent,
+    longestStreak: newLongest,
+    playerXpDelta: STREAK_PLAYER_XP,
+    playerCoinsDelta: STREAK_PLAYER_COINS,
+    hatchlingReward,
+    goal,
+    totals: row,
+    target: { calories: target.calories, protein: target.protein, carbs: target.carbs, fat: target.fat },
+  };
+}
+
 router.post("/nutrition/posts", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const body = CreateMealPostBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
@@ -276,11 +403,70 @@ router.post("/nutrition/posts", requireAuth, attachPlayer, requirePlayerOwnershi
     hatchlingStatChange = await applyNutritionStatBuff(playerId, effectiveScore);
   }
 
+  // Daily macro-target streak check: rewards consistent daily nutrition, not just
+  // single high-quality meals. Idempotent — only fires once per UTC day.
+  let dailyMacroReward: Awaited<ReturnType<typeof checkAndRewardDailyMacroTarget>> = null;
+  const playerRow = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
+  if (playerRow) {
+    dailyMacroReward = await checkAndRewardDailyMacroTarget(playerId, playerRow);
+  }
+
   res.status(201).json({
     ...post,
     createdAt: post!.createdAt.toISOString(),
     newBadges,
     hatchlingStatChange,
+    dailyMacroReward,
+  });
+});
+
+// ── GET /nutrition/streak ─────────────────────────────────────────────────────
+// Returns the player's current daily-macro-target streak. Also reports today's
+// totals + target so the UI can render a progress meter without a second call.
+router.get("/nutrition/streak", requireAuth, attachPlayer, async (req, res) => {
+  const playerId = req.playerId!;
+  const today = todayUtcDateString();
+
+  const [streak, player] = await Promise.all([
+    db.query.nutritionDailyStreaksTable.findFirst({
+      where: eq(nutritionDailyStreaksTable.playerId, playerId),
+    }),
+    db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) }),
+  ]);
+
+  const goal = player?.physiqueGoal ?? "lean_athlete";
+  const target = MACRO_GOAL_TARGETS[goal] ?? MACRO_GOAL_TARGETS["lean_athlete"]!;
+
+  const totalsResult = await db.execute(sql`
+    SELECT
+      COALESCE(SUM(calories), 0)::float  AS calories,
+      COALESCE(SUM(protein_g), 0)::float AS protein,
+      COALESCE(SUM(carbs_g), 0)::float   AS carbs,
+      COALESCE(SUM(fat_g), 0)::float     AS fat
+    FROM meal_posts
+    WHERE player_id = ${playerId}
+      AND created_at >= (CURRENT_DATE AT TIME ZONE 'UTC')
+      AND created_at <  (CURRENT_DATE AT TIME ZONE 'UTC') + INTERVAL '1 day'
+  `);
+  const totals = totalsResult.rows[0] as { calories: number; protein: number; carbs: number; fat: number };
+
+  // If the player missed yesterday, the displayed streak should reflect that
+  // it has lapsed — even before the next reward write happens.
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const lastHit = streak?.lastHitDate?.toString() ?? null;
+  const stillActive = lastHit === today || lastHit === yesterday;
+  const displayedCurrent = stillActive ? (streak?.currentStreak ?? 0) : 0;
+
+  res.json({
+    currentStreak: displayedCurrent,
+    longestStreak: streak?.longestStreak ?? 0,
+    lastHitDate: lastHit,
+    hitToday: lastHit === today,
+    today: {
+      totals,
+      target: { calories: target.calories, protein: target.protein, carbs: target.carbs, fat: target.fat },
+      tolerance: MACRO_TOLERANCE,
+    },
   });
 });
 
