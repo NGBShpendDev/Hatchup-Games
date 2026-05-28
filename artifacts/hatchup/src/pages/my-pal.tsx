@@ -19,7 +19,7 @@ import { GlowBadge } from "@/components/ui/glow-badge";
 import { motion, useAnimation } from "framer-motion";
 import {
   Heart, Zap, Coffee, Star, Shield, TrendingUp, Footprints,
-  Swords, ChevronLeft, ChevronRight, ArrowLeft, AlertTriangle, Target, Clock,
+  Swords, ChevronLeft, ChevronRight, ArrowLeft, AlertTriangle, Target, Clock, Flame,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -170,7 +170,7 @@ export default function MyPalPage() {
   const [loyaltyMilestone, setLoyaltyMilestone] = useState<LoyaltyMilestoneData | null>(null);
   const palImgControls = useAnimation();
 
-  type PalSnapshot = { loyaltyScore: number; motivationScore: number; battleWins: number };
+  type PalSnapshot = { loyaltyScore: number; motivationScore: number; battleWins: number; comebackStreak: number };
   const prevPalRef = useRef<PalSnapshot | null>(null);
   const sadReactionFiredRef = useRef<number | null>(null);
 
@@ -291,7 +291,7 @@ export default function MyPalPage() {
             }, 2000);
           }
 
-          prevPalRef.current = { loyaltyScore: newLoyalty, motivationScore: newMotivation, battleWins: newBattleWins };
+          prevPalRef.current = { loyaltyScore: newLoyalty, motivationScore: newMotivation, battleWins: newBattleWins, comebackStreak: (updatedPal as any)?.comebackStreak ?? (pal as any).comebackStreak ?? 0 };
           queryClient.invalidateQueries({ queryKey: getGetHatchlingQueryKey(activePalId) });
         },
         onError: () => toast({ title: "Couldn't train", variant: "destructive" }),
@@ -328,6 +328,7 @@ export default function MyPalPage() {
       loyaltyScore: (pal as any).loyaltyScore ?? 50,
       motivationScore: (pal as any).motivationScore ?? 50,
       battleWins: (pal as any).battleWins ?? 0,
+      comebackStreak: (pal as any).comebackStreak ?? 0,
     };
 
     // On first encounter of this pal (or when switching pals) check for a sad
@@ -360,6 +361,18 @@ export default function MyPalPage() {
         kind: "comeback",
       });
       triggerPalBounce(true);
+
+      // Comeback streak milestone: every 3rd consecutive comeback earns a bonus
+      const newComebackStreak = current.comebackStreak;
+      if (newComebackStreak > 0 && newComebackStreak % 3 === 0) {
+        setTimeout(() => {
+          toast({
+            title: `🔥 Unstoppable! Comeback Streak ×${newComebackStreak}`,
+            description: `${pal.name} earned +50 XP & +5 Loyalty bonus for ${newComebackStreak} consecutive comebacks!`,
+          });
+        }, 1800);
+      }
+
       prevPalRef.current = current;
       return;
     }
@@ -498,6 +511,7 @@ export default function MyPalPage() {
   const powerScore = (pal as any).powerScore ?? (pal.level * 10);
   const stepsToEvolution = (pal as any).stepsToEvolution ?? 0;
   const moodState = (pal.moodState as string | undefined) ?? "happy";
+  const comebackStreak = (pal as any).comebackStreak ?? 0;
   const stage = pal.evolutionStage ?? 1;
   const palDailyStepGoal = (pal as any).dailyStepGoal ?? player?.dailyStepGoal ?? 8000;
   const palDeadlineHour = (pal as any).dailyWorkoutDeadlineHour ?? (player as any)?.dailyWorkoutDeadlineHour ?? 20;
@@ -619,6 +633,15 @@ export default function MyPalPage() {
                 {isActivePal && (
                   <Badge className="text-xs font-bold bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
                     <Star className="w-3 h-3 mr-1 fill-yellow-400" /> Active Pal
+                  </Badge>
+                )}
+                {comebackStreak >= 1 && (
+                  <Badge
+                    className="text-xs font-bold"
+                    style={{ background: "#7c2d12bb", borderColor: "#fb923c70", color: "#fb923c" }}
+                    title={`${comebackStreak} comeback${comebackStreak !== 1 ? "s" : ""} — ${3 - (comebackStreak % 3 === 0 ? 3 : comebackStreak % 3)} more to next bonus!`}
+                  >
+                    <Flame className="w-3 h-3 mr-1" /> {comebackStreak}× Comeback
                   </Badge>
                 )}
               </div>

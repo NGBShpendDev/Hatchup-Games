@@ -42,6 +42,9 @@ export const hatchlingsTable = pgTable("hatchlings", {
   lastDecayAt: timestamp("last_decay_at", { withTimezone: true }),
   motivationDecayAt: timestamp("motivation_decay_at", { withTimezone: true }),
   nutritionBuffExpiresAt: timestamp("nutrition_buff_expires_at", { withTimezone: true }),
+  // Consecutive comeback counter — increments every time the player recovers from
+  // a "sad" mood state by logging a workout. Every 3rd comeback triggers a bonus.
+  comebackStreak: integer("comeback_streak").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

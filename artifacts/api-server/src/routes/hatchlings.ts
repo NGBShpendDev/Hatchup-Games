@@ -470,6 +470,10 @@ router.patch("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
   const { lastWorkoutAt: lastWorkoutAtStr, ...restBody } = body.data;
   const updateData: HatchlingPatch = { ...restBody };
 
+  // Whether this workout triggered a comeback (was previously sad → now recovering)
+  let isComeback = false;
+  let comebackStreakBonus = false;
+
   // If a workout is being logged (lastWorkoutAt sent), auto-increment friendship, loyalty and set mood
   if (body.data.lastWorkoutAt) {
     if (current) {
@@ -481,6 +485,23 @@ router.patch("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
       (updateData as Record<string, unknown>).motivationScore = Math.min(100, (current.motivationScore ?? 50) + 10);
       // Reset the motivation decay clock so the 24h grace window starts fresh
       (updateData as Record<string, unknown>).motivationDecayAt = new Date();
+
+      // Detect comeback: was the hatchling in a sad mood state before this workout?
+      const prevMoodState = computeMoodState(current.lastWorkoutAt, current.motivationScore ?? 50);
+      if (prevMoodState === "sad") {
+        isComeback = true;
+        const newComebackStreak = (current.comebackStreak ?? 0) + 1;
+        (updateData as Record<string, unknown>).comebackStreak = newComebackStreak;
+
+        // Every 3rd consecutive comeback earns a milestone bonus: +50 XP, +5 extra loyalty
+        if (newComebackStreak % 3 === 0) {
+          comebackStreakBonus = true;
+          const bonusXp = 50;
+          const bonusLoyalty = 5;
+          (updateData as Record<string, unknown>).xp = Math.min(9999, (current.xp ?? 0) + bonusXp);
+          (updateData as Record<string, unknown>).loyaltyScore = Math.min(100, (current.loyaltyScore ?? 50) + 3 + bonusLoyalty);
+        }
+      }
     }
   }
 
@@ -510,6 +531,9 @@ router.patch("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {
     dailyWorkoutDeadlineHour: patchDeadlineHour,
     createdAt: updatedRows[0].createdAt.toISOString(),
     lastWorkoutAt: updatedRows[0].lastWorkoutAt?.toISOString() ?? null,
+    // Comeback streak metadata — frontend uses these to trigger "Unstoppable!" toast
+    isComeback,
+    comebackStreakBonus,
   });
 });
 
