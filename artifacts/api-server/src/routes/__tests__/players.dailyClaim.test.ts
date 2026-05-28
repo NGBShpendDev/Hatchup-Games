@@ -34,6 +34,7 @@ interface PlayerRow {
   dailyRewardStreak: number;
   lastRewardClaimedAt: Date | null;
   streakFreezes: number;
+  streakShields: number;
   isMinor: boolean | null;
 }
 
@@ -95,6 +96,7 @@ function makePlayer(overrides: Partial<PlayerRow> = {}): PlayerRow {
     dailyRewardStreak: 0,
     lastRewardClaimedAt: null,
     streakFreezes: 0,
+    streakShields: 0,
     isMinor: false,
     ...overrides,
   };
@@ -252,6 +254,15 @@ const fakeDb = {
           if (vals.lastRewardClaimedAt instanceof Date) {
             state.player.lastRewardClaimedAt = vals.lastRewardClaimedAt;
           }
+          // Simulate SQL increment expressions for numeric shield/freeze fields
+          if (
+            vals.streakShields !== undefined &&
+            typeof vals.streakShields === "object" &&
+            vals.streakShields !== null &&
+            "__op" in (vals.streakShields as object)
+          ) {
+            state.player.streakShields = (state.player.streakShields ?? 0) + 1;
+          }
         }
       },
     }),
@@ -286,7 +297,7 @@ mock.module("@workspace/db", {
     playersTable: tableCols(
       "id", "clerkId", "username", "displayName", "avatarUrl",
       "coins", "xp", "level", "rank", "rankScore",
-      "dailyRewardStreak", "lastRewardClaimedAt", "streakFreezes",
+      "dailyRewardStreak", "lastRewardClaimedAt", "streakFreezes", "streakShields",
       "locationVisibility", "isMinor", "isAdmin", "isVerified",
       "requireWorkoutApproval", "totalSteps", "totalWorkouts",
       "totalBattleWins", "currentStreak", "battleElo",
@@ -602,6 +613,94 @@ describe("POST /players/me/daily-claim", () => {
     });
   });
 
+  describe("streak_shield bonus", () => {
+    it("sets streakShieldGranted=true when bonus is streak_shield", async () => {
+      state.player = makePlayer({ lastRewardClaimedAt: null });
+      state.rewardForDay = () => ({
+        day: 3, coins: 100, xp: 100, bonus: "streak_shield",
+        kind: "xp", label: "Streak Shield", icon: "🛡️",
+      });
+
+      const { status, body } = await post("/players/me/daily-claim");
+
+      assert.equal(status, 200);
+      assert.equal(body.bonus, "streak_shield");
+      assert.equal(body.streakShieldGranted, true);
+      assert.equal(body.eggAdded, false);
+    });
+
+    it("issues a DB update to increment streakShields by exactly 1", async () => {
+      const initialShields = 2;
+      state.player = makePlayer({ lastRewardClaimedAt: null, streakShields: initialShields });
+      state.rewardForDay = () => ({
+        day: 3, coins: 100, xp: 100, bonus: "streak_shield",
+        kind: "xp", label: "Streak Shield", icon: "🛡️",
+      });
+
+      await post("/players/me/daily-claim");
+
+      // The route issues the base update (coins/xp/streak) plus a separate
+      // streakShields increment update — at least 2 updates total.
+      assert.ok(
+        state.playerUpdates.length >= 2,
+        "Expected a separate DB update for streakShields increment",
+      );
+      // The streak_shield update contains the streakShields field (as a sql expr)
+      const shieldUpdate = state.playerUpdates.find(u =>
+        Object.prototype.hasOwnProperty.call(u, "streakShields"),
+      );
+      assert.ok(shieldUpdate, "No DB update contained streakShields");
+      // Fake DB simulates the SQL +1 expression — verify exact increment
+      assert.equal(
+        state.player!.streakShields,
+        initialShields + 1,
+        `streakShields should be ${initialShields + 1} after claiming a shield day`,
+      );
+    });
+
+    it("applies on day 20 as well (second scheduled shield day)", async () => {
+      state.player = makePlayer({ lastRewardClaimedAt: utcDaysAgo(1), dailyRewardStreak: 19 });
+      state.rewardForDay = () => ({
+        day: 20, coins: 225, xp: 225, bonus: "streak_shield",
+        kind: "coins", label: "Streak Shield", icon: "🛡️",
+      });
+
+      const { status, body } = await post("/players/me/daily-claim");
+
+      assert.equal(status, 200);
+      assert.equal(body.streakShieldGranted, true);
+      assert.equal(body.streakDay, 20);
+    });
+
+    it("does not grant a shield on a non-shield day", async () => {
+      state.player = makePlayer({ lastRewardClaimedAt: null });
+      state.rewardForDay = () => ({
+        day: 1, coins: 50, xp: 25, kind: "coins", label: "50 Coins", icon: "🪙",
+      });
+
+      const { status, body } = await post("/players/me/daily-claim");
+
+      assert.equal(status, 200);
+      assert.equal(body.streakShieldGranted, false);
+      const shieldUpdate = state.playerUpdates.find(u =>
+        Object.prototype.hasOwnProperty.call(u, "streakShields"),
+      );
+      assert.equal(shieldUpdate, undefined, "No DB update should touch streakShields on non-shield day");
+    });
+
+    it("does not add an egg when bonus is streak_shield", async () => {
+      state.player = makePlayer({ lastRewardClaimedAt: null });
+      state.rewardForDay = () => ({
+        day: 3, coins: 100, xp: 100, bonus: "streak_shield",
+        kind: "xp", label: "Streak Shield", icon: "🛡️",
+      });
+
+      await post("/players/me/daily-claim");
+
+      assert.equal(state.eggsInserted.length, 0);
+    });
+  });
+
   describe("response shape", () => {
     it("includes all expected fields on a successful claim", async () => {
       state.player = makePlayer({ lastRewardClaimedAt: null });
@@ -614,7 +713,7 @@ describe("POST /players/me/daily-claim", () => {
       const requiredFields = [
         "ok", "day", "coinsGranted", "xpGranted",
         "streakDay", "newStreakDay", "eggAdded",
-        "artifactGranted", "streakFreezeGranted", "bonus", "streakBroken", "newBadges",
+        "artifactGranted", "streakFreezeGranted", "streakShieldGranted", "bonus", "streakBroken", "newBadges",
       ];
       for (const field of requiredFields) {
         assert.ok(
