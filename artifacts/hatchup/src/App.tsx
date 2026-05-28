@@ -54,6 +54,7 @@ import NotificationsPage from "@/pages/notifications";
 import PostDetail from "@/pages/post-detail";
 import { PageTransition } from "@/components/page-transition";
 import { EpicMomentProvider } from "@/components/epic-moment-overlay";
+import { EvolutionShareProvider } from "@/components/evolution-share-provider";
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({ onError: handleAccountSuspendedError }),
@@ -304,7 +305,9 @@ function HomeRedirect() {
       <Show when="signed-in">
         <PlayerProvider>
           <EpicMomentProvider>
-            <AppRoutes />
+            <EvolutionShareProvider>
+              <AppRoutes />
+            </EvolutionShareProvider>
           </EpicMomentProvider>
         </PlayerProvider>
       </Show>

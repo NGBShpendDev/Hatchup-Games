@@ -23,7 +23,6 @@ import { ArrowLeft, Zap, Heart, Coffee, Shield, Trash2, ArrowUpCircle, Sword, St
 import { ComposeSheet } from "@/components/compose-sheet";
 import { ErrorCard } from "@/components/error-card";
 import { useToast } from "@/hooks/use-toast";
-import { ToastAction } from "@/components/ui/toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEpicMomentQueue } from "@/components/epic-moment-overlay";
 
@@ -160,14 +159,10 @@ export default function HatchlingDetail() {
   const prevStatsRef = useRef<{ happiness: number; energy: number } | null>(null);
   const [reaction, setReaction] = useState<HatchlingReactionData | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
-  // When the player just evolved their Pal, prefill the composer with a
-  // rich evolution_reveal payload so the share lands in the feed as the
-  // dedicated celebration card (sprite + stage badges + stat deltas)
-  // instead of a plain text post.
-  const [evolutionShare, setEvolutionShare] = useState<{
-    content: string;
-    metadata: Record<string, unknown>;
-  } | null>(null);
+  // The "Share this evolution!" toast + ComposeSheet flow is handled
+  // centrally by EvolutionShareProvider so it fires from any evolve
+  // mutation site (detail page, future compete results, auto-evolves,
+  // event rewards). This page only owns the manual "Share <name>" button.
 
   useEffect(() => {
     if (!hatchling) return;
@@ -250,8 +245,6 @@ export default function HatchlingDetail() {
   const handleEvolve = () => {
     if (!hatchling) return;
     const preStage = hatchling.evolutionStage ?? 1;
-    const preLevel = hatchling.level ?? 1;
-    const preXp = hatchling.xp ?? 0;
     evolveMutation.mutate(
       { id: hatchlingId, data: { triggerId: 1 } },
       {
@@ -268,55 +261,8 @@ export default function HatchlingDetail() {
             realmColor: realmCfg?.color,
             realmEmoji: realmCfg?.emoji,
           });
-          // Build the structured evolution_reveal share payload so the
-          // post lands in the feed as the dedicated celebration card.
-          const newLevel = result?.level ?? preLevel + 2;
-          const newXp = result?.xp ?? preXp + 500;
-          const statDeltas: Record<string, number> = {
-            level: newLevel - preLevel,
-            xp: newXp - preXp,
-          };
-          const toStageName = STAGE_LABELS[newStage]?.name;
-          const fromStageName = STAGE_LABELS[preStage]?.name;
-          const evolutionType = (result?.evolutionType ?? hatchling.evolutionType) as string | undefined;
-          const headline = evolutionType
-            ? `✨ ${hatchling.name} evolved into ${evolutionType}!`
-            : `✨ ${hatchling.name} just evolved!`;
-          const stageLine = toStageName
-            ? `Stage ${preStage} → Stage ${newStage} (${toStageName})`
-            : `Stage ${preStage} → Stage ${newStage}`;
-          const shareData = {
-            content: `${headline}\n${stageLine}`,
-            metadata: {
-              hatchlingId: hatchling.id,
-              hatchlingName: hatchling.name,
-              fromStage: preStage,
-              toStage: newStage,
-              ...(fromStageName ? { fromStageName } : {}),
-              ...(toStageName ? { toStageName } : {}),
-              ...(realm ? { realm } : {}),
-              ...(result?.imageUrl ? { imageUrl: result.imageUrl as string } : hatchling.imageUrl ? { imageUrl: hatchling.imageUrl } : {}),
-              statDeltas,
-            },
-          };
-          setEvolutionShare(shareData);
-          const evolvedLabel = toStageName ? `Stage ${newStage} (${toStageName})` : `Stage ${newStage}`;
-          toast({
-            title: "Evolution Complete!",
-            description: `${hatchling.name} reached ${evolvedLabel}. Share the moment!`,
-            action: (
-              <ToastAction
-                altText="Share this evolution"
-                onClick={() => {
-                  setEvolutionShare(shareData);
-                  setComposeOpen(true);
-                }}
-                data-testid="toast-action-share-evolution"
-              >
-                Share this evolution!
-              </ToastAction>
-            ),
-          });
+          // The "Share this evolution!" toast + ComposeSheet are surfaced
+          // by EvolutionShareProvider listening on the mutation cache.
           queryClient.invalidateQueries({ queryKey: getGetHatchlingQueryKey(hatchlingId) });
         },
         onError: () => {
@@ -679,13 +625,11 @@ export default function HatchlingDetail() {
       {player && (
         <ComposeSheet
           open={composeOpen}
-          onClose={() => { setComposeOpen(false); setEvolutionShare(null); }}
+          onClose={() => setComposeOpen(false)}
           playerId={player.id}
           initialCreatureId={hatchling.id}
-          initialPostType={evolutionShare ? "evolution_reveal" : "general"}
-          initialContent={evolutionShare?.content}
-          initialMetadata={evolutionShare?.metadata}
-          title={evolutionShare ? `Celebrate ${hatchling.name}'s evolution ✨` : `Share ${hatchling.name} ✨`}
+          initialPostType="general"
+          title={`Share ${hatchling.name} ✨`}
         />
       )}
     </Layout>
