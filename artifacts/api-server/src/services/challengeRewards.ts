@@ -65,8 +65,27 @@ export type RewardParticipant = {
   eliminatedRound: number | null;
 };
 
+export type ClaimOutcome =
+  | { kind: "claimed"; challenge: RewardChallenge }
+  | { kind: "noop"; reason: "not_found" | "not_active" | "not_ended" };
+
 export interface RewardStore {
-  getChallenge(id: number): Promise<RewardChallenge | null>;
+  /**
+   * Atomically transition the challenge from `status="active"` to
+   * `status="completed"` iff the challenge exists, is still active, and its
+   * `endAt` is in the past. The transition MUST be performed in a single
+   * conditional write (e.g. `UPDATE ... WHERE status='active' RETURNING`
+   * or a `SELECT ... FOR UPDATE` inside a transaction) so that under
+   * concurrent finalize attempts exactly one caller receives `"claimed"`
+   * and every other caller receives `"noop"`. The claimed caller is the
+   * only one that pays out rewards; this is what guarantees rewards are
+   * never double-paid even if the leaderboard route auto-finalizes the
+   * same challenge from two requests at the same time.
+   */
+  claimChallengeForFinalization(
+    id: number,
+    now: Date,
+  ): Promise<ClaimOutcome>;
   getParticipants(challengeId: number): Promise<RewardParticipant[]>;
   setParticipantRank(participantId: number, rank: number): Promise<void>;
   grantPlayerReward(
@@ -75,7 +94,6 @@ export interface RewardStore {
     coins: number,
   ): Promise<void>;
   awardChampion(playerId: number, challengeId: number): Promise<void>;
-  markCompleted(challengeId: number): Promise<void>;
 }
 
 export type DistributionRanking = {
@@ -94,10 +112,16 @@ export async function distributeChallengeRewards(
   challengeId: number,
   now: Date = new Date(),
 ): Promise<DistributionOutcome> {
-  const challenge = await store.getChallenge(challengeId);
-  if (!challenge) return { kind: "noop", reason: "not_found" };
-  if (challenge.status !== "active") return { kind: "noop", reason: "not_active" };
-  if (now < challenge.endAt) return { kind: "noop", reason: "not_ended" };
+  // Concurrency: rather than read-then-write (which can race when two
+  // requests both auto-finalize the same expired challenge), the store
+  // performs a single conditional write that transitions
+  // `status: "active" -> "completed"` and returns the row only if it won
+  // the claim. Losers receive a "not_active" noop and skip every payout
+  // side effect below, so rewards can never double-pay even if multiple
+  // callers reach `distributeChallengeRewards` at the same instant.
+  const claim = await store.claimChallengeForFinalization(challengeId, now);
+  if (claim.kind === "noop") return claim;
+  const challenge = claim.challenge;
 
   // Rank every participant — survivors first, then eliminated players by
   // `eliminatedRound` desc, ties broken by `currentValue` desc. This is the
@@ -133,6 +157,8 @@ export async function distributeChallengeRewards(
     rankings.push({ participantId: p.id, playerId: p.playerId, rank, grant });
   }
 
-  await store.markCompleted(challengeId);
+  // No explicit markCompleted: the atomic claim above already flipped
+  // `status` to `"completed"`. That ordering is what gives us idempotency
+  // under concurrent finalize attempts.
   return { kind: "completed", rankings };
 }

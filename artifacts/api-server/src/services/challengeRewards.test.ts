@@ -54,12 +54,30 @@ type FakeState = {
   ranksSet: Array<{ participantId: number; rank: number }>;
   grants: Array<{ playerId: number; xp: number; coins: number }>;
   champions: number[];
+  /**
+   * Number of callers that successfully won the atomic claim — equivalent
+   * to the old `markCompletedCalls` counter and the canonical signal that
+   * a finalize attempt actually paid out rewards. Under concurrent
+   * `distributeChallengeRewards` invocations this must stay at 1.
+   */
   markCompletedCalls: number;
+};
+
+type RewardStoreHooks = {
+  /**
+   * Optional async hook fired inside `claimChallengeForFinalization`
+   * AFTER the active-status check but BEFORE the status flip. Used by
+   * the concurrency test to interleave two in-flight claim attempts so
+   * both would observe `status="active"` if the implementation were not
+   * actually atomic.
+   */
+  beforeClaimCommit?: () => Promise<void>;
 };
 
 function makeRewardStore(
   initial: RewardChallenge,
   participants: RewardParticipant[],
+  hooks: RewardStoreHooks = {},
 ): { store: RewardStore; state: FakeState } {
   const state: FakeState = {
     challenge: { ...initial },
@@ -70,8 +88,32 @@ function makeRewardStore(
     markCompletedCalls: 0,
   };
   const store: RewardStore = {
-    async getChallenge() {
-      return { ...state.challenge };
+    async claimChallengeForFinalization(_id, now) {
+      // Snapshot the pre-claim row, run the optional interleave hook,
+      // then perform the status flip as a single "atomic" step on the
+      // shared state object. JavaScript is single-threaded so the
+      // commit itself can't be torn — the hook is what lets the test
+      // simulate two claims that both passed the active-status check
+      // before either committed.
+      if (state.challenge.status !== "active") {
+        return { kind: "noop", reason: "not_active" };
+      }
+      if (now < state.challenge.endAt) {
+        return { kind: "noop", reason: "not_ended" };
+      }
+      const snapshot: RewardChallenge = { ...state.challenge };
+      if (hooks.beforeClaimCommit) {
+        await hooks.beforeClaimCommit();
+      }
+      // Re-check after the await — the sibling caller may have already
+      // committed the claim. This mirrors the conditional UPDATE in the
+      // DB-backed store: only one caller's flip can win.
+      if (state.challenge.status !== "active") {
+        return { kind: "noop", reason: "not_active" };
+      }
+      state.challenge.status = "completed";
+      state.markCompletedCalls += 1;
+      return { kind: "claimed", challenge: snapshot };
     },
     async getParticipants() {
       return state.participants.map(p => ({ ...p }));
@@ -86,10 +128,6 @@ function makeRewardStore(
     },
     async awardChampion(playerId, _challengeId) {
       state.champions.push(playerId);
-    },
-    async markCompleted() {
-      state.markCompletedCalls += 1;
-      state.challenge.status = "completed";
     },
   };
   return { store, state };
@@ -288,12 +326,11 @@ describe("distributeChallengeRewards", () => {
 
   it("is a no-op when the challenge does not exist", async () => {
     const store: RewardStore = {
-      async getChallenge() { return null; },
+      async claimChallengeForFinalization() { return { kind: "noop", reason: "not_found" }; },
       async getParticipants() { throw new Error("should not be called"); },
       async setParticipantRank() { throw new Error("should not be called"); },
       async grantPlayerReward() { throw new Error("should not be called"); },
       async awardChampion() { throw new Error("should not be called"); },
-      async markCompleted() { throw new Error("should not be called"); },
     };
     const outcome = await distributeChallengeRewards(store, 999, NOW);
     assert.equal(outcome.kind, "noop");
@@ -347,5 +384,76 @@ describe("distributeChallengeRewards", () => {
       { playerId: 20, xp: 60, coins: 30 },
       { playerId: 30, xp: 30, coins: 15 },
     ]);
+  });
+
+  // Regression: the leaderboard route auto-calls `finalizeChallenge` for
+  // expired challenges on every read, so two reads landing in the same
+  // tick used to both pass the `status === "active"` guard, both rank
+  // participants, and both pay out XP/coins before either could flip the
+  // status to "completed". The atomic claim moves the status flip BEFORE
+  // any payout, so only the winning caller actually grants rewards.
+  it("does not double-pay rewards when two finalize attempts race", async () => {
+    let gate: (() => void) | null = null;
+    const firstClaimReachedCommit = new Promise<void>((resolve) => {
+      gate = resolve;
+    });
+    let calls = 0;
+
+    const { store, state } = makeRewardStore(
+      { id: 99, status: "active", endAt: PAST, isElimination: true, rewardXp: 100, rewardCoins: 50 },
+      [
+        { id: 1, playerId: 10, currentValue: 80, eliminated: false, eliminatedRound: null },
+        { id: 2, playerId: 20, currentValue: 60, eliminated: false, eliminatedRound: null },
+        { id: 3, playerId: 30, currentValue: 40, eliminated: false, eliminatedRound: null },
+      ],
+      {
+        // Pause the FIRST claim attempt after it has snapshotted the
+        // active row but before it commits the status flip. Release it
+        // only after the SECOND caller has also entered claim and
+        // observed the same active row — i.e. both callers are mid-
+        // flight at the same time, which is exactly the race the
+        // original bug triggered.
+        async beforeClaimCommit() {
+          calls += 1;
+          if (calls === 1) {
+            await firstClaimReachedCommit;
+          }
+        },
+      },
+    );
+
+    const first = distributeChallengeRewards(store, 99, NOW);
+    // Yield so the first claim reaches its pause point before we start
+    // the second caller, then release once both are inside the hook.
+    await Promise.resolve();
+    const second = distributeChallengeRewards(store, 99, NOW).then(async (r) => {
+      gate?.();
+      return r;
+    });
+
+    const [a, b] = await Promise.all([first, second]);
+
+    // Exactly one caller wins the claim and pays out; the other gets
+    // a "not_active" noop with no grants.
+    const completed = [a, b].filter(r => r.kind === "completed");
+    const noops = [a, b].filter(r => r.kind === "noop");
+    assert.equal(completed.length, 1, "exactly one finalize attempt should pay rewards");
+    assert.equal(noops.length, 1, "the losing finalize attempt should be a noop");
+    assert.equal((noops[0] as { reason: string }).reason, "not_active");
+
+    // Reward side effects fire exactly once across both callers.
+    assert.equal(state.markCompletedCalls, 1);
+    assert.equal(state.challenge.status, "completed");
+    assert.deepEqual(state.grants, [
+      { playerId: 10, xp: 200, coins: 100 },
+      { playerId: 20, xp: 60, coins: 30 },
+      { playerId: 30, xp: 30, coins: 15 },
+    ]);
+    assert.deepEqual(state.champions, [10]);
+    // Ranks are persisted exactly one time per participant.
+    assert.deepEqual(
+      state.ranksSet.map(r => r.participantId).sort((x, y) => x - y),
+      [1, 2, 3],
+    );
   });
 });
