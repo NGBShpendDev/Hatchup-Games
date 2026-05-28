@@ -37,6 +37,7 @@ import FamilyPage from "@/pages/family";
 import SubscriptionPage from "@/pages/subscription";
 import PlayerProfile from "@/pages/player-profile";
 import NotificationsPage from "@/pages/notifications";
+import PostDetail from "@/pages/post-detail";
 import { PageTransition } from "@/components/page-transition";
 
 const queryClient = new QueryClient();
@@ -307,6 +308,7 @@ function ClerkProviderWithRoutes() {
         <Switch>
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
+          <Route path="/post/:id" component={PostDetail} />
           <Route component={HomeRedirect} />
         </Switch>
       </QueryClientProvider>

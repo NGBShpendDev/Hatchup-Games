@@ -285,10 +285,25 @@ router.post("/social/posts", socialWriteLimiter, requireAuth, attachPlayer, bloc
 });
 
 // ── GET /social/posts/:id ───────────────────────────────────────────────────
+// Public endpoint — permalinks must work for logged-out viewers too.
 
-router.get("/social/posts/:id", requireAuth, attachPlayer, async (req, res) => {
+router.get("/social/posts/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const viewerId = req.playerId!;
+  if (!Number.isFinite(id)) { res.status(404).json({ error: "Post not found" }); return; }
+
+  let viewerId: number | null = null;
+  try {
+    const { getAuth } = await import("@clerk/express");
+    const auth = getAuth(req);
+    if (auth?.userId) {
+      const player = await db.query.playersTable.findFirst({
+        where: eq(playersTable.clerkId, auth.userId),
+      });
+      if (player) viewerId = player.id;
+    }
+  } catch {
+    // ignore auth lookup failures — fall back to anonymous view
+  }
 
   const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, id) });
   if (!post) { res.status(404).json({ error: "Post not found" }); return; }
