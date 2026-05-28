@@ -14,7 +14,11 @@ import { eq, desc, and, gt, lt, sql, inArray } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
 import { awardBadge } from "../services/badgeService";
 import { computeChallengeReward } from "../services/challengeRewards";
-import { planEliminationRound } from "../services/eliminationBracket";
+import {
+  advanceEliminationRound as advanceEliminationRoundCore,
+  type AdvanceOutcome,
+  type EliminationStore,
+} from "../services/eliminationBracket";
 import { sendPushToPlayer } from "../services/pushNotifications";
 
 const router = Router();
@@ -30,84 +34,102 @@ function containsFlaggedContent(text: string): boolean {
 // For elimination tournaments: when the current round window expires, sort
 // active participants by progress, eliminate the bottom half, reset progress
 // for the survivors, increment currentRound, and extend endAt by another
-// durationDays window. Returns true if a new round was started (challenge
-// should stay active), false if the bracket has resolved to ≤1 survivor and
-// the caller should finalize normally.
-async function advanceEliminationRound(challengeId: number): Promise<boolean> {
+// durationDays window. The core orchestration lives in
+// `services/eliminationBracket` so it can be unit-tested with an in-memory
+// store; here we wire it up to Drizzle and fan out in-app notifications to
+// the eliminated and advancing participants.
+const dbEliminationStore: EliminationStore = {
+  async getChallenge(id) {
+    const c = await db.query.challengesTable.findFirst({
+      where: eq(challengesTable.id, id),
+    });
+    if (!c) return null;
+    return {
+      id: c.id,
+      isElimination: c.isElimination,
+      currentRound: c.currentRound,
+      durationDays: c.durationDays,
+      status: c.status,
+    };
+  },
+  async getActiveParticipants(challengeId) {
+    const rows = await db.query.challengeParticipantsTable.findMany({
+      where: and(
+        eq(challengeParticipantsTable.challengeId, challengeId),
+        eq(challengeParticipantsTable.eliminated, false),
+      ),
+      orderBy: [desc(challengeParticipantsTable.currentValue)],
+    });
+    return rows.map(p => ({ id: p.id, currentValue: p.currentValue }));
+  },
+  async markEliminated(ids, eliminatedRound) {
+    await db.update(challengeParticipantsTable)
+      .set({ eliminated: true, eliminatedRound })
+      .where(inArray(challengeParticipantsTable.id, ids));
+  },
+  async resetSurvivorProgress(ids) {
+    await db.update(challengeParticipantsTable)
+      .set({ currentValue: 0 })
+      .where(inArray(challengeParticipantsTable.id, ids));
+  },
+  async updateChallengeRound(id, nextRound, nextEndAt) {
+    await db.update(challengesTable)
+      .set({ currentRound: nextRound, endAt: nextEndAt })
+      .where(eq(challengesTable.id, id));
+  },
+};
+
+async function playerIdsForParticipantIds(participantIds: number[]): Promise<number[]> {
+  if (participantIds.length === 0) return [];
+  const rows = await db.query.challengeParticipantsTable.findMany({
+    where: inArray(challengeParticipantsTable.id, participantIds),
+    columns: { playerId: true },
+  });
+  return rows.map(r => r.playerId);
+}
+
+async function advanceEliminationRound(challengeId: number): Promise<AdvanceOutcome> {
+  const outcome = await advanceEliminationRoundCore(dbEliminationStore, challengeId);
+  if (outcome.kind === "noop") return outcome;
+
   const challenge = await db.query.challengesTable.findFirst({
     where: eq(challengesTable.id, challengeId),
   });
-  if (!challenge || !challenge.isElimination) return false;
-
-  const active = await db.query.challengeParticipantsTable.findMany({
-    where: and(
-      eq(challengeParticipantsTable.challengeId, challengeId),
-      eq(challengeParticipantsTable.eliminated, false),
-    ),
-    orderBy: [desc(challengeParticipantsTable.currentValue)],
-  });
-
-  const plan = planEliminationRound(
-    { currentRound: challenge.currentRound, durationDays: challenge.durationDays },
-    active.map(p => ({ id: p.id, currentValue: p.currentValue })),
-  );
-
-  if (plan.kind === "noop") return false;
-
-  const participantPlayer = new Map(active.map(p => [p.id, p.playerId]));
+  if (!challenge) return outcome;
   const link = `/challenges/${challengeId}`;
   const title = challenge.title;
 
-  if (plan.eliminatedIds.length > 0) {
-    await db.update(challengeParticipantsTable)
-      .set({ eliminated: true, eliminatedRound: plan.eliminatedRound })
-      .where(inArray(challengeParticipantsTable.id, plan.eliminatedIds));
-
-    const eliminatedRound = plan.eliminatedRound;
-    const rows = plan.eliminatedIds
-      .map(pid => participantPlayer.get(pid))
-      .filter((id): id is number => typeof id === "number")
-      .map(playerId => ({
-        playerId,
-        type: "tournament_eliminated",
-        title: `Eliminated in round ${eliminatedRound}`,
-        body: `You were eliminated from "${title}" in round ${eliminatedRound}. Better luck next time!`,
-        link,
-        sourceId: challengeId,
-      }));
-    if (rows.length > 0) await db.insert(notificationsTable).values(rows);
-  }
-
-  // If only one survivor remains, the bracket is resolved — let the caller
-  // run normal finalization (ranking + reward payout) for the champion.
-  // Do NOT reset their progress or extend the timer.
-  if (plan.kind === "champion") return false;
-
-  // Reset survivor progress so the next round is a fresh race.
-  await db.update(challengeParticipantsTable)
-    .set({ currentValue: 0 })
-    .where(inArray(challengeParticipantsTable.id, plan.survivorIds));
-
-  // Extend the challenge window by another durationDays for the next round.
-  await db.update(challengesTable)
-    .set({ currentRound: plan.nextRound, endAt: plan.nextEndAt })
-    .where(eq(challengesTable.id, challengeId));
-
-  // Notify survivors that they advanced to the next round.
-  const advancedRows = plan.survivorIds
-    .map(pid => participantPlayer.get(pid))
-    .filter((id): id is number => typeof id === "number")
-    .map(playerId => ({
+  // Notify eliminated participants (fires for both "champion" and "advance").
+  if (outcome.eliminatedParticipantIds.length > 0) {
+    const eliminatedPlayerIds = await playerIdsForParticipantIds(outcome.eliminatedParticipantIds);
+    const eliminatedRound = outcome.eliminatedRound;
+    const rows = eliminatedPlayerIds.map(playerId => ({
       playerId,
-      type: "tournament_advanced",
-      title: `Advanced to round ${plan.nextRound}`,
-      body: `You advanced to round ${plan.nextRound} of "${title}". Keep going!`,
+      type: "tournament_eliminated",
+      title: `Eliminated in round ${eliminatedRound}`,
+      body: `You were eliminated from "${title}" in round ${eliminatedRound}. Better luck next time!`,
       link,
       sourceId: challengeId,
     }));
-  if (advancedRows.length > 0) await db.insert(notificationsTable).values(advancedRows);
+    if (rows.length > 0) await db.insert(notificationsTable).values(rows);
+  }
 
-  return true;
+  // Notify survivors that they advanced to the next round.
+  if (outcome.kind === "advance" && outcome.survivorParticipantIds.length > 0) {
+    const survivorPlayerIds = await playerIdsForParticipantIds(outcome.survivorParticipantIds);
+    const nextRound = outcome.nextRound;
+    const rows = survivorPlayerIds.map(playerId => ({
+      playerId,
+      type: "tournament_advanced",
+      title: `Advanced to round ${nextRound}`,
+      body: `You advanced to round ${nextRound} of "${title}". Keep going!`,
+      link,
+      sourceId: challengeId,
+    }));
+    if (rows.length > 0) await db.insert(notificationsTable).values(rows);
+  }
+
+  return outcome;
 }
 
 // ── Ending-soon push fan-out ───────────────────────────────────────────────
@@ -209,8 +231,8 @@ async function finalizeChallenge(challengeId: number) {
   // For elimination tournaments, try to advance to the next round instead of
   // finalizing. If a new round started, leave the challenge active.
   if (challenge.isElimination) {
-    const advanced = await advanceEliminationRound(challengeId);
-    if (advanced) {
+    const advanceOutcome = await advanceEliminationRound(challengeId);
+    if (advanceOutcome.kind === "advance") {
       // Survivors begin a fresh round — reset their ending-soon flag so they
       // can receive a new push when the next deadline approaches.
       await db.update(challengeParticipantsTable)

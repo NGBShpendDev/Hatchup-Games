@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
+import { formatRoundCountdown } from "@/lib/roundCountdown";
 import {
   useGetChallenge,
   getGetChallengeQueryKey,
@@ -57,19 +58,6 @@ function formatCountdown(endAt: string): string {
   if (days > 0) return `${days}d ${hours}h left`;
   const mins = Math.floor((diff % 3600000) / 60000);
   return `${hours}h ${mins}m left`;
-}
-
-function formatRoundCountdown(endAt: string): string {
-  const diff = new Date(endAt).getTime() - Date.now();
-  if (diff <= 0) return "Cut imminent";
-  const days = Math.floor(diff / 86400000);
-  const hours = Math.floor((diff % 86400000) / 3600000);
-  const mins = Math.floor((diff % 3600000) / 60000);
-  const secs = Math.floor((diff % 60000) / 1000);
-  if (days > 0) return `${days}d ${hours}h ${mins}m`;
-  if (hours > 0) return `${hours}h ${mins}m`;
-  if (mins > 0) return `${mins}m ${secs}s`;
-  return `${secs}s`;
 }
 
 function RankIcon({ rank }: { rank: number }) {
