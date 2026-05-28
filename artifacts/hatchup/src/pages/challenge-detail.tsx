@@ -27,6 +27,7 @@ import { SafetyBanner } from "@/components/safety-banner";
 import { ReportBlockMenu } from "@/components/report-block-menu";
 import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
+import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
 import {
   Trophy, Users, Clock, Zap, Coins, Target, ArrowLeft,
   MapPin, Share2, CheckCircle2, Medal, Crown,
@@ -94,6 +95,7 @@ export default function ChallengeDetail() {
   const [inviteSearch, setInviteSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [invitedIds, setInvitedIds] = useState<Set<number>>(new Set());
+  const [rewardSummary, setRewardSummary] = useState<{ open: boolean; entries: RewardEntry[]; title?: string }>({ open: false, entries: [] });
 
   // Debounce the search input by 300ms to avoid hammering the API
   useEffect(() => {
@@ -173,7 +175,13 @@ export default function ChallengeDetail() {
   const joinMutation = useJoinChallenge({
     mutation: {
       onSuccess: () => {
-        toast({ title: "Joined!", description: "You're in. Go crush it! 💪" });
+        setRewardSummary({
+          open: true,
+          title: "You're in!",
+          entries: [
+            { kind: "challenge", label: "Challenge joined", detail: "Log progress to climb the leaderboard." },
+          ],
+        });
         queryClient.invalidateQueries({ queryKey: getGetChallengeQueryKey(challengeId) });
       },
       onError: (err: { response?: { data?: { error?: string } } }) => {
@@ -184,8 +192,33 @@ export default function ChallengeDetail() {
 
   const progressMutation = useSubmitChallengeProgress({
     mutation: {
-      onSuccess: () => {
-        toast({ title: "Progress logged!", description: `+${progressValue} added to your total.` });
+      onSuccess: (data: unknown) => {
+        const updated = data as { currentValue?: number } | undefined;
+        const newValue = updated?.currentValue;
+        const target = (challenge as unknown as { targetValue: number } | undefined)?.targetValue ?? 0;
+        const reachedGoal = newValue != null && target > 0 && newValue >= target;
+        const prevRank = myEntry?.rank;
+        const entries: RewardEntry[] = [
+          {
+            kind: "challenge",
+            label: "Progress logged",
+            value: `+${progressValue.toLocaleString()}`,
+            detail: newValue != null
+              ? `Now ${newValue.toLocaleString()} / ${target.toLocaleString()} ${metric.unit}`
+              : `${metric.label} challenge`,
+          },
+        ];
+        if (prevRank) {
+          entries.push({ kind: "leaderboard", label: "Leaderboard", value: `#${prevRank}`, detail: "Refreshing live standings..." });
+        }
+        if (reachedGoal) {
+          entries.push({ kind: "xp", label: "Goal reached!", detail: "Your run is locked in for the final tally." });
+        }
+        setRewardSummary({
+          open: true,
+          title: reachedGoal ? "Goal Crushed!" : "Reward Summary",
+          entries,
+        });
         setProgressOpen(false);
         queryClient.invalidateQueries({ queryKey: getGetChallengeQueryKey(challengeId) });
       },
@@ -632,6 +665,14 @@ export default function ChallengeDetail() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Unified reward summary — fires on join and every progress submission */}
+      <RewardSummaryModal
+        open={rewardSummary.open}
+        onClose={() => setRewardSummary({ open: false, entries: [] })}
+        title={rewardSummary.title ?? "Reward Summary"}
+        rewards={rewardSummary.entries}
+      />
 
       {/* Progress dialog */}
       <Dialog open={progressOpen} onOpenChange={setProgressOpen}>

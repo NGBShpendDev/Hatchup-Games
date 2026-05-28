@@ -14,6 +14,7 @@ import {
   Swords, Zap, Shield, Sparkles, Trophy, RotateCcw, ChevronLeft,
   Share2, Bookmark, Trash2, Star, Plus, X,
 } from "lucide-react";
+import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -380,6 +381,7 @@ export default function BattlePage() {
   const [rewards, setRewards] = useState<{ xp: number; coins: number; eloChange: number } | null>(null);
   const [artifactXpGains, setArtifactXpGains] = useState<ArtifactXpGain[]>([]);
   const [queueSecs, setQueueSecs] = useState(0);
+  const [rewardSummary, setRewardSummary] = useState<{ open: boolean; entries: RewardEntry[]; title?: string }>({ open: false, entries: [] });
 
   // Loadout state
   const [loadoutSlots, setLoadoutSlots] = useState<LoadoutSlots>({ major: null, minor1: null, minor2: null });
@@ -521,16 +523,44 @@ export default function BattlePage() {
       });
     }
     if (msg.type === "battle_end") {
-      setBattleState(msg.state as BattleState);
-      setRewards({
+      const endState = msg.state as BattleState;
+      setBattleState(endState);
+      const r = {
         xp:        (msg.rewards as { xp: number }).xp,
         coins:     (msg.rewards as { coins: number }).coins,
         eloChange: Number(msg.eloChange ?? 0),
-      });
+      };
+      setRewards(r);
       const gains = (msg.artifactXp as ArtifactXpGain[] | undefined) ?? [];
       setArtifactXpGains(gains);
       setLastTurn(null);
       setPhase("result");
+
+      // Show the unified reward summary modal whenever the viewer wins, so
+      // battle victories funnel through the same celebratory loop as
+      // activity logs, meal logs, and challenge progress.
+      const viewerWonBattle = endState.winner === yourSlot;
+      if (viewerWonBattle) {
+        const entries: RewardEntry[] = [];
+        if (r.xp > 0)    entries.push({ kind: "xp",          label: "Battle XP",  value: r.xp,    detail: "Granted to your Hatchling." });
+        if (r.coins > 0) entries.push({ kind: "artifact",    label: "Coins",      value: r.coins });
+        if (endState.mode === "ranked" && r.eloChange !== 0) {
+          entries.push({
+            kind: "leaderboard",
+            label: "ELO change",
+            value: (r.eloChange > 0 ? "+" : "") + r.eloChange,
+            detail: r.eloChange > 0 ? "Climbed the ranked ladder." : "Setback — bounce back next match.",
+          });
+        }
+        let stageUps = 0;
+        for (const g of gains) {
+          if (g.xpGained > 0) entries.push({ kind: "artifact", label: `Artifact #${g.artifactId} XP`, value: g.xpGained });
+          if (g.newStage > 1) stageUps += 1;
+        }
+        if (stageUps > 0) entries.push({ kind: "hatchling", label: `${stageUps} artifact stage-up${stageUps === 1 ? "" : "s"}`, detail: "Power scaled up." });
+        if (entries.length === 0) entries.push({ kind: "xp", label: "Victory!", detail: "GG — keep the streak alive." });
+        setRewardSummary({ open: true, entries, title: "Victory Rewards" });
+      }
     }
     if (msg.type === "error") {
       toast({ title: "Battle error", description: String(msg.message), variant: "destructive" });
@@ -1205,6 +1235,14 @@ export default function BattlePage() {
 
         </AnimatePresence>
       </div>
+
+      {/* Unified reward summary — fires on every battle win */}
+      <RewardSummaryModal
+        open={rewardSummary.open}
+        onClose={() => setRewardSummary({ open: false, entries: [] })}
+        title={rewardSummary.title ?? "Victory Rewards"}
+        rewards={rewardSummary.entries}
+      />
 
       {/* ── Saved Builds Sheet ─────────────────────────────────────────────── */}
       <Sheet open={showBuildsSheet} onOpenChange={setShowBuildsSheet}>

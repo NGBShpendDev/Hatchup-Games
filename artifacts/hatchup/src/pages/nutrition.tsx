@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Heart, MessageCircle, Zap, ChefHat, Plus, X, Sparkles, Droplets, Flame, Dumbbell, MoreHorizontal, Compass, Trophy, Camera, Loader2, Target } from "lucide-react";
 import { ReportBlockMenu } from "@/components/report-block-menu";
 import { HatchlingReaction, type HatchlingReactionData } from "@/components/hatchling-reaction";
+import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -128,6 +129,7 @@ export default function Nutrition() {
   const [showCreateSheet, setShowCreateSheet] = useState(false);
   const [showGoalPicker, setShowGoalPicker] = useState(false);
   const [reaction, setReaction] = useState<HatchlingReactionData | null>(null);
+  const [rewardSummary, setRewardSummary] = useState<{ open: boolean; entries: RewardEntry[]; title?: string }>({ open: false, entries: [] });
 
   // Create form state
   const [form, setForm] = useState({
@@ -256,11 +258,15 @@ export default function Nutrition() {
       }).then(r => r.json()),
     onSuccess: (data, key) => {
       qc.invalidateQueries({ queryKey: ["nutrition-challenges", pid] });
+      const entries: RewardEntry[] = [
+        { kind: "challenge", label: "Challenge progress", value: `${data.currentValue}/${data.target}`, detail: `${key.replace(/_/g, " ")}` },
+      ];
       if (data.isComplete) {
-        toast({ title: "Challenge Complete! 🏆", description: `You earned a new badge!` });
-      } else {
-        toast({ title: "Progress logged!", description: `${data.currentValue} / ${data.target}` });
+        if (data.xpReward) entries.push({ kind: "xp", label: "Challenge bonus", value: data.xpReward });
+        if (data.coinsReward) entries.push({ kind: "artifact", label: "Coins", value: data.coinsReward });
+        entries.push({ kind: "challenge", label: "Badge unlocked!", detail: "Check your collection." });
       }
+      setRewardSummary({ open: true, entries, title: data.isComplete ? "Challenge Complete!" : "Progress Logged" });
     },
   });
 
@@ -320,29 +326,62 @@ export default function Nutrition() {
       setImageUrl(null);
       setUploadToken(null);
       setImagePreview(null);
-      if (data.dailyMacroReward) {
-        const r = data.dailyMacroReward;
-        const nameBit = r.hatchlingReward ? `${r.hatchlingReward.hatchlingName} +${r.hatchlingReward.bondDelta} bond · ` : "";
-        toast({
-          title: `Daily macros hit! 🎯 ${r.currentStreak}-day streak`,
-          description: `${nameBit}+${r.playerXpDelta} XP · +${r.playerCoinsDelta} coins`,
+      const c = data.hatchlingStatChange;
+      if (c && ((c.happinessDelta ?? 0) !== 0 || (c.energyDelta ?? 0) !== 0)) {
+        setReaction({
+          hatchlingName: c.hatchlingName,
+          happinessDelta: c.happinessDelta ?? 0,
+          energyDelta: c.energyDelta ?? 0,
         });
-      } else if (data.newBadges?.length > 0) {
-        toast({ title: "New badge unlocked! 🏅", description: data.newBadges.join(", ") });
-      } else if (data.hatchlingStatChange) {
-        const c = data.hatchlingStatChange;
-        if ((c.happinessDelta ?? 0) !== 0 || (c.energyDelta ?? 0) !== 0) {
-          setReaction({
-            hatchlingName: c.hatchlingName,
-            happinessDelta: c.happinessDelta ?? 0,
-            energyDelta: c.energyDelta ?? 0,
-          });
-        } else {
-          toast({ title: "Meal posted!", description: "Your meal is on the feed." });
-        }
-      } else {
-        toast({ title: "Meal posted!", description: "Your meal is on the feed." });
       }
+
+      // Build a unified reward summary so meal logging visibly reinforces the
+      // same celebratory loop used by Home (activity) and Battle (wins).
+      const entries: RewardEntry[] = [];
+      entries.push({
+        kind: "xp",
+        label: "Meal logged",
+        detail: data.name ? `"${data.name}" added to your feed.` : "Added to your feed.",
+      });
+      if (c) {
+        if ((c.happinessDelta ?? 0) !== 0) {
+          entries.push({
+            kind: "hatchling",
+            label: `${c.hatchlingName} happiness`,
+            value: (c.happinessDelta > 0 ? "+" : "") + c.happinessDelta,
+            detail: c.happinessDelta > 0 ? "Quality fuel — your Pal is thriving." : "Lower-quality fuel hurt your Pal.",
+          });
+        }
+        if ((c.energyDelta ?? 0) !== 0) {
+          entries.push({
+            kind: "hatchling",
+            label: `${c.hatchlingName} energy`,
+            value: (c.energyDelta > 0 ? "+" : "") + c.energyDelta,
+          });
+        }
+      }
+      for (const badgeKey of (data.newBadges ?? []) as string[]) {
+        entries.push({ kind: "challenge", label: `Badge: ${badgeKey}`, detail: "Nutrition milestone unlocked." });
+      }
+      if (data.dailyMacroReward) {
+        const dmr = data.dailyMacroReward;
+        entries.push({
+          kind: "streak",
+          label: `Daily macros hit — ${dmr.currentStreak}-day streak`,
+          value: dmr.currentStreak,
+          detail: "Macros target met for the day.",
+        });
+        if (dmr.playerXpDelta) entries.push({ kind: "xp", label: "Macro bonus XP", value: dmr.playerXpDelta });
+        if (dmr.playerCoinsDelta) entries.push({ kind: "artifact", label: "Macro bonus coins", value: dmr.playerCoinsDelta });
+        if (dmr.hatchlingReward) {
+          entries.push({
+            kind: "hatchling",
+            label: `${dmr.hatchlingReward.hatchlingName} bond`,
+            value: `+${dmr.hatchlingReward.bondDelta}`,
+          });
+        }
+      }
+      setRewardSummary({ open: true, entries, title: "Meal Rewards" });
     },
   });
 
@@ -596,6 +635,14 @@ export default function Nutrition() {
 
       {/* Hatchling reaction overlay — plays when a posted meal buffs/debuffs the active Pal */}
       <HatchlingReaction reaction={reaction} onDismiss={() => setReaction(null)} />
+
+      {/* Unified reward summary — every meal log and challenge step funnels through here */}
+      <RewardSummaryModal
+        open={rewardSummary.open}
+        onClose={() => setRewardSummary({ open: false, entries: [] })}
+        title={rewardSummary.title ?? "Reward Summary"}
+        rewards={rewardSummary.entries}
+      />
 
       {/* ── CREATE POST SHEET ── */}
       <AnimatePresence>
