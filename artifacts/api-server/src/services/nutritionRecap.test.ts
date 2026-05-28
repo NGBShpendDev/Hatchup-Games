@@ -5,6 +5,7 @@ type Player = {
   id: number;
   physiqueGoal: string | null;
   email?: string | null;
+  emailVerifiedAt?: Date | null;
   notifyRecapEmail?: boolean;
   notifyRecapPush?: boolean;
   recapEmailLastSentWeek?: number | null;
@@ -415,6 +416,7 @@ describe("sendWeeklyRecapNotification", () => {
       id: 11,
       physiqueGoal: "lean_athlete",
       email: "p11@example.com",
+      emailVerifiedAt: new Date("2026-06-01T00:00:00Z"),
       notifyRecapEmail: true,
       notifyRecapPush: true,
       displayName: "Eleven",

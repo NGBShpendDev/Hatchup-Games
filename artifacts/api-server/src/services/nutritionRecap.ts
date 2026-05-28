@@ -286,6 +286,7 @@ async function maybeSendRecapEmail(
       where: eq(playersTable.id, playerId),
       columns: {
         email: true,
+        emailVerifiedAt: true,
         notifyRecapEmail: true,
         displayName: true,
         username: true,
@@ -294,6 +295,10 @@ async function maybeSendRecapEmail(
     });
     if (!player) return;
     if (!player.email) return;
+    // Only deliver recap mail to confirmed addresses. An unverified email may
+    // be a typo or unowned inbox; sending recaps there risks bounces and spam
+    // complaints that damage our sender reputation.
+    if (!player.emailVerifiedAt) return;
     if (!player.notifyRecapEmail) return;
     if (player.recapEmailLastSentWeek === weekKey) return;
 

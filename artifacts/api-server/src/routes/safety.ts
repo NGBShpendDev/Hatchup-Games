@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { userReportsTable, blockedUsersTable, playersTable } from "@workspace/db";
 import { eq, and, desc, or, notInArray } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
+import { issueEmailVerification } from "../services/emailVerification";
 
 const router = Router();
 
@@ -158,6 +159,7 @@ router.get("/players/:id/privacy-settings", requireAuth, attachPlayer, async (re
     emergencyContactPhone: player.emergencyContactPhone,
     isVerified: player.isVerified,
     isMinor: player.isMinor,
+    emailVerifiedAt: player.emailVerifiedAt?.toISOString() ?? null,
     weeklyRecapEnabled: player.weeklyRecapEnabled,
     weeklyRecapDayOfWeek: player.weeklyRecapDayOfWeek,
     weeklyRecapHourLocal: player.weeklyRecapHourLocal,
@@ -266,12 +268,30 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
       return;
     }
   }
+  // Track whether the email actually changed so we can fire a verification
+  // email AFTER the row is persisted. We re-verify on every change (including
+  // clearing) so we never leave a stale verified flag on a different address.
+  let newEmailToVerify: string | null = null;
   if (body.email !== undefined) {
     const raw = body.email;
     if (raw === null || raw === "") {
       updates.email = null;
+      if (current.email !== null) {
+        updates.emailVerifiedAt = null;
+        updates.emailVerificationToken = null;
+        updates.emailVerificationExpiresAt = null;
+      }
     } else if (typeof raw === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw.trim())) {
-      updates.email = raw.trim().toLowerCase();
+      const normalized = raw.trim().toLowerCase();
+      updates.email = normalized;
+      if (normalized !== (current.email ?? null)) {
+        // Address changed — clear any prior verification. issueEmailVerification
+        // (called below, post-update) will set a fresh token + expiry.
+        updates.emailVerifiedAt = null;
+        updates.emailVerificationToken = null;
+        updates.emailVerificationExpiresAt = null;
+        newEmailToVerify = normalized;
+      }
     } else {
       res.status(400).json({ error: "Invalid email" });
       return;
@@ -318,15 +338,98 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     .set(updates)
     .where(eq(playersTable.id, urlId))
     .returning();
+
+  // Best-effort: send a verification email when the address changed. The
+  // service overwrites the token/expiry we just cleared above, so a failed
+  // send (e.g. provider unconfigured) still leaves the row in a consistent
+  // unverified state with no usable token.
+  let verificationSent = false;
+  if (newEmailToVerify) {
+    try {
+      verificationSent = await issueEmailVerification(
+        urlId,
+        newEmailToVerify,
+        updated.displayName ?? updated.username,
+      );
+    } catch (err) {
+      req.log.warn({ err, playerId: urlId }, "failed to issue email verification");
+    }
+  }
+
   res.json({
     locationVisibility: updated.locationVisibility,
     requireWorkoutApproval: updated.requireWorkoutApproval,
     emergencyContactName: updated.emergencyContactName,
     emergencyContactPhone: updated.emergencyContactPhone,
     email: updated.email,
+    emailVerifiedAt: updated.emailVerifiedAt?.toISOString() ?? null,
+    emailVerificationSent: verificationSent,
     notifyRecapEmail: updated.notifyRecapEmail,
     notifyRecapPush: updated.notifyRecapPush,
   });
+});
+
+// ── Email verification ──────────────────────────────────────────────────────
+
+// GET /api/email/verify?token=...
+// Public endpoint hit from the link in the verification email. Marks the
+// player's email as verified and redirects them back to the settings page
+// with a status query param the UI can surface.
+router.get("/email/verify", async (req, res) => {
+  const token = typeof req.query.token === "string" ? req.query.token : "";
+  if (!token) {
+    res.redirect("/settings/privacy?emailVerify=missing");
+    return;
+  }
+  const player = await db.query.playersTable.findFirst({
+    where: eq(playersTable.emailVerificationToken, token),
+  });
+  if (!player) {
+    res.redirect("/settings/privacy?emailVerify=invalid");
+    return;
+  }
+  if (!player.emailVerificationExpiresAt || player.emailVerificationExpiresAt.getTime() < Date.now()) {
+    res.redirect("/settings/privacy?emailVerify=expired");
+    return;
+  }
+  await db
+    .update(playersTable)
+    .set({
+      emailVerifiedAt: new Date(),
+      emailVerificationToken: null,
+      emailVerificationExpiresAt: null,
+    })
+    .where(eq(playersTable.id, player.id));
+  res.redirect("/settings/privacy?emailVerify=ok");
+});
+
+// POST /api/email/resend-verification
+// Re-issues the verification email for the signed-in player's current address.
+router.post("/email/resend-verification", requireAuth, attachPlayer, async (req, res) => {
+  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!player) {
+    res.status(404).json({ error: "Player not found" });
+    return;
+  }
+  if (!player.email) {
+    res.status(400).json({ error: "no_email_on_file" });
+    return;
+  }
+  if (player.emailVerifiedAt) {
+    res.json({ alreadyVerified: true, sent: false });
+    return;
+  }
+  try {
+    const sent = await issueEmailVerification(
+      player.id,
+      player.email,
+      player.displayName ?? player.username,
+    );
+    res.json({ alreadyVerified: false, sent });
+  } catch (err) {
+    req.log.error(err, "resend email verification failed");
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // ── Admin: suspend / unsuspend account ──────────────────────────────────────

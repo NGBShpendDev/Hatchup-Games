@@ -98,6 +98,12 @@ export const playersTable = pgTable("players", {
   weeklyRecapTimezone: text("weekly_recap_timezone"),
   // Transactional email
   email: text("email"),
+  // Email confirmation — non-null once the user has clicked the verification
+  // link we sent. Recap pipeline only sends to verified addresses to protect
+  // deliverability (avoids bounces, spam reports, and wrong-inbox delivery).
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+  emailVerificationToken: text("email_verification_token").unique(),
+  emailVerificationExpiresAt: timestamp("email_verification_expires_at", { withTimezone: true }),
   notifyRecapEmail: boolean("notify_recap_email").notNull().default(true),
   recapEmailLastSentWeek: integer("recap_email_last_sent_week"),
   notifyRecapPush: boolean("notify_recap_push").notNull().default(true),

@@ -60,6 +60,9 @@ export default function SettingsPrivacy() {
   const [recapDay, setRecapDay] = useState(0);
   const [recapHour, setRecapHour] = useState(9);
   const [recapEmail, setRecapEmail] = useState("");
+  const [savedEmail, setSavedEmail] = useState<string | null>(null);
+  const [emailVerifiedAt, setEmailVerifiedAt] = useState<string | null>(null);
+  const [resendingVerification, setResendingVerification] = useState(false);
   const [notifyRecapEmail, setNotifyRecapEmail] = useState(true);
   const [notifyRecapPush, setNotifyRecapPush] = useState(true);
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -128,6 +131,8 @@ export default function SettingsPrivacy() {
         if (typeof data.weeklyRecapDayOfWeek === "number") setRecapDay(data.weeklyRecapDayOfWeek);
         if (typeof data.weeklyRecapHourLocal === "number") setRecapHour(data.weeklyRecapHourLocal);
         setRecapEmail(typeof data.email === "string" ? data.email : "");
+        setSavedEmail(typeof data.email === "string" ? data.email : null);
+        setEmailVerifiedAt(typeof data.emailVerifiedAt === "string" ? data.emailVerifiedAt : null);
         if (typeof data.notifyRecapEmail === "boolean") setNotifyRecapEmail(data.notifyRecapEmail);
         if (typeof data.notifyRecapPush === "boolean") setNotifyRecapPush(data.notifyRecapPush);
         setLoaded(true);
@@ -158,6 +163,53 @@ export default function SettingsPrivacy() {
       }
     } finally {
       setVerifySubmitting(false);
+    }
+  };
+
+  // Surface the result of clicking the verification link from the email.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("emailVerify");
+    if (!status) return;
+    const map: Record<string, { title: string; description: string; variant?: "destructive" }> = {
+      ok: { title: "Email confirmed", description: "You'll start receiving recap emails on your scheduled day." },
+      expired: { title: "Link expired", description: "That confirmation link has expired. Resend a new one from settings.", variant: "destructive" },
+      invalid: { title: "Invalid link", description: "We couldn't verify that link. Try resending the confirmation email.", variant: "destructive" },
+      missing: { title: "Missing token", description: "That confirmation link was missing required information.", variant: "destructive" },
+    };
+    const msg = map[status];
+    if (msg) toast({ title: msg.title, description: msg.description, variant: msg.variant });
+    // Strip the query so refreshing doesn't re-fire the toast.
+    params.delete("emailVerify");
+    const search = params.toString();
+    window.history.replaceState({}, "", window.location.pathname + (search ? `?${search}` : ""));
+  }, [toast]);
+
+  const handleResendVerification = async () => {
+    if (resendingVerification) return;
+    setResendingVerification(true);
+    try {
+      const res = await fetch("/api/email/resend-verification", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        toast({ title: "Couldn't resend", description: "Save your email first, then try again.", variant: "destructive" });
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      if (data?.alreadyVerified) {
+        toast({ title: "Already verified", description: "This email is already confirmed." });
+        setEmailVerifiedAt(new Date().toISOString());
+      } else if (data?.sent) {
+        toast({ title: "Confirmation sent", description: `Check ${savedEmail ?? "your inbox"} for the link.` });
+      } else {
+        toast({ title: "Email service not configured", description: "Please contact support if this persists.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Couldn't resend", description: "Please try again in a moment.", variant: "destructive" });
+    } finally {
+      setResendingVerification(false);
     }
   };
 
@@ -220,7 +272,23 @@ export default function SettingsPrivacy() {
         }),
       });
       if (res.ok) {
-        toast({ title: "Privacy settings saved", description: "Your safety preferences have been updated." });
+        const data = await res.json().catch(() => null);
+        if (data) {
+          if (typeof data.email === "string" || data.email === null) {
+            setSavedEmail(typeof data.email === "string" ? data.email : null);
+          }
+          if (typeof data.emailVerifiedAt === "string" || data.emailVerifiedAt === null) {
+            setEmailVerifiedAt(typeof data.emailVerifiedAt === "string" ? data.emailVerifiedAt : null);
+          }
+        }
+        if (data?.emailVerificationSent) {
+          toast({
+            title: "Confirm your email",
+            description: `We sent a confirmation link to ${data.email}. Click it to start receiving recap emails.`,
+          });
+        } else {
+          toast({ title: "Privacy settings saved", description: "Your safety preferences have been updated." });
+        }
       } else if (res.status === 400) {
         const data = await res.json().catch(() => null);
         if (data?.error === "Invalid email") {
@@ -671,6 +739,32 @@ export default function SettingsPrivacy() {
                 <p id="recap-email-error" className="text-xs font-bold text-red-400">
                   {emailError}
                 </p>
+              )}
+              {savedEmail && (
+                emailVerifiedAt ? (
+                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-300">
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    Verified
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <p className="text-xs font-bold text-amber-300 truncate">
+                        Unverified — recaps paused until you confirm
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResendVerification}
+                      disabled={resendingVerification}
+                      className="shrink-0 h-7 px-3 text-xs border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+                    >
+                      {resendingVerification ? "Sending..." : "Resend"}
+                    </Button>
+                  </div>
+                )
               )}
             </div>
             <div className="flex items-center justify-between gap-4 border-t border-emerald-500/10 pt-3">
