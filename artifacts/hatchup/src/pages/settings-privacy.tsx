@@ -162,16 +162,22 @@ export default function SettingsPrivacy() {
 
   // Web push state ──
   const push = usePushSubscription();
+  type SocialChannelType = "reactions" | "replies" | "mentions" | "followers";
+  type SocialChannel = "inbox" | "push" | "email";
+  type SocialChannels = Record<SocialChannelType, Record<SocialChannel, boolean>>;
+  const DEFAULT_SOCIAL_CHANNELS: SocialChannels = {
+    reactions: { inbox: true, push: true, email: false },
+    replies: { inbox: true, push: true, email: false },
+    mentions: { inbox: true, push: true, email: false },
+    followers: { inbox: true, push: true, email: false },
+  };
   const [pushPrefs, setPushPrefs] = useState({
     invites: true,
     social: true,
     endingSoon: true,
     completed: true,
-    socialReactions: true,
-    socialReplies: true,
-    socialMentions: true,
-    socialFollowers: true,
   });
+  const [socialChannels, setSocialChannels] = useState<SocialChannels>(DEFAULT_SOCIAL_CHANNELS);
   const [pushPrefsLoaded, setPushPrefsLoaded] = useState(false);
 
   useEffect(() => {
@@ -179,24 +185,34 @@ export default function SettingsPrivacy() {
     fetch("/api/push/preferences", { credentials: "include" })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (data) setPushPrefs({
-          invites: !!data.invites,
-          social: data.social !== false,
-          endingSoon: !!data.endingSoon,
-          completed: !!data.completed,
-          socialReactions: data.socialReactions !== false,
-          socialReplies: data.socialReplies !== false,
-          socialMentions: data.socialMentions !== false,
-          socialFollowers: data.socialFollowers !== false,
-        });
+        if (data) {
+          setPushPrefs({
+            invites: !!data.invites,
+            social: data.social !== false,
+            endingSoon: !!data.endingSoon,
+            completed: !!data.completed,
+          });
+          if (data.socialChannels) {
+            const next: SocialChannels = { ...DEFAULT_SOCIAL_CHANNELS };
+            for (const t of ["reactions", "replies", "mentions", "followers"] as const) {
+              const incoming = data.socialChannels[t];
+              if (incoming) {
+                next[t] = {
+                  inbox: incoming.inbox !== false,
+                  push: incoming.push !== false,
+                  email: incoming.email === true,
+                };
+              }
+            }
+            setSocialChannels(next);
+          }
+        }
         setPushPrefsLoaded(true);
       })
       .catch(() => setPushPrefsLoaded(true));
   }, [playerId, pushPrefsLoaded]);
 
-  type PushPrefKey =
-    | "invites" | "social" | "endingSoon" | "completed"
-    | "socialReactions" | "socialReplies" | "socialMentions" | "socialFollowers";
+  type PushPrefKey = "invites" | "social" | "endingSoon" | "completed";
   const updatePushPref = async (key: PushPrefKey, value: boolean) => {
     setPushPrefs(prev => ({ ...prev, [key]: value }));
     try {
@@ -205,6 +221,27 @@ export default function SettingsPrivacy() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [key]: value }),
+      });
+    } catch {
+      toast({ title: "Could not update notification preference", variant: "destructive" });
+    }
+  };
+
+  const updateSocialChannel = async (
+    type: SocialChannelType,
+    channel: SocialChannel,
+    value: boolean,
+  ) => {
+    setSocialChannels(prev => ({
+      ...prev,
+      [type]: { ...prev[type], [channel]: value },
+    }));
+    try {
+      await fetch("/api/push/preferences", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ socialChannels: { [type]: { [channel]: value } } }),
       });
     } catch {
       toast({ title: "Could not update notification preference", variant: "destructive" });
@@ -830,26 +867,41 @@ export default function SettingsPrivacy() {
                   onCheckedChange={(v) => updatePushPref("social", v)}
                 />
               </div>
-              {[
-                { key: "socialReactions" as const, label: "Reactions on my posts", desc: "Someone likes, cheers, fire-reacts or flexes your posts and comments." },
-                { key: "socialReplies" as const, label: "Replies to my posts", desc: "Someone comments on a post you wrote." },
-                { key: "socialMentions" as const, label: "@mentions", desc: "Someone mentions you in a post, comment or club chat." },
-                { key: "socialFollowers" as const, label: "New followers", desc: "Someone starts following you." },
-              ].map(({ key, label, desc }) => (
-                <div key={key} className="flex items-center justify-between gap-4 pl-3 border-l-2 border-cyan-500/20">
-                  <div className="min-w-0">
-                    <p className="font-bold text-sm">{label}</p>
-                    <p className="text-xs text-muted-foreground font-medium">{desc}</p>
-                  </div>
-                  <Switch
-                    checked={pushPrefs[key]}
-                    disabled={!pushPrefsLoaded}
-                    onCheckedChange={(v) => updatePushPref(key, v)}
-                  />
-                </div>
-              ))}
               <p className="text-[11px] text-muted-foreground/80 font-medium">
-                Turning a social type off silences both the in-app inbox row and the push.
+                Pick exactly how each kind of social activity reaches you — independently
+                in your in-app inbox, as a web push, or by email.
+              </p>
+              <div className="grid grid-cols-[1fr_repeat(3,minmax(48px,auto))] gap-x-3 gap-y-1 items-center pl-3 border-l-2 border-cyan-500/20">
+                <div />
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-center">Inbox</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-center">Push</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-center">Email</p>
+                {([
+                  { key: "reactions", label: "Reactions on my posts", desc: "Someone likes, cheers, fire-reacts or flexes your posts and comments." },
+                  { key: "replies", label: "Replies to my posts", desc: "Someone comments on a post you wrote." },
+                  { key: "mentions", label: "@mentions", desc: "Someone mentions you in a post, comment or club chat." },
+                  { key: "followers", label: "New followers", desc: "Someone starts following you." },
+                ] as { key: SocialChannelType; label: string; desc: string }[]).map(({ key, label, desc }) => (
+                  <div key={key} className="contents">
+                    <div className="min-w-0 py-2">
+                      <p className="font-bold text-sm">{label}</p>
+                      <p className="text-xs text-muted-foreground font-medium">{desc}</p>
+                    </div>
+                    {(["inbox", "push", "email"] as const).map((channel) => (
+                      <div key={channel} className="flex justify-center py-2">
+                        <Switch
+                          checked={socialChannels[key][channel]}
+                          disabled={!pushPrefsLoaded}
+                          onCheckedChange={(v) => updateSocialChannel(key, channel, v)}
+                          aria-label={`${label} — ${channel}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground/80 font-medium">
+                Email pings require a confirmed email address in the Email recap card below.
               </p>
             </div>
           </div>

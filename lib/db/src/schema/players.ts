@@ -99,14 +99,28 @@ export const playersTable = pgTable("players", {
   notifySocialPush: boolean("notify_social_push").notNull().default(true),
   notifyEndingSoonPush: boolean("notify_ending_soon_push").notNull().default(true),
   notifyCompletedPush: boolean("notify_completed_push").notNull().default(true),
-  // Per-type social opt-outs. Gate BOTH the in-app inbox row and the push
-  // delivery so silencing a type fully removes it. When false, the matching
-  // notification is suppressed end-to-end. Defaults to true so existing
-  // behavior is unchanged for current users.
+  // Per-type social opt-outs. Legacy master toggle per type — when false,
+  // suppresses every channel for that type. The per-channel columns below
+  // give finer control (in-app inbox / web push / email) independently.
   notifySocialReactions: boolean("notify_social_reactions").notNull().default(true),
   notifySocialReplies: boolean("notify_social_replies").notNull().default(true),
   notifySocialMentions: boolean("notify_social_mentions").notNull().default(true),
   notifySocialFollowers: boolean("notify_social_followers").notNull().default(true),
+  // Per-channel toggles for each social event type. Inbox/push default ON
+  // (matches prior end-to-end behavior); email defaults OFF since social
+  // events were never emailed before — opt-in only.
+  notifySocialReactionsInbox: boolean("notify_social_reactions_inbox").notNull().default(true),
+  notifySocialReactionsPush: boolean("notify_social_reactions_push").notNull().default(true),
+  notifySocialReactionsEmail: boolean("notify_social_reactions_email").notNull().default(false),
+  notifySocialRepliesInbox: boolean("notify_social_replies_inbox").notNull().default(true),
+  notifySocialRepliesPush: boolean("notify_social_replies_push").notNull().default(true),
+  notifySocialRepliesEmail: boolean("notify_social_replies_email").notNull().default(false),
+  notifySocialMentionsInbox: boolean("notify_social_mentions_inbox").notNull().default(true),
+  notifySocialMentionsPush: boolean("notify_social_mentions_push").notNull().default(true),
+  notifySocialMentionsEmail: boolean("notify_social_mentions_email").notNull().default(false),
+  notifySocialFollowersInbox: boolean("notify_social_followers_inbox").notNull().default(true),
+  notifySocialFollowersPush: boolean("notify_social_followers_push").notNull().default(true),
+  notifySocialFollowersEmail: boolean("notify_social_followers_email").notNull().default(false),
   // Weekly nutrition recap delivery preferences
   weeklyRecapEnabled: boolean("weekly_recap_enabled").notNull().default(true),
   weeklyRecapDayOfWeek: integer("weekly_recap_day_of_week").notNull().default(0),

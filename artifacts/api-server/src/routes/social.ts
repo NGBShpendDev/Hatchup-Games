@@ -38,7 +38,8 @@ import {
 } from "./sharedGroups.ts";
 import { sendPushToPlayer } from "../services/pushNotifications.ts";
 import { pushForNotification } from "../services/notificationFanout.ts";
-import { isSocialNotificationAllowed } from "../services/socialNotifyPrefs.ts";
+import { socialChannelsForType } from "../services/socialNotifyPrefs.ts";
+import { sendSocialEmail } from "../services/socialEmail.ts";
 import { notificationsTable } from "@workspace/db";
 import { resolveMentionedPlayers } from "../services/mentions.ts";
 import { createHmac } from "node:crypto";
@@ -690,24 +691,30 @@ router.post("/social/posts", requireAuth, attachPlayer, socialWriteLimiter, bloc
       : post.content;
     const link = `/post/${post.id}`;
     for (const m of mentioned) {
-      if (!(await isSocialNotificationAllowed(m.id, "post_mention"))) continue;
+      const ch = await socialChannelsForType(m.id, "post_mention");
+      if (!ch || (!ch.inbox && !ch.push && !ch.email)) continue;
       const title = "You were mentioned";
       const body = `${posterName} mentioned you in a post: "${snippet}"`;
-      await db.insert(notificationsTable).values({
-        playerId: m.id,
-        type: "post_mention",
-        title,
-        body,
-        link,
-        sourceId: post.id,
-      });
-      void sendPushToPlayer(m.id, {
-        title,
-        body,
-        link,
-        category: "social",
-        tag: `post-mention-${post.id}-${m.id}`,
-      });
+      if (ch.inbox) {
+        await db.insert(notificationsTable).values({
+          playerId: m.id,
+          type: "post_mention",
+          title,
+          body,
+          link,
+          sourceId: post.id,
+        });
+      }
+      if (ch.push) {
+        void sendPushToPlayer(m.id, {
+          title,
+          body,
+          link,
+          category: "social",
+          tag: `post-mention-${post.id}-${m.id}`,
+        });
+      }
+      if (ch.email) void sendSocialEmail(m.id, { title, body, link });
     }
   }
 
@@ -1086,9 +1093,10 @@ router.post("/social/posts/:id/react", requireAuth, attachPlayer, socialWriteLim
   if (
     added &&
     targetPost.playerId !== playerId &&
-    !(await isPostMutedFor(targetPost.playerId, postId)) &&
-    (await isSocialNotificationAllowed(targetPost.playerId, "post_reaction"))
+    !(await isPostMutedFor(targetPost.playerId, postId))
   ) {
+    const ch = await socialChannelsForType(targetPost.playerId, "post_reaction");
+    if (ch && (ch.inbox || ch.push || ch.email)) {
     const link = `/post/${postId}?reactFrom=${playerId}`;
     const duplicate = await db.query.notificationsTable.findFirst({
       where: and(
@@ -1112,21 +1120,27 @@ router.post("/social/posts/:id/react", requireAuth, attachPlayer, socialWriteLim
       const verb = REACTION_VERB[reactionType] ?? "reacted to";
       const title = "New reaction on your post";
       const bodyText = `${name} ${verb} your post`;
-      await db.insert(notificationsTable).values({
-        playerId: targetPost.playerId,
-        type: "post_reaction",
-        title,
-        body: bodyText,
-        link,
-        sourceId: postId,
-      });
-      void sendPushToPlayer(targetPost.playerId, {
-        title,
-        body: bodyText,
-        link,
-        category: "social",
-        tag: `post-reaction-${postId}-${playerId}`,
-      });
+      if (ch.inbox) {
+        await db.insert(notificationsTable).values({
+          playerId: targetPost.playerId,
+          type: "post_reaction",
+          title,
+          body: bodyText,
+          link,
+          sourceId: postId,
+        });
+      }
+      if (ch.push) {
+        void sendPushToPlayer(targetPost.playerId, {
+          title,
+          body: bodyText,
+          link,
+          category: "social",
+          tag: `post-reaction-${postId}-${playerId}`,
+        });
+      }
+      if (ch.email) void sendSocialEmail(targetPost.playerId, { title, body: bodyText, link });
+    }
     }
   }
 
@@ -1304,26 +1318,33 @@ router.post("/social/posts/:id/comments", requireAuth, attachPlayer, socialWrite
   const commenterName = author?.displayName ?? author?.username ?? "Someone";
   if (
     parentPost.playerId !== playerId &&
-    !(await isPostMutedFor(parentPost.playerId, postId)) &&
-    (await isSocialNotificationAllowed(parentPost.playerId, "post_comment"))
+    !(await isPostMutedFor(parentPost.playerId, postId))
   ) {
-    const replyTitle = "New reply on your post";
-    const replyBody = `${commenterName}: "${snippet}"`;
-    await db.insert(notificationsTable).values({
-      playerId: parentPost.playerId,
-      type: "post_comment",
-      title: replyTitle,
-      body: replyBody,
-      link: commentLink,
-      sourceId: comment.id,
-    });
-    void sendPushToPlayer(parentPost.playerId, {
-      title: replyTitle,
-      body: replyBody,
-      link: commentLink,
-      category: "social",
-      tag: `post-comment-${comment.id}`,
-    });
+    const ch = await socialChannelsForType(parentPost.playerId, "post_comment");
+    if (ch && (ch.inbox || ch.push || ch.email)) {
+      const replyTitle = "New reply on your post";
+      const replyBody = `${commenterName}: "${snippet}"`;
+      if (ch.inbox) {
+        await db.insert(notificationsTable).values({
+          playerId: parentPost.playerId,
+          type: "post_comment",
+          title: replyTitle,
+          body: replyBody,
+          link: commentLink,
+          sourceId: comment.id,
+        });
+      }
+      if (ch.push) {
+        void sendPushToPlayer(parentPost.playerId, {
+          title: replyTitle,
+          body: replyBody,
+          link: commentLink,
+          category: "social",
+          tag: `post-comment-${comment.id}`,
+        });
+      }
+      if (ch.email) void sendSocialEmail(parentPost.playerId, { title: replyTitle, body: replyBody, link: commentLink });
+    }
   }
 
   // Notify any @mentioned players. Skip the comment author and the post
@@ -1332,24 +1353,30 @@ router.post("/social/posts/:id/comments", requireAuth, attachPlayer, socialWrite
   for (const m of mentioned) {
     if (m.id === parentPost.playerId) continue;
     if (await isPostMutedFor(m.id, postId)) continue;
-    if (!(await isSocialNotificationAllowed(m.id, "comment_mention"))) continue;
+    const ch = await socialChannelsForType(m.id, "comment_mention");
+    if (!ch || (!ch.inbox && !ch.push && !ch.email)) continue;
     const mTitle = "You were mentioned";
     const mBody = `${commenterName} mentioned you in a comment: "${snippet}"`;
-    await db.insert(notificationsTable).values({
-      playerId: m.id,
-      type: "comment_mention",
-      title: mTitle,
-      body: mBody,
-      link: commentLink,
-      sourceId: comment.id,
-    });
-    void sendPushToPlayer(m.id, {
-      title: mTitle,
-      body: mBody,
-      link: commentLink,
-      category: "social",
-      tag: `comment-mention-${comment.id}-${m.id}`,
-    });
+    if (ch.inbox) {
+      await db.insert(notificationsTable).values({
+        playerId: m.id,
+        type: "comment_mention",
+        title: mTitle,
+        body: mBody,
+        link: commentLink,
+        sourceId: comment.id,
+      });
+    }
+    if (ch.push) {
+      void sendPushToPlayer(m.id, {
+        title: mTitle,
+        body: mBody,
+        link: commentLink,
+        category: "social",
+        tag: `comment-mention-${comment.id}-${m.id}`,
+      });
+    }
+    if (ch.email) void sendSocialEmail(m.id, { title: mTitle, body: mBody, link: commentLink });
   }
 
   res.status(201).json({
@@ -1503,9 +1530,10 @@ router.post(
     if (
       liked &&
       comment.playerId !== playerId &&
-      !(await isPostMutedFor(comment.playerId, comment.postId)) &&
-      (await isSocialNotificationAllowed(comment.playerId, "comment_like"))
+      !(await isPostMutedFor(comment.playerId, comment.postId))
     ) {
+      const ch = await socialChannelsForType(comment.playerId, "comment_like");
+      if (ch && (ch.inbox || ch.push || ch.email)) {
       const link = `/post/${comment.postId}?commentLikeFrom=${playerId}`;
       const duplicate = await db.query.notificationsTable.findFirst({
         where: and(
@@ -1527,22 +1555,28 @@ router.post(
         const title = "New like on your comment";
         const body = `${likerName} liked your comment: "${snippet}"`;
 
-        await db.insert(notificationsTable).values({
-          playerId: comment.playerId,
-          type: "comment_like",
-          title,
-          body,
-          link,
-          sourceId: commentId,
-        });
+        if (ch.inbox) {
+          await db.insert(notificationsTable).values({
+            playerId: comment.playerId,
+            type: "comment_like",
+            title,
+            body,
+            link,
+            sourceId: commentId,
+          });
+        }
 
-        void sendPushToPlayer(comment.playerId, {
-          title,
-          body,
-          link,
-          category: "social",
-          tag: `comment-like-${commentId}-${playerId}`,
-        });
+        if (ch.push) {
+          void sendPushToPlayer(comment.playerId, {
+            title,
+            body,
+            link,
+            category: "social",
+            tag: `comment-like-${commentId}-${playerId}`,
+          });
+        }
+        if (ch.email) void sendSocialEmail(comment.playerId, { title, body, link });
+      }
       }
     }
 
@@ -1662,29 +1696,37 @@ router.post("/social/follow", requireAuth, attachPlayer, socialWriteLimiter, blo
       eq(notificationsTable.sourceId, followerId),
     ),
   });
-  if (!duplicate && (await isSocialNotificationAllowed(followeeId, "new_follower"))) {
-    const follower = await db.query.playersTable.findFirst({
-      where: eq(playersTable.id, followerId),
-    });
-    const followerName = follower?.displayName ?? follower?.username ?? "Someone";
-    const title = "New follower";
-    const bodyText = `${followerName} started following you`;
-    const link = `/players/${followerId}`;
-    await db.insert(notificationsTable).values({
-      playerId: followeeId,
-      type: "new_follower",
-      title,
-      body: bodyText,
-      link,
-      sourceId: followerId,
-    });
-    void sendPushToPlayer(followeeId, {
-      title,
-      body: bodyText,
-      link,
-      category: "social",
-      tag: `new-follower-${followerId}`,
-    });
+  if (!duplicate) {
+    const ch = await socialChannelsForType(followeeId, "new_follower");
+    if (ch && (ch.inbox || ch.push || ch.email)) {
+      const follower = await db.query.playersTable.findFirst({
+        where: eq(playersTable.id, followerId),
+      });
+      const followerName = follower?.displayName ?? follower?.username ?? "Someone";
+      const title = "New follower";
+      const bodyText = `${followerName} started following you`;
+      const link = `/players/${followerId}`;
+      if (ch.inbox) {
+        await db.insert(notificationsTable).values({
+          playerId: followeeId,
+          type: "new_follower",
+          title,
+          body: bodyText,
+          link,
+          sourceId: followerId,
+        });
+      }
+      if (ch.push) {
+        void sendPushToPlayer(followeeId, {
+          title,
+          body: bodyText,
+          link,
+          category: "social",
+          tag: `new-follower-${followerId}`,
+        });
+      }
+      if (ch.email) void sendSocialEmail(followeeId, { title, body: bodyText, link });
+    }
   }
 
   res.json({ success: true });
