@@ -9,7 +9,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Shield, Flag, CheckCircle, X, AlertTriangle, User, Ban, Trash2, RotateCcw, Clock } from "lucide-react";
+import { Shield, Flag, CheckCircle, X, AlertTriangle, User, Ban, Trash2, RotateCcw, Clock, ScrollText } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface AdminReport {
@@ -215,6 +215,11 @@ export default function AdminReports() {
             <h1 className="font-black text-2xl">Moderation Dashboard</h1>
             <p className="text-xs text-muted-foreground font-medium">Review reports and recently deleted posts</p>
           </div>
+          <Link href="/admin/audit">
+            <Button variant="ghost" size="sm" data-testid="link-admin-audit">
+              <ScrollText className="w-3.5 h-3.5 mr-1" /> Audit
+            </Button>
+          </Link>
           <Link href="/admin/suspended">
             <Button variant="ghost" size="sm" data-testid="link-admin-suspended">
               <Ban className="w-3.5 h-3.5 mr-1" /> Suspended

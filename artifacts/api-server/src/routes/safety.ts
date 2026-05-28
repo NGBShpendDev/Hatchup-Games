@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { userReportsTable, blockedUsersTable, playersTable } from "@workspace/db";
+import { userReportsTable, blockedUsersTable, playersTable, moderationAuditLogTable } from "@workspace/db";
 import { eq, and, desc, or, notInArray } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { emailResendLimiter, consumeEmailResendBudget } from "../middlewares/rateLimiters.ts";
 import { issueEmailVerification } from "../services/emailVerification.ts";
@@ -100,6 +101,37 @@ router.post("/reports", requireAuth, attachPlayer, async (req, res) => {
   }
 });
 
+// ── Moderation audit log helper ──────────────────────────────────────────────
+
+type AuditAction =
+  | "suspend"
+  | "unsuspend"
+  | "verify"
+  | "resolve_report"
+  | "dismiss_report";
+
+async function writeAuditLog(entry: {
+  actorId: number;
+  action: AuditAction;
+  targetPlayerId?: number | null;
+  targetReportId?: number | null;
+  reason?: string | null;
+  metadata?: Record<string, unknown> | null;
+}): Promise<void> {
+  try {
+    await db.insert(moderationAuditLogTable).values({
+      actorId: entry.actorId,
+      action: entry.action,
+      targetPlayerId: entry.targetPlayerId ?? null,
+      targetReportId: entry.targetReportId ?? null,
+      reason: entry.reason ?? null,
+      metadata: entry.metadata ? JSON.stringify(entry.metadata) : null,
+    });
+  } catch {
+    // Audit logging is best-effort; never break the moderation action itself.
+  }
+}
+
 // ── Admin Moderation ─────────────────────────────────────────────────────────
 
 // GET /api/admin/reports?status=
@@ -131,13 +163,68 @@ router.patch("/admin/reports/:id", requireAuth, attachPlayer, async (req, res) =
     res.status(400).json({ error: "Invalid status" });
     return;
   }
+  const reason = typeof (req.body as { reason?: unknown })?.reason === "string"
+    ? ((req.body as { reason: string }).reason).trim().slice(0, 500) || null
+    : null;
   const [updated] = await db
     .update(userReportsTable)
     .set({ status, resolvedAt: new Date() })
     .where(eq(userReportsTable.id, id))
     .returning();
+  if (updated) {
+    await writeAuditLog({
+      actorId: caller.id,
+      action: status === "resolved" ? "resolve_report" : "dismiss_report",
+      targetReportId: updated.id,
+      targetPlayerId: updated.reportedUserId ?? null,
+      reason,
+    });
+  }
   res.json(updated);
 });
+
+// GET /api/admin/audit?actorId=&targetPlayerId=&action=&limit=
+router.get("/admin/audit", requireAuth, attachPlayer, async (req, res) => {
+  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!caller?.isAdmin) {
+    res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+  const { actorId, targetPlayerId, action } = req.query as {
+    actorId?: string;
+    targetPlayerId?: string;
+    action?: string;
+  };
+  const limitRaw = Number(req.query.limit);
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 200) : 100;
+
+  const filters: SQL[] = [];
+  if (actorId) {
+    const n = Number(actorId);
+    if (Number.isFinite(n)) filters.push(eq(moderationAuditLogTable.actorId, n));
+  }
+  if (targetPlayerId) {
+    const n = Number(targetPlayerId);
+    if (Number.isFinite(n)) filters.push(eq(moderationAuditLogTable.targetPlayerId, n));
+  }
+  if (action) {
+    filters.push(eq(moderationAuditLogTable.action, action));
+  }
+
+  const rows = filters.length
+    ? await db.select().from(moderationAuditLogTable).where(and(...filters)).orderBy(desc(moderationAuditLogTable.createdAt)).limit(limit)
+    : await db.select().from(moderationAuditLogTable).orderBy(desc(moderationAuditLogTable.createdAt)).limit(limit);
+
+  res.json(rows.map(r => ({
+    ...r,
+    createdAt: r.createdAt.toISOString(),
+    metadata: r.metadata ? safeParseJson(r.metadata) : null,
+  })));
+});
+
+function safeParseJson(s: string): unknown {
+  try { return JSON.parse(s); } catch { return s; }
+}
 
 // ── Privacy Settings ─────────────────────────────────────────────────────────
 
@@ -524,6 +611,15 @@ router.patch("/admin/players/:id/suspend", requireAuth, attachPlayer, async (req
     { adminId: caller.id, targetId, isSuspended: body.isSuspended },
     "admin toggled account suspension",
   );
+  const suspendReason = typeof (req.body as { reason?: unknown })?.reason === "string"
+    ? ((req.body as { reason: string }).reason).trim().slice(0, 500) || null
+    : null;
+  await writeAuditLog({
+    actorId: caller.id,
+    action: body.isSuspended ? "suspend" : "unsuspend",
+    targetPlayerId: targetId,
+    reason: suspendReason,
+  });
   res.json({ success: true, player: updated });
 });
 
@@ -548,14 +644,22 @@ router.post("/admin/players/:id/verify", requireAuth, attachPlayer, async (req, 
   if (!updated) { res.status(404).json({ error: "Player not found" }); return; }
 
   // Auto-resolve any pending verification_request reports for this player
-  await db
+  const autoResolved = await db
     .update(userReportsTable)
     .set({ status: "resolved", resolvedAt: new Date() })
     .where(and(
       eq(userReportsTable.reportedUserId, targetId),
       eq(userReportsTable.contentType, "verification"),
       eq(userReportsTable.status, "open"),
-    ));
+    ))
+    .returning({ id: userReportsTable.id });
+
+  await writeAuditLog({
+    actorId: caller.id,
+    action: "verify",
+    targetPlayerId: targetId,
+    metadata: autoResolved.length ? { autoResolvedReportIds: autoResolved.map(r => r.id) } : null,
+  });
 
   res.json({ success: true, player: updated });
 });

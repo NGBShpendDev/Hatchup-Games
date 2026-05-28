@@ -31,3 +31,18 @@ export type UserReport = typeof userReportsTable.$inferSelect;
 export const insertBlockedUserSchema = createInsertSchema(blockedUsersTable).omit({ id: true, createdAt: true });
 export type InsertBlockedUser = z.infer<typeof insertBlockedUserSchema>;
 export type BlockedUser = typeof blockedUsersTable.$inferSelect;
+
+export const moderationAuditLogTable = pgTable("moderation_audit_log", {
+  id: serial("id").primaryKey(),
+  actorId: integer("actor_id").notNull(),
+  action: text("action").notNull(),
+  targetPlayerId: integer("target_player_id"),
+  targetReportId: integer("target_report_id"),
+  reason: text("reason"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertModerationAuditLogSchema = createInsertSchema(moderationAuditLogTable).omit({ id: true, createdAt: true });
+export type InsertModerationAuditLog = z.infer<typeof insertModerationAuditLogSchema>;
+export type ModerationAuditLog = typeof moderationAuditLogTable.$inferSelect;
