@@ -6,6 +6,7 @@ import {
   groupChallengesTable,
   groupRaidsTable,
   groupMessagesTable,
+  groupNotificationMutesTable,
   notificationsTable,
   playersTable,
 } from "@workspace/db";
@@ -506,6 +507,21 @@ router.post("/groups/:id/messages", requireAuth, attachPlayer, blockSuspendedSoc
   // recipients instead of one query per recipient (N-query pattern avoided).
   const mentioned = await resolveMentionedPlayers(content, req.playerId!);
   if (mentioned.length > 0) {
+    const mentionedIds = mentioned.map(m => m.id);
+
+    // Fetch players who have muted this group so we can skip them.
+    const mutedRows = mentionedIds.length > 0
+      ? await db.select({ playerId: groupNotificationMutesTable.playerId })
+          .from(groupNotificationMutesTable)
+          .where(
+            and(
+              eq(groupNotificationMutesTable.groupId, params.data.id),
+              inArray(groupNotificationMutesTable.playerId, mentionedIds),
+            ),
+          )
+      : [];
+    const mutedSet = new Set(mutedRows.map(r => r.playerId));
+
     const senderName = player?.displayName ?? player?.username ?? "Someone";
     const snippet = content.slice(0, 80);
     const link = `/groups/${params.data.id}`;
@@ -513,11 +529,12 @@ router.post("/groups/:id/messages", requireAuth, attachPlayer, blockSuspendedSoc
     const body = `${senderName} mentioned you in a group: "${snippet}"`;
 
     const channelMap = await socialChannelsForPlayers(
-      mentioned.map(m => m.id),
+      mentionedIds,
       "club_mention",
     );
 
     for (const m of mentioned) {
+      if (mutedSet.has(m.id)) continue;
       const ch = channelMap.get(m.id) ?? null;
       if (!ch || (!ch.inbox && !ch.push && !ch.email)) continue;
       if (ch.inbox) {
@@ -544,6 +561,58 @@ router.post("/groups/:id/messages", requireAuth, attachPlayer, blockSuspendedSoc
   }
 
   res.status(201).json({ ...msg, createdAt: msg.createdAt.toISOString() });
+});
+
+// GET /groups/:id/mute — check mute status for the current player
+router.get("/groups/:id/mute", requireAuth, attachPlayer, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const isMember = await checkMembership(id, req.playerId!);
+  if (!isMember) { res.status(403).json({ error: "Not a group member" }); return; }
+
+  const row = await db.query.groupNotificationMutesTable.findFirst({
+    where: and(
+      eq(groupNotificationMutesTable.groupId, id),
+      eq(groupNotificationMutesTable.playerId, req.playerId!),
+    ),
+  });
+
+  res.json({ muted: !!row });
+});
+
+// POST /groups/:id/mute — mute mention notifications for this group
+router.post("/groups/:id/mute", requireAuth, attachPlayer, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const isMember = await checkMembership(id, req.playerId!);
+  if (!isMember) { res.status(403).json({ error: "Not a group member" }); return; }
+
+  await db.insert(groupNotificationMutesTable)
+    .values({ groupId: id, playerId: req.playerId! })
+    .onConflictDoNothing();
+
+  res.json({ success: true });
+});
+
+// DELETE /groups/:id/mute — unmute mention notifications for this group
+router.delete("/groups/:id/mute", requireAuth, attachPlayer, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const isMember = await checkMembership(id, req.playerId!);
+  if (!isMember) { res.status(403).json({ error: "Not a group member" }); return; }
+
+  await db.delete(groupNotificationMutesTable)
+    .where(
+      and(
+        eq(groupNotificationMutesTable.groupId, id),
+        eq(groupNotificationMutesTable.playerId, req.playerId!),
+      ),
+    );
+
+  res.json({ success: true });
 });
 
 export default router;

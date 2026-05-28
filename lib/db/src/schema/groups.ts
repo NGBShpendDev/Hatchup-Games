@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, index, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -82,3 +82,17 @@ export type GroupRaid = typeof groupRaidsTable.$inferSelect;
 export const insertGroupMessageSchema = createInsertSchema(groupMessagesTable).omit({ id: true, createdAt: true });
 export type InsertGroupMessage = z.infer<typeof insertGroupMessageSchema>;
 export type GroupMessage = typeof groupMessagesTable.$inferSelect;
+
+export const groupNotificationMutesTable = pgTable("group_notification_mutes", {
+  id: serial("id").primaryKey(),
+  playerId: integer("player_id").notNull(),
+  groupId: integer("group_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  unique("group_notification_mutes_player_group_unique").on(t.playerId, t.groupId),
+  index("group_notification_mutes_group_idx").on(t.groupId),
+]);
+
+export const insertGroupNotificationMuteSchema = createInsertSchema(groupNotificationMutesTable).omit({ id: true, createdAt: true });
+export type InsertGroupNotificationMute = z.infer<typeof insertGroupNotificationMuteSchema>;
+export type GroupNotificationMute = typeof groupNotificationMutesTable.$inferSelect;

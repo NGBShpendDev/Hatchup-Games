@@ -2119,6 +2119,69 @@ paths:
               schema:
                 $ref: "#/components/schemas/GroupMessage"
 
+  /groups/{id}/mute:
+    get:
+      operationId: getGroupMuteStatus
+      tags: [groups]
+      summary: Check whether the current player has muted mention notifications for this group
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Mute status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  muted:
+                    type: boolean
+                required: [muted]
+        "403":
+          description: Not a group member
+    post:
+      operationId: muteGroup
+      tags: [groups]
+      summary: Mute mention notifications for a group
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Muted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResult"
+        "403":
+          description: Not a group member
+    delete:
+      operationId: unmuteGroup
+      tags: [groups]
+      summary: Unmute mention notifications for a group
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Unmuted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResult"
+        "403":
+          description: Not a group member
+
   # ── Social Feed ───────────────────────────────────────────────────────────
   /social/feed:
     get:

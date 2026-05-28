@@ -14,6 +14,10 @@ import {
   getListGroupMessagesUrl,
   getListGroupMessagesQueryKey,
   useSendGroupMessage,
+  useGetGroupMuteStatus,
+  getGetGroupMuteStatusQueryKey,
+  useMuteGroup,
+  useUnmuteGroup,
   type WorkoutGroupDetail,
   type GroupMessage,
 } from "@workspace/api-client-react";
@@ -46,6 +50,8 @@ import {
   Dumbbell,
   Shield,
   MoreVertical,
+  BellOff,
+  Bell,
 } from "lucide-react";
 import { SafetyBanner } from "@/components/safety-banner";
 import { SafetyGuidelinesSheet } from "@/components/safety-guidelines-sheet";
@@ -171,6 +177,28 @@ function GroupDetail({ groupId, onBack }: { groupId: number; onBack: () => void 
   const logWorkout = useLogGroupWorkout();
   const sendMsg = useSendGroupMessage();
   const leaveGroup = useLeaveGroup();
+  const { data: muteStatus } = useGetGroupMuteStatus(groupId, { query: { enabled: !!groupId && !!pid } });
+  const muteGroup = useMuteGroup();
+  const unmuteGroup = useUnmuteGroup();
+  const isMuted = muteStatus?.muted ?? false;
+
+  const handleToggleMute = () => {
+    if (isMuted) {
+      unmuteGroup.mutate({ id: groupId }, {
+        onSuccess: () => {
+          toast({ title: "Notifications unmuted", description: "You'll receive mention pings from this group again." });
+          queryClient.invalidateQueries({ queryKey: getGetGroupMuteStatusQueryKey(groupId) });
+        },
+      });
+    } else {
+      muteGroup.mutate({ id: groupId }, {
+        onSuccess: () => {
+          toast({ title: "Notifications muted", description: "You won't receive mention pings from this group." });
+          queryClient.invalidateQueries({ queryKey: getGetGroupMuteStatusQueryKey(groupId) });
+        },
+      });
+    }
+  };
 
   const [msgText, setMsgText] = useState("");
   const [workoutXp, setWorkoutXp] = useState("100");
@@ -263,6 +291,16 @@ function GroupDetail({ groupId, onBack }: { groupId: number; onBack: () => void 
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleToggleMute}
+            disabled={muteGroup.isPending || unmuteGroup.isPending}
+            title={isMuted ? "Unmute mention notifications" : "Mute mention notifications"}
+            className={`p-2 ${isMuted ? "text-muted-foreground" : "text-foreground"}`}
+          >
+            {isMuted ? <BellOff className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
+          </Button>
           <Button variant="outline" size="sm" onClick={copyInviteCode} className="font-bold text-xs gap-1">
             <Copy className="w-3 h-3" /> {group.inviteCode}
           </Button>

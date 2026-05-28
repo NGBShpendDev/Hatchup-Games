@@ -108,6 +108,7 @@ import type {
   GetBattleEloLeaderboardParams,
   GetDailyMemoryParams,
   GetGlobalLeaderboardParams,
+  GetGroupMuteStatus200,
   GetHatchlingShareImageParams,
   GetMealPlanParams,
   GetModeLeaderboardParams,
@@ -7351,6 +7352,223 @@ export const useSendGroupMessage = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getSendGroupMessageMutationOptions(options));
+    }
+
+export const getGetGroupMuteStatusUrl = (id: number,) => {
+
+
+
+
+  return `/api/groups/${id}/mute`
+}
+
+/**
+ * @summary Check whether the current player has muted mention notifications for this group
+ */
+export const getGroupMuteStatus = async (id: number, options?: RequestInit): Promise<GetGroupMuteStatus200> => {
+
+  return customFetch<GetGroupMuteStatus200>(getGetGroupMuteStatusUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetGroupMuteStatusQueryKey = (id: number,) => {
+    return [
+    `/api/groups/${id}/mute`
+    ] as const;
+    }
+
+
+export const getGetGroupMuteStatusQueryOptions = <TData = Awaited<ReturnType<typeof getGroupMuteStatus>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGroupMuteStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetGroupMuteStatusQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getGroupMuteStatus>>> = ({ signal }) => getGroupMuteStatus(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getGroupMuteStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetGroupMuteStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getGroupMuteStatus>>>
+export type GetGroupMuteStatusQueryError = ErrorType<void>
+
+
+/**
+ * @summary Check whether the current player has muted mention notifications for this group
+ */
+
+export function useGetGroupMuteStatus<TData = Awaited<ReturnType<typeof getGroupMuteStatus>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGroupMuteStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetGroupMuteStatusQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getMuteGroupUrl = (id: number,) => {
+
+
+
+
+  return `/api/groups/${id}/mute`
+}
+
+/**
+ * @summary Mute mention notifications for a group
+ */
+export const muteGroup = async (id: number, options?: RequestInit): Promise<SuccessResult> => {
+
+  return customFetch<SuccessResult>(getMuteGroupUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getMuteGroupMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof muteGroup>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof muteGroup>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['muteGroup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof muteGroup>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  muteGroup(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MuteGroupMutationResult = NonNullable<Awaited<ReturnType<typeof muteGroup>>>
+
+    export type MuteGroupMutationError = ErrorType<void>
+
+    /**
+ * @summary Mute mention notifications for a group
+ */
+export const useMuteGroup = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof muteGroup>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof muteGroup>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getMuteGroupMutationOptions(options));
+    }
+
+export const getUnmuteGroupUrl = (id: number,) => {
+
+
+
+
+  return `/api/groups/${id}/mute`
+}
+
+/**
+ * @summary Unmute mention notifications for a group
+ */
+export const unmuteGroup = async (id: number, options?: RequestInit): Promise<SuccessResult> => {
+
+  return customFetch<SuccessResult>(getUnmuteGroupUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getUnmuteGroupMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unmuteGroup>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unmuteGroup>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['unmuteGroup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unmuteGroup>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  unmuteGroup(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnmuteGroupMutationResult = NonNullable<Awaited<ReturnType<typeof unmuteGroup>>>
+
+    export type UnmuteGroupMutationError = ErrorType<void>
+
+    /**
+ * @summary Unmute mention notifications for a group
+ */
+export const useUnmuteGroup = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unmuteGroup>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unmuteGroup>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getUnmuteGroupMutationOptions(options));
     }
 
 export const getGetSocialFeedUrl = (params: GetSocialFeedParams,) => {

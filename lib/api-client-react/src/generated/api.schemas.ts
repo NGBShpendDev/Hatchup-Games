@@ -3697,6 +3697,10 @@ export type ListMyGroupsParams = {
 playerId: number;
 };
 
+export type GetGroupMuteStatus200 = {
+  muted: boolean;
+};
+
 export type GetSocialFeedParams = {
 playerId: number;
 cursor?: number;

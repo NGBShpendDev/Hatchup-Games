@@ -2546,6 +2546,42 @@ export const SendGroupMessageBody = zod.object({
 
 
 /**
+ * @summary Check whether the current player has muted mention notifications for this group
+ */
+export const GetGroupMuteStatusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetGroupMuteStatusResponse = zod.object({
+  "muted": zod.boolean()
+})
+
+
+/**
+ * @summary Mute mention notifications for a group
+ */
+export const MuteGroupParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const MuteGroupResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Unmute mention notifications for a group
+ */
+export const UnmuteGroupParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UnmuteGroupResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
  * @summary Get social feed (followed + global, scored by algorithm)
  */
 export const getSocialFeedQueryLimitDefault = 20;
