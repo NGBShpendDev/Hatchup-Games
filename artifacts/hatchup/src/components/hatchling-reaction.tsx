@@ -16,6 +16,7 @@ export interface HatchlingReactionData {
   motivationDelta?: number;
   imageUrl?: string | null;
   realm?: string | null;
+  kind?: "comeback";
 }
 
 interface Props {
@@ -55,12 +56,19 @@ export function HatchlingReaction({ reaction, onDismiss, variant = "overlay" }: 
     return () => clearTimeout(t);
   }, [reaction, onDismiss]);
 
-  const positive = reaction ? (reaction.happinessDelta ?? 0) >= 0 : true;
+  const isComeback = reaction?.kind === "comeback";
+  const positive = isComeback || (reaction ? (reaction.happinessDelta ?? 0) >= 0 : true);
   const hasSprite = !!(reaction?.imageUrl || reaction?.realm);
   const tint = reaction?.realm ? REALM_TINT[reaction.realm.toLowerCase()] : undefined;
-  const ringColor = tint?.ring ?? (positive ? "ring-green-400/60" : "ring-red-400/60");
-  const tintFrom = tint?.gradient ?? (positive ? "from-green-500/20" : "from-red-500/20");
-  const accent = positive ? "text-green-300" : "text-red-300";
+
+  // Comeback reactions always use gold styling regardless of realm tint.
+  const ringColor = isComeback
+    ? "ring-yellow-400/80"
+    : (tint?.ring ?? (positive ? "ring-green-400/60" : "ring-red-400/60"));
+  const tintFrom = isComeback
+    ? "from-yellow-500/30"
+    : (tint?.gradient ?? (positive ? "from-green-500/20" : "from-red-500/20"));
+  const accent = isComeback ? "text-yellow-300" : (positive ? "text-green-300" : "text-red-300");
   const spriteSrc = hasSprite
     ? (reaction!.imageUrl || realmFallbackImage(reaction!.realm))
     : null;
@@ -80,10 +88,12 @@ export function HatchlingReaction({ reaction, onDismiss, variant = "overlay" }: 
   }
   const caption = parts.join(" · ");
 
-  // Happy = bounce + wiggle; sad = slump downward with a small head-shake.
-  const bounceAnim = positive
-    ? { y: [0, -16, 0, -8, 0], rotate: [0, -6, 6, -3, 0], scale: [1, 1.05, 1, 1.02, 1] }
-    : { y: [0, 6, 6, 6, 0], rotate: [0, -4, 0, 4, 0], scale: [1, 0.92, 0.92, 0.95, 1] };
+  // Comeback = dramatic multi-bounce with extra height; happy = bounce + wiggle; sad = slump.
+  const bounceAnim = isComeback
+    ? { y: [0, -28, 4, -18, 2, -10, 0], rotate: [0, -8, 8, -5, 5, -2, 0], scale: [1, 1.15, 0.96, 1.1, 0.98, 1.04, 1] }
+    : positive
+      ? { y: [0, -16, 0, -8, 0], rotate: [0, -6, 6, -3, 0], scale: [1, 1.05, 1, 1.02, 1] }
+      : { y: [0, 6, 6, 6, 0], rotate: [0, -4, 0, 4, 0], scale: [1, 0.92, 0.92, 0.95, 1] };
 
   const containerBase =
     variant === "overlay"
@@ -110,14 +120,30 @@ export function HatchlingReaction({ reaction, onDismiss, variant = "overlay" }: 
             exit={{ scale: 0.6, opacity: 0, y: -10 }}
             transition={{ type: "spring", damping: 14, stiffness: 260 }}
           >
+            {isComeback && (
+              <motion.div
+                className="text-2xl font-black text-yellow-300 tracking-wide"
+                initial={{ opacity: 0, scale: 0.7 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.15, type: "spring", stiffness: 300, damping: 18 }}
+              >
+                💪 Back on track!
+              </motion.div>
+            )}
             {spriteSrc ? (
               <motion.img
                 src={spriteSrc}
                 alt={reaction.hatchlingName}
                 className="w-24 h-24 object-contain select-none pointer-events-none"
-                style={tint ? { filter: `drop-shadow(0 0 18px ${tint.color}99)` } : undefined}
+                style={
+                  isComeback
+                    ? { filter: "drop-shadow(0 0 22px #eab30899) drop-shadow(0 0 8px #fbbf24cc)" }
+                    : tint
+                      ? { filter: `drop-shadow(0 0 18px ${tint.color}99)` }
+                      : undefined
+                }
                 animate={bounceAnim}
-                transition={{ duration: 1.4, ease: "easeInOut" }}
+                transition={{ duration: 1.6, ease: "easeInOut" }}
                 draggable={false}
               />
             ) : (
@@ -126,12 +152,14 @@ export function HatchlingReaction({ reaction, onDismiss, variant = "overlay" }: 
                 animate={bounceAnim}
                 transition={{ duration: 1.4, ease: "easeInOut" }}
               >
-                {positive ? "😄" : "😞"}
+                {isComeback ? "🥳" : positive ? "😄" : "😞"}
               </motion.div>
             )}
             <p className="font-black text-sm text-white text-center">
               {reaction.hatchlingName}{" "}
-              <span className={accent}>{positive ? "loved it!" : "didn't enjoy that"}</span>
+              <span className={accent}>
+                {isComeback ? "bounced back! 🌟" : positive ? "loved it!" : "didn't enjoy that"}
+              </span>
             </p>
             {caption && (
               <p className={`text-[11px] font-bold ${accent}`}>{caption}</p>

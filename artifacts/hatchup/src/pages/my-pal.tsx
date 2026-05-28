@@ -335,6 +335,35 @@ export default function MyPalPage() {
     // daily goal or motivation has dropped critically low. Fire the sad slump
     // animation and a motivation-loss toast exactly once per pal per session.
     const palMoodState = (pal.moodState as string | undefined) ?? "happy";
+
+    // Comeback: we previously saw this pal in a sad state, but mood has
+    // now recovered (player logged a workout). Fire the celebratory comeback
+    // reaction and clear the sad ref so it doesn't re-trigger.
+    if (sadReactionFiredRef.current === pal.id && palMoodState !== "sad") {
+      sadReactionFiredRef.current = null;
+      const prevSnapshot = prevPalRef.current;
+      const rawMotivationDelta = prevSnapshot
+        ? current.motivationScore - prevSnapshot.motivationScore
+        : 10;
+      const motivationGain = rawMotivationDelta > 0 ? rawMotivationDelta : 10;
+      toast({
+        title: `+${motivationGain} Motivation 💪`,
+        description: "Back on track!",
+      });
+      setReaction({
+        hatchlingName: pal.name,
+        happinessDelta: 10,
+        energyDelta: 0,
+        motivationDelta: motivationGain,
+        imageUrl: pal.imageUrl,
+        realm: (pal as any).realm ?? null,
+        kind: "comeback",
+      });
+      triggerPalBounce(true);
+      prevPalRef.current = current;
+      return;
+    }
+
     if (palMoodState === "sad" && sadReactionFiredRef.current !== pal.id) {
       sadReactionFiredRef.current = pal.id;
       toast({
