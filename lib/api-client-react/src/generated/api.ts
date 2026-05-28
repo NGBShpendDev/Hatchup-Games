@@ -88,6 +88,7 @@ import type {
   GetMyPostInsightsParams,
   GetPlayerSocialProfileParams,
   GetPostParams,
+  GetPostViewSeriesParams,
   GetScopedLeaderboardParams,
   GetSocialFeedParams,
   GetSpeedLeaderboardParams,
@@ -178,6 +179,7 @@ import type {
   PostComment,
   PostCommentRevision,
   PostInsightsResponse,
+  PostViewSeries,
   PushPreferences,
   PushPreferencesUpdate,
   PushPublicKey,
@@ -6911,6 +6913,95 @@ export const useRecordPostView = <TError = ErrorType<void>,
       > => {
       return useMutation(getRecordPostViewMutationOptions(options));
     }
+
+export const getGetPostViewSeriesUrl = (id: number,
+    params: GetPostViewSeriesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/social/posts/${id}/view-series?${stringifiedParams}` : `/api/social/posts/${id}/view-series`
+}
+
+/**
+ * @summary Hourly view counts for the last 24h (creator-only)
+ */
+export const getPostViewSeries = async (id: number,
+    params: GetPostViewSeriesParams, options?: RequestInit): Promise<PostViewSeries> => {
+
+  return customFetch<PostViewSeries>(getGetPostViewSeriesUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPostViewSeriesQueryKey = (id: number,
+    params?: GetPostViewSeriesParams,) => {
+    return [
+    `/api/social/posts/${id}/view-series`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetPostViewSeriesQueryOptions = <TData = Awaited<ReturnType<typeof getPostViewSeries>>, TError = ErrorType<void>>(id: number,
+    params: GetPostViewSeriesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPostViewSeries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPostViewSeriesQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPostViewSeries>>> = ({ signal }) => getPostViewSeries(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPostViewSeries>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPostViewSeriesQueryResult = NonNullable<Awaited<ReturnType<typeof getPostViewSeries>>>
+export type GetPostViewSeriesQueryError = ErrorType<void>
+
+
+/**
+ * @summary Hourly view counts for the last 24h (creator-only)
+ */
+
+export function useGetPostViewSeries<TData = Awaited<ReturnType<typeof getPostViewSeries>>, TError = ErrorType<void>>(
+ id: number,
+    params: GetPostViewSeriesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPostViewSeries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPostViewSeriesQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getReactToPostUrl = (id: number,) => {
 

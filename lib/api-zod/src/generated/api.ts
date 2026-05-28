@@ -2401,6 +2401,27 @@ export const RecordPostViewResponse = zod.object({
 
 
 /**
+ * @summary Hourly view counts for the last 24h (creator-only)
+ */
+export const GetPostViewSeriesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetPostViewSeriesQueryParams = zod.object({
+  "playerId": zod.coerce.number().describe('The viewing player — must be the post owner.')
+})
+
+export const GetPostViewSeriesResponse = zod.object({
+  "windowHours": zod.number(),
+  "total": zod.number().describe('Total views across the returned buckets'),
+  "buckets": zod.array(zod.object({
+  "hour": zod.string().describe('ISO timestamp at the start of the hour (UTC)'),
+  "views": zod.number()
+})).describe('One bucket per hour, oldest first. Always windowHours entries (zero-filled).')
+})
+
+
+/**
  * @summary Toggle a reaction on a post
  */
 export const ReactToPostParams = zod.object({

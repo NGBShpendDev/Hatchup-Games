@@ -1940,6 +1940,35 @@ paths:
         "404":
           description: Not found
 
+  /social/posts/{id}/view-series:
+    get:
+      operationId: getPostViewSeries
+      tags: [social]
+      summary: Hourly view counts for the last 24h (creator-only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: playerId
+          in: query
+          required: true
+          description: The viewing player — must be the post owner.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Hourly view series
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostViewSeries"
+        "403":
+          description: Not the post owner
+        "404":
+          description: Post not found
+
   /social/posts/{id}/react:
     post:
       operationId: reactToPost
@@ -5211,6 +5240,22 @@ components:
       properties:
         viewCount: { type: integer }
         counted:   { type: boolean }
+
+    PostViewSeries:
+      type: object
+      required: [windowHours, buckets, total]
+      properties:
+        windowHours: { type: integer }
+        total:       { type: integer, description: Total views across the returned buckets }
+        buckets:
+          type: array
+          description: One bucket per hour, oldest first. Always windowHours entries (zero-filled).
+          items:
+            type: object
+            required: [hour, views]
+            properties:
+              hour:  { type: string, description: ISO timestamp at the start of the hour (UTC) }
+              views: { type: integer }
 
     PostInsight:
       type: object

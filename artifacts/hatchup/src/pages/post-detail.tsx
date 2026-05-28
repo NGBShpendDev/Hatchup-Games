@@ -14,6 +14,7 @@ import {
   useGetPost,
   getGetPostQueryKey,
   getGetSocialFeedQueryKey,
+  getGetPostViewSeriesQueryKey,
   useReactToPost,
   useDeletePost,
   useRecordPostView,
@@ -59,6 +60,12 @@ function PostBody({ postId, viewerId }: { postId: number; viewerId: number | nul
               qc.invalidateQueries({
                 queryKey: getGetPostQueryKey(postId, viewerId != null ? { playerId: viewerId } : undefined),
               });
+              if (viewerId != null) {
+                qc.invalidateQueries({ queryKey: getGetSocialFeedQueryKey({ playerId: viewerId }) });
+                qc.invalidateQueries({
+                  queryKey: getGetPostViewSeriesQueryKey(postId, { playerId: viewerId }),
+                });
+              }
             }
           },
         },

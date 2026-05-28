@@ -1439,6 +1439,20 @@ export interface ViewResult {
   counted: boolean;
 }
 
+export type PostViewSeriesBucketsItem = {
+  /** ISO timestamp at the start of the hour (UTC) */
+  hour: string;
+  views: number;
+};
+
+export interface PostViewSeries {
+  windowHours: number;
+  /** Total views across the returned buckets */
+  total: number;
+  /** One bucket per hour, oldest first. Always windowHours entries (zero-filled). */
+  buckets: PostViewSeriesBucketsItem[];
+}
+
 export interface PostInsight {
   id: number;
   content: string;
@@ -2667,6 +2681,13 @@ playerId?: number;
 };
 
 export type DeletePostParams = {
+playerId: number;
+};
+
+export type GetPostViewSeriesParams = {
+/**
+ * The viewing player — must be the post owner.
+ */
 playerId: number;
 };
 

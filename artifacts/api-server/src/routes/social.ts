@@ -537,6 +537,53 @@ router.post("/social/posts/:id/view", postViewLimiter, async (req, res) => {
   res.json({ viewCount, counted });
 });
 
+// ── GET /social/posts/:id/view-series ───────────────────────────────────────
+// Returns the last 24 hourly view buckets so the creator can render a small
+// trend chart next to their post. Owner-only (the chip is meant as an ambient
+// reward for the author, not a public stat).
+
+router.get("/social/posts/:id/view-series", requireAuth, attachPlayer, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) { res.status(404).json({ error: "Post not found" }); return; }
+  const viewerId = req.playerId!;
+
+  const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, id) });
+  if (!post || post.deletedAt != null) { res.status(404).json({ error: "Post not found" }); return; }
+  if (post.playerId !== viewerId) { res.status(403).json({ error: "Not your post" }); return; }
+
+  const windowHours = 24;
+  const now = Date.now();
+  // Bucket start = top of the current hour, so buckets align cleanly.
+  const currentHourStart = new Date(now - (now % 3600_000));
+  const cutoff = new Date(currentHourStart.getTime() - (windowHours - 1) * 3600_000);
+
+  const rows = await db
+    .select({
+      hour: sql<Date>`date_trunc('hour', ${postViewsTable.createdAt})`,
+      views: sql<number>`count(*)::int`,
+    })
+    .from(postViewsTable)
+    .where(and(eq(postViewsTable.postId, id), gte(postViewsTable.createdAt, cutoff)))
+    .groupBy(sql`date_trunc('hour', ${postViewsTable.createdAt})`);
+
+  const byHour = new Map<number, number>();
+  for (const r of rows) {
+    const t = r.hour instanceof Date ? r.hour.getTime() : new Date(r.hour as unknown as string).getTime();
+    byHour.set(t, r.views);
+  }
+
+  const buckets: { hour: string; views: number }[] = [];
+  let total = 0;
+  for (let i = 0; i < windowHours; i++) {
+    const t = cutoff.getTime() + i * 3600_000;
+    const views = byHour.get(t) ?? 0;
+    total += views;
+    buckets.push({ hour: new Date(t).toISOString(), views });
+  }
+
+  res.json({ windowHours, total, buckets });
+});
+
 // ── DELETE /social/posts/:id ────────────────────────────────────────────────
 
 router.delete("/social/posts/:id", requireAuth, attachPlayer, async (req, res) => {

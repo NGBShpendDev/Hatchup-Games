@@ -204,7 +204,7 @@ const fakeDb = {
             };
             state.viewsByKey.set(key, record);
             state.recordedViews.push(record);
-            return [{ id: state.recordedViews.size }];
+            return [{ id: state.recordedViews.length }];
           },
         }),
       };

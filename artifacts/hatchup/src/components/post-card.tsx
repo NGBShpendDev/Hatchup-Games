@@ -7,7 +7,9 @@ import {
   useToggleCommentLike,
   useListCommentRevisions,
   getListCommentRevisionsQueryKey,
+  useGetPostViewSeries,
   getGetSocialFeedQueryKey,
+  getGetPostViewSeriesQueryKey,
   type FeedPost,
   type PostComment,
 } from "@workspace/api-client-react";
@@ -354,6 +356,51 @@ export function CommentRow({
   );
 }
 
+function ViewSparkline({ postId, playerId }: { postId: number; playerId: number }) {
+  const { data } = useGetPostViewSeries(postId, { playerId }, {
+    query: {
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+      queryKey: getGetPostViewSeriesQueryKey(postId, { playerId }),
+    },
+  });
+  const buckets = data?.buckets ?? [];
+  if (buckets.length === 0 || (data?.total ?? 0) === 0) return null;
+
+  const width = 44;
+  const height = 14;
+  const max = Math.max(1, ...buckets.map(b => b.views));
+  const step = buckets.length > 1 ? width / (buckets.length - 1) : 0;
+  const pts = buckets.map((b, i) => {
+    const x = i * step;
+    const y = height - (b.views / max) * (height - 2) - 1;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const line = pts.join(" ");
+  const area = `0,${height} ${line} ${width},${height}`;
+
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      className="text-primary/80"
+      aria-label={`${data?.total ?? 0} views in the last 24 hours`}
+      data-testid={`sparkline-views-${postId}`}
+    >
+      <polygon points={area} fill="currentColor" opacity="0.18" />
+      <polyline
+        points={line}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function PostCard({
   post,
   playerId,
@@ -635,16 +682,22 @@ export function PostCard({
               {post.commentCount > 0 && post.commentCount}
               {showComments ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             </button>
-            {((post as any).viewCount ?? 0) > 0 && (
-              <div
-                className="flex items-center gap-1 px-2 py-1 rounded-full text-xs text-muted-foreground font-bold"
-                title={`${(post as any).viewCount} ${(post as any).viewCount === 1 ? "view" : "views"}`}
-                data-testid={`text-view-count-${post.id}`}
-              >
-                <Eye className="w-3.5 h-3.5" />
-                <span>{(post as any).viewCount}</span>
-              </div>
-            )}
+            {(() => {
+              const views = post.viewCount ?? 0;
+              const isOwn = !isAnonymous && post.playerId === playerId;
+              const formatted = views >= 1000 ? `${(views / 1000).toFixed(views >= 10_000 ? 0 : 1)}k` : `${views}`;
+              return (
+                <div
+                  className="flex items-center gap-1 px-2 py-1 rounded-full text-xs text-muted-foreground font-bold"
+                  title={`${views.toLocaleString()} ${views === 1 ? "view" : "views"}`}
+                  data-testid={`text-view-count-${post.id}`}
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>{formatted}</span>
+                  {isOwn && views > 0 && <ViewSparkline postId={post.id} playerId={playerId!} />}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Comments */}
