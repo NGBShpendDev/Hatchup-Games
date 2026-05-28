@@ -13,7 +13,7 @@ import {
   groupMembersTable,
   groupsTable,
 } from "@workspace/db";
-import { eq, and, desc, sql, or, ne, inArray, ilike, gte } from "drizzle-orm";
+import { eq, and, desc, sql, or, ne, inArray, ilike, gte, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAuth, attachPlayer } from "../middlewares/auth";
 import { attachEntitlement, requirePremium } from "../services/subscriptionGuards";
@@ -72,7 +72,9 @@ async function maybeGrantCreatorBadge(playerId: number) {
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
   if (!player || player.creatorBadge) return;
 
-  const posts = await db.query.postsTable.findMany({ where: eq(postsTable.playerId, playerId) });
+  const posts = await db.query.postsTable.findMany({
+    where: and(eq(postsTable.playerId, playerId), isNull(postsTable.deletedAt)),
+  });
   const totalEngagement = posts.reduce((sum, p) => sum + p.engagementScore, 0);
   if (totalEngagement >= CREATOR_BADGE_THRESHOLD) {
     await db.update(playersTable)
@@ -222,6 +224,7 @@ router.get("/social/feed", requireAuth, attachPlayer, async (req, res) => {
   const followedIds = new Set(follows.map(f => f.followeeId));
 
   const allPosts = await db.query.postsTable.findMany({
+    where: isNull(postsTable.deletedAt),
     orderBy: [desc(postsTable.createdAt)],
     limit: 200,
   });
@@ -291,7 +294,11 @@ router.get("/social/trending", requireAuth, attachPlayer, async (req, res) => {
 
   const postIds = recentViewRows.map(r => r.postId);
   const postsForWindow = await db.query.postsTable.findMany({
-    where: and(inArray(postsTable.id, postIds), eq(postsTable.isFlagged, false)),
+    where: and(
+      inArray(postsTable.id, postIds),
+      eq(postsTable.isFlagged, false),
+      isNull(postsTable.deletedAt),
+    ),
   });
 
   const viewsById = new Map(recentViewRows.map(r => [r.postId, r.recentViews]));
@@ -400,7 +407,7 @@ router.get("/social/posts/:id", async (req, res) => {
   }
 
   const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, id) });
-  if (!post) { res.status(404).json({ error: "Post not found" }); return; }
+  if (!post || post.deletedAt != null) { res.status(404).json({ error: "Post not found" }); return; }
 
   const enriched = await enrichPost(post, viewerId);
   res.json(enriched);
@@ -417,7 +424,7 @@ router.post("/social/posts/:id/view", postViewLimiter, async (req, res) => {
   if (!Number.isFinite(id)) { res.status(404).json({ error: "Post not found" }); return; }
 
   const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, id) });
-  if (!post) { res.status(404).json({ error: "Post not found" }); return; }
+  if (!post || post.deletedAt != null) { res.status(404).json({ error: "Post not found" }); return; }
 
   // For anonymous viewers, hash the IP with SESSION_SECRET so we can still
   // dedup per-day without persisting raw IPs (privacy + a small extra cost
@@ -470,18 +477,15 @@ router.delete("/social/posts/:id", requireAuth, attachPlayer, async (req, res) =
   const playerId = req.playerId!;
 
   const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, id) });
-  if (!post) { res.status(404).json({ error: "Post not found" }); return; }
+  if (!post || post.deletedAt != null) { res.status(404).json({ error: "Post not found" }); return; }
   if (post.playerId !== playerId) { res.status(403).json({ error: "Not your post" }); return; }
 
-  await db.delete(postReactionsTable).where(eq(postReactionsTable.postId, id));
-  const postComments = await db.query.postCommentsTable.findMany({ where: eq(postCommentsTable.postId, id) });
-  if (postComments.length) {
-    await db.delete(postCommentReactionsTable)
-      .where(inArray(postCommentReactionsTable.commentId, postComments.map(c => c.id)));
-  }
-  await db.delete(postCommentsTable).where(eq(postCommentsTable.postId, id));
-  await db.delete(postRepostsTable).where(eq(postRepostsTable.postId, id));
-  await db.delete(postsTable).where(eq(postsTable.id, id));
+  // Soft-delete: keep the row (and its reactions/comments/reposts) so moderation
+  // retains an audit trail. The scheduled `postPurgeJob` hard-removes rows older
+  // than the retention window. Public read paths filter on `deletedAt IS NULL`.
+  await db.update(postsTable)
+    .set({ deletedAt: new Date() })
+    .where(eq(postsTable.id, id));
 
   res.status(204).send();
 });
@@ -495,6 +499,9 @@ router.post("/social/posts/:id/react", socialWriteLimiter, requireAuth, attachPl
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
   const { reactionType } = body.data;
+
+  const targetPost = await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) });
+  if (!targetPost || targetPost.deletedAt != null) { res.status(404).json({ error: "Post not found" }); return; }
 
   const existing = await db.query.postReactionsTable.findFirst({
     where: and(eq(postReactionsTable.postId, postId), eq(postReactionsTable.playerId, playerId)),
@@ -552,7 +559,7 @@ router.post("/social/posts/:id/repost", socialWriteLimiter, requireAuth, attachP
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
   const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) });
-  if (!post) { res.status(404).json({ error: "Post not found" }); return; }
+  if (!post || post.deletedAt != null) { res.status(404).json({ error: "Post not found" }); return; }
 
   const existing = await db.query.postRepostsTable.findFirst({
     where: and(eq(postRepostsTable.postId, postId), eq(postRepostsTable.playerId, playerId)),
@@ -594,6 +601,8 @@ router.post("/social/posts/:id/repost", socialWriteLimiter, requireAuth, attachP
 
 router.get("/social/posts/:id/comments", requireAuth, attachPlayer, async (req, res) => {
   const postId = Number(req.params.id);
+  const parent = await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) });
+  if (!parent || parent.deletedAt != null) { res.json([]); return; }
   const comments = await db.query.postCommentsTable.findMany({
     where: eq(postCommentsTable.postId, postId),
     orderBy: [desc(postCommentsTable.createdAt)],
@@ -638,6 +647,9 @@ router.post("/social/posts/:id/comments", socialWriteLimiter, requireAuth, attac
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
   const { content } = body.data;
+
+  const parentPost = await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) });
+  if (!parentPost || parentPost.deletedAt != null) { res.status(404).json({ error: "Post not found" }); return; }
 
   const mod = moderateContent(content);
   if (mod.flagged) {
@@ -888,7 +900,7 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
   if (!player) { res.status(404).json({ error: "Player not found" }); return; }
 
   const posts = await db.query.postsTable.findMany({
-    where: eq(postsTable.playerId, id),
+    where: and(eq(postsTable.playerId, id), isNull(postsTable.deletedAt)),
     orderBy: [desc(postsTable.createdAt)],
     limit: 30,
   });
@@ -1168,7 +1180,7 @@ async function getMemoryForPlayer(
 ): Promise<{ post: Awaited<ReturnType<typeof enrichPost>>; memoryType: string; yearsAgo: number; label: string } | null> {
   const allPosts = posts ?? await (async () => {
     const raw = await db.query.postsTable.findMany({
-      where: eq(postsTable.playerId, playerId),
+      where: and(eq(postsTable.playerId, playerId), isNull(postsTable.deletedAt)),
       orderBy: [desc(postsTable.createdAt)],
     });
     return Promise.all(raw.map(p => enrichPost(p, playerId)));
@@ -1278,6 +1290,7 @@ router.get("/social/discover", requireAuth, attachPlayer, async (req, res) => {
 
   // Recently active: latest posters
   const recentPosts = await db.query.postsTable.findMany({
+    where: isNull(postsTable.deletedAt),
     orderBy: [desc(postsTable.createdAt)],
     limit: 100,
   });
@@ -1460,7 +1473,7 @@ router.get(
         engagementScore: postsTable.engagementScore,
       })
       .from(postsTable)
-      .where(eq(postsTable.playerId, playerId))
+      .where(and(eq(postsTable.playerId, playerId), isNull(postsTable.deletedAt)))
       .orderBy(...orderBy)
       .limit(limit);
 

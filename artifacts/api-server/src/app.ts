@@ -17,6 +17,7 @@ import ogClubRouter from "./routes/og-club";
 import { logger } from "./lib/logger";
 import { startPassiveSyncJob } from "./services/passiveSyncJob";
 import { startWeeklyNutritionRecapJob } from "./services/weeklyNutritionRecapJob";
+import { startPostPurgeJob } from "./services/postPurgeJob";
 import { WebhookHandlers } from "./webhookHandlers";
 
 const app: Express = express();
@@ -141,5 +142,6 @@ app.use(ogClubRouter);
 
 startPassiveSyncJob();
 startWeeklyNutritionRecapJob();
+startPostPurgeJob();
 
 export default app;
