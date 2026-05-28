@@ -4,13 +4,59 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { Send, RotateCcw, Bot, User, Dumbbell, Zap, UsersRound, Trophy, ChevronRight, AlertTriangle } from "lucide-react";
+import {
+  Send, RotateCcw, Bot, User,
+  Dumbbell, Zap, UsersRound, Trophy, ChevronRight, AlertTriangle,
+} from "lucide-react";
+
+interface DeepLink {
+  label: string;
+  href: string;
+  icon: React.ReactNode;
+}
 
 interface Message {
   id: number;
   role: "user" | "assistant";
   content: string;
+  timestamp: Date;
   streaming?: boolean;
+  deepLinks?: DeepLink[];
+}
+
+const ALL_DEEP_LINKS: (DeepLink & { keywords: string[] })[] = [
+  {
+    label: "Training Plan",
+    href: "/training",
+    icon: <Dumbbell className="w-3.5 h-3.5" />,
+    keywords: ["workout plan", "training plan", "training tab", "generate a plan", "workout plan", "exercise plan"],
+  },
+  {
+    label: "Log Activity",
+    href: "/",
+    icon: <Zap className="w-3.5 h-3.5" />,
+    keywords: ["log your", "log a workout", "log activity", "track your steps", "log steps", "record your"],
+  },
+  {
+    label: "Join a Group",
+    href: "/groups",
+    icon: <UsersRound className="w-3.5 h-3.5" />,
+    keywords: ["workout group", "join a group", "group workout", "social feature", "team", "community"],
+  },
+  {
+    label: "Leaderboard",
+    href: "/social",
+    icon: <Trophy className="w-3.5 h-3.5" />,
+    keywords: ["leaderboard", "ranking", "top players", "compete", "social"],
+  },
+];
+
+function extractDeepLinks(text: string): DeepLink[] {
+  const lower = text.toLowerCase();
+  const found = ALL_DEEP_LINKS.filter((dl) =>
+    dl.keywords.some((kw) => lower.includes(kw))
+  );
+  return found.map(({ label, href, icon }) => ({ label, href, icon }));
 }
 
 const QUICK_PROMPTS = [
@@ -18,19 +64,16 @@ const QUICK_PROMPTS = [
   { label: "Build my streak", prompt: "How can I build a longer activity streak? Give me practical daily tips." },
   { label: "Boost my Pals", prompt: "What's the fastest way to level up my Pals through fitness?" },
   { label: "Recovery tips", prompt: "I'm feeling sore from recent workouts. What recovery strategies do you recommend?" },
-  { label: "Nutrition advice", prompt: "Give me quick nutrition tips that match my fitness goal." },
+  { label: "Nutrition tips", prompt: "Give me quick nutrition tips that match my fitness goal." },
   { label: "Morning routine", prompt: "Design a quick 15-minute morning routine I can do every day." },
-];
-
-const ACTION_LINKS = [
-  { label: "Training Plan", href: "/training", icon: <Dumbbell className="w-3.5 h-3.5" /> },
-  { label: "Log Activity", href: "/", icon: <Zap className="w-3.5 h-3.5" /> },
-  { label: "Groups", href: "/groups", icon: <UsersRound className="w-3.5 h-3.5" /> },
-  { label: "Leaderboard", href: "/social", icon: <Trophy className="w-3.5 h-3.5" /> },
 ];
 
 let msgIdCounter = 1;
 function nextId() { return msgIdCounter++; }
+
+function formatTime(d: Date): string {
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
 
 export default function Coach() {
   const { playerId } = usePlayer();
@@ -39,6 +82,7 @@ export default function Coach() {
       id: nextId(),
       role: "assistant",
       content: "Hey there! I'm **Hatch**, your AI Fitness Coach. I can see your stats, recent workouts, and Pal progress — so my advice is tailored just for you.\n\nWhat do you want to work on today?",
+      timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState("");
@@ -54,10 +98,16 @@ export default function Coach() {
     const trimmed = text.trim();
     if (!trimmed || isStreaming || !playerId) return;
 
-    const userMsg: Message = { id: nextId(), role: "user", content: trimmed };
+    const now = new Date();
+    const userMsg: Message = { id: nextId(), role: "user", content: trimmed, timestamp: now };
     const assistantId = nextId();
+    const assistantTimestamp = new Date();
 
-    setMessages((prev) => [...prev, userMsg, { id: assistantId, role: "assistant", content: "", streaming: true }]);
+    setMessages((prev) => [
+      ...prev,
+      userMsg,
+      { id: assistantId, role: "assistant", content: "", timestamp: assistantTimestamp, streaming: true },
+    ]);
     setInput("");
     setIsStreaming(true);
 
@@ -72,20 +122,21 @@ export default function Coach() {
         credentials: "include",
       });
 
-      if (!res.ok || !res.body) {
-        throw new Error("Request failed");
-      }
+      if (!res.ok || !res.body) throw new Error("Request failed");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let accumulated = "";
+      let lineBuffer = "";
 
-      while (true) {
+      outer: while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n");
+        lineBuffer += decoder.decode(value, { stream: true });
+        const lines = lineBuffer.split("\n");
+        // Keep the last (possibly incomplete) line in the buffer
+        lineBuffer = lines.pop() ?? "";
 
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
@@ -99,23 +150,29 @@ export default function Coach() {
                 )
               );
             }
-            if (event.done || event.error) {
-              if (event.error) accumulated = event.error;
-              break;
+            if (event.done) break outer;
+            if (event.error) {
+              accumulated = event.error;
+              break outer;
             }
-          } catch { /* skip malformed event */ }
+          } catch { /* skip malformed line */ }
         }
       }
 
+      const deepLinks = extractDeepLinks(accumulated);
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === assistantId ? { ...m, content: accumulated || "Sorry, I couldn't respond. Try again.", streaming: false } : m
+          m.id === assistantId
+            ? { ...m, content: accumulated || "Sorry, I couldn't respond. Try again.", streaming: false, deepLinks }
+            : m
         )
       );
     } catch {
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === assistantId ? { ...m, content: "Coach is unavailable right now. Please try again.", streaming: false } : m
+          m.id === assistantId
+            ? { ...m, content: "Coach is unavailable right now. Please try again.", streaming: false }
+            : m
         )
       );
     } finally {
@@ -135,6 +192,7 @@ export default function Coach() {
       id: nextId(),
       role: "assistant",
       content: "New session started! What do you want to work on today?",
+      timestamp: new Date(),
     }]);
     setIsStreaming(false);
   };
@@ -143,6 +201,7 @@ export default function Coach() {
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
       <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-background to-black pointer-events-none -z-10" />
       <div className="flex flex-col h-[100dvh] max-w-2xl mx-auto w-full">
+
         {/* Header */}
         <header className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-card/60 backdrop-blur shrink-0">
           <div className="flex items-center gap-3">
@@ -154,11 +213,9 @@ export default function Coach() {
               <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Personalized fitness guidance</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleReset} title="New chat">
-              <RotateCcw className="w-4 h-4" />
-            </Button>
-          </div>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleReset} title="New chat">
+            <RotateCcw className="w-4 h-4" />
+          </Button>
         </header>
 
         {/* Safety notice */}
@@ -167,19 +224,6 @@ export default function Coach() {
           <p className="text-[11px] text-yellow-600 dark:text-yellow-400 font-medium leading-snug">
             For general wellness only. Always consult a healthcare professional for medical concerns, pain, or injury.
           </p>
-        </div>
-
-        {/* Quick action links */}
-        <div className="flex gap-2 px-4 mt-3 overflow-x-auto no-scrollbar shrink-0">
-          {ACTION_LINKS.map((link) => (
-            <Link key={link.href} href={link.href}>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-card border border-border rounded-full text-[11px] font-bold text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors whitespace-nowrap cursor-pointer">
-                {link.icon}
-                {link.label}
-                <ChevronRight className="w-3 h-3" />
-              </div>
-            </Link>
-          ))}
         </div>
 
         {/* Messages */}
@@ -200,24 +244,45 @@ export default function Coach() {
                 }`}>
                   {msg.role === "assistant"
                     ? <Bot className="w-4 h-4 text-white" />
-                    : <User className="w-3.5 h-3.5 text-muted-foreground" />
-                  }
+                    : <User className="w-3.5 h-3.5 text-muted-foreground" />}
                 </div>
-                <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                  msg.role === "user"
-                    ? "bg-primary text-white rounded-tr-sm"
-                    : "bg-card border border-border/60 rounded-tl-sm"
-                }`}>
-                  {msg.content
-                    ? <FormattedMessage content={msg.content} />
-                    : msg.streaming
-                      ? <span className="inline-flex gap-1 items-center text-muted-foreground">
-                          <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:0ms]" />
-                          <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:150ms]" />
-                          <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:300ms]" />
-                        </span>
-                      : null
-                  }
+                <div className={`flex flex-col gap-1 max-w-[85%] ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                  <div className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                    msg.role === "user"
+                      ? "bg-primary text-white rounded-tr-sm"
+                      : "bg-card border border-border/60 rounded-tl-sm"
+                  }`}>
+                    {msg.content
+                      ? <FormattedMessage content={msg.content} />
+                      : msg.streaming
+                        ? <span className="inline-flex gap-1 items-center text-muted-foreground">
+                            <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:0ms]" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:150ms]" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:300ms]" />
+                          </span>
+                        : null
+                    }
+                  </div>
+
+                  {/* Timestamp */}
+                  <span className="text-[10px] text-muted-foreground px-1">
+                    {formatTime(msg.timestamp)}
+                  </span>
+
+                  {/* Contextual deep-link actions (assistant only, after streaming) */}
+                  {msg.role === "assistant" && !msg.streaming && msg.deepLinks && msg.deepLinks.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 px-1 pt-0.5">
+                      {msg.deepLinks.map((dl) => (
+                        <Link key={dl.href} href={dl.href}>
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 border border-primary/30 rounded-full text-[11px] font-bold text-primary hover:bg-primary/20 transition-colors cursor-pointer whitespace-nowrap">
+                            {dl.icon}
+                            {dl.label}
+                            <ChevronRight className="w-3 h-3" />
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             ))}
@@ -225,21 +290,21 @@ export default function Coach() {
           <div ref={bottomRef} />
         </div>
 
-        {/* Quick prompts (shown when only the welcome message exists) */}
-        {messages.length === 1 && (
-          <div className="px-4 pb-2 grid grid-cols-2 gap-2 shrink-0">
+        {/* Quick prompt chips — always visible above input */}
+        <div className="px-4 pt-2 pb-1 shrink-0">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar">
             {QUICK_PROMPTS.map((qp) => (
               <button
                 key={qp.label}
                 onClick={() => sendMessage(qp.prompt)}
                 disabled={isStreaming}
-                className="text-left text-xs font-semibold px-3 py-2.5 bg-card border border-border rounded-xl hover:border-primary/50 hover:bg-primary/5 transition-colors disabled:opacity-50 leading-snug"
+                className="shrink-0 text-xs font-semibold px-3 py-1.5 bg-card border border-border rounded-full hover:border-primary/50 hover:bg-primary/5 transition-colors disabled:opacity-50 whitespace-nowrap"
               >
                 {qp.label}
               </button>
             ))}
           </div>
-        )}
+        </div>
 
         {/* Input area */}
         <div className="px-4 pb-4 pt-2 shrink-0 border-t border-border/50 bg-card/60 backdrop-blur">
@@ -264,7 +329,7 @@ export default function Coach() {
             </Button>
           </div>
           <p className="text-center text-[10px] text-muted-foreground mt-2 font-medium">
-            Press Enter to send · Shift+Enter for new line
+            Enter to send · Shift+Enter for new line
           </p>
         </div>
       </div>
