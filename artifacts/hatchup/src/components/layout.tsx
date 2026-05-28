@@ -5,6 +5,7 @@ import { UniversePalette } from "./universe-palette";
 import { AIAssistantFab } from "./ai-assistant-fab";
 import { useChallengeNotifications } from "@/hooks/use-challenge-notifications";
 import { useNotificationsToast } from "@/hooks/use-notifications-toast";
+import { TournamentChampionGate } from "./tournament-champion-gate";
 
 export function Layout({ children }: { children: ReactNode }) {
   useChallengeNotifications();
@@ -26,6 +27,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <UniversePalette />
       <AIAssistantFab />
       <BottomNav />
+      <TournamentChampionGate />
     </div>
   );
 }
