@@ -1371,6 +1371,20 @@ export interface PlayerSocialProfile {
   sharedGroups: SharedGroup[];
 }
 
+export interface FollowersPage {
+  players: PlayerStub[];
+  total: number;
+  /** @nullable */
+  nextCursor: number | null;
+}
+
+export interface FollowingPage {
+  players: PlayerStub[];
+  total: number;
+  /** @nullable */
+  nextCursor: number | null;
+}
+
 export interface MutualFollowersPage {
   players: PlayerStub[];
   total: number;
@@ -2414,6 +2428,14 @@ export type GetPlayerSocialProfileParams = {
 viewerId?: number;
 };
 
+export type ListFollowersParams = {
+/**
+ * Offset (number of items to skip).
+ */
+cursor?: number;
+limit?: number;
+};
+
 export type ListMutualFollowersParams = {
 viewerId: number;
 /**
@@ -2425,6 +2447,14 @@ limit?: number;
 
 export type ListMutualFollowingParams = {
 viewerId: number;
+/**
+ * Offset (number of items to skip).
+ */
+cursor?: number;
+limit?: number;
+};
+
+export type ListFollowingParams = {
 /**
  * Offset (number of items to skip).
  */

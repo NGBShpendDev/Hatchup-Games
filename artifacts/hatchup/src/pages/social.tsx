@@ -493,6 +493,7 @@ function FollowersListSheet({
 }) {
   const { data, isLoading } = useListFollowers(
     profileId,
+    undefined,
     {
       query: {
         queryKey: getListFollowersQueryKey(profileId),
@@ -500,6 +501,9 @@ function FollowersListSheet({
       },
     },
   );
+
+  const players = data?.players ?? [];
+  const total = data?.total ?? 0;
 
   return (
     <Sheet open={open} onOpenChange={v => { if (!v) onClose(); }}>
@@ -509,7 +513,7 @@ function FollowersListSheet({
             <Users className="w-4 h-4 text-primary" />
             Followers
             {data && (
-              <span className="text-xs font-bold text-muted-foreground">({data.length})</span>
+              <span className="text-xs font-bold text-muted-foreground">({total})</span>
             )}
           </SheetTitle>
         </SheetHeader>
@@ -521,12 +525,12 @@ function FollowersListSheet({
               <Skeleton className="h-14 w-full rounded-2xl" />
               <Skeleton className="h-14 w-full rounded-2xl" />
             </>
-          ) : !data || data.length === 0 ? (
+          ) : players.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
               No followers yet.
             </p>
           ) : (
-            data.map(p => (
+            players.map(p => (
               <PlayerListRow
                 key={p.id}
                 player={p as PlayerStubRow}
@@ -556,6 +560,7 @@ function FollowingListSheet({
 }) {
   const { data, isLoading } = useListFollowing(
     profileId,
+    undefined,
     {
       query: {
         queryKey: getListFollowingQueryKey(profileId),
@@ -563,6 +568,9 @@ function FollowingListSheet({
       },
     },
   );
+
+  const players = data?.players ?? [];
+  const total = data?.total ?? 0;
 
   return (
     <Sheet open={open} onOpenChange={v => { if (!v) onClose(); }}>
@@ -572,7 +580,7 @@ function FollowingListSheet({
             <UserPlus className="w-4 h-4 text-primary" />
             Following
             {data && (
-              <span className="text-xs font-bold text-muted-foreground">({data.length})</span>
+              <span className="text-xs font-bold text-muted-foreground">({total})</span>
             )}
           </SheetTitle>
         </SheetHeader>
@@ -584,12 +592,12 @@ function FollowingListSheet({
               <Skeleton className="h-14 w-full rounded-2xl" />
               <Skeleton className="h-14 w-full rounded-2xl" />
             </>
-          ) : !data || data.length === 0 ? (
+          ) : players.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
               Not following anyone yet.
             </p>
           ) : (
-            data.map(p => (
+            players.map(p => (
               <PlayerListRow
                 key={p.id}
                 player={p as PlayerStubRow}

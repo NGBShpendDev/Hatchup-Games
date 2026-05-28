@@ -1293,25 +1293,46 @@ async function loadSharedGroupsForViewer(
 router.get("/social/players/:id/followers", requireAuth, attachPlayer, async (req, res) => {
   const id = Number(req.params.id);
   const viewerId = req.playerId!;
-  const follows = await db.query.playerFollowsTable.findMany({ where: eq(playerFollowsTable.followeeId, id) });
-  const ids = follows.map(f => f.followerId);
-  if (ids.length === 0) { res.json([]); return; }
-  const playerRows = await db.query.playersTable.findMany({ where: inArray(playersTable.id, ids) });
-  const playerMap = new Map(playerRows.map(p => [p.id, p]));
-  const sharedGroupsByPlayer = await loadSharedGroupsForViewer(viewerId, ids);
-  const players = ids.flatMap(pid => {
-    const p = playerMap.get(pid);
-    if (!p) return [];
-    return [{
-      id: p.id,
-      username: p.username,
-      displayName: p.displayName ?? null,
-      avatarUrl: p.avatarUrl ?? null,
-      creatorBadge: p.creatorBadge ?? null,
-      sharedGroups: sharedGroupsByPlayer.get(p.id) ?? [],
-    }];
-  });
-  res.json(players);
+  const cursor = Math.max(0, Number(req.query.cursor) || 0);
+  const limit = Math.min(Math.max(1, Number(req.query.limit) || 20), 100);
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(playerFollowsTable)
+    .where(eq(playerFollowsTable.followeeId, id));
+  const total = countRow?.count ?? 0;
+
+  const rows = await db
+    .select({
+      id: playersTable.id,
+      username: playersTable.username,
+      displayName: playersTable.displayName,
+      avatarUrl: playersTable.avatarUrl,
+      creatorBadge: playersTable.creatorBadge,
+      followId: playerFollowsTable.id,
+    })
+    .from(playerFollowsTable)
+    .innerJoin(playersTable, eq(playersTable.id, playerFollowsTable.followerId))
+    .where(eq(playerFollowsTable.followeeId, id))
+    .orderBy(desc(playerFollowsTable.id))
+    .limit(limit)
+    .offset(cursor);
+
+  const pageIds = rows.map(r => r.id);
+  const sharedGroupsByPlayer = await loadSharedGroupsForViewer(viewerId, pageIds);
+  const players = rows.map(p => ({
+    id: p.id,
+    username: p.username,
+    displayName: p.displayName ?? null,
+    avatarUrl: p.avatarUrl ?? null,
+    creatorBadge: p.creatorBadge ?? null,
+    sharedGroups: sharedGroupsByPlayer.get(p.id) ?? [],
+  }));
+
+  const nextOffset = cursor + rows.length;
+  const nextCursor = nextOffset < total ? nextOffset : null;
+
+  res.json({ players, total, nextCursor });
 });
 
 // ── GET /social/players/:id/following ──────────────────────────────────────
@@ -1319,25 +1340,46 @@ router.get("/social/players/:id/followers", requireAuth, attachPlayer, async (re
 router.get("/social/players/:id/following", requireAuth, attachPlayer, async (req, res) => {
   const id = Number(req.params.id);
   const viewerId = req.playerId!;
-  const follows = await db.query.playerFollowsTable.findMany({ where: eq(playerFollowsTable.followerId, id) });
-  const ids = follows.map(f => f.followeeId);
-  if (ids.length === 0) { res.json([]); return; }
-  const playerRows = await db.query.playersTable.findMany({ where: inArray(playersTable.id, ids) });
-  const playerMap = new Map(playerRows.map(p => [p.id, p]));
-  const sharedGroupsByPlayer = await loadSharedGroupsForViewer(viewerId, ids);
-  const players = ids.flatMap(pid => {
-    const p = playerMap.get(pid);
-    if (!p) return [];
-    return [{
-      id: p.id,
-      username: p.username,
-      displayName: p.displayName ?? null,
-      avatarUrl: p.avatarUrl ?? null,
-      creatorBadge: p.creatorBadge ?? null,
-      sharedGroups: sharedGroupsByPlayer.get(p.id) ?? [],
-    }];
-  });
-  res.json(players);
+  const cursor = Math.max(0, Number(req.query.cursor) || 0);
+  const limit = Math.min(Math.max(1, Number(req.query.limit) || 20), 100);
+
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(playerFollowsTable)
+    .where(eq(playerFollowsTable.followerId, id));
+  const total = countRow?.count ?? 0;
+
+  const rows = await db
+    .select({
+      id: playersTable.id,
+      username: playersTable.username,
+      displayName: playersTable.displayName,
+      avatarUrl: playersTable.avatarUrl,
+      creatorBadge: playersTable.creatorBadge,
+      followId: playerFollowsTable.id,
+    })
+    .from(playerFollowsTable)
+    .innerJoin(playersTable, eq(playersTable.id, playerFollowsTable.followeeId))
+    .where(eq(playerFollowsTable.followerId, id))
+    .orderBy(desc(playerFollowsTable.id))
+    .limit(limit)
+    .offset(cursor);
+
+  const pageIds = rows.map(r => r.id);
+  const sharedGroupsByPlayer = await loadSharedGroupsForViewer(viewerId, pageIds);
+  const players = rows.map(p => ({
+    id: p.id,
+    username: p.username,
+    displayName: p.displayName ?? null,
+    avatarUrl: p.avatarUrl ?? null,
+    creatorBadge: p.creatorBadge ?? null,
+    sharedGroups: sharedGroupsByPlayer.get(p.id) ?? [],
+  }));
+
+  const nextOffset = cursor + rows.length;
+  const nextCursor = nextOffset < total ? nextOffset : null;
+
+  res.json({ players, total, nextCursor });
 });
 
 // ── GET /social/memories ────────────────────────────────────────────────────

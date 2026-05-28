@@ -2726,13 +2726,22 @@ export const GetPlayerSocialProfileResponse = zod.object({
 
 
 /**
- * @summary List followers of a player
+ * @summary List followers of a player (paginated)
  */
 export const ListFollowersParams = zod.object({
   "id": zod.coerce.number()
 })
 
-export const ListFollowersResponseItem = zod.object({
+export const listFollowersQueryCursorDefault = 0;
+export const listFollowersQueryLimitDefault = 20;
+
+export const ListFollowersQueryParams = zod.object({
+  "cursor": zod.coerce.number().default(listFollowersQueryCursorDefault).describe('Offset (number of items to skip).'),
+  "limit": zod.coerce.number().default(listFollowersQueryLimitDefault)
+})
+
+export const ListFollowersResponse = zod.object({
+  "players": zod.array(zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "displayName": zod.string().nullable(),
@@ -2742,8 +2751,10 @@ export const ListFollowersResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string()
 })).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n')
+})),
+  "total": zod.number(),
+  "nextCursor": zod.number().nullable()
 })
-export const ListFollowersResponse = zod.array(ListFollowersResponseItem)
 
 
 /**
@@ -2813,13 +2824,22 @@ export const ListMutualFollowingResponse = zod.object({
 
 
 /**
- * @summary List players a player is following
+ * @summary List players a player is following (paginated)
  */
 export const ListFollowingParams = zod.object({
   "id": zod.coerce.number()
 })
 
-export const ListFollowingResponseItem = zod.object({
+export const listFollowingQueryCursorDefault = 0;
+export const listFollowingQueryLimitDefault = 20;
+
+export const ListFollowingQueryParams = zod.object({
+  "cursor": zod.coerce.number().default(listFollowingQueryCursorDefault).describe('Offset (number of items to skip).'),
+  "limit": zod.coerce.number().default(listFollowingQueryLimitDefault)
+})
+
+export const ListFollowingResponse = zod.object({
+  "players": zod.array(zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "displayName": zod.string().nullable(),
@@ -2829,8 +2849,10 @@ export const ListFollowingResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string()
 })).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n')
+})),
+  "total": zod.number(),
+  "nextCursor": zod.number().nullable()
 })
-export const ListFollowingResponse = zod.array(ListFollowingResponseItem)
 
 
 /**

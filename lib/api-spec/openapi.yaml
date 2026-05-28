@@ -2228,22 +2228,31 @@ paths:
     get:
       operationId: listFollowers
       tags: [social]
-      summary: List followers of a player
+      summary: List followers of a player (paginated)
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: integer
+        - name: cursor
+          in: query
+          description: Offset (number of items to skip).
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
       responses:
         "200":
-          description: Followers
+          description: Paginated followers
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PlayerStub"
+                $ref: "#/components/schemas/FollowersPage"
 
   /social/players/{id}/mutual-followers:
     get:
@@ -2319,22 +2328,31 @@ paths:
     get:
       operationId: listFollowing
       tags: [social]
-      summary: List players a player is following
+      summary: List players a player is following (paginated)
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: integer
+        - name: cursor
+          in: query
+          description: Offset (number of items to skip).
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
       responses:
         "200":
-          description: Following
+          description: Paginated following
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PlayerStub"
+                $ref: "#/components/schemas/FollowingPage"
 
   /social/me/post-insights:
     get:
@@ -4991,6 +5009,28 @@ components:
           description: Groups that both the viewer and this player are members of.
           items:
             $ref: "#/components/schemas/SharedGroup"
+
+    FollowersPage:
+      type: object
+      required: [players, total, nextCursor]
+      properties:
+        players:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlayerStub"
+        total:      { type: integer }
+        nextCursor: { type: ["integer", "null"] }
+
+    FollowingPage:
+      type: object
+      required: [players, total, nextCursor]
+      properties:
+        players:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlayerStub"
+        total:      { type: integer }
+        nextCursor: { type: ["integer", "null"] }
 
     MutualFollowersPage:
       type: object

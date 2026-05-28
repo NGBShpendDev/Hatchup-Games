@@ -71,6 +71,8 @@ import type {
   FitnessRealm,
   FitnessStats,
   FollowInput,
+  FollowersPage,
+  FollowingPage,
   GameMode,
   GenerateMealPlanInput,
   GeneratePlanInput,
@@ -122,6 +124,8 @@ import type {
   ListEventsParams,
   ListEvolutionsParams,
   ListFitnessActivitiesParams,
+  ListFollowersParams,
+  ListFollowingParams,
   ListHatchlingsParams,
   ListIdentityPaths200,
   ListItemsParams,
@@ -7753,20 +7757,29 @@ export function useGetPlayerSocialProfile<TData = Awaited<ReturnType<typeof getP
 
 
 
-export const getListFollowersUrl = (id: number,) => {
+export const getListFollowersUrl = (id: number,
+    params?: ListFollowersParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/social/players/${id}/followers`
+  return stringifiedParams.length > 0 ? `/api/social/players/${id}/followers?${stringifiedParams}` : `/api/social/players/${id}/followers`
 }
 
 /**
- * @summary List followers of a player
+ * @summary List followers of a player (paginated)
  */
-export const listFollowers = async (id: number, options?: RequestInit): Promise<PlayerStub[]> => {
+export const listFollowers = async (id: number,
+    params?: ListFollowersParams, options?: RequestInit): Promise<FollowersPage> => {
 
-  return customFetch<PlayerStub[]>(getListFollowersUrl(id),
+  return customFetch<FollowersPage>(getListFollowersUrl(id,params),
   {
     ...options,
     method: 'GET'
@@ -7779,23 +7792,25 @@ export const listFollowers = async (id: number, options?: RequestInit): Promise<
 
 
 
-export const getListFollowersQueryKey = (id: number,) => {
+export const getListFollowersQueryKey = (id: number,
+    params?: ListFollowersParams,) => {
     return [
-    `/api/social/players/${id}/followers`
+    `/api/social/players/${id}/followers`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListFollowersQueryOptions = <TData = Awaited<ReturnType<typeof listFollowers>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFollowers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListFollowersQueryOptions = <TData = Awaited<ReturnType<typeof listFollowers>>, TError = ErrorType<unknown>>(id: number,
+    params?: ListFollowersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFollowers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListFollowersQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getListFollowersQueryKey(id,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFollowers>>> = ({ signal }) => listFollowers(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFollowers>>> = ({ signal }) => listFollowers(id,params, { signal, ...requestOptions });
 
 
 
@@ -7809,15 +7824,16 @@ export type ListFollowersQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List followers of a player
+ * @summary List followers of a player (paginated)
  */
 
 export function useListFollowers<TData = Awaited<ReturnType<typeof listFollowers>>, TError = ErrorType<unknown>>(
- id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFollowers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ id: number,
+    params?: ListFollowersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFollowers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListFollowersQueryOptions(id,options)
+  const queryOptions = getListFollowersQueryOptions(id,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -8008,20 +8024,29 @@ export function useListMutualFollowing<TData = Awaited<ReturnType<typeof listMut
 
 
 
-export const getListFollowingUrl = (id: number,) => {
+export const getListFollowingUrl = (id: number,
+    params?: ListFollowingParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/social/players/${id}/following`
+  return stringifiedParams.length > 0 ? `/api/social/players/${id}/following?${stringifiedParams}` : `/api/social/players/${id}/following`
 }
 
 /**
- * @summary List players a player is following
+ * @summary List players a player is following (paginated)
  */
-export const listFollowing = async (id: number, options?: RequestInit): Promise<PlayerStub[]> => {
+export const listFollowing = async (id: number,
+    params?: ListFollowingParams, options?: RequestInit): Promise<FollowingPage> => {
 
-  return customFetch<PlayerStub[]>(getListFollowingUrl(id),
+  return customFetch<FollowingPage>(getListFollowingUrl(id,params),
   {
     ...options,
     method: 'GET'
@@ -8034,23 +8059,25 @@ export const listFollowing = async (id: number, options?: RequestInit): Promise<
 
 
 
-export const getListFollowingQueryKey = (id: number,) => {
+export const getListFollowingQueryKey = (id: number,
+    params?: ListFollowingParams,) => {
     return [
-    `/api/social/players/${id}/following`
+    `/api/social/players/${id}/following`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListFollowingQueryOptions = <TData = Awaited<ReturnType<typeof listFollowing>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFollowing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListFollowingQueryOptions = <TData = Awaited<ReturnType<typeof listFollowing>>, TError = ErrorType<unknown>>(id: number,
+    params?: ListFollowingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFollowing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListFollowingQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getListFollowingQueryKey(id,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFollowing>>> = ({ signal }) => listFollowing(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFollowing>>> = ({ signal }) => listFollowing(id,params, { signal, ...requestOptions });
 
 
 
@@ -8064,15 +8091,16 @@ export type ListFollowingQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List players a player is following
+ * @summary List players a player is following (paginated)
  */
 
 export function useListFollowing<TData = Awaited<ReturnType<typeof listFollowing>>, TError = ErrorType<unknown>>(
- id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFollowing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ id: number,
+    params?: ListFollowingParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFollowing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListFollowingQueryOptions(id,options)
+  const queryOptions = getListFollowingQueryOptions(id,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
