@@ -19,6 +19,11 @@ import { getHiddenPlayerIds } from "./safety.ts";
 import { verifyUploadToken } from "./storage.ts";
 import { ObjectStorageService } from "../lib/objectStorage.ts";
 import { computeWeeklyRecap, sendWeeklyRecapNotification, buildRecapMessage, MACRO_GOAL_TARGETS } from "../services/nutritionRecap.ts";
+import {
+  MACRO_TOLERANCE,
+  decideDailyMacroReward,
+  todayUtcDateString,
+} from "../services/dailyMacroReward.ts";
 import { notificationsTable } from "@workspace/db";
 import { recapPreviewLimiter } from "../middlewares/rateLimiters.ts";
 
@@ -189,32 +194,16 @@ function deriveQualityScoreFromMacros(
 // AI call on every meal post). If all four macros are within ±10% of target and
 // we haven't already rewarded today, increment the streak and grant a bond/XP/
 // coins bonus to the active Hatchling. Idempotent per UTC date.
-const MACRO_TOLERANCE = 0.10;
 const STREAK_PLAYER_XP = 200;
 const STREAK_PLAYER_COINS = 50;
 const STREAK_HATCHLING_XP = 25;
 const STREAK_HATCHLING_BOND = 1;
 
-function todayUtcDateString(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function withinTolerance(actual: number, target: number): boolean {
-  if (target <= 0) return false;
-  const ratio = actual / target;
-  return ratio >= 1 - MACRO_TOLERANCE && ratio <= 1 + MACRO_TOLERANCE;
-}
-
 async function checkAndRewardDailyMacroTarget(playerId: number, player: typeof playersTable.$inferSelect) {
-  const today = todayUtcDateString();
-
   // Short-circuit: already rewarded today
   const existingStreak = await db.query.nutritionDailyStreaksTable.findFirst({
     where: eq(nutritionDailyStreaksTable.playerId, playerId),
   });
-  if (existingStreak?.rewardedOnDate && existingStreak.rewardedOnDate.toString() === today) {
-    return null;
-  }
 
   const goal = player.physiqueGoal ?? "lean_athlete";
   const target = MACRO_GOAL_TARGETS[goal] ?? MACRO_GOAL_TARGETS["lean_athlete"]!;
@@ -233,19 +222,23 @@ async function checkAndRewardDailyMacroTarget(playerId: number, player: typeof p
   `);
   const row = totalsResult.rows[0] as { calories: number; protein: number; carbs: number; fat: number };
 
-  const hit =
-    withinTolerance(row.calories, target.calories) &&
-    withinTolerance(row.protein,  target.protein)  &&
-    withinTolerance(row.carbs,    target.carbs)    &&
-    withinTolerance(row.fat,      target.fat);
+  // Pure decision: tolerance check, idempotency, streak math. See
+  // `services/dailyMacroReward.ts` for the rules + unit tests.
+  const decision = decideDailyMacroReward({
+    prev: existingStreak
+      ? {
+          currentStreak: existingStreak.currentStreak,
+          longestStreak: existingStreak.longestStreak,
+          lastHitDate: existingStreak.lastHitDate?.toString() ?? null,
+          rewardedOnDate: existingStreak.rewardedOnDate?.toString() ?? null,
+        }
+      : null,
+    totals: row,
+    target: { calories: target.calories, protein: target.protein, carbs: target.carbs, fat: target.fat },
+  });
 
-  if (!hit) return null;
-
-  // Compute new streak: +1 if yesterday was the previous hit, else reset to 1.
-  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const prevHit = existingStreak?.lastHitDate?.toString() ?? null;
-  const newCurrent = prevHit === yesterday ? (existingStreak!.currentStreak + 1) : 1;
-  const newLongest = Math.max(existingStreak?.longestStreak ?? 0, newCurrent);
+  if (decision.kind !== "reward") return null;
+  const { today, newCurrent, newLongest } = decision;
 
   if (existingStreak) {
     await db.update(nutritionDailyStreaksTable)
