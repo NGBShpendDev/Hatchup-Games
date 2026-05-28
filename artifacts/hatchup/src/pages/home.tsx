@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot, Dumbbell, Minus, Plus, Users, MessageCircle, ChevronDown, ChevronUp, Send, Heart } from "lucide-react";
+import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot, Dumbbell, Minus, Plus, Users, MessageCircle, ChevronDown, ChevronUp, Send, Heart, RefreshCw } from "lucide-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { XpBar } from "@/components/xp-bar";
@@ -171,7 +171,7 @@ export default function Home() {
     shuffle: true,
     ...(excludeIdsParam ? { excludeIds: excludeIdsParam } : {}),
   } as const;
-  const { data: socialFeed } = useGetSocialFeed(
+  const { data: socialFeed, refetch: refetchHighlights, isFetching: isFetchingHighlights } = useGetSocialFeed(
     socialFeedParams,
     {
       query: {
@@ -959,6 +959,15 @@ export default function Home() {
             </h2>
             <div className="flex items-center gap-2">
               <button
+                onClick={() => refetchHighlights()}
+                disabled={isFetchingHighlights}
+                className="text-xs font-bold text-primary flex items-center gap-1 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="button-home-refresh-highlights"
+                aria-label="Refresh community highlights"
+              >
+                <RefreshCw className={`w-3 h-3 ${isFetchingHighlights ? "animate-spin" : ""}`} />
+              </button>
+              <button
                 onClick={() => setComposeOpen(true)}
                 className="text-xs font-bold text-primary flex items-center gap-1 hover:underline"
                 data-testid="button-home-compose"
@@ -989,16 +998,25 @@ export default function Home() {
 
           {socialFeed && socialFeed.posts && socialFeed.posts.length > 0 && (
             <div className="space-y-2">
-              {socialFeed.posts.slice(0, 3).map((post: any) => (
-                <HighlightCard
-                  key={post.id}
-                  post={post}
-                  playerId={pid}
-                  typeIcon={HIGHLIGHT_POST_TYPE_ICONS[post.postType] ?? "💬"}
-                  onReact={handleHighlightReact}
-                  reactPending={reactToPost.isPending}
-                />
-              ))}
+              <AnimatePresence mode="popLayout" initial={false}>
+                {socialFeed.posts.slice(0, 3).map((post: any, idx: number) => (
+                  <motion.div
+                    key={post.id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.25, delay: idx * 0.05 }}
+                  >
+                    <HighlightCard
+                      post={post}
+                      playerId={pid}
+                      typeIcon={HIGHLIGHT_POST_TYPE_ICONS[post.postType] ?? "💬"}
+                      onReact={handleHighlightReact}
+                      reactPending={reactToPost.isPending}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           )}
         </section>
