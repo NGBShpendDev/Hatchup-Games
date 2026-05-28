@@ -374,11 +374,13 @@ async function notifyTournamentChampion(
       columns: {
         email: true,
         notifyChampionEmail: true,
+        notifyRecapEmail: true,
         displayName: true,
         username: true,
       },
     });
-    if (!player || !player.email || !player.notifyChampionEmail) return;
+    if (!player || !player.email) return;
+    if (!player.notifyChampionEmail || !player.notifyRecapEmail) return;
 
     const name = player.displayName ?? player.username;
     const safeTitle = escapeHtml(challengeTitle);

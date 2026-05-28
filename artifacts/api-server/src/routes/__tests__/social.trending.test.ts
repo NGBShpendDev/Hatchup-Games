@@ -127,6 +127,8 @@ mock.module("../../middlewares/rateLimiters.ts", {
   namedExports: {
     socialWriteLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
     postViewLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+    emailResendLimiter: (_req: unknown, _res: unknown, next: () => void) => next(),
+    consumeEmailResendBudget: (_req: unknown) => true,
   },
 });
 
@@ -261,9 +263,8 @@ mock.module("@workspace/db", {
     postViewsTable,
     postReactionsTable,
     postCommentsTable,
-    postCommentRevisionsTable: {},
+    postCommentRevisionsTable: { __t: "postCommentRevisions" },
     postCommentReactionsTable,
-    userReportsTable: {},
     playerFollowsTable,
     postRepostsTable,
     playersTable,
@@ -271,6 +272,9 @@ mock.module("@workspace/db", {
     groupMembersTable,
     groupsTable,
     notificationsTable,
+    userReportsTable: { __t: "userReports" },
+    blockedUsersTable: { __t: "blockedUsers" },
+    moderationAuditLogTable: { __t: "moderationAuditLog" },
   },
 });
 

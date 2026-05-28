@@ -194,6 +194,7 @@ mock.module("@workspace/db", {
     playersTable: PLAYER_COLS,
     userReportsTable: { id: {}, status: {}, createdAt: {}, reportedUserId: {}, contentType: {} },
     blockedUsersTable: { blockerId: {}, blockedId: {}, createdAt: {} },
+    moderationAuditLogTable: { id: {}, actorId: {}, action: {}, targetPlayerId: {}, targetReportId: {}, reason: {}, metadata: {}, createdAt: {} },
   },
 });
 

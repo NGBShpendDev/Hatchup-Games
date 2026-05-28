@@ -215,6 +215,7 @@ mock.module("@workspace/db", {
       id: {}, status: {}, createdAt: {}, reportedUserId: {}, contentType: {},
     },
     blockedUsersTable: { blockerId: {}, blockedId: {}, createdAt: {} },
+    moderationAuditLogTable: { id: {}, actorId: {}, action: {}, targetPlayerId: {}, targetReportId: {}, reason: {}, metadata: {}, createdAt: {} },
   },
 });
 
