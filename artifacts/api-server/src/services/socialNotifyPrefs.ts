@@ -11,7 +11,7 @@
 // per-channel UI shipped.
 
 import { db, playersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 export type SocialPrefBase = "Reactions" | "Replies" | "Mentions" | "Followers";
 
@@ -92,6 +92,70 @@ export async function socialChannelsForType(
     push: player[`notifySocial${base}Push` as const] !== false,
     email: player[`notifySocial${base}Email` as const] === true,
   };
+}
+
+const PREF_COLUMNS = {
+  id: true,
+  notifySocialReactions: true,
+  notifySocialReplies: true,
+  notifySocialMentions: true,
+  notifySocialFollowers: true,
+  notifySocialReactionsInbox: true,
+  notifySocialReactionsPush: true,
+  notifySocialReactionsEmail: true,
+  notifySocialRepliesInbox: true,
+  notifySocialRepliesPush: true,
+  notifySocialRepliesEmail: true,
+  notifySocialMentionsInbox: true,
+  notifySocialMentionsPush: true,
+  notifySocialMentionsEmail: true,
+  notifySocialFollowersInbox: true,
+  notifySocialFollowersPush: true,
+  notifySocialFollowersEmail: true,
+} as const;
+
+/**
+ * Batch variant of `socialChannelsForType`. Fetches all recipients in a
+ * single `inArray` query instead of one query per recipient ID.
+ *
+ * Returns a Map keyed by player ID. Recipients missing from the DB get the
+ * default channels (inbox=true, push=true, email=false).
+ * Returns an empty Map when `playerIds` is empty or the type is non-social.
+ */
+export async function socialChannelsForPlayers(
+  playerIds: number[],
+  type: string,
+): Promise<Map<number, SocialChannels>> {
+  const base = TYPE_TO_BASE[type];
+  if (!base || playerIds.length === 0) return new Map();
+
+  const rows = await db.query.playersTable.findMany({
+    where: inArray(playersTable.id, playerIds),
+    columns: PREF_COLUMNS,
+  });
+
+  const rowById = new Map(rows.map(r => [r.id, r]));
+  const result = new Map<number, SocialChannels>();
+
+  for (const id of playerIds) {
+    const player = rowById.get(id);
+    if (!player) {
+      result.set(id, { inbox: true, push: true, email: false });
+      continue;
+    }
+    const masterKey = `notifySocial${base}` as SocialPrefKey;
+    if (player[masterKey] === false) {
+      result.set(id, ALL_OFF);
+      continue;
+    }
+    result.set(id, {
+      inbox: player[`notifySocial${base}Inbox` as const] !== false,
+      push: player[`notifySocial${base}Push` as const] !== false,
+      email: player[`notifySocial${base}Email` as const] === true,
+    });
+  }
+
+  return result;
 }
 
 /**

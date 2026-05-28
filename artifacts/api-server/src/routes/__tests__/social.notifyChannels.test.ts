@@ -152,6 +152,14 @@ mock.module("../../services/socialNotifyPrefs.ts", {
       if (override) return override;
       return { inbox: true, push: true, email: false };
     },
+    socialChannelsForPlayers: async (playerIds: number[], type: string): Promise<Map<number, Channels>> => {
+      const map = new Map<number, Channels>();
+      for (const playerId of playerIds) {
+        const override = state.channelsByPlayerType.get(chKey(playerId, type));
+        map.set(playerId, override ?? { inbox: true, push: true, email: false });
+      }
+      return map;
+    },
     isSocialNotificationAllowed: async () => true,
     socialPrefBaseForType: () => null,
     SOCIAL_NOTIFY_PREF_KEYS: [],

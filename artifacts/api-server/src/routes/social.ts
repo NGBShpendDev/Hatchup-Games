@@ -38,7 +38,7 @@ import {
 } from "./sharedGroups.ts";
 import { sendPushToPlayer } from "../services/pushNotifications.ts";
 import { pushForNotification } from "../services/notificationFanout.ts";
-import { socialChannelsForType } from "../services/socialNotifyPrefs.ts";
+import { socialChannelsForType, socialChannelsForPlayers } from "../services/socialNotifyPrefs.ts";
 import { sendSocialEmail } from "../services/socialEmail.ts";
 import { notificationsTable } from "@workspace/db";
 import { resolveMentionedPlayers } from "../services/mentions.ts";
@@ -690,8 +690,9 @@ router.post("/social/posts", requireAuth, attachPlayer, socialWriteLimiter, bloc
       ? `${post.content.slice(0, 77)}…`
       : post.content;
     const link = `/post/${post.id}`;
+    const mentionChannels = await socialChannelsForPlayers(mentioned.map(m => m.id), "post_mention");
     for (const m of mentioned) {
-      const ch = await socialChannelsForType(m.id, "post_mention");
+      const ch = mentionChannels.get(m.id) ?? null;
       if (!ch || (!ch.inbox && !ch.push && !ch.email)) continue;
       const title = "You were mentioned";
       const body = `${posterName} mentioned you in a post: "${snippet}"`;
@@ -1350,10 +1351,11 @@ router.post("/social/posts/:id/comments", requireAuth, attachPlayer, socialWrite
   // Notify any @mentioned players. Skip the comment author and the post
   // author (who already got the reply notification above).
   const mentioned = await resolveMentionedPlayers(comment.content, playerId);
+  const commentMentionChannels = await socialChannelsForPlayers(mentioned.map(m => m.id), "comment_mention");
   for (const m of mentioned) {
     if (m.id === parentPost.playerId) continue;
     if (await isPostMutedFor(m.id, postId)) continue;
-    const ch = await socialChannelsForType(m.id, "comment_mention");
+    const ch = commentMentionChannels.get(m.id) ?? null;
     if (!ch || (!ch.inbox && !ch.push && !ch.email)) continue;
     const mTitle = "You were mentioned";
     const mBody = `${commenterName} mentioned you in a comment: "${snippet}"`;

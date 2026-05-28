@@ -27,6 +27,7 @@ const playersTable = { id: { __col: "id" } };
 mock.module("drizzle-orm", {
   namedExports: {
     eq: (_c: unknown, _v: unknown) => ({}),
+    inArray: (_c: unknown, _v: unknown) => ({}),
   },
 });
 
@@ -36,6 +37,7 @@ mock.module("@workspace/db", {
       query: {
         playersTable: {
           findFirst: async () => (state.player ?? undefined) as never,
+          findMany: async () => (state.player ? [state.player] : []) as never,
         },
       },
     },
