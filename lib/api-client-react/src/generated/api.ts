@@ -36,6 +36,7 @@ import type {
   ChallengeParticipant,
   Club,
   ClubInput,
+  ClubMember,
   CoachChatBody,
   Competition,
   CompetitionInput,
@@ -3950,6 +3951,83 @@ export function useGetClub<TData = Awaited<ReturnType<typeof getClub>>, TError =
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetClubQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListClubMembersUrl = (id: number,) => {
+
+
+
+
+  return `/api/clubs/${id}/members`
+}
+
+/**
+ * @summary List members of a club
+ */
+export const listClubMembers = async (id: number, options?: RequestInit): Promise<ClubMember[]> => {
+
+  return customFetch<ClubMember[]>(getListClubMembersUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListClubMembersQueryKey = (id: number,) => {
+    return [
+    `/api/clubs/${id}/members`
+    ] as const;
+    }
+
+
+export const getListClubMembersQueryOptions = <TData = Awaited<ReturnType<typeof listClubMembers>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClubMembers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListClubMembersQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listClubMembers>>> = ({ signal }) => listClubMembers(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listClubMembers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListClubMembersQueryResult = NonNullable<Awaited<ReturnType<typeof listClubMembers>>>
+export type ListClubMembersQueryError = ErrorType<void>
+
+
+/**
+ * @summary List members of a club
+ */
+
+export function useListClubMembers<TData = Awaited<ReturnType<typeof listClubMembers>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listClubMembers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListClubMembersQueryOptions(id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -36,6 +36,27 @@ router.get("/clubs/:id", async (req, res) => {
   res.json({ ...club, createdAt: club.createdAt.toISOString() });
 });
 
+router.get("/clubs/:id/members", async (req, res) => {
+  const params = GetClubParams.safeParse({ id: Number(req.params.id) });
+  if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
+  const club = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, params.data.id) });
+  if (!club) { res.status(404).json({ error: "Club not found" }); return; }
+  const members = await db.query.playersTable.findMany({
+    where: eq(playersTable.clubId, params.data.id),
+    columns: {
+      id: true,
+      username: true,
+      displayName: true,
+      avatarUrl: true,
+      level: true,
+      rank: true,
+      totalWins: true,
+      clubRole: true,
+    },
+  });
+  res.json(members);
+});
+
 router.post("/clubs/:id/join", requireAuth, attachPlayer, async (req, res) => {
   const params = GetClubParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }

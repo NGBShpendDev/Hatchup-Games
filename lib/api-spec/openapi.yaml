@@ -1046,6 +1046,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/Club"
 
+  /clubs/{id}/members:
+    get:
+      operationId: listClubMembers
+      tags: [clubs]
+      summary: List members of a club
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Club members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClubMember"
+        "404":
+          description: Club not found
+
   /clubs/{id}/join:
     post:
       operationId: joinClub
@@ -3163,6 +3186,19 @@ components:
         rank:        { type: string }
         isPublic:    { type: boolean }
         createdAt:   { type: string }
+
+    ClubMember:
+      type: object
+      required: [id, username, level, rank, totalWins]
+      properties:
+        id:          { type: integer }
+        username:    { type: string }
+        displayName: { type: ["string", "null"] }
+        avatarUrl:   { type: ["string", "null"] }
+        level:       { type: integer }
+        rank:        { type: string }
+        totalWins:   { type: integer }
+        clubRole:    { type: ["string", "null"] }
 
     ClubInput:
       type: object

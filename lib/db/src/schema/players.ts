@@ -16,6 +16,7 @@ export const playersTable = pgTable("players", {
   totalWins: integer("total_wins").notNull().default(0),
   totalMatches: integer("total_matches").notNull().default(0),
   clubId: integer("club_id"),
+  clubRole: text("club_role"),
   activeHatchlingId: integer("active_hatchling_id"),
   // Fitness fields
   totalSteps: integer("total_steps").notNull().default(0),

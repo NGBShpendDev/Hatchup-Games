@@ -1,3 +1,4 @@
+import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { useListClubs, getListClubsQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,6 +42,8 @@ export default function ClubHub() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
+                <Link href={`/clubs/${club.id}`}>
+                  <a className="block h-full">
                 <Card className="hover:border-primary transition-colors border-2 cursor-pointer group h-full flex flex-col">
                   <CardHeader className="pb-2">
                     <div className="flex justify-between items-start">
@@ -63,6 +66,8 @@ export default function ClubHub() {
                     </div>
                   </CardContent>
                 </Card>
+                  </a>
+                </Link>
               </motion.div>
             ))}
           </div>

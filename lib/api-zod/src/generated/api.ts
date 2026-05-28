@@ -1285,6 +1285,26 @@ export const GetClubResponse = zod.object({
 
 
 /**
+ * @summary List members of a club
+ */
+export const ListClubMembersParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListClubMembersResponseItem = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "level": zod.number(),
+  "rank": zod.string(),
+  "totalWins": zod.number(),
+  "clubRole": zod.string().nullish()
+})
+export const ListClubMembersResponse = zod.array(ListClubMembersResponseItem)
+
+
+/**
  * @summary Join a club
  */
 export const JoinClubParams = zod.object({

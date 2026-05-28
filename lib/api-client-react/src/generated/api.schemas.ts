@@ -368,6 +368,20 @@ export interface Club {
   createdAt: string;
 }
 
+export interface ClubMember {
+  id: number;
+  username: string;
+  /** @nullable */
+  displayName?: string | null;
+  /** @nullable */
+  avatarUrl?: string | null;
+  level: number;
+  rank: string;
+  totalWins: number;
+  /** @nullable */
+  clubRole?: string | null;
+}
+
 export interface ClubInput {
   /**
      * @minLength 2
