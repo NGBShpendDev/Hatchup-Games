@@ -36,6 +36,17 @@ function isPendingRematchInvite(n: Notification): boolean {
   return /wants a rematch/i.test(n.title);
 }
 
+function challengeInviteId(n: Notification): number | null {
+  if (n.type !== "challenge_invite") return null;
+  // The challenge-invite responder endpoint takes the invite id; the
+  // creator stores it as the notification's sourceId.
+  return typeof n.sourceId === "number" ? n.sourceId : null;
+}
+
+function isClubMention(n: Notification): boolean {
+  return n.type === "club_mention";
+}
+
 const TYPE_META: Record<string, { icon: typeof Bell; color: string }> = {
   challenge_invite:   { icon: Mail,      color: "from-pink-500 to-rose-500" },
   challenge_ending:   { icon: Clock,     color: "from-amber-500 to-orange-500" },
@@ -124,6 +135,68 @@ export default function NotificationsPage() {
     }
   };
 
+  const respondToChallengeInvite = async (
+    n: Notification,
+    inviteId: number,
+    status: "accepted" | "declined",
+  ) => {
+    setBusyInvite({ id: n.id, action: status === "accepted" ? "accept" : "decline" });
+    try {
+      const res = await fetch(`${BASE}/api/challenge-invites/${inviteId}/respond`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error ?? `HTTP ${res.status}`);
+      }
+      // The responder endpoint already marks the related notification read,
+      // but invalidate locally so the UI reflects it immediately.
+      if (!n.read) markRead.mutate({ id: n.id });
+      refresh();
+      if (status === "accepted") {
+        toast({ title: "Challenge accepted", description: "You're in. Good luck!" });
+        navigate(n.link ?? "/challenges");
+      } else {
+        toast({ title: "Challenge declined" });
+      }
+    } catch (err) {
+      toast({
+        title: status === "accepted" ? "Could not accept invite" : "Could not decline invite",
+        description: String((err as Error).message),
+        variant: "destructive",
+      });
+    } finally {
+      setBusyInvite(null);
+    }
+  };
+
+  const dismissNotification = async (n: Notification) => {
+    setBusyInvite({ id: n.id, action: "decline" });
+    try {
+      if (!n.read) {
+        await new Promise<void>((resolve, reject) => {
+          markRead.mutate(
+            { id: n.id },
+            { onSuccess: () => resolve(), onError: (e) => reject(e) },
+          );
+        });
+      }
+      refresh();
+      toast({ title: "Dismissed" });
+    } catch (err) {
+      toast({
+        title: "Could not dismiss",
+        description: String((err as Error).message),
+        variant: "destructive",
+      });
+    } finally {
+      setBusyInvite(null);
+    }
+  };
+
   const declineRematch = async (n: Notification, inviteId: string) => {
     setBusyInvite({ id: n.id, action: "decline" });
     try {
@@ -198,6 +271,9 @@ export default function NotificationsPage() {
               const meta = iconFor(n.type);
               const Icon = meta.icon;
               const rematchId = isPendingRematchInvite(n) ? extractRematchId(n.link) : null;
+              const challengeId = challengeInviteId(n);
+              const clubMention = isClubMention(n) && !n.read ? n : null;
+              const hasInlineActions = Boolean(rematchId || challengeId || clubMention);
               const busy = busyInvite?.id === n.id ? busyInvite.action : null;
               const rowClass = `w-full text-left rounded-xl border bg-card/60 backdrop-blur p-3 flex items-start gap-3 transition-all hover:bg-card hover:border-border ${
                 n.read ? "border-border/30 opacity-70" : "border-primary/40 shadow-[0_0_12px_-4px_hsl(var(--primary)/0.6)]"
@@ -256,14 +332,84 @@ export default function NotificationsPage() {
                         </Button>
                       </div>
                     )}
+                    {challengeId !== null && (
+                      <div className="mt-2 flex gap-2">
+                        <Button
+                          size="sm"
+                          className="h-7 px-2.5 gap-1 bg-gradient-to-br from-pink-500 to-rose-500 hover:from-pink-500/90 hover:to-rose-500/90"
+                          disabled={busy !== null}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            respondToChallengeInvite(n, challengeId, "accepted");
+                          }}
+                          data-testid={`button-accept-challenge-${n.id}`}
+                        >
+                          {busy === "accept"
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <Check className="w-3.5 h-3.5" />}
+                          Accept
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2.5 gap-1"
+                          disabled={busy !== null}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            respondToChallengeInvite(n, challengeId, "declined");
+                          }}
+                          data-testid={`button-decline-challenge-${n.id}`}
+                        >
+                          {busy === "decline"
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <X className="w-3.5 h-3.5" />}
+                          Decline
+                        </Button>
+                      </div>
+                    )}
+                    {clubMention && (
+                      <div className="mt-2 flex gap-2">
+                        {n.link && (
+                          <Button
+                            size="sm"
+                            className="h-7 px-2.5 gap-1 bg-gradient-to-br from-indigo-500 to-violet-500 hover:from-indigo-500/90 hover:to-violet-500/90"
+                            disabled={busy !== null}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              open(n);
+                            }}
+                            data-testid={`button-view-club-${n.id}`}
+                          >
+                            <Users className="w-3.5 h-3.5" />
+                            View
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2.5 gap-1"
+                          disabled={busy !== null}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            dismissNotification(n);
+                          }}
+                          data-testid={`button-dismiss-club-${n.id}`}
+                        >
+                          {busy === "decline"
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <X className="w-3.5 h-3.5" />}
+                          Dismiss
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </>
               );
 
-              // For rematch invites we render a non-button container so the
-              // nested Accept/Decline buttons don't violate button-in-button
+              // For rows with inline action buttons we render a non-button
+              // container so the nested buttons don't violate button-in-button
               // semantics. Tapping the body still opens the link.
-              if (rematchId) {
+              if (hasInlineActions) {
                 return (
                   <motion.div
                     key={n.id}
