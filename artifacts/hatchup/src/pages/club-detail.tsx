@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, useRoute } from "wouter";
 import { Layout } from "@/components/layout";
 import {
@@ -5,12 +6,25 @@ import {
   getGetClubQueryKey,
   useListClubMembers,
   getListClubMembersQueryKey,
+  useInviteToClub,
+  useSearchPlayers,
+  getSearchPlayersQueryKey,
+  type PlayerStub,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { usePlayer } from "@/lib/playerContext";
+import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Crown, Shield, ShieldCheck, Trophy, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ArrowLeft, Check, Crown, Search, Shield, ShieldCheck, Trophy, UserPlus, Users } from "lucide-react";
 import { motion } from "framer-motion";
 
 function roleStyle(role: string | null | undefined) {
@@ -38,6 +52,19 @@ function initials(name: string) {
 export default function ClubDetail() {
   const [, params] = useRoute("/clubs/:id");
   const id = Number(params?.id);
+  const { player } = usePlayer();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteSearch, setInviteSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [invitedIds, setInvitedIds] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(inviteSearch.trim()), 300);
+    return () => clearTimeout(t);
+  }, [inviteSearch]);
 
   const { data: club, isLoading: clubLoading } = useGetClub(id, {
     query: { queryKey: getGetClubQueryKey(id), enabled: Number.isFinite(id) },
@@ -46,12 +73,51 @@ export default function ClubDetail() {
     query: { queryKey: getListClubMembersQueryKey(id), enabled: Number.isFinite(id) },
   });
 
+  const searchParams = { q: debouncedSearch, limit: 20 };
+  const { data: searchResults, isLoading: searchLoading, isFetching: searchFetching } = useSearchPlayers(
+    searchParams,
+    {
+      query: {
+        queryKey: getSearchPlayersQueryKey(searchParams),
+        enabled: inviteOpen && debouncedSearch.length > 0,
+      },
+    }
+  );
+
+  const inviteMutation = useInviteToClub({
+    mutation: {
+      onSuccess: (_, vars) => {
+        setInvitedIds((prev) => new Set(prev).add(vars.data.inviteeId));
+        toast({ title: "Invite sent!", description: "They'll see it on their invites." });
+        queryClient.invalidateQueries({ queryKey: getListClubMembersQueryKey(id) });
+      },
+      onError: (err: { response?: { data?: { error?: string } } }) => {
+        toast({
+          title: "Could not invite",
+          description: err?.response?.data?.error ?? "Try again",
+          variant: "destructive",
+        });
+      },
+    },
+  });
+
   const sortedMembers = [...(members ?? [])].sort((a, b) => {
     const rank = (r: string | null | undefined) => (r === "owner" ? 0 : r === "officer" ? 1 : 2);
     const diff = rank(a.clubRole) - rank(b.clubRole);
     if (diff !== 0) return diff;
     return b.level - a.level;
   });
+
+  const myMembership = player ? (members ?? []).find((m) => m.id === player.id) : null;
+  const canInvite = myMembership?.clubRole === "owner" || myMembership?.clubRole === "officer";
+
+  const memberIds = new Set((members ?? []).map((m) => m.id));
+  const inviteResults: PlayerStub[] = (searchResults ?? []).filter(
+    (p) => p.id !== player?.id && !memberIds.has(p.id)
+  );
+  const hasTypedQuery = inviteSearch.trim().length > 0;
+  const searchIsLoading = (searchLoading || searchFetching) && debouncedSearch.length > 0;
+  const queryStillDebouncing = hasTypedQuery && debouncedSearch !== inviteSearch.trim();
 
   return (
     <Layout>
@@ -96,9 +162,20 @@ export default function ClubDetail() {
         )}
 
         <div>
-          <h2 className="text-2xl font-black tracking-tight mb-4 flex items-center gap-2">
-            <Users className="w-6 h-6 text-primary" /> Members
-          </h2>
+          <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+            <h2 className="text-2xl font-black tracking-tight flex items-center gap-2">
+              <Users className="w-6 h-6 text-primary" /> Members
+            </h2>
+            {canInvite && (
+              <Button
+                onClick={() => setInviteOpen(true)}
+                className="bg-primary hover:bg-primary/90 font-bold"
+                data-testid="button-open-invite"
+              >
+                <UserPlus className="w-4 h-4 mr-2" /> Invite player
+              </Button>
+            )}
+          </div>
 
           {membersLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -161,6 +238,101 @@ export default function ClubDetail() {
           )}
         </div>
       </div>
+
+      <Sheet open={inviteOpen} onOpenChange={setInviteOpen}>
+        <SheetContent side="bottom" className="max-h-[85vh] flex flex-col">
+          <SheetHeader className="text-left">
+            <SheetTitle className="flex items-center gap-2 text-foreground">
+              <UserPlus className="w-5 h-5 text-primary" /> Invite to {club?.name ?? "club"}
+            </SheetTitle>
+            <SheetDescription>
+              Search for a player to send a club invite.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="relative mt-4 px-4">
+            <Search className="w-4 h-4 absolute left-7 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by name or username…"
+              value={inviteSearch}
+              onChange={(e) => setInviteSearch(e.target.value)}
+              className="pl-9"
+              data-testid="input-invite-search"
+            />
+          </div>
+
+          <ScrollArea className="flex-1 mt-3 px-4 pb-4">
+            {!hasTypedQuery ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Search className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p className="font-bold">Search for players to invite</p>
+                <p className="text-xs mt-1">Type a name or username to get started.</p>
+              </div>
+            ) : searchIsLoading || queryStillDebouncing ? (
+              <div className="space-y-2 py-2">
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}
+              </div>
+            ) : inviteResults.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                <p className="font-bold">No matches</p>
+                <p className="text-xs mt-1">Try a different name or username.</p>
+              </div>
+            ) : (
+              <div className="space-y-2 py-2">
+                {inviteResults.map((p) => {
+                  const invited = invitedIds.has(p.id);
+                  const isPending =
+                    inviteMutation.isPending &&
+                    inviteMutation.variables?.data.inviteeId === p.id;
+                  return (
+                    <div
+                      key={p.id}
+                      className="flex items-center gap-3 p-2 rounded-xl hover:bg-muted/30 transition-colors"
+                      data-testid={`invite-result-${p.id}`}
+                    >
+                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-black shrink-0 overflow-hidden">
+                        {p.avatarUrl ? (
+                          <img src={p.avatarUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          (p.displayName ?? p.username).charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-foreground truncate">
+                          {p.displayName ?? p.username}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">@{p.username}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={invited ? "secondary" : "default"}
+                        disabled={invited || isPending}
+                        onClick={() =>
+                          inviteMutation.mutate({
+                            id,
+                            data: { inviteeId: p.id },
+                          })
+                        }
+                        className={invited ? "" : "bg-primary hover:bg-primary/90"}
+                        data-testid={`button-send-invite-${p.id}`}
+                      >
+                        {invited ? (
+                          <><Check className="w-3.5 h-3.5 mr-1" /> Invited</>
+                        ) : isPending ? (
+                          "Sending…"
+                        ) : (
+                          "Send"
+                        )}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
     </Layout>
   );
 }
