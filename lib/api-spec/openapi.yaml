@@ -3899,6 +3899,23 @@ paths:
         Returns `hasGap=false` with `suggestion=null` when every macro is on
         or over target. The serving is scaled (0.5x–2x) to fill the primary
         gap without significantly overshooting macros already at target.
+
+        Pass `exclude` (comma-separated list of meal names) to skip ideas
+        the player has already seen or dismissed this session. The server
+        will pick a different template that still targets the same macro
+        gap; if every template in the matching pool has been excluded the
+        exclusion is ignored so the player still gets a suggestion.
+      parameters:
+        - name: exclude
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 1000
+          description: |
+            Comma-separated list of meal `name` values to exclude from the
+            suggestion (case-insensitive). Used by the "Try another" button
+            to avoid re-suggesting ideas already shown this session.
       responses:
         "200":
           description: Next-meal suggestion

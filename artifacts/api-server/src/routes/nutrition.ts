@@ -457,6 +457,7 @@ function pickNextMealSuggestion(
   totals: { calories: number; protein: number; carbs: number; fat: number },
   target: { calories: number; protein: number; carbs: number; fat: number },
   tolerance: number,
+  excludeNames: Set<string> = new Set(),
 ) {
   const gaps = {
     calories: Math.max(0, target.calories - totals.calories),
@@ -487,8 +488,14 @@ function pickNextMealSuggestion(
 
   // Among templates matching the primary macro, pick the (template, serving)
   // pair that minimizes overshoot of macros already at/over target.
-  const candidates = NEXT_MEAL_TEMPLATES.filter(t => t.primaryMacro === primary);
-  const pool = candidates.length > 0 ? candidates : NEXT_MEAL_TEMPLATES;
+  // The "Try another" flow passes excluded names so we don't repeat ideas
+  // the player already saw or dismissed this session. If exclusion empties
+  // the matching pool we fall back to the unfiltered pool — better to show
+  // a repeat than nothing at all.
+  const matchingPrimary = NEXT_MEAL_TEMPLATES.filter(t => t.primaryMacro === primary);
+  const primaryPool = matchingPrimary.length > 0 ? matchingPrimary : NEXT_MEAL_TEMPLATES;
+  const filtered = primaryPool.filter(t => !excludeNames.has(t.name.toLowerCase()));
+  const pool = filtered.length > 0 ? filtered : primaryPool;
 
   let best: { template: MealTemplate; servings: number; macros: { calories: number; protein: number; carbs: number; fat: number }; overshoot: number } | null = null;
   for (const t of pool) {
@@ -550,6 +557,18 @@ function pickNextMealSuggestion(
 router.get("/nutrition/suggest-next", requireAuth, attachPlayer, async (req, res) => {
   const playerId = req.playerId!;
 
+  // Parse the optional comma-separated `exclude` list used by the "Try another"
+  // flow. Names are matched case-insensitively against the catalog. Cap the
+  // raw string length defensively even though the schema also enforces it.
+  const excludeRaw = typeof req.query.exclude === "string" ? req.query.exclude : "";
+  const excludeNames = new Set(
+    excludeRaw
+      .slice(0, 1000)
+      .split(",")
+      .map(s => s.trim().toLowerCase())
+      .filter(s => s.length > 0),
+  );
+
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
   const goal = player?.physiqueGoal ?? "lean_athlete";
   const target = MACRO_GOAL_TARGETS[goal] ?? MACRO_GOAL_TARGETS["lean_athlete"]!;
@@ -571,6 +590,7 @@ router.get("/nutrition/suggest-next", requireAuth, attachPlayer, async (req, res
     totals,
     { calories: target.calories, protein: target.protein, carbs: target.carbs, fat: target.fat },
     MACRO_TOLERANCE,
+    excludeNames,
   );
 
   res.json({

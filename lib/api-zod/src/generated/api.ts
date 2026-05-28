@@ -4413,8 +4413,22 @@ Returns `hasGap=false` with `suggestion=null` when every macro is on
 or over target. The serving is scaled (0.5x–2x) to fill the primary
 gap without significantly overshooting macros already at target.
 
+Pass `exclude` (comma-separated list of meal names) to skip ideas
+the player has already seen or dismissed this session. The server
+will pick a different template that still targets the same macro
+gap; if every template in the matching pool has been excluded the
+exclusion is ignored so the player still gets a suggestion.
+
  * @summary Suggest the next meal to fill today's macro gaps
  */
+export const getNutritionSuggestNextQueryExcludeMax = 1000;
+
+
+
+export const GetNutritionSuggestNextQueryParams = zod.object({
+  "exclude": zod.coerce.string().max(getNutritionSuggestNextQueryExcludeMax).optional().describe('Comma-separated list of meal `name` values to exclude from the\nsuggestion (case-insensitive). Used by the \"Try another\" button\nto avoid re-suggesting ideas already shown this session.\n')
+})
+
 export const GetNutritionSuggestNextResponse = zod.object({
   "hasGap": zod.boolean(),
   "primaryMacro": zod.union([zod.literal('protein'),zod.literal('carbs'),zod.literal('fat'),zod.literal('calories'),zod.literal(null)]).nullable(),

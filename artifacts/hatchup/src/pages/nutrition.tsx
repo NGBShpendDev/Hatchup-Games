@@ -241,8 +241,13 @@ export default function Nutrition() {
     query: { enabled: !!pid, queryKey: getGetNutritionStreakQueryKey() },
   });
 
-  const { data: nextMeal } = useGetNutritionSuggestNext({
-    query: { enabled: !!pid, queryKey: getGetNutritionSuggestNextQueryKey() },
+  // Track meal names the player has skipped via "Try another" this session,
+  // so the server can rotate through alternatives that still target the same
+  // macro gap. Resets on page reload (or when a meal is actually logged).
+  const [excludedMeals, setExcludedMeals] = useState<string[]>([]);
+  const excludeParam = excludedMeals.length > 0 ? { exclude: excludedMeals.join(",") } : undefined;
+  const { data: nextMeal, isFetching: nextMealFetching } = useGetNutritionSuggestNext(excludeParam, {
+    query: { enabled: !!pid, queryKey: getGetNutritionSuggestNextQueryKey(excludeParam) },
   });
 
   // ── Mutations ────────────────────────────────────────────────────────────────
@@ -298,6 +303,9 @@ export default function Nutrition() {
         qc.invalidateQueries({ queryKey: getGetNutritionSummaryQueryKey() });
         qc.invalidateQueries({ queryKey: getGetNutritionStreakQueryKey() });
         qc.invalidateQueries({ queryKey: getGetNutritionSuggestNextQueryKey() });
+        // Reset the per-session "Try another" exclusion list after a successful
+        // log — macro gaps have shifted, so prior dismissals no longer apply.
+        setExcludedMeals([]);
       // Refresh hatchling stats since nutrition can buff/debuff the active Hatchling.
       // Generated query keys are arrays starting with "/api/hatchlings" (list) or
       // "/api/hatchlings/:id" (detail) — match either by prefix.
@@ -521,20 +529,29 @@ export default function Nutrition() {
 
         {/* What to eat next — only shown when at least one macro is behind target */}
         {nextMeal && nextMeal.hasGap && nextMeal.suggestion && (
-          <NextMealSuggestion data={nextMeal} onLog={() => {
-            const s = nextMeal.suggestion!;
-            setForm({
-              name: s.name,
-              emoji: s.emoji,
-              tag: "healthy-snack",
-              description: s.description,
-              calories: String(s.calories),
-              proteinG: String(s.proteinG),
-              carbsG:   String(s.carbsG),
-              fatG:     String(s.fatG),
-            });
-            setShowCreateSheet(true);
-          }} />
+          <NextMealSuggestion
+            data={nextMeal}
+            isFetching={nextMealFetching}
+            onLog={() => {
+              const s = nextMeal.suggestion!;
+              setForm({
+                name: s.name,
+                emoji: s.emoji,
+                tag: "healthy-snack",
+                description: s.description,
+                calories: String(s.calories),
+                proteinG: String(s.proteinG),
+                carbsG:   String(s.carbsG),
+                fatG:     String(s.fatG),
+              });
+              setShowCreateSheet(true);
+            }}
+            onSkip={() => {
+              const name = nextMeal.suggestion?.name;
+              if (!name) return;
+              setExcludedMeals(prev => (prev.includes(name) ? prev : [...prev, name]));
+            }}
+          />
         )}
 
         {streak && <WeekStreakCalendar weekly={streak.weekly} />}
@@ -995,7 +1012,17 @@ export default function Nutrition() {
   );
 }
 
-function NextMealSuggestion({ data, onLog }: { data: NutritionNextMealSuggestion; onLog: () => void }) {
+function NextMealSuggestion({
+  data,
+  onLog,
+  onSkip,
+  isFetching,
+}: {
+  data: NutritionNextMealSuggestion;
+  onLog: () => void;
+  onSkip: () => void;
+  isFetching: boolean;
+}) {
   const s = data.suggestion!;
   const primary = data.primaryMacro ?? "calories";
   const primaryLabel: Record<string, string> = {
@@ -1003,6 +1030,7 @@ function NextMealSuggestion({ data, onLog }: { data: NutritionNextMealSuggestion
   };
   return (
     <motion.div
+      key={s.name}
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       className="rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/10 to-pink-500/5 p-4 mb-4"
@@ -1019,12 +1047,23 @@ function NextMealSuggestion({ data, onLog }: { data: NutritionNextMealSuggestion
           <p className="font-black text-sm leading-tight">{s.name}<span className="text-muted-foreground"> — {s.summary}</span></p>
           <p className="text-[11px] text-muted-foreground font-medium leading-tight mt-0.5">{s.description}</p>
         </div>
-        <button
-          onClick={onLog}
-          className="shrink-0 px-3 py-2 rounded-lg bg-primary text-white text-[11px] font-black uppercase tracking-wide shadow"
-        >
-          Log it
-        </button>
+        <div className="flex flex-col gap-1.5 shrink-0">
+          <button
+            onClick={onLog}
+            className="px-3 py-1.5 rounded-lg bg-primary text-white text-[11px] font-black uppercase tracking-wide shadow"
+            data-testid="button-log-suggested-meal"
+          >
+            Log it
+          </button>
+          <button
+            onClick={onSkip}
+            disabled={isFetching}
+            className="px-3 py-1.5 rounded-lg border border-primary/40 text-primary text-[10px] font-black uppercase tracking-wide hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="button-try-another-meal"
+          >
+            {isFetching ? "…" : "Try another"}
+          </button>
+        </div>
       </div>
     </motion.div>
   );

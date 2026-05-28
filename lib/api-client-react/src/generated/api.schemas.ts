@@ -3712,6 +3712,17 @@ export const ListNutritionPostsMode = {
   discover: 'discover',
 } as const;
 
+export type GetNutritionSuggestNextParams = {
+/**
+ * Comma-separated list of meal `name` values to exclude from the
+suggestion (case-insensitive). Used by the "Try another" button
+to avoid re-suggesting ideas already shown this session.
+
+ * @maxLength 1000
+ */
+exclude?: string;
+};
+
 export type ListBattleHistoryParams = {
 /**
  * @minimum 1
