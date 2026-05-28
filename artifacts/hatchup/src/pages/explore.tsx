@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { Map, Lock, Zap, Egg, Sparkles, Trophy, Users, Eye, EyeOff } from "lucide-react";
+import { Map, Lock, Zap, Egg, Sparkles, Trophy, Users, Eye, EyeOff, X } from "lucide-react";
 import { ForYouStrip } from "@/components/for-you-strip";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Link } from "wouter";
@@ -19,7 +19,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 const NEARBY_PREV_VIS_KEY = "hatchup:nearby:prevVisibility";
+const NEARBY_HIDDEN_REMINDER_DISMISSED_KEY = "hatchup:nearby:hiddenReminderDismissedAt";
 const DEFAULT_VISIBILITY = "city";
+const HIDDEN_REMINDER_THRESHOLD_MS = 14 * 24 * 60 * 60 * 1000;
+const HIDDEN_REMINDER_DISMISS_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
 
 export default function Explore() {
   const { playerId } = usePlayer();
@@ -39,7 +42,18 @@ export default function Explore() {
   const nearbyEntries = nearby?.entries ?? [];
 
   const [visibility, setVisibility] = useState<string | null>(null);
+  const [hiddenSince, setHiddenSince] = useState<string | null>(null);
+  const [reminderDismissed, setReminderDismissed] = useState(false);
   const [toggling, setToggling] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = window.localStorage.getItem(NEARBY_HIDDEN_REMINDER_DISMISSED_KEY);
+    const ts = raw ? Number(raw) : 0;
+    if (ts && Date.now() - ts < HIDDEN_REMINDER_DISMISS_COOLDOWN_MS) {
+      setReminderDismissed(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (!playerId) return;
@@ -49,12 +63,24 @@ export default function Explore() {
       .then(data => {
         if (cancelled || !data) return;
         setVisibility(data.locationVisibility ?? DEFAULT_VISIBILITY);
+        setHiddenSince(data.locationHiddenSince ?? null);
       })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [playerId]);
 
   const isHidden = visibility === "hidden";
+  const hiddenForMs = hiddenSince ? Date.now() - new Date(hiddenSince).getTime() : 0;
+  const showHiddenReminder =
+    isHidden && !reminderDismissed && hiddenSince !== null && hiddenForMs >= HIDDEN_REMINDER_THRESHOLD_MS;
+  const hiddenForDays = Math.max(1, Math.floor(hiddenForMs / (24 * 60 * 60 * 1000)));
+
+  const dismissHiddenReminder = () => {
+    setReminderDismissed(true);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(NEARBY_HIDDEN_REMINDER_DISMISSED_KEY, String(Date.now()));
+    }
+  };
 
   const handleToggleHidden = async () => {
     if (!playerId || toggling || visibility === null) return;
@@ -80,6 +106,18 @@ export default function Explore() {
       const data = await res.json().catch(() => null);
       const applied = data?.locationVisibility ?? next;
       setVisibility(applied);
+      if (applied === "hidden") {
+        // The server stamps locationHiddenSince on the transition; mirror it
+        // locally so the 14-day reminder timer starts from now. Also reset
+        // any prior dismissal so a future long-hidden state can re-prompt.
+        setHiddenSince(new Date().toISOString());
+        setReminderDismissed(false);
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem(NEARBY_HIDDEN_REMINDER_DISMISSED_KEY);
+        }
+      } else {
+        setHiddenSince(null);
+      }
       await queryClient.invalidateQueries({ queryKey: getListNearbyPlayersQueryKey(nearbyParams) });
       toast({
         title: applied === "hidden" ? "You're hidden from nearby" : "You're visible nearby again",
@@ -133,6 +171,48 @@ export default function Explore() {
                 </button>
               )}
             </div>
+            {showHiddenReminder && (
+              <div
+                className="mb-3 rounded-2xl border border-primary/40 bg-primary/10 backdrop-blur p-4 text-sm text-foreground flex items-start gap-3"
+                data-testid="banner-nearby-hidden-reminder"
+              >
+                <Eye className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold mb-1">Still hidden from nearby?</p>
+                  <p className="text-muted-foreground">
+                    You've been hidden from the Players Nearby strip for {hiddenForDays} days. You're missing out on local discovery and city leaderboards.
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleToggleHidden}
+                      disabled={toggling}
+                      data-testid="button-nearby-hidden-reminder-show"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1 text-[11px] font-bold uppercase tracking-wider hover:bg-primary/90 transition-colors disabled:opacity-50"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> Show me
+                    </button>
+                    <button
+                      type="button"
+                      onClick={dismissHiddenReminder}
+                      data-testid="button-nearby-hidden-reminder-dismiss"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-card/70 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Not now
+                    </button>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={dismissHiddenReminder}
+                  aria-label="Dismiss"
+                  data-testid="button-nearby-hidden-reminder-close"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
             {isHidden ? (
               <div
                 className="rounded-2xl border border-dashed border-white/10 bg-card/40 backdrop-blur p-4 text-sm text-muted-foreground"

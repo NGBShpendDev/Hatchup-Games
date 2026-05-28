@@ -460,6 +460,7 @@ router.get("/players/:id/privacy-settings", requireAuth, attachPlayer, async (re
     notifyModerationEmail: player.notifyModerationEmail,
     notifyRecapPush: player.notifyRecapPush,
     weeklyRecapLastSentAt: lastRecap?.createdAt.toISOString() ?? null,
+    locationHiddenSince: player.locationHiddenSince?.toISOString() ?? null,
   });
 });
 
@@ -641,6 +642,18 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
       updates.locationVisibility = "city";
     }
     updates.requireWorkoutApproval = true;
+  }
+
+  // Track when the viewer first transitioned TO "hidden" so Explore can
+  // gently remind long-hidden players that they're missing local discovery.
+  // Clear it on any transition back to a visible mode so the 14-day window
+  // resets if they re-hide later.
+  if (updates.locationVisibility !== undefined && updates.locationVisibility !== current.locationVisibility) {
+    if (updates.locationVisibility === "hidden") {
+      updates.locationHiddenSince = new Date();
+    } else {
+      updates.locationHiddenSince = null;
+    }
   }
 
   const [updated] = await db

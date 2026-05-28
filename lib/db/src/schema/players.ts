@@ -48,6 +48,10 @@ export const playersTable = pgTable("players", {
   emergencyContactName: text("emergency_contact_name"),
   emergencyContactPhone: text("emergency_contact_phone"),
   locationVisibility: text("location_visibility").notNull().default("city"),
+  // Set when locationVisibility transitions TO "hidden"; cleared on transitions
+  // away. Used by Explore to surface a soft reminder if the viewer has been
+  // hidden from the "Players Nearby" strip for a long time (~14 days).
+  locationHiddenSince: timestamp("location_hidden_since", { withTimezone: true }),
   requireWorkoutApproval: boolean("require_workout_approval").notNull().default(false),
   isAdmin: boolean("is_admin").notNull().default(false),
   isSuperAdmin: boolean("is_super_admin").notNull().default(false),
