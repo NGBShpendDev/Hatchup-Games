@@ -10,14 +10,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { Map, Lock, Zap, Egg, Sparkles, Trophy, Users } from "lucide-react";
+import { Map, Lock, Zap, Egg, Sparkles, Trophy, Users, Eye, EyeOff } from "lucide-react";
 import { ForYouStrip } from "@/components/for-you-strip";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Link } from "wouter";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+
+const NEARBY_PREV_VIS_KEY = "hatchup:nearby:prevVisibility";
+const DEFAULT_VISIBILITY = "city";
 
 export default function Explore() {
   const { playerId } = usePlayer();
   const pid = playerId ?? 0;
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const { data: realms, isLoading } = useListRealms(
     { playerId: pid },
     { query: { queryKey: getListRealmsQueryKey({ playerId: pid }), enabled: !!playerId } }
@@ -29,6 +37,63 @@ export default function Explore() {
     { query: { queryKey: getListNearbyPlayersQueryKey(nearbyParams), enabled: !!playerId } }
   );
   const nearbyEntries = nearby?.entries ?? [];
+
+  const [visibility, setVisibility] = useState<string | null>(null);
+  const [toggling, setToggling] = useState(false);
+
+  useEffect(() => {
+    if (!playerId) return;
+    let cancelled = false;
+    fetch(`/api/players/${playerId}/privacy-settings`, { credentials: "include" })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (cancelled || !data) return;
+        setVisibility(data.locationVisibility ?? DEFAULT_VISIBILITY);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [playerId]);
+
+  const isHidden = visibility === "hidden";
+
+  const handleToggleHidden = async () => {
+    if (!playerId || toggling || visibility === null) return;
+    const prev = visibility;
+    let next: string;
+    if (prev === "hidden") {
+      next = (typeof window !== "undefined" && window.localStorage.getItem(NEARBY_PREV_VIS_KEY)) || DEFAULT_VISIBILITY;
+      if (next === "hidden") next = DEFAULT_VISIBILITY;
+    } else {
+      if (typeof window !== "undefined") window.localStorage.setItem(NEARBY_PREV_VIS_KEY, prev);
+      next = "hidden";
+    }
+    setToggling(true);
+    setVisibility(next);
+    try {
+      const res = await fetch(`/api/players/${playerId}/privacy-settings`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locationVisibility: next }),
+      });
+      if (!res.ok) throw new Error("save failed");
+      const data = await res.json().catch(() => null);
+      const applied = data?.locationVisibility ?? next;
+      setVisibility(applied);
+      await queryClient.invalidateQueries({ queryKey: getListNearbyPlayersQueryKey(nearbyParams) });
+      toast({
+        title: applied === "hidden" ? "You're hidden from nearby" : "You're visible nearby again",
+        description: applied === "hidden"
+          ? "Other players in your city won't see you in the nearby strip."
+          : "Players in your city can see you in the nearby strip.",
+      });
+    } catch {
+      setVisibility(prev);
+      toast({ title: "Couldn't update visibility", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setToggling(false);
+    }
+  };
   const distanceLabel: Record<string, string> = {
     under_1km: "< 1 km away",
     under_5km: "< 5 km away",
@@ -48,13 +113,34 @@ export default function Explore() {
           </p>
         </div>
 
-        {(nearbyLoading || nearbyEntries.length > 0) && (
+        {(nearbyLoading || nearbyEntries.length > 0 || isHidden) && (
           <section>
-            <div className="flex justify-between items-center mb-2">
+            <div className="flex justify-between items-center mb-2 gap-2">
               <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                 <Users className="w-4 h-4" /> Players Nearby
               </h2>
+              {visibility !== null && (
+                <button
+                  type="button"
+                  onClick={handleToggleHidden}
+                  disabled={toggling}
+                  data-testid="button-toggle-nearby-visibility"
+                  aria-pressed={isHidden}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-card/70 backdrop-blur px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors disabled:opacity-50"
+                >
+                  {isHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                  {isHidden ? "Show me" : "Hide me"}
+                </button>
+              )}
             </div>
+            {isHidden ? (
+              <div
+                className="rounded-2xl border border-dashed border-white/10 bg-card/40 backdrop-blur p-4 text-sm text-muted-foreground"
+                data-testid="text-nearby-hidden-state"
+              >
+                You're hidden from the nearby strip. Tap <span className="font-bold text-foreground">Show me</span> to appear to players in your city again.
+              </div>
+            ) : (
             <div className="-mx-4 px-4 overflow-x-auto scrollbar-hide">
               <div className="flex gap-3 pb-2 snap-x snap-mandatory">
                 {nearbyLoading
@@ -96,6 +182,7 @@ export default function Explore() {
                     })}
               </div>
             </div>
+            )}
           </section>
         )}
 
