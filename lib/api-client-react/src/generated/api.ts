@@ -187,6 +187,7 @@ import type {
   SuccessResult,
   SyncResult,
   TodayGoalProgress,
+  ToggleOwnedArtifactBody,
   UnsubscribePushBody,
   UploadUrlRequest,
   UploadUrlResponse,
@@ -2758,6 +2759,78 @@ export function useGetMyArtifacts<TData = Awaited<ReturnType<typeof getMyArtifac
 
 
 
+
+export const getToggleOwnedArtifactUrl = (id: number,) => {
+
+
+
+
+  return `/api/players/me/artifacts/${id}`
+}
+
+/**
+ * @summary Toggle equipped / featured state on an owned artifact
+ */
+export const toggleOwnedArtifact = async (id: number,
+    toggleOwnedArtifactBody: ToggleOwnedArtifactBody, options?: RequestInit): Promise<OwnedArtifact> => {
+
+  return customFetch<OwnedArtifact>(getToggleOwnedArtifactUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      toggleOwnedArtifactBody,)
+  }
+);}
+
+
+
+
+export const getToggleOwnedArtifactMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleOwnedArtifact>>, TError,{id: number;data: BodyType<ToggleOwnedArtifactBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof toggleOwnedArtifact>>, TError,{id: number;data: BodyType<ToggleOwnedArtifactBody>}, TContext> => {
+
+const mutationKey = ['toggleOwnedArtifact'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof toggleOwnedArtifact>>, {id: number;data: BodyType<ToggleOwnedArtifactBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  toggleOwnedArtifact(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ToggleOwnedArtifactMutationResult = NonNullable<Awaited<ReturnType<typeof toggleOwnedArtifact>>>
+    export type ToggleOwnedArtifactMutationBody = BodyType<ToggleOwnedArtifactBody>
+    export type ToggleOwnedArtifactMutationError = ErrorType<void>
+
+    /**
+ * @summary Toggle equipped / featured state on an owned artifact
+ */
+export const useToggleOwnedArtifact = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleOwnedArtifact>>, TError,{id: number;data: BodyType<ToggleOwnedArtifactBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof toggleOwnedArtifact>>,
+        TError,
+        {id: number;data: BodyType<ToggleOwnedArtifactBody>},
+        TContext
+      > => {
+      return useMutation(getToggleOwnedArtifactMutationOptions(options));
+    }
 
 export const getReorderFeaturedArtifactsUrl = () => {
 

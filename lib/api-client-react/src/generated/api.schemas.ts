@@ -820,6 +820,14 @@ export interface OwnedArtifact {
   earnedAt: string;
 }
 
+/**
+ * At least one of `isEquipped` or `isFeatured` should be provided. Omitted fields are left unchanged.
+ */
+export interface ToggleOwnedArtifactBody {
+  isEquipped?: boolean;
+  isFeatured?: boolean;
+}
+
 export interface ReorderFeaturedArtifactsBody {
   /**
      * Featured artifact IDs in the desired display order. Every ID must already be featured and owned by the player.

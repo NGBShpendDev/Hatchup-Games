@@ -752,6 +752,32 @@ paths:
                 items:
                   $ref: "#/components/schemas/OwnedArtifact"
 
+  /players/me/artifacts/{id}:
+    patch:
+      operationId: toggleOwnedArtifact
+      tags: [players]
+      summary: Toggle equipped / featured state on an owned artifact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ToggleOwnedArtifactBody"
+      responses:
+        "200":
+          description: Updated owned artifact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnedArtifact"
+        "404":
+          description: Artifact not owned by the authenticated player
+
   /players/me/featured-order:
     put:
       operationId: reorderFeaturedArtifacts
@@ -4209,6 +4235,13 @@ components:
           type: ["integer", "null"]
           description: 1-based position in the player's profile showcase, or null if not featured.
         earnedAt:    { type: string }
+
+    ToggleOwnedArtifactBody:
+      type: object
+      properties:
+        isEquipped: { type: boolean }
+        isFeatured: { type: boolean }
+      description: At least one of `isEquipped` or `isFeatured` should be provided. Omitted fields are left unchanged.
 
     ReorderFeaturedArtifactsBody:
       type: object

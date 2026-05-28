@@ -945,6 +945,37 @@ export const GetMyArtifactsResponse = zod.array(GetMyArtifactsResponseItem)
 
 
 /**
+ * @summary Toggle equipped / featured state on an owned artifact
+ */
+export const ToggleOwnedArtifactParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ToggleOwnedArtifactBody = zod.object({
+  "isEquipped": zod.boolean().optional(),
+  "isFeatured": zod.boolean().optional()
+}).describe('At least one of `isEquipped` or `isFeatured` should be provided. Omitted fields are left unchanged.')
+
+export const ToggleOwnedArtifactResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "lore": zod.string(),
+  "rarity": zod.string(),
+  "type": zod.string(),
+  "imageSlug": zod.string(),
+  "abilities": zod.array(zod.object({
+  "name": zod.string(),
+  "description": zod.string(),
+  "value": zod.number()
+})),
+  "isEquipped": zod.boolean(),
+  "isFeatured": zod.boolean(),
+  "featuredOrder": zod.number().nullable().describe('1-based position in the player\'s profile showcase, or null if not featured.'),
+  "earnedAt": zod.string()
+})
+
+
+/**
  * @summary Reorder the authenticated player's featured artifact showcase
  */
 

@@ -6,10 +6,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { GlassCard } from "@/components/ui/glass-card";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sparkles, Lock, Star, Zap, Shield, Trophy, ChevronDown, ChevronUp, User, GripVertical } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { useReorderFeaturedArtifacts } from "@workspace/api-client-react";
+import { useReorderFeaturedArtifacts, useToggleOwnedArtifact } from "@workspace/api-client-react";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -120,27 +120,19 @@ export default function Artifacts() {
     if (changed) reorderFeatured.mutate({ data: { artifactIds: ids } });
   };
 
-  const toggleFeatured = useMutation({
-    mutationFn: async ({ artifactId, isFeatured }: { artifactId: number; isFeatured: boolean }) => {
-      const res = await fetch(`${BASE}/api/players/me/artifacts/${artifactId}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isFeatured }),
-      });
-      if (!res.ok) throw new Error("Failed to update");
-      return res.json();
-    },
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ["artifacts-museum", pid] });
-      qc.invalidateQueries({ queryKey: ["player-profile", pid] });
-      toast({
-        title: vars.isFeatured ? "Featured on profile" : "Removed from showcase",
-        description: vars.isFeatured ? "This artifact now shines on your profile." : undefined,
-      });
-    },
-    onError: (err: Error) => {
-      toast({ title: "Couldn't update", description: err.message, variant: "destructive" });
+  const toggleFeatured = useToggleOwnedArtifact({
+    mutation: {
+      onSuccess: (_data, vars) => {
+        qc.invalidateQueries({ queryKey: ["artifacts-museum", pid] });
+        qc.invalidateQueries({ queryKey: ["player-profile", pid] });
+        toast({
+          title: vars.data.isFeatured ? "Featured on profile" : "Removed from showcase",
+          description: vars.data.isFeatured ? "This artifact now shines on your profile." : undefined,
+        });
+      },
+      onError: (err: Error) => {
+        toast({ title: "Couldn't update", description: err.message, variant: "destructive" });
+      },
     },
   });
 
@@ -153,7 +145,7 @@ export default function Artifacts() {
       });
       return;
     }
-    toggleFeatured.mutate({ artifactId: artifact.id, isFeatured: !artifact.isFeatured });
+    toggleFeatured.mutate({ id: artifact.id, data: { isFeatured: !artifact.isFeatured } });
   };
 
   const { data: fitnessBars, isLoading: barsLoading } = useQuery<FitnessBarEntry[]>({

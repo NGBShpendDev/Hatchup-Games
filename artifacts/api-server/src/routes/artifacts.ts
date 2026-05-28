@@ -138,7 +138,25 @@ router.patch("/players/me/artifacts/:id", requireAuth, attachPlayer, async (req,
     .where(eq(playerArtifactsTable.id, owned.id))
     .returning();
 
-  res.json(updated[0]);
+  const row = updated[0]!;
+  const artifact = await db.query.artifactsTable.findFirst({
+    where: eq(artifactsTable.id, row.artifactId),
+  });
+  if (!artifact) { res.status(404).json({ error: "Artifact not found" }); return; }
+
+  res.json({
+    id: artifact.id,
+    name: artifact.name,
+    lore: artifact.lore,
+    rarity: artifact.rarity,
+    type: artifact.type,
+    imageSlug: artifact.imageSlug,
+    abilities: artifact.abilities as unknown[],
+    isEquipped: row.isEquipped,
+    isFeatured: row.isFeatured,
+    featuredOrder: row.featuredOrder,
+    earnedAt: row.earnedAt.toISOString(),
+  });
 });
 
 // ── PUT /players/me/featured-order ────────────────────────────────────────────
