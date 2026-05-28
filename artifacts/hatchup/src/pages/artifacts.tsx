@@ -4,6 +4,7 @@ import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { GlassCard } from "@/components/ui/glass-card";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Sparkles, Lock, Star, Zap, Shield, Trophy, ChevronDown, ChevronUp, User, GripVertical } from "lucide-react";
@@ -262,7 +263,7 @@ export default function Artifacts() {
         )}
 
         {/* ── Fitness Bars Panel ── */}
-        <div className="bg-card border border-border rounded-3xl p-5 space-y-4">
+        <GlassCard glow="cyan" className="p-5 space-y-4">
           <div className="flex items-center gap-2">
             <Star className="w-5 h-5 text-yellow-400" />
             <h2 className="font-black text-lg">Fitness Bars</h2>
@@ -301,7 +302,7 @@ export default function Artifacts() {
               ))}
             </div>
           )}
-        </div>
+        </GlassCard>
 
         {/* ── Artifact Museum by Rarity ── */}
         {museumLoading ? (

@@ -3,6 +3,7 @@ import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { NeonButton } from "@/components/ui/neon-button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -159,10 +160,10 @@ export default function FamilyPage() {
             <div className="flex gap-3 w-full max-w-xs">
               <Dialog open={createOpen} onOpenChange={setCreateOpen}>
                 <DialogTrigger asChild>
-                  <Button className="flex-1 bg-gradient-to-r from-[#ff2d55] to-[#bf00ff] text-white font-bold">
-                    <Plus className="w-4 h-4 mr-1" />
+                  <NeonButton variant="primary" size="md" className="flex-1">
+                    <Plus className="w-4 h-4 mr-1 inline" />
                     Create
-                  </Button>
+                  </NeonButton>
                 </DialogTrigger>
                 <DialogContent className="bg-[#0d0d14] border-white/10 text-white max-w-sm mx-auto">
                   <DialogHeader>
@@ -203,10 +204,10 @@ export default function FamilyPage() {
 
               <Dialog open={joinOpen} onOpenChange={setJoinOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="flex-1 border-white/20 text-white bg-transparent hover:bg-white/5">
-                    <LogIn className="w-4 h-4 mr-1" />
+                  <NeonButton variant="secondary" size="md" className="flex-1">
+                    <LogIn className="w-4 h-4 mr-1 inline" />
                     Join
-                  </Button>
+                  </NeonButton>
                 </DialogTrigger>
                 <DialogContent className="bg-[#0d0d14] border-white/10 text-white max-w-sm mx-auto">
                   <DialogHeader>

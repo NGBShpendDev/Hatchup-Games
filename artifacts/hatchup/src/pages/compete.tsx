@@ -2,9 +2,11 @@ import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { useListGameModes, getListGameModesQueryKey } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { GlassCard } from "@/components/ui/glass-card";
+import { NeonButton } from "@/components/ui/neon-button";
+import { GlowBadge } from "@/components/ui/glow-badge";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { Swords, Trophy, Zap, Crown, Salad, Dumbbell, Bot } from "lucide-react";
@@ -68,7 +70,7 @@ export default function Compete() {
               <div className="flex items-center gap-2 mb-1">
                 <Swords className="w-5 h-5 text-primary" />
                 <span className="font-black text-lg">Battle Arena</span>
-                <span className="text-[10px] bg-primary/20 border border-primary/40 text-primary font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">NEW</span>
+                <GlowBadge tone="primary">NEW</GlowBadge>
               </div>
               <p className="text-sm text-muted-foreground mb-3">
                 Real-time 1v1 Hatchling battles. Fitness stats power your moves. Climb the ELO ladder.
@@ -98,9 +100,9 @@ export default function Compete() {
               </div>
             </div>
             <Link href="/compete/battle">
-              <Button size="lg" className="font-black bg-gradient-to-r from-primary to-purple-600 rounded-2xl shadow-primary/30 shadow-lg px-8 shrink-0">
-                <Swords className="w-4 h-4 mr-2" /> Quick Battle
-              </Button>
+              <NeonButton variant="primary" size="lg" className="shrink-0">
+                <Swords className="w-4 h-4 mr-2 inline" /> Quick Battle
+              </NeonButton>
             </Link>
           </div>
         </motion.div>
@@ -150,16 +152,16 @@ export default function Compete() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {modes?.map(mode => (
               <motion.div key={mode.id} whileHover={{ y: -5 }}>
-                <Card className={`overflow-hidden border-2 h-full ${mode.isLive ? 'border-primary shadow-primary/20 shadow-lg' : 'border-border'}`}>
-                  <CardContent className="p-0 h-full flex flex-col sm:flex-row">
-                    <div className="w-full sm:w-1/3 bg-muted flex items-center justify-center p-8 border-b sm:border-b-0 sm:border-r border-border">
-                      <span className="text-6xl">{mode.iconEmoji || '🎮'}</span>
+                <GlassCard glow={mode.isLive ? "primary" : "none"} className="overflow-hidden h-full">
+                  <div className="h-full flex flex-col sm:flex-row">
+                    <div className="w-full sm:w-1/3 bg-muted/40 flex items-center justify-center p-8 border-b sm:border-b-0 sm:border-r border-border">
+                      <span className="text-6xl">{(mode as any).iconEmoji || '🎮'}</span>
                     </div>
                     <div className="p-6 flex-1 flex flex-col justify-between">
                       <div>
                         <div className="flex justify-between items-start mb-2">
                           <h3 className="text-2xl font-black">{mode.name}</h3>
-                          {mode.isLive && <span className="bg-red-500 text-white text-[10px] font-black uppercase px-2 py-1 rounded-full animate-pulse">Live</span>}
+                          {mode.isLive && <GlowBadge tone="primary">Live</GlowBadge>}
                         </div>
                         <p className="text-sm text-muted-foreground font-medium mb-4">{mode.description}</p>
                         <div className="flex gap-4 text-xs font-bold text-muted-foreground mb-6">
@@ -168,13 +170,15 @@ export default function Compete() {
                         </div>
                       </div>
                       <Link href={`/compete/race?mode=${encodeURIComponent(mode.name)}`}>
-                        <Button className="w-full font-bold active-elevate" size="lg" disabled={!mode.isLive && mode.type !== 'standard'}>
-                          {mode.isLive || mode.type === 'standard' ? 'Play Now' : 'Coming Soon'}
-                        </Button>
+                        {mode.isLive ? (
+                          <NeonButton variant="primary" size="lg" className="w-full">Play Now</NeonButton>
+                        ) : (
+                          <Button className="w-full font-bold" size="lg" disabled>Coming Soon</Button>
+                        )}
                       </Link>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </GlassCard>
               </motion.div>
             ))}
           </div>

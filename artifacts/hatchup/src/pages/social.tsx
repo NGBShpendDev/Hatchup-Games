@@ -27,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { GlassCard } from "@/components/ui/glass-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -192,8 +193,7 @@ function PostCard({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
     >
-      <Card className="border border-border/50 bg-card/80 backdrop-blur rounded-2xl overflow-hidden">
-        <CardContent className="p-4 space-y-3">
+      <GlassCard className="p-4 space-y-3 overflow-hidden">
           {/* Header */}
           <div className="flex items-start gap-3">
             <button onClick={() => onViewProfile(post.playerId)}>
@@ -340,8 +340,7 @@ function PostCard({
               </motion.div>
             )}
           </AnimatePresence>
-        </CardContent>
-      </Card>
+      </GlassCard>
     </motion.div>
   );
 }

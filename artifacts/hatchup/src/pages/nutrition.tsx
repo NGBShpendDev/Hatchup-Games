@@ -6,6 +6,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { GlassCard } from "@/components/ui/glass-card";
+import { NeonButton } from "@/components/ui/neon-button";
 import { useToast } from "@/hooks/use-toast";
 import { Heart, MessageCircle, Zap, ChefHat, Plus, X, Sparkles, Droplets, Flame, Dumbbell, MoreHorizontal, Compass, Trophy, Camera, Loader2, Target } from "lucide-react";
 import { ReportBlockMenu } from "@/components/report-block-menu";
@@ -436,7 +438,7 @@ export default function Nutrition() {
 
         {/* Macro Target Banner */}
         {macroTarget && (
-          <div className="rounded-2xl border border-border bg-card p-4 mb-4">
+          <GlassCard glow="primary" className="p-4 mb-4">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="text-xl">{goalIcon}</span>
@@ -468,7 +470,7 @@ export default function Nutrition() {
                 );
               })}
             </div>
-          </div>
+          </GlassCard>
         )}
 
         {/* Weekly Summary Card */}
@@ -562,9 +564,9 @@ export default function Nutrition() {
                     <div className="text-5xl mb-4">🍽️</div>
                     <p className="font-black text-lg mb-1">No meals yet</p>
                     <p className="text-muted-foreground text-sm">Be the first to post a meal!</p>
-                    <Button onClick={() => setShowCreateSheet(true)} className="mt-4 bg-primary">
+                    <NeonButton onClick={() => setShowCreateSheet(true)} variant="primary" size="md" className="mt-4">
                       Post a Meal
-                    </Button>
+                    </NeonButton>
                   </div>
                 )
                 : posts.map((post, i) => (

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { NeonButton } from "@/components/ui/neon-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Trophy, Star, Flame, Zap, Gift, Lock, CheckCircle2, Crown, TrendingUp, Dumbbell, Footprints, Timer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -223,13 +224,15 @@ export default function Rewards() {
               </div>
             </div>
             {!dailyReward.alreadyClaimed && (
-              <Button
+              <NeonButton
                 onClick={handleClaimReward}
                 disabled={claiming}
-                className="w-full mt-4 font-black bg-yellow-500 hover:bg-yellow-400 text-black h-12 text-base active-elevate"
+                variant="primary"
+                size="md"
+                className="w-full mt-4"
               >
                 {claiming ? "Claiming..." : "Claim Reward! 🎉"}
-              </Button>
+              </NeonButton>
             )}
             {dailyReward.alreadyClaimed && (
               <p className="text-center text-sm text-muted-foreground font-bold mt-3">

@@ -15,7 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dumbbell, Target, Utensils, History, Zap, CheckCircle2, Trophy, Clock, Badge } from "lucide-react";
+import { Dumbbell, Target, Utensils, History, Zap, CheckCircle2, Trophy, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -55,21 +56,21 @@ export default function Training() {
 
   const handleGenerateWorkout = () => {
     generateWorkout.mutate(
-      { data: { playerId: pid, goal: workoutGoal, fitnessLevel: "intermediate", equipment: ["dumbbells", "bodyweight"] } },
+      { data: { playerId: pid, goal: workoutGoal, fitnessLevel: "intermediate", equipment: "dumbbells,bodyweight" } },
       { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetWorkoutPlanQueryKey({ playerId: pid }) }) }
     );
   };
 
   const handleGenerateMeal = () => {
     generateMeal.mutate(
-      { data: { playerId: pid, goal: mealGoal, dietType: "standard", allergies: [] } },
+      { data: { playerId: pid, goal: mealGoal } },
       { onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetMealPlanQueryKey({ playerId: pid }) }) }
     );
   };
 
   const handleLogSession = (type: string, duration: number) => {
     logSession.mutate(
-      { data: { playerId: pid, workoutType: type, durationMinutes: duration, exercisesCompleted: 5, realm: "strength" } },
+      { data: { playerId: pid, workoutType: type, durationMinutes: duration, exercisesCompleted: 5 } },
       { 
         onSuccess: () => {
           toast({ title: "Workout logged!", description: "XP and coins earned." });
@@ -144,7 +145,7 @@ export default function Training() {
                         <div key={i} className="flex justify-between items-center p-4 bg-muted/50 rounded-2xl border border-border">
                           <div>
                             <h4 className="font-bold text-lg">{ex.name}</h4>
-                            <p className="text-sm text-muted-foreground font-medium">{ex.sets} sets × {ex.reps} {ex.type}</p>
+                            <p className="text-sm text-muted-foreground font-medium">{ex.sets} sets × {ex.reps} • rest {ex.rest}</p>
                           </div>
                           <CheckCircle2 className="w-6 h-6 text-muted-foreground opacity-30" />
                         </div>
@@ -180,7 +181,7 @@ export default function Training() {
                       <div className="space-y-2">
                         <div className="flex justify-between text-xs font-bold">
                           <span>{quest.currentValue} / {quest.targetValue}</span>
-                          <span>{Math.round(quest.progressPct)}%</span>
+                          <span>{Math.round(quest.progressPct ?? 0)}%</span>
                         </div>
                         <Progress value={quest.progressPct} className="h-3 bg-muted [&>div]:bg-primary" />
                       </div>

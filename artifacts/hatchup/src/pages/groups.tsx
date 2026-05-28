@@ -22,6 +22,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { GlassCard } from "@/components/ui/glass-card";
+import { NeonButton } from "@/components/ui/neon-button";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -270,27 +272,21 @@ function GroupDetail({ groupId, onBack }: { groupId: number; onBack: () => void 
 
       {/* Stats Row */}
       <div className="grid grid-cols-3 gap-3">
-        <Card className="bg-card border">
-          <CardContent className="p-3 text-center">
-            <Users className="w-5 h-5 text-blue-400 mx-auto mb-1" />
-            <p className="font-black text-xl">{memberCount}</p>
-            <p className="text-[10px] text-muted-foreground font-bold uppercase">Members</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border">
-          <CardContent className="p-3 text-center">
-            <Zap className="w-5 h-5 text-yellow-400 mx-auto mb-1" />
-            <p className="font-black text-xl">{group.teamEnergy}</p>
-            <p className="text-[10px] text-muted-foreground font-bold uppercase">Energy</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border">
-          <CardContent className="p-3 text-center">
-            <Flame className="w-5 h-5 text-orange-400 mx-auto mb-1" />
-            <p className="font-black text-xl">+{xpBonus}%</p>
-            <p className="text-[10px] text-muted-foreground font-bold uppercase">XP Bonus</p>
-          </CardContent>
-        </Card>
+        <GlassCard className="p-3 text-center">
+          <Users className="w-5 h-5 text-blue-400 mx-auto mb-1" />
+          <p className="font-black text-xl">{memberCount}</p>
+          <p className="text-[10px] text-muted-foreground font-bold uppercase">Members</p>
+        </GlassCard>
+        <GlassCard glow="yellow" className="p-3 text-center">
+          <Zap className="w-5 h-5 text-yellow-400 mx-auto mb-1" />
+          <p className="font-black text-xl">{group.teamEnergy}</p>
+          <p className="text-[10px] text-muted-foreground font-bold uppercase">Energy</p>
+        </GlassCard>
+        <GlassCard glow="primary" className="p-3 text-center">
+          <Flame className="w-5 h-5 text-orange-400 mx-auto mb-1" />
+          <p className="font-black text-xl">+{xpBonus}%</p>
+          <p className="text-[10px] text-muted-foreground font-bold uppercase">XP Bonus</p>
+        </GlassCard>
       </div>
 
       {/* Team Energy Bar */}
@@ -315,13 +311,15 @@ function GroupDetail({ groupId, onBack }: { groupId: number; onBack: () => void 
 
       {/* Log Group Workout */}
       {isMember && (
-        <Button
+        <NeonButton
+          variant="primary"
+          size="lg"
           onClick={() => setWorkoutModalOpen(true)}
-          className="w-full font-black text-base h-14 active-elevate bg-gradient-to-r from-primary to-purple-600 gap-2"
+          className="w-full"
         >
-          <Dumbbell className="w-5 h-5" />
+          <Dumbbell className="w-5 h-5 mr-2 inline" />
           Log Group Workout (+{xpBonus}% XP Bonus)
-        </Button>
+        </NeonButton>
       )}
 
       {/* Group Challenges */}

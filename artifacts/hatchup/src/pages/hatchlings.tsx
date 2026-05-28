@@ -3,9 +3,10 @@ import { usePlayer } from "@/lib/playerContext";
 import { HatchlingCard } from "@/components/hatchling-card";
 import { useListHatchlings, getListHatchlingsQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
+import { GlassCard } from "@/components/ui/glass-card";
+import { NeonButton } from "@/components/ui/neon-button";
 
 export default function Hatchlings() {
   const { playerId } = usePlayer();
@@ -24,7 +25,7 @@ export default function Hatchlings() {
             <p className="text-muted-foreground font-medium mt-1">Manage, train, and evolve your Fitness Pals.</p>
           </div>
           <Link href="/hatch">
-            <Button size="lg" variant="secondary" className="font-bold active-elevate">Hatch a Pal</Button>
+            <NeonButton variant="secondary" size="md">Hatch a Pal</NeonButton>
           </Link>
         </div>
 
@@ -54,13 +55,13 @@ export default function Hatchlings() {
             ))}
           </motion.div>
         ) : (
-          <div className="text-center p-16 bg-card rounded-3xl border-4 border-dashed border-border mt-10">
+          <GlassCard glow="primary" className="text-center p-16 mt-10">
             <h2 className="text-2xl font-black mb-4">No Pals Yet!</h2>
             <p className="text-muted-foreground mb-8">Start your journey by hatching your first Fitness Pal.</p>
             <Link href="/hatch">
-              <Button size="lg" className="font-bold text-lg px-8 active-elevate">Hatch Your First Pal</Button>
+              <NeonButton variant="primary" size="lg">Hatch Your First Pal</NeonButton>
             </Link>
-          </div>
+          </GlassCard>
         )}
       </div>
     </Layout>

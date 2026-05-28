@@ -2,6 +2,7 @@ import { usePlayer } from "@/lib/playerContext";
 import { Layout } from "@/components/layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { GlassCard } from "@/components/ui/glass-card";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Dumbbell, Zap, TrendingUp, Award, Activity } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -170,7 +171,7 @@ export default function Records() {
         ) : (
           <>
             {/* Total Reps Milestone Progress */}
-            <section className="bg-card border border-border rounded-2xl p-5 space-y-4">
+            <GlassCard glow="primary" className="p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-black text-lg flex items-center gap-2">
                   <Dumbbell className="w-5 h-5 text-primary" /> Rep Milestones
@@ -233,7 +234,7 @@ export default function Records() {
                   </div>
                 </div>
               )}
-            </section>
+            </GlassCard>
 
             {/* Per-Exercise PRs */}
             <section className="bg-card border border-border rounded-2xl overflow-hidden">

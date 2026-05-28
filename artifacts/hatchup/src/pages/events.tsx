@@ -103,7 +103,7 @@ export default function Events() {
                     <div className="p-6 md:p-8 flex-1 flex flex-col justify-between">
                       <div>
                         <div className="flex items-center gap-2 mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(event.startsAt).toLocaleDateString()}</span>
+                          <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(event.startTime).toLocaleDateString()}</span>
                           <span>•</span>
                           <span className="text-primary">{event.type}</span>
                         </div>
@@ -121,12 +121,12 @@ export default function Events() {
                         <div className="flex gap-6">
                           <div className="flex items-center gap-2 text-sm font-bold">
                             <Users className="w-5 h-5 text-blue-500" />
-                            <span>{event.participants.toLocaleString()} players</span>
+                            <span>{(event.participantCount ?? 0).toLocaleString()} players</span>
                           </div>
-                          {event.reward && (
+                          {event.rewardXp != null && (
                             <div className="flex items-center gap-2 text-sm font-bold">
                               <Gift className="w-5 h-5 text-yellow-500" />
-                              <span>{event.reward}</span>
+                              <span>{event.rewardXp} XP</span>
                             </div>
                           )}
                         </div>

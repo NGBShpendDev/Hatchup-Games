@@ -15,6 +15,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { GlassCard } from "@/components/ui/glass-card";
+import { NeonButton } from "@/components/ui/neon-button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SafetyBanner } from "@/components/safety-banner";
 import { useLocation } from "wouter";
@@ -72,11 +74,12 @@ function ChallengeCard({ challenge, onJoin }: {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <Card
-        className={`border-border/50 bg-card/60 hover:bg-card/80 cursor-pointer transition-all duration-200 hover:border-primary/30 ${isCompleted ? "opacity-70" : ""}`}
+      <GlassCard
+        interactive
+        glow={isCompleted ? "none" : "primary"}
+        className={`p-4 cursor-pointer ${isCompleted ? "opacity-70" : ""}`}
         onClick={() => navigate(`/challenges/${challenge.id}`)}
       >
-        <CardContent className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
@@ -153,8 +156,7 @@ function ChallengeCard({ challenge, onJoin }: {
               )}
             </div>
           </div>
-        </CardContent>
-      </Card>
+      </GlassCard>
     </motion.div>
   );
 }
@@ -314,12 +316,14 @@ export default function Challenges() {
         <InvitesSection />
 
         {/* Create CTA */}
-        <Button
-          className="w-full h-12 text-base font-black bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
+        <NeonButton
+          variant="primary"
+          size="md"
+          className="w-full"
           onClick={() => navigate("/challenges/create")}
         >
-          <Plus className="w-5 h-5 mr-2" /> Create Challenge
-        </Button>
+          <Plus className="w-5 h-5 mr-2 inline" /> Create Challenge
+        </NeonButton>
 
         {/* Tabs */}
         <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
