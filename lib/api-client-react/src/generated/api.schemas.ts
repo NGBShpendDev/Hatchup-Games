@@ -1234,6 +1234,11 @@ export interface CommentLikeInput {
   playerId: number;
 }
 
+export interface SharedGroup {
+  id: number;
+  name: string;
+}
+
 export interface PlayerStub {
   id: number;
   username: string;
@@ -1243,6 +1248,12 @@ export interface PlayerStub {
   avatarUrl: string | null;
   /** @nullable */
   creatorBadge: string | null;
+  /** Groups that both the viewer and this player are members of. Optional
+  because not every surface populates it (e.g. raw follower lists).
+  When present, picker UIs should surface "Also in <group> with you"
+  so the player feels trustworthy at every social touchpoint.
+   */
+  sharedGroups?: SharedGroup[];
 }
 
 /**
@@ -1277,11 +1288,6 @@ export interface NearbyPlayer {
   other case the bucket is `same_city`.
    */
   distanceBucket: NearbyPlayerDistanceBucket;
-}
-
-export interface SharedGroup {
-  id: number;
-  name: string;
 }
 
 export interface DiscoverablePlayer {

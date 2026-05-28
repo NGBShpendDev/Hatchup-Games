@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { createDecipheriv, createHash } from "crypto";
 import { db } from "@workspace/db";
-import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable, eggsTable, fitnessActivitiesTable, playerBadgesTable, playerArtifactsTable, artifactsTable, playerLocationTable } from "@workspace/db";
+import { playersTable, hatchlingsTable, competitionsTable, liveEventsTable, eggsTable, fitnessActivitiesTable, playerBadgesTable, playerArtifactsTable, artifactsTable, playerLocationTable, groupMembersTable, groupsTable } from "@workspace/db";
 import { eq, desc, and, gte, or, ilike, ne, inArray } from "drizzle-orm";
 import { getHiddenPlayerIds } from "./safety";
 import {
@@ -110,12 +110,46 @@ router.get("/players/search", requireAuth, attachPlayer, async (req, res) => {
     orderBy: (t, { asc }) => [asc(t.username)],
   });
 
+  // Compute shared groups (viewer ∩ each match) so the invite picker can
+  // surface "Also in <group> with you" — same trust signal as the social
+  // discover card.
+  const sharedGroupsByPlayer = new Map<number, Array<{ id: number; name: string }>>();
+  if (viewerId && rows.length > 0) {
+    const viewerMemberships = await db.query.groupMembersTable.findMany({
+      where: eq(groupMembersTable.playerId, viewerId),
+    });
+    const viewerGroupIds = viewerMemberships.map(m => m.groupId);
+    if (viewerGroupIds.length > 0) {
+      const matchMemberships = await db.query.groupMembersTable.findMany({
+        where: and(
+          inArray(groupMembersTable.playerId, rows.map(r => r.id)),
+          inArray(groupMembersTable.groupId, viewerGroupIds),
+        ),
+      });
+      if (matchMemberships.length > 0) {
+        const referencedGroupIds = Array.from(new Set(matchMemberships.map(m => m.groupId)));
+        const groupRows = await db.query.groupsTable.findMany({
+          where: inArray(groupsTable.id, referencedGroupIds),
+        });
+        const groupNameMap = new Map(groupRows.map(g => [g.id, g.name]));
+        for (const m of matchMemberships) {
+          const name = groupNameMap.get(m.groupId);
+          if (!name) continue;
+          const list = sharedGroupsByPlayer.get(m.playerId) ?? [];
+          list.push({ id: m.groupId, name });
+          sharedGroupsByPlayer.set(m.playerId, list);
+        }
+      }
+    }
+  }
+
   res.json(rows.map(p => ({
     id: p.id,
     username: p.username,
     displayName: p.displayName ?? null,
     avatarUrl: p.avatarUrl ?? null,
     creatorBadge: p.creatorBadge ?? null,
+    sharedGroups: sharedGroupsByPlayer.get(p.id) ?? [],
   })));
 });
 

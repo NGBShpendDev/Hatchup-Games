@@ -4721,6 +4721,15 @@ components:
         displayName: { type: ["string", "null"] }
         avatarUrl:   { type: ["string", "null"] }
         creatorBadge: { type: ["string", "null"] }
+        sharedGroups:
+          type: array
+          description: |
+            Groups that both the viewer and this player are members of. Optional
+            because not every surface populates it (e.g. raw follower lists).
+            When present, picker UIs should surface "Also in <group> with you"
+            so the player feels trustworthy at every social touchpoint.
+          items:
+            $ref: "#/components/schemas/SharedGroup"
 
     NearbyPlayer:
       type: object

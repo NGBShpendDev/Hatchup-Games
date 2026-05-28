@@ -32,7 +32,7 @@ import { motion } from "framer-motion";
 import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
 import { ChampionVictoryOverlay } from "@/components/champion-victory-overlay";
 import {
-  Trophy, Users, Clock, Zap, Coins, Target, ArrowLeft,
+  Trophy, Users, Users2, Clock, Zap, Coins, Target, ArrowLeft,
   MapPin, Share2, CheckCircle2, Medal, Crown,
   Plus, Minus, MoreVertical, UserPlus, Search, Check, Swords, XCircle,
 } from "lucide-react";
@@ -935,6 +935,22 @@ export default function ChallengeDetail() {
                           {p.displayName ?? p.username}
                         </p>
                         <p className="text-xs text-muted-foreground truncate">@{p.username}</p>
+                        {p.sharedGroups && p.sharedGroups.length > 0 && (() => {
+                          const names = p.sharedGroups.map(g => g.name);
+                          const preview = names.slice(0, 2).join(" & ");
+                          const extra = names.length - 2;
+                          return (
+                            <p
+                              className="text-[10px] font-bold mt-0.5 flex items-center gap-1 text-purple-400 truncate"
+                              data-testid={`invite-shared-groups-${p.id}`}
+                            >
+                              <Users2 className="w-3 h-3 shrink-0" />
+                              <span className="truncate">
+                                Also in {preview}{extra > 0 ? ` +${extra} more` : ""} with you
+                              </span>
+                            </p>
+                          );
+                        })()}
                       </div>
                       <Button
                         size="sm"

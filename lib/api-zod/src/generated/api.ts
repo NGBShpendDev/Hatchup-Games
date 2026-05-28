@@ -119,7 +119,11 @@ export const SearchPlayersResponseItem = zod.object({
   "username": zod.string(),
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
-  "creatorBadge": zod.string().nullable()
+  "creatorBadge": zod.string().nullable(),
+  "sharedGroups": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string()
+})).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n')
 })
 export const SearchPlayersResponse = zod.array(SearchPlayersResponseItem)
 
@@ -2377,7 +2381,9 @@ export const EditPostCommentResponse = zod.object({
   "authorAvatar": zod.string().nullish(),
   "content": zod.string(),
   "isFlagged": zod.boolean(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "likeCount": zod.number(),
+  "myLiked": zod.boolean()
 })
 
 
@@ -2525,7 +2531,11 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "username": zod.string(),
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
-  "creatorBadge": zod.string().nullable()
+  "creatorBadge": zod.string().nullable(),
+  "sharedGroups": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string()
+})).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n')
 }),
   "posts": zod.array(zod.object({
   "id": zod.number(),
@@ -2616,7 +2626,11 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "username": zod.string(),
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
-  "creatorBadge": zod.string().nullable()
+  "creatorBadge": zod.string().nullable(),
+  "sharedGroups": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string()
+})).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n')
 })).describe('Up to 3 followers of this player that the viewer also follows.'),
   "mutualFollowersTotal": zod.number().describe('Total number of mutual followers (not limited to the preview list).'),
   "sharedGroups": zod.array(zod.object({
@@ -2638,7 +2652,11 @@ export const ListFollowersResponseItem = zod.object({
   "username": zod.string(),
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
-  "creatorBadge": zod.string().nullable()
+  "creatorBadge": zod.string().nullable(),
+  "sharedGroups": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string()
+})).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n')
 })
 export const ListFollowersResponse = zod.array(ListFollowersResponseItem)
 
@@ -2665,7 +2683,11 @@ export const ListMutualFollowersResponse = zod.object({
   "username": zod.string(),
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
-  "creatorBadge": zod.string().nullable()
+  "creatorBadge": zod.string().nullable(),
+  "sharedGroups": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string()
+})).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n')
 })),
   "total": zod.number(),
   "nextCursor": zod.number().nullable()
@@ -2684,7 +2706,11 @@ export const ListFollowingResponseItem = zod.object({
   "username": zod.string(),
   "displayName": zod.string().nullable(),
   "avatarUrl": zod.string().nullable(),
-  "creatorBadge": zod.string().nullable()
+  "creatorBadge": zod.string().nullable(),
+  "sharedGroups": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string()
+})).optional().describe('Groups that both the viewer and this player are members of. Optional\nbecause not every surface populates it (e.g. raw follower lists).\nWhen present, picker UIs should surface \"Also in <group> with you\"\nso the player feels trustworthy at every social touchpoint.\n')
 })
 export const ListFollowingResponse = zod.array(ListFollowingResponseItem)
 
