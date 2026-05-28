@@ -129,17 +129,32 @@ function PostCard({
     }
   }
 
-  async function handleNativeShare() {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    const text = `${post.authorName} on HatchUp: ${post.content}`;
-    if (typeof navigator !== "undefined" && (navigator as any).share) {
-      try { await (navigator as any).share({ title: "HatchUp", text, url }); } catch {}
-    } else if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(`${text}\n${url}`).then(() => toast({ title: "Copied to clipboard! 📋" }));
-    }
-  }
-
   const postTypeInfo = POST_TYPES.find(t => t.value === post.postType);
+
+  async function handleNativeShare() {
+    const url = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}` : "";
+    const tag = postTypeInfo ? `${postTypeInfo.icon} ${postTypeInfo.label}\n` : "";
+    const text = `${tag}${post.authorName} on HatchUp: ${post.content}`;
+    const canNativeShare =
+      typeof navigator !== "undefined" &&
+      typeof (navigator as any).share === "function";
+    if (canNativeShare) {
+      try {
+        await (navigator as any).share({ title: "HatchUp", text, url });
+        return;
+      } catch (err: any) {
+        if (err?.name === "AbortError") return;
+      }
+    }
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(`${text}\n${url}`);
+        toast({ title: "Link copied to clipboard! 📋", description: "Paste it anywhere to share." });
+        return;
+      } catch {}
+    }
+    toast({ title: "Could not share post", variant: "destructive" });
+  }
 
   async function handleComment(e: React.FormEvent) {
     e.preventDefault();
