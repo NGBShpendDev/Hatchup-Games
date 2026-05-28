@@ -556,9 +556,8 @@ export default function BattlePage() {
       setLastTurn(null);
       setPhase("result");
 
-      // Show the unified reward summary modal whenever the viewer wins, so
-      // battle victories funnel through the same celebratory loop as
-      // activity logs, meal logs, and challenge progress.
+      // Show the unified reward summary modal for both winner and loser so
+      // every match ends with a clear summary rather than an abrupt cut.
       const viewerWonBattle = endState.winner === yourSlot;
       if (viewerWonBattle) {
         const entries: RewardEntry[] = [];
@@ -580,21 +579,44 @@ export default function BattlePage() {
         if (stageUps > 0) entries.push({ kind: "hatchling", label: `${stageUps} artifact stage-up${stageUps === 1 ? "" : "s"}`, detail: "Power scaled up." });
         if (entries.length === 0) entries.push({ kind: "xp", label: "Victory!", detail: "GG — keep the streak alive." });
         setRewardSummary({ open: true, entries, title: "Victory Rewards" });
-        // Refetch authoritative hatchling state so the centralized
-        // EvolutionShareProvider watcher sees the post-battle level/stage
-        // (the server is the source of truth for XP grants). If the
-        // server's reward crosses an evolution threshold, the watcher
-        // fires the evolve mutation and surfaces the share prompt.
-        if (selectedHatchling) {
-          queryClient.invalidateQueries({
-            queryKey: getGetHatchlingQueryKey(selectedHatchling.id),
+      } else {
+        // Consolation summary for the losing player — encouraging, not punishing.
+        const entries: RewardEntry[] = [];
+        if (r.xp > 0) entries.push({ kind: "xp", label: "Consolation XP", value: r.xp, detail: "Every battle sharpens your Hatchling." });
+        if (r.coins > 0) entries.push({ kind: "artifact", label: "Coins", value: r.coins });
+        if (endState.mode === "ranked" && r.eloChange !== 0) {
+          entries.push({
+            kind: "leaderboard",
+            label: "ELO change",
+            value: (r.eloChange > 0 ? "+" : "") + r.eloChange,
+            detail: "Bounce back next match — the ladder rewards persistence.",
           });
         }
-        if (pid) {
-          queryClient.invalidateQueries({
-            queryKey: getListHatchlingsQueryKey({ playerId: pid }),
-          });
+        let stageUps = 0;
+        for (const g of gains) {
+          if (g.xpGained > 0) entries.push({ kind: "artifact", label: `Artifact #${g.artifactId} XP`, value: g.xpGained });
+          if (g.newStage > 1) stageUps += 1;
         }
+        if (stageUps > 0) entries.push({ kind: "hatchling", label: `${stageUps} artifact stage-up${stageUps === 1 ? "" : "s"}`, detail: "Power scaled up regardless." });
+        if (entries.length === 0) entries.push({ kind: "xp", label: "Almost!", detail: "One more match — you've got this." });
+        setRewardSummary({ open: true, entries, title: "Almost! Keep Going" });
+      }
+
+      // Refetch authoritative hatchling state so the centralized
+      // EvolutionShareProvider watcher sees the post-battle level/stage
+      // (the server is the source of truth for XP grants). If the
+      // server's reward crosses an evolution threshold, the watcher
+      // fires the evolve mutation and surfaces the share prompt.
+      // Run for both winner and loser — both sides may have earned XP.
+      if (selectedHatchling) {
+        queryClient.invalidateQueries({
+          queryKey: getGetHatchlingQueryKey(selectedHatchling.id),
+        });
+      }
+      if (pid) {
+        queryClient.invalidateQueries({
+          queryKey: getListHatchlingsQueryKey({ playerId: pid }),
+        });
       }
     }
     if (msg.type === "error") {
