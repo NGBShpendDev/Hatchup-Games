@@ -25,6 +25,7 @@ import { SubscriptionChip } from "@/components/subscription-chip";
 import { LevelUpOverlay } from "@/components/level-up-overlay";
 import { ArtifactUnlockOverlay, type UnlockedArtifact } from "@/components/artifact-unlock-overlay";
 import { ForYouStrip, type ForYouItem } from "@/components/for-you-strip";
+import { TrendingStrip } from "@/components/trending-strip";
 import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
 import { Bot as BotIcon, Salad as SaladIcon, Swords as SwordsIcon, Users as UsersIcon, Trophy as TrophyIcon, Egg as EggLucide } from "lucide-react";
 
@@ -517,6 +518,9 @@ export default function Home() {
             return items;
           })()}
         />
+
+        {/* Trending now — top 5 most-watched posts in the last 24h */}
+        <TrendingStrip playerId={pid} />
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4">
