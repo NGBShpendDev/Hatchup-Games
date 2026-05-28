@@ -159,6 +159,14 @@ export default function HatchlingDetail() {
   const prevStatsRef = useRef<{ happiness: number; energy: number } | null>(null);
   const [reaction, setReaction] = useState<HatchlingReactionData | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
+  // When the player just evolved their Pal, prefill the composer with a
+  // rich evolution_reveal payload so the share lands in the feed as the
+  // dedicated celebration card (sprite + stage badges + stat deltas)
+  // instead of a plain text post.
+  const [evolutionShare, setEvolutionShare] = useState<{
+    content: string;
+    metadata: Record<string, unknown>;
+  } | null>(null);
 
   useEffect(() => {
     if (!hatchling) return;
@@ -240,12 +248,16 @@ export default function HatchlingDetail() {
 
   const handleEvolve = () => {
     if (!hatchling) return;
+    const preStage = hatchling.evolutionStage ?? 1;
+    const preLevel = hatchling.level ?? 1;
+    const preXp = hatchling.xp ?? 0;
     evolveMutation.mutate(
       { id: hatchlingId, data: { triggerId: 1 } },
       {
         onSuccess: (res) => {
-          const newStage = (res as any)?.evolutionStage ?? (hatchling.evolutionStage ?? 1) + 1;
-          const realm = ((res as any)?.realm ?? hatchling.realm) as string | undefined;
+          const result = res as any;
+          const newStage = result?.evolutionStage ?? preStage + 1;
+          const realm = (result?.realm ?? hatchling.realm) as string | undefined;
           const realmCfg = realm ? REALM_CONFIG[realm] : undefined;
           enqueueEpicMoment({
             kind: "evolution",
@@ -255,6 +267,38 @@ export default function HatchlingDetail() {
             realmColor: realmCfg?.color,
             realmEmoji: realmCfg?.emoji,
           });
+          // Build the structured evolution_reveal share payload so the
+          // post lands in the feed as the dedicated celebration card.
+          const newLevel = result?.level ?? preLevel + 2;
+          const newXp = result?.xp ?? preXp + 500;
+          const statDeltas: Record<string, number> = {
+            level: newLevel - preLevel,
+            xp: newXp - preXp,
+          };
+          const toStageName = STAGE_LABELS[newStage]?.name;
+          const fromStageName = STAGE_LABELS[preStage]?.name;
+          const evolutionType = (result?.evolutionType ?? hatchling.evolutionType) as string | undefined;
+          const headline = evolutionType
+            ? `✨ ${hatchling.name} evolved into ${evolutionType}!`
+            : `✨ ${hatchling.name} just evolved!`;
+          const stageLine = toStageName
+            ? `Stage ${preStage} → Stage ${newStage} (${toStageName})`
+            : `Stage ${preStage} → Stage ${newStage}`;
+          setEvolutionShare({
+            content: `${headline}\n${stageLine}`,
+            metadata: {
+              hatchlingId: hatchling.id,
+              hatchlingName: hatchling.name,
+              fromStage: preStage,
+              toStage: newStage,
+              ...(fromStageName ? { fromStageName } : {}),
+              ...(toStageName ? { toStageName } : {}),
+              ...(realm ? { realm } : {}),
+              ...(result?.imageUrl ? { imageUrl: result.imageUrl as string } : hatchling.imageUrl ? { imageUrl: hatchling.imageUrl } : {}),
+              statDeltas,
+            },
+          });
+          setComposeOpen(true);
           toast({ title: "Evolution Complete!", description: `${hatchling.name} has reached Stage ${newStage}!` });
           queryClient.invalidateQueries({ queryKey: getGetHatchlingQueryKey(hatchlingId) });
         },
@@ -614,11 +658,13 @@ export default function HatchlingDetail() {
       {player && (
         <ComposeSheet
           open={composeOpen}
-          onClose={() => setComposeOpen(false)}
+          onClose={() => { setComposeOpen(false); setEvolutionShare(null); }}
           playerId={player.id}
           initialCreatureId={hatchling.id}
-          initialPostType="evolution"
-          title={`Share ${hatchling.name} ✨`}
+          initialPostType={evolutionShare ? "evolution_reveal" : "general"}
+          initialContent={evolutionShare?.content}
+          initialMetadata={evolutionShare?.metadata}
+          title={evolutionShare ? `Celebrate ${hatchling.name}'s evolution ✨` : `Share ${hatchling.name} ✨`}
         />
       )}
     </Layout>

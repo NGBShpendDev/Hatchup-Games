@@ -5781,8 +5781,13 @@ components:
             Structured payload that depends on `postType`. For
             `tournament_win`, expect `challengeId` (integer),
             `challengeTitle` (string), `bracketSize` (integer),
-            `boostedXp` (integer), and `boostedCoins` (integer). May be
-            null for post types that don't carry extra data.
+            `boostedXp` (integer), and `boostedCoins` (integer). For
+            `evolution_reveal`, expect `hatchlingId` (integer),
+            `hatchlingName` (string), `fromStage` (integer 1-3),
+            `toStage` (integer 1-3), optional `fromStageName` /
+            `toStageName` / `realm` / `imageUrl`, and `statDeltas`
+            (object of stat → delta numbers). May be null for post types
+            that don't carry extra data.
           nullable: true
           type: object
           additionalProperties: true
@@ -6202,12 +6207,17 @@ components:
             Structured payload that depends on `postType`. See `FeedPost.metadata`
             for the per-type shape (e.g. `tournament_win` carries `challengeId`,
             `challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`;
-            `artifact_unlock` carries `artifactId`, `artifactName`,
-            `artifactRarity`, `artifactLore`). The server validates this object
-            against a per-postType Zod schema at write time — payloads with
-            missing required keys or wrong types are rejected with `400`. For
-            `tournament_win`, the server also verifies the authenticated player
-            actually placed first (rank=1) in the referenced challenge.
+            `evolution_reveal` carries `hatchlingId`, `hatchlingName`,
+            `fromStage`, `toStage`, optional stage/realm/image fields, and
+            `statDeltas`; `artifact_unlock` carries `artifactId`,
+            `artifactName`, `artifactRarity`, `artifactLore`). The server
+            validates this object against a per-postType Zod schema at
+            write time — payloads with missing required keys or wrong
+            types are rejected with `400`. For `tournament_win`, the
+            server also verifies the authenticated player actually
+            placed first (rank=1) in the referenced challenge. For
+            `evolution_reveal`, the server enforces creature ownership
+            and that `toStage > fromStage`.
           nullable: true
           type: object
           additionalProperties: true

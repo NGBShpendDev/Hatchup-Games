@@ -37,6 +37,7 @@ export function ComposeSheet({
   initialPostType,
   initialContent,
   initialTags,
+  initialMetadata,
   title,
 }: {
   open: boolean;
@@ -46,6 +47,7 @@ export function ComposeSheet({
   initialPostType?: string;
   initialContent?: string;
   initialTags?: string;
+  initialMetadata?: Record<string, unknown> | null;
   title?: string;
 }) {
   const [content, setContent] = useState(initialContent ?? "");
@@ -107,6 +109,14 @@ export function ComposeSheet({
           mediaUrl: arDataUrl || mediaUrl || undefined,
           postType,
           creatureId: creatureId !== "none" ? Number(creatureId) : undefined,
+          // Only forward metadata when the post type still matches the
+          // type the metadata was prepared for, so a user editing the
+          // dropdown can't accidentally attach an evolution payload to
+          // a "general" post.
+          metadata:
+            initialMetadata && postType === (initialPostType ?? "general")
+              ? initialMetadata
+              : undefined,
         },
       });
       toast({ title: "Posted! 🎉", description: `+${POST_TYPES.find(t => t.value === postType)?.label ?? "post"} shared with the community.` });

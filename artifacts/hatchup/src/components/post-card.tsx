@@ -804,6 +804,112 @@ export function PostCard({
             </Link>
           )}
 
+          {/* Evolution-reveal celebration card — mirrors the in-app
+              evolution overlay (realm color, stage badge, stat deltas)
+              so the share reads as the same moment in the feed. */}
+          {post.postType === "evolution_reveal" && post.metadata && (() => {
+            const meta = post.metadata as {
+              hatchlingId?: number;
+              hatchlingName?: string;
+              fromStage?: number;
+              toStage?: number;
+              fromStageName?: string;
+              toStageName?: string;
+              realm?: string;
+              imageUrl?: string;
+              statDeltas?: Record<string, number>;
+            };
+            const realmTheme: Record<string, { border: string; bg: string; text: string; emoji: string; label: string }> = {
+              strength: { border: "border-red-400/60",    bg: "from-red-900/30 via-orange-900/20 to-black/40",     text: "text-red-200",    emoji: "🔥", label: "Strength" },
+              cardio:   { border: "border-cyan-400/60",   bg: "from-cyan-900/30 via-blue-900/20 to-black/40",      text: "text-cyan-200",   emoji: "⚡", label: "Cardio" },
+              balance:  { border: "border-purple-400/60", bg: "from-purple-900/30 via-fuchsia-900/20 to-black/40", text: "text-purple-200", emoji: "✨", label: "Balance" },
+              beast:    { border: "border-green-400/60",  bg: "from-green-900/30 via-emerald-900/20 to-black/40",  text: "text-green-200",  emoji: "🌿", label: "Beast" },
+              mythic:   { border: "border-pink-400/60",   bg: "from-pink-900/30 via-violet-900/20 to-black/40",    text: "text-pink-200",   emoji: "🌌", label: "Mythic" },
+            };
+            const theme = (meta.realm && realmTheme[meta.realm]) || {
+              border: "border-fuchsia-400/60",
+              bg: "from-fuchsia-900/30 via-violet-900/20 to-black/40",
+              text: "text-fuchsia-200",
+              emoji: "✨",
+              label: "Evolution",
+            };
+            const detailHref = meta.hatchlingId != null ? `/hatchlings/${meta.hatchlingId}` : null;
+            const card = (
+              <div
+                className={`relative overflow-hidden rounded-2xl border-2 ${theme.border} bg-gradient-to-br ${theme.bg} p-4 ${detailHref ? "cursor-pointer hover:scale-[1.01] transition-transform" : ""}`}
+                data-testid={`evolution-reveal-card-${post.id}`}
+              >
+                <div className="absolute -top-6 -right-6 opacity-20 text-7xl select-none" aria-hidden="true">
+                  {theme.emoji}
+                </div>
+                <div className="relative flex items-start gap-3">
+                  <div className={`flex items-center justify-center w-16 h-16 rounded-2xl bg-black/40 border ${theme.border} overflow-hidden shrink-0`}>
+                    {meta.imageUrl ? (
+                      <img
+                        src={meta.imageUrl}
+                        alt={meta.hatchlingName ?? "Evolved Pal"}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Sparkles className={`w-7 h-7 ${theme.text}`} />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <p className={`text-[10px] font-black uppercase tracking-widest ${theme.text}`}>
+                      {theme.label} Evolution
+                    </p>
+                    {meta.hatchlingName && (
+                      <p className="text-base font-black text-white truncate drop-shadow-[0_0_10px_rgba(255,255,255,0.25)]">
+                        {meta.hatchlingName}
+                      </p>
+                    )}
+                    {(meta.fromStage != null && meta.toStage != null) && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-black/40 text-white/80 text-[10px] font-bold">
+                          Stage {meta.fromStage}{meta.fromStageName ? ` · ${meta.fromStageName}` : ""}
+                        </span>
+                        <span className={`text-xs font-black ${theme.text}`}>→</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full bg-black/40 ${theme.text} text-[10px] font-black border ${theme.border}`}>
+                          Stage {meta.toStage}{meta.toStageName ? ` · ${meta.toStageName}` : ""}
+                        </span>
+                      </div>
+                    )}
+                    {meta.statDeltas && Object.keys(meta.statDeltas).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        {Object.entries(meta.statDeltas)
+                          .filter(([, v]) => typeof v === "number" && v !== 0)
+                          .map(([stat, delta]) => (
+                            <span
+                              key={stat}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/30 text-green-300 text-[11px] font-bold"
+                              data-testid={`evolution-stat-delta-${stat}-${post.id}`}
+                            >
+                              <Zap className="w-3 h-3" />
+                              {delta > 0 ? "+" : ""}{delta.toLocaleString()} {stat.toUpperCase()}
+                            </span>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {detailHref && (
+                  <Button
+                    size="sm"
+                    className={`w-full mt-3 bg-white/10 hover:bg-white/15 text-white font-black border ${theme.border}`}
+                    data-testid={`button-see-evolution-${post.id}`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 mr-1" /> See evolution
+                  </Button>
+                )}
+              </div>
+            );
+            return detailHref ? (
+              <Link href={detailHref}>{card}</Link>
+            ) : (
+              card
+            );
+          })()}
+
           {/* Tournament-win champion card */}
           {post.postType === "tournament_win" && post.metadata && (() => {
             const meta = post.metadata as {

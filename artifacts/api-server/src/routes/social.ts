@@ -50,6 +50,23 @@ import {
   FollowPlayerBody,
   RepostPostBody,
 } from "@workspace/api-zod";
+import { z } from "zod/v4";
+
+// ── Per-postType metadata validation ──────────────────────────────────────
+// `CreatePostBody.metadata` is intentionally an open record at the OpenAPI
+// layer (different post types carry different payloads). For structured
+// feed cards we validate the per-type shape here before persisting.
+const EvolutionRevealMetadata = z.object({
+  hatchlingId: z.number().int().positive(),
+  hatchlingName: z.string().min(1).max(80).optional(),
+  fromStage: z.number().int().min(1).max(3),
+  toStage: z.number().int().min(1).max(3),
+  fromStageName: z.string().min(1).max(40).optional(),
+  toStageName: z.string().min(1).max(40).optional(),
+  realm: z.string().min(1).max(40).optional(),
+  imageUrl: z.string().max(2048).optional(),
+  statDeltas: z.record(z.string(), z.number()).optional(),
+});
 
 const router = Router();
 
@@ -133,6 +150,7 @@ const TournamentWinMetadata = z.object({
 const POST_METADATA_SCHEMAS: Record<string, z.ZodType<Record<string, unknown>>> = {
   artifact_unlock: ArtifactUnlockMetadata,
   tournament_win: TournamentWinMetadata,
+  evolution_reveal: EvolutionRevealMetadata,
 };
 
 // ── Creator badge threshold ─────────────────────────────────────────────────
@@ -582,6 +600,39 @@ router.post("/social/posts", requireAuth, attachPlayer, socialWriteLimiter, bloc
       res.status(403).json({
         error: "Only the first-place finisher can post a tournament_win card",
         field: "metadata.challengeId",
+      });
+      return;
+    }
+  }
+
+  // evolution_reveal: the schema-validated metadata must reference a
+  // creature owned by this player, with a valid stage transition. If
+  // `creatureId` is also provided, the IDs must match.
+  if (postType === "evolution_reveal" && validatedMetadata) {
+    const hatchlingId = validatedMetadata.hatchlingId as number;
+    const fromStage = validatedMetadata.fromStage as number;
+    const toStage = validatedMetadata.toStage as number;
+    if (creatureId != null && creatureId !== hatchlingId) {
+      res.status(400).json({
+        error: "metadata.hatchlingId must match creatureId",
+        field: "metadata.hatchlingId",
+      });
+      return;
+    }
+    const owned = await db.query.hatchlingsTable.findFirst({
+      where: eq(hatchlingsTable.id, hatchlingId),
+    });
+    if (!owned || owned.playerId !== playerId) {
+      res.status(403).json({
+        error: "That creature does not belong to you",
+        field: "metadata.hatchlingId",
+      });
+      return;
+    }
+    if (toStage <= fromStage) {
+      res.status(400).json({
+        error: "toStage must be greater than fromStage",
+        field: "metadata.toStage",
       });
       return;
     }

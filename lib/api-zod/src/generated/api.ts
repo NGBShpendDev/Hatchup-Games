@@ -2263,7 +2263,7 @@ export const GetSocialFeedResponse = zod.object({
   "engagementScore": zod.number(),
   "viewCount": zod.number(),
   "createdAt": zod.string(),
-  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). May be\nnull for post types that don\'t carry extra data.\n'),
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). For\n`evolution_reveal`, expect `hatchlingId` (integer),\n`hatchlingName` (string), `fromStage` (integer 1-3),\n`toStage` (integer 1-3), optional `fromStageName` \/\n`toStageName` \/ `realm` \/ `imageUrl`, and `statDeltas`\n(object of stat → delta numbers). May be null for post types\nthat don\'t carry extra data.\n'),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),
   "encourage": zod.number().optional(),
@@ -2326,7 +2326,7 @@ export const GetTrendingPostsResponse = zod.object({
   "engagementScore": zod.number(),
   "viewCount": zod.number(),
   "createdAt": zod.string(),
-  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). May be\nnull for post types that don\'t carry extra data.\n'),
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). For\n`evolution_reveal`, expect `hatchlingId` (integer),\n`hatchlingName` (string), `fromStage` (integer 1-3),\n`toStage` (integer 1-3), optional `fromStageName` \/\n`toStageName` \/ `realm` \/ `imageUrl`, and `statDeltas`\n(object of stat → delta numbers). May be null for post types\nthat don\'t carry extra data.\n'),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),
   "encourage": zod.number().optional(),
@@ -2370,7 +2370,7 @@ export const CreatePostBody = zod.object({
   "mediaUrl": zod.string().optional(),
   "postType": zod.string().optional(),
   "creatureId": zod.number().optional(),
-  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. See `FeedPost.metadata`\nfor the per-type shape (e.g. `tournament_win` carries `challengeId`,\n`challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`;\n`artifact_unlock` carries `artifactId`, `artifactName`,\n`artifactRarity`, `artifactLore`). The server validates this object\nagainst a per-postType Zod schema at write time — payloads with\nmissing required keys or wrong types are rejected with `400`. For\n`tournament_win`, the server also verifies the authenticated player\nactually placed first (rank=1) in the referenced challenge.\n')
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. See `FeedPost.metadata`\nfor the per-type shape (e.g. `tournament_win` carries `challengeId`,\n`challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`;\n`evolution_reveal` carries `hatchlingId`, `hatchlingName`,\n`fromStage`, `toStage`, optional stage\/realm\/image fields, and\n`statDeltas`; `artifact_unlock` carries `artifactId`,\n`artifactName`, `artifactRarity`, `artifactLore`). The server\nvalidates this object against a per-postType Zod schema at\nwrite time — payloads with missing required keys or wrong\ntypes are rejected with `400`. For `tournament_win`, the\nserver also verifies the authenticated player actually\nplaced first (rank=1) in the referenced challenge. For\n`evolution_reveal`, the server enforces creature ownership\nand that `toStage > fromStage`.\n')
 })
 
 
@@ -2402,7 +2402,7 @@ export const GetPostResponse = zod.object({
   "engagementScore": zod.number(),
   "viewCount": zod.number(),
   "createdAt": zod.string(),
-  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). May be\nnull for post types that don\'t carry extra data.\n'),
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). For\n`evolution_reveal`, expect `hatchlingId` (integer),\n`hatchlingName` (string), `fromStage` (integer 1-3),\n`toStage` (integer 1-3), optional `fromStageName` \/\n`toStageName` \/ `realm` \/ `imageUrl`, and `statDeltas`\n(object of stat → delta numbers). May be null for post types\nthat don\'t carry extra data.\n'),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),
   "encourage": zod.number().optional(),
@@ -2799,7 +2799,7 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "engagementScore": zod.number(),
   "viewCount": zod.number(),
   "createdAt": zod.string(),
-  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). May be\nnull for post types that don\'t carry extra data.\n'),
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). For\n`evolution_reveal`, expect `hatchlingId` (integer),\n`hatchlingName` (string), `fromStage` (integer 1-3),\n`toStage` (integer 1-3), optional `fromStageName` \/\n`toStageName` \/ `realm` \/ `imageUrl`, and `statDeltas`\n(object of stat → delta numbers). May be null for post types\nthat don\'t carry extra data.\n'),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),
   "encourage": zod.number().optional(),
@@ -2845,7 +2845,7 @@ export const GetPlayerSocialProfileResponse = zod.object({
   "engagementScore": zod.number(),
   "viewCount": zod.number(),
   "createdAt": zod.string(),
-  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). May be\nnull for post types that don\'t carry extra data.\n'),
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). For\n`evolution_reveal`, expect `hatchlingId` (integer),\n`hatchlingName` (string), `fromStage` (integer 1-3),\n`toStage` (integer 1-3), optional `fromStageName` \/\n`toStageName` \/ `realm` \/ `imageUrl`, and `statDeltas`\n(object of stat → delta numbers). May be null for post types\nthat don\'t carry extra data.\n'),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),
   "encourage": zod.number().optional(),
@@ -3122,7 +3122,7 @@ export const GetDailyMemoryResponse = zod.union([zod.object({
   "engagementScore": zod.number(),
   "viewCount": zod.number(),
   "createdAt": zod.string(),
-  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). May be\nnull for post types that don\'t carry extra data.\n'),
+  "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. For\n`tournament_win`, expect `challengeId` (integer),\n`challengeTitle` (string), `bracketSize` (integer),\n`boostedXp` (integer), and `boostedCoins` (integer). For\n`evolution_reveal`, expect `hatchlingId` (integer),\n`hatchlingName` (string), `fromStage` (integer 1-3),\n`toStage` (integer 1-3), optional `fromStageName` \/\n`toStageName` \/ `realm` \/ `imageUrl`, and `statDeltas`\n(object of stat → delta numbers). May be null for post types\nthat don\'t carry extra data.\n'),
   "reactionCounts": zod.object({
   "like": zod.number().optional(),
   "encourage": zod.number().optional(),
