@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, useRoute } from "wouter";
+import { Link, useRoute, useLocation } from "wouter";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/layout";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -289,9 +293,22 @@ interface RivalrySummary {
   draws: number;
   viewerEloDelta: number;
   lastBattleAt: string | null;
+  lastBattleId: number | null;
+  opponentDisplayName: string | null;
+  opponentUsername: string | null;
+}
+
+interface RivalHatchlingLite {
+  id: number;
+  name: string;
+  level: number;
 }
 
 function RivalryCard({ viewerId, opponentId }: { viewerId: number; opponentId: number }) {
+  const [, navigate] = useLocation();
+  const [rematchOpen, setRematchOpen] = useState(false);
+  const [sending, setSending] = useState(false);
+
   const { data } = useQuery<RivalrySummary>({
     queryKey: ["rival-summary", viewerId, opponentId],
     queryFn: () =>
@@ -300,40 +317,131 @@ function RivalryCard({ viewerId, opponentId }: { viewerId: number; opponentId: n
     enabled: !!viewerId && opponentId > 0 && viewerId !== opponentId,
   });
 
+  const { data: myHatchlings = [] } = useQuery<RivalHatchlingLite[]>({
+    queryKey: ["hatchlings-rival-card", viewerId],
+    queryFn: () =>
+      fetch(`${BASE}/api/hatchlings?playerId=${viewerId}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!viewerId && rematchOpen,
+  });
+
   if (!data || data.totalBattles === 0) return null;
 
-  const { wins, losses, draws, viewerEloDelta, totalBattles } = data;
+  const { wins, losses, draws, viewerEloDelta, totalBattles, lastBattleId } = data;
   const eloLabel = viewerEloDelta > 0 ? `+${viewerEloDelta}` : `${viewerEloDelta}`;
   const eloClass = viewerEloDelta > 0 ? "text-green-400" : viewerEloDelta < 0 ? "text-red-400" : "text-muted-foreground";
+  const opponentName = data.opponentDisplayName ?? data.opponentUsername ?? "your rival";
+
+  async function sendRematch(hatchlingId: number) {
+    if (!lastBattleId) return;
+    setSending(true);
+    try {
+      const res = await fetch(`${BASE}/api/battles/rematch`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ battleId: lastBattleId, hatchlingId }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.error ?? "Could not send rematch");
+      toast({
+        title: "Rematch sent!",
+        description: `Waiting for ${opponentName}…`,
+      });
+      setRematchOpen(false);
+      navigate("/compete/battle");
+    } catch (err) {
+      toast({
+        title: "Could not send rematch",
+        description: String((err as Error).message),
+        variant: "destructive",
+      });
+    } finally {
+      setSending(false);
+    }
+  }
 
   return (
-    <Link href={`/compete/rivals/${opponentId}`}>
+    <>
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="block bg-card border border-border rounded-3xl p-4 hover:border-primary/60 transition-colors cursor-pointer"
+        className="block bg-card border border-border rounded-3xl p-4 hover:border-primary/60 transition-colors"
         data-testid="card-rivalry"
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Swords className="w-4 h-4 text-primary" />
-            <h2 className="font-black text-base text-white">Head to Head</h2>
+        <Link href={`/compete/rivals/${opponentId}`}>
+          <div className="cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Swords className="w-4 h-4 text-primary" />
+                <h2 className="font-black text-base text-white">Head to Head</h2>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div className="grid grid-cols-4 gap-2 mt-3">
+              <RivalStat label="Battles" value={String(totalBattles)} className="text-white" testId="rivalry-total" />
+              <RivalStat label="Wins" value={String(wins)} className="text-green-400" testId="rivalry-wins" />
+              <RivalStat label="Losses" value={String(losses)} className="text-red-400" testId="rivalry-losses" />
+              <RivalStat label="ELO" value={eloLabel} className={eloClass} testId="rivalry-elo" />
+            </div>
+            {draws > 0 && (
+              <p className="text-[10px] text-muted-foreground mt-2 text-center font-bold uppercase tracking-wider">
+                {draws} {draws === 1 ? "draw" : "draws"}
+              </p>
+            )}
           </div>
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-        </div>
-        <div className="grid grid-cols-4 gap-2 mt-3">
-          <RivalStat label="Battles" value={String(totalBattles)} className="text-white" testId="rivalry-total" />
-          <RivalStat label="Wins" value={String(wins)} className="text-green-400" testId="rivalry-wins" />
-          <RivalStat label="Losses" value={String(losses)} className="text-red-400" testId="rivalry-losses" />
-          <RivalStat label="ELO" value={eloLabel} className={eloClass} testId="rivalry-elo" />
-        </div>
-        {draws > 0 && (
-          <p className="text-[10px] text-muted-foreground mt-2 text-center font-bold uppercase tracking-wider">
-            {draws} {draws === 1 ? "draw" : "draws"}
-          </p>
+        </Link>
+        {lastBattleId && (
+          <Button
+            onClick={() => setRematchOpen(true)}
+            className="w-full mt-3 font-bold"
+            size="sm"
+            data-testid="button-rematch-profile"
+          >
+            <Swords className="w-4 h-4 mr-1.5" /> Rematch
+          </Button>
         )}
       </motion.div>
-    </Link>
+
+      <Dialog open={rematchOpen} onOpenChange={(open) => { if (!open) setRematchOpen(false); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rematch {opponentName}?</DialogTitle>
+            <DialogDescription>
+              You're {wins}–{losses}{draws > 0 ? `–${draws}` : ""} against them.
+              Pick a Hatchling to send into the arena.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-72 overflow-y-auto space-y-2">
+            {myHatchlings.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                You need a Hatchling first.
+              </p>
+            ) : (
+              myHatchlings.map(h => (
+                <button
+                  key={h.id}
+                  disabled={sending}
+                  onClick={() => sendRematch(h.id)}
+                  className="w-full flex items-center justify-between gap-3 rounded-xl border border-border bg-card/40 px-3 py-2.5 text-left hover:border-primary/50 hover:bg-primary/5 transition disabled:opacity-50"
+                  data-testid={`button-pick-hatchling-rematch-${h.id}`}
+                >
+                  <div className="min-w-0">
+                    <p className="font-bold truncate">{h.name}</p>
+                    <p className="text-[11px] text-muted-foreground">Lv. {h.level}</p>
+                  </div>
+                  <Swords className="w-4 h-4 text-primary shrink-0" />
+                </button>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRematchOpen(false)} disabled={sending}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
