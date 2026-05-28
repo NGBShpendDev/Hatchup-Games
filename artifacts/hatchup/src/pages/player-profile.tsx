@@ -8,7 +8,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { motion, Reorder } from "framer-motion";
 import { usePlayer } from "@/lib/playerContext";
 import { toast } from "@/hooks/use-toast";
-import { BadgeCheck, Flame, Trophy, Sparkles, ArrowLeft, Settings, GripVertical, X, Plus, Lock, BarChart3, Eye, Heart, MessageCircle, Repeat2, Crown } from "lucide-react";
+import { BadgeCheck, Flame, Trophy, Sparkles, ArrowLeft, Settings, GripVertical, X, Plus, Lock, BarChart3, Eye, Heart, MessageCircle, Repeat2, Crown, Ban } from "lucide-react";
 import { useGetMyPostInsights, getGetMyPostInsightsQueryKey } from "@workspace/api-client-react";
 import type { PostInsight } from "@workspace/api-client-react";
 import { useSubscription } from "@/lib/subscription";
@@ -66,6 +66,7 @@ interface PlayerProfile {
   currentStreak: number;
   totalWorkouts: number;
   isVerified: boolean;
+  isSuspended?: boolean;
   artifactShowcase: ShowcaseArtifact[];
   artifactCount: number;
 }
@@ -73,8 +74,9 @@ interface PlayerProfile {
 export default function PlayerProfilePage() {
   const [, params] = useRoute("/players/:id");
   const profileId = Number(params?.id);
-  const { playerId: viewerId } = usePlayer();
+  const { playerId: viewerId, player: viewer } = usePlayer();
   const isOwnProfile = viewerId === profileId;
+  const viewerIsAdmin = !!(viewer as { isAdmin?: boolean } | null)?.isAdmin;
 
   const qc = useQueryClient();
   const { data: profile, isLoading } = useQuery<PlayerProfile>({
@@ -210,7 +212,7 @@ export default function PlayerProfilePage() {
           <ProfileSkeleton />
         ) : (
           <>
-            <ProfileHeader profile={profile} />
+            <ProfileHeader profile={profile} viewerIsAdmin={viewerIsAdmin} />
             <ShowcaseStrip
               artifacts={profile.artifactShowcase}
               totalCount={profile.artifactCount}
@@ -231,7 +233,7 @@ export default function PlayerProfilePage() {
   );
 }
 
-function ProfileHeader({ profile }: { profile: PlayerProfile }) {
+function ProfileHeader({ profile, viewerIsAdmin }: { profile: PlayerProfile; viewerIsAdmin: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -259,6 +261,14 @@ function ProfileHeader({ profile }: { profile: PlayerProfile }) {
           {profile.isVerified && <BadgeCheck className="w-5 h-5 text-blue-400 fill-blue-400/20" />}
         </div>
         <p className="text-sm text-muted-foreground">@{profile.username}</p>
+        {viewerIsAdmin && profile.isSuspended && (
+          <div
+            className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/15 border border-red-500/40 text-red-300 text-[10px] font-black uppercase tracking-wider"
+            data-testid="badge-suspended"
+          >
+            <Ban className="w-3 h-3" /> Suspended
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-3 gap-3 pt-2">
         <Stat icon={<Trophy className="w-3.5 h-3.5" />} label="Level" value={profile.level} />

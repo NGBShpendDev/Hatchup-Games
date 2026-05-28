@@ -438,6 +438,32 @@ router.post("/email/resend-verification", requireAuth, attachPlayer, async (req,
   }
 });
 
+// ── Admin: list suspended accounts ──────────────────────────────────────────
+
+// GET /api/admin/players/suspended
+router.get("/admin/players/suspended", requireAuth, attachPlayer, async (req, res) => {
+  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!caller?.isAdmin) {
+    res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+  const rows = await db
+    .select({
+      id: playersTable.id,
+      username: playersTable.username,
+      displayName: playersTable.displayName,
+      avatarUrl: playersTable.avatarUrl,
+      suspendedAt: playersTable.suspendedAt,
+    })
+    .from(playersTable)
+    .where(eq(playersTable.isSuspended, true))
+    .orderBy(desc(playersTable.suspendedAt));
+  res.json(rows.map(r => ({
+    ...r,
+    suspendedAt: r.suspendedAt ? r.suspendedAt.toISOString() : null,
+  })));
+});
+
 // ── Admin: suspend / unsuspend account ──────────────────────────────────────
 
 // PATCH /api/admin/players/:id/suspend
@@ -465,12 +491,16 @@ router.patch("/admin/players/:id/suspend", requireAuth, attachPlayer, async (req
 
   const [updated] = await db
     .update(playersTable)
-    .set({ isSuspended: body.isSuspended })
+    .set({
+      isSuspended: body.isSuspended,
+      suspendedAt: body.isSuspended ? new Date() : null,
+    })
     .where(eq(playersTable.id, targetId))
     .returning({
       id: playersTable.id,
       username: playersTable.username,
       isSuspended: playersTable.isSuspended,
+      suspendedAt: playersTable.suspendedAt,
     });
   if (!updated) {
     res.status(404).json({ error: "Player not found" });

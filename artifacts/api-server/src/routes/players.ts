@@ -338,6 +338,7 @@ router.get("/players/:id/profile", requireAuth, async (req, res) => {
     currentStreak: player.currentStreak,
     totalWorkouts: player.totalWorkouts,
     isVerified: player.isVerified,
+    isSuspended: player.isSuspended,
     artifactShowcase: showcaseArtifacts,
     artifactCount: ownedArtifacts.length,
   });

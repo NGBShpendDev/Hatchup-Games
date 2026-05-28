@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { useToast } from "@/hooks/use-toast";
@@ -117,10 +118,15 @@ export default function AdminReports() {
           <div className="w-10 h-10 rounded-2xl bg-red-500/10 flex items-center justify-center border border-red-500/20">
             <Flag className="w-5 h-5 text-red-400" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="font-black text-2xl">Moderation Dashboard</h1>
             <p className="text-xs text-muted-foreground font-medium">Review and resolve user reports</p>
           </div>
+          <Link href="/admin/suspended">
+            <Button variant="ghost" size="sm" data-testid="link-admin-suspended">
+              <Ban className="w-3.5 h-3.5 mr-1" /> Suspended
+            </Button>
+          </Link>
         </div>
 
         {/* Filter tabs */}

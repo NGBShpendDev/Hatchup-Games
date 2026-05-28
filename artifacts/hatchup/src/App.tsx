@@ -23,6 +23,7 @@ import NotFound from "@/pages/not-found";
 import Rewards from "@/pages/rewards";
 import SettingsPrivacy from "@/pages/settings-privacy";
 import AdminReports from "@/pages/admin-reports";
+import AdminSuspended from "@/pages/admin-suspended";
 import SafetyGuidelines from "@/pages/safety-guidelines";
 import Coach from "@/pages/coach";
 import Records from "@/pages/records";
@@ -245,6 +246,7 @@ function AppRoutes() {
         <Route path="/rewards" component={Rewards} />
         <Route path="/settings/privacy" component={SettingsPrivacy} />
         <Route path="/admin/reports" component={AdminReports} />
+        <Route path="/admin/suspended" component={AdminSuspended} />
         <Route path="/safety/guidelines" component={SafetyGuidelines} />
         <Route path="/coach" component={Coach} />
         <Route path="/records" component={Records} />
