@@ -1,11 +1,13 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
-import { useQuery } from "@tanstack/react-query";
-import { Sparkles, Lock, Star, Zap, Shield, Trophy, ChevronDown, ChevronUp } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Sparkles, Lock, Star, Zap, Shield, Trophy, ChevronDown, ChevronUp, User } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 
@@ -68,6 +70,7 @@ interface FitnessBarEntry {
 export default function Artifacts() {
   const { playerId } = usePlayer();
   const pid = playerId ?? 0;
+  const qc = useQueryClient();
   const [expandedRarities, setExpandedRarities] = useState<Set<string>>(new Set(["Legendary", "Mythic", "Ancient", "Celestial", "Epic"]));
   const [expandedArtifact, setExpandedArtifact] = useState<number | null>(null);
 
@@ -76,6 +79,45 @@ export default function Artifacts() {
     queryFn: () => fetch(`${BASE}/api/artifacts`, { credentials: "include" }).then(r => r.json()),
     enabled: !!pid,
   });
+
+  const featuredCount = (museum ?? []).filter(a => a.isFeatured).length;
+  const MAX_FEATURED = 3;
+
+  const toggleFeatured = useMutation({
+    mutationFn: async ({ artifactId, isFeatured }: { artifactId: number; isFeatured: boolean }) => {
+      const res = await fetch(`${BASE}/api/players/me/artifacts/${artifactId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFeatured }),
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      return res.json();
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["artifacts-museum", pid] });
+      qc.invalidateQueries({ queryKey: ["player-profile", pid] });
+      toast({
+        title: vars.isFeatured ? "Featured on profile" : "Removed from showcase",
+        description: vars.isFeatured ? "This artifact now shines on your profile." : undefined,
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Couldn't update", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleToggleFeatured = (artifact: ArtifactEntry) => {
+    if (!artifact.isFeatured && featuredCount >= MAX_FEATURED) {
+      toast({
+        title: `Showcase full (${MAX_FEATURED} max)`,
+        description: "Unfeature one to feature another.",
+        variant: "destructive",
+      });
+      return;
+    }
+    toggleFeatured.mutate({ artifactId: artifact.id, isFeatured: !artifact.isFeatured });
+  };
 
   const { data: fitnessBars, isLoading: barsLoading } = useQuery<FitnessBarEntry[]>({
     queryKey: ["fitness-bars", pid],
@@ -110,6 +152,16 @@ export default function Artifacts() {
             <h1 className="text-3xl font-black tracking-tight text-white">Artifact Museum</h1>
           </div>
           <p className="text-muted-foreground text-sm">Legendary relics earned through elite fitness discipline.</p>
+          {pid > 0 && (
+            <Link href={`/players/${pid}`}>
+              <button
+                className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-full bg-card border border-border text-xs font-bold text-muted-foreground hover:text-white hover:border-primary/60 transition-all"
+                data-testid="link-view-profile"
+              >
+                <User className="w-3 h-3" /> View my profile
+              </button>
+            </Link>
+          )}
           {!museumLoading && (
             <div className="flex items-center justify-center gap-2 mt-3">
               <span className="text-sm font-bold text-yellow-400">{totalOwned}</span>
@@ -213,6 +265,8 @@ export default function Artifacts() {
                             styles={styles}
                             isExpanded={expandedArtifact === artifact.id}
                             onToggle={() => setExpandedArtifact(prev => prev === artifact.id ? null : artifact.id)}
+                            onToggleFeatured={() => handleToggleFeatured(artifact)}
+                            isToggling={toggleFeatured.isPending}
                           />
                         ))}
                       </div>
@@ -233,11 +287,15 @@ function ArtifactCard({
   styles,
   isExpanded,
   onToggle,
+  onToggleFeatured,
+  isToggling,
 }: {
   artifact: ArtifactEntry;
   styles: { glow: string; border: string; badge: string; text: string; bg: string };
   isExpanded: boolean;
   onToggle: () => void;
+  onToggleFeatured: () => void;
+  isToggling: boolean;
 }) {
   const discovered = artifact.discovered;
 
@@ -278,24 +336,41 @@ function ArtifactCard({
       </div>
 
       <AnimatePresence>
-        {isExpanded && discovered && artifact.abilities.length > 0 && (
+        {isExpanded && discovered && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className={`border-t ${styles.border} px-4 py-3 space-y-2`}
+            className={`border-t ${styles.border} px-4 py-3 space-y-3`}
           >
-            <p className="text-xs font-black uppercase tracking-wider text-muted-foreground">Active Abilities</p>
-            {artifact.abilities.map((ability, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <Zap className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${styles.text}`} />
-                <div>
-                  <p className={`text-xs font-bold ${styles.text}`}>{ability.name}</p>
-                  <p className="text-[11px] text-muted-foreground">{ability.description}</p>
-                </div>
-              </div>
-            ))}
+            {artifact.abilities.length > 0 && (
+              <>
+                <p className="text-xs font-black uppercase tracking-wider text-muted-foreground">Active Abilities</p>
+                {artifact.abilities.map((ability, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <Zap className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${styles.text}`} />
+                    <div>
+                      <p className={`text-xs font-bold ${styles.text}`}>{ability.name}</p>
+                      <p className="text-[11px] text-muted-foreground">{ability.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleFeatured(); }}
+              disabled={isToggling}
+              data-testid={`button-toggle-featured-${artifact.id}`}
+              className={`w-full mt-2 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${
+                artifact.isFeatured
+                  ? "bg-yellow-500/90 text-black hover:bg-yellow-400"
+                  : `${styles.bg} ${styles.text} border ${styles.border} hover:brightness-125`
+              }`}
+            >
+              <Star className={`w-3.5 h-3.5 ${artifact.isFeatured ? "fill-black" : ""}`} />
+              {artifact.isFeatured ? "Featured on Profile" : "Feature on Profile"}
+            </button>
             {artifact.earnedAt && (
               <p className="text-[10px] text-muted-foreground/60 pt-1">
                 Earned {new Date(artifact.earnedAt).toLocaleDateString()}

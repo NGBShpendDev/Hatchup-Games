@@ -35,6 +35,7 @@ import ChallengeCreate from "@/pages/challenge-create";
 import Onboarding from "@/pages/onboarding";
 import FamilyPage from "@/pages/family";
 import SubscriptionPage from "@/pages/subscription";
+import PlayerProfile from "@/pages/player-profile";
 
 const queryClient = new QueryClient();
 
@@ -232,6 +233,7 @@ function AppRoutes() {
         <Route path="/groups" component={Groups} />
         <Route path="/health-settings" component={HealthSettings} />
         <Route path="/hatchlings/:id" component={HatchlingDetail} />
+        <Route path="/players/:id" component={PlayerProfile} />
         <Route path="/compete/battle" component={Battle} />
         <Route path="/compete/race" component={Race} />
         <Route path="/rewards" component={Rewards} />
