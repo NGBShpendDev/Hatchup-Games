@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { userReportsTable, blockedUsersTable, playersTable, moderationAuditLogTable, notificationsTable } from "@workspace/db";
+import { userReportsTable, blockedUsersTable, playersTable, moderationAuditLogTable, notificationsTable, accountAppealsTable } from "@workspace/db";
 import { eq, and, desc, or, notInArray, inArray } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
@@ -112,7 +112,9 @@ type AuditAction =
   | "unverify"
   | "resolve_report"
   | "dismiss_report"
-  | "reopen_report";
+  | "reopen_report"
+  | "approve_appeal"
+  | "deny_appeal";
 
 async function writeAuditLog(entry: {
   actorId: number;
@@ -1048,5 +1050,211 @@ export async function filterDiscoverableCandidates<
       !p.isMinor,
   );
 }
+
+// ── Account appeals ─────────────────────────────────────────────────────────
+
+// In-app suspension appeals. A suspended player can submit one short message
+// explaining why they think the suspension was a mistake. Only one appeal can
+// be open ("pending") at a time per player; further attempts get 409 until an
+// admin resolves the existing one. Admins see appeals on the moderation page
+// and can approve (which also unsuspends the account) or deny.
+
+const APPEAL_MIN_LEN = 10;
+const APPEAL_MAX_LEN = 1000;
+
+function serializeAppeal(row: typeof accountAppealsTable.$inferSelect) {
+  return {
+    ...row,
+    createdAt: row.createdAt.toISOString(),
+    resolvedAt: row.resolvedAt ? row.resolvedAt.toISOString() : null,
+  };
+}
+
+// GET /api/account/appeals/mine — current player's most recent appeal (or null)
+router.get("/account/appeals/mine", requireAuth, attachPlayer, async (req, res) => {
+  const row = await db.query.accountAppealsTable.findFirst({
+    where: eq(accountAppealsTable.playerId, req.playerId!),
+    orderBy: [desc(accountAppealsTable.createdAt)],
+  });
+  res.json({ appeal: row ? serializeAppeal(row) : null });
+});
+
+// POST /api/account/appeals — suspended player submits an appeal
+// body: { message: string }
+router.post("/account/appeals", requireAuth, attachPlayer, async (req, res) => {
+  const player = await db.query.playersTable.findFirst({
+    where: eq(playersTable.id, req.playerId!),
+    columns: { id: true, isSuspended: true },
+  });
+  if (!player) {
+    res.status(404).json({ error: "Player not found" });
+    return;
+  }
+  if (!player.isSuspended) {
+    res.status(403).json({
+      error: "not_suspended",
+      message: "Only suspended accounts can submit an appeal.",
+    });
+    return;
+  }
+  const body = req.body as { message?: unknown };
+  const message = typeof body.message === "string" ? body.message.trim() : "";
+  if (message.length < APPEAL_MIN_LEN || message.length > APPEAL_MAX_LEN) {
+    res.status(400).json({
+      error: "invalid_message",
+      message: `Appeal message must be between ${APPEAL_MIN_LEN} and ${APPEAL_MAX_LEN} characters.`,
+    });
+    return;
+  }
+
+  // Enforce one open appeal at a time.
+  const existing = await db.query.accountAppealsTable.findFirst({
+    where: and(
+      eq(accountAppealsTable.playerId, player.id),
+      eq(accountAppealsTable.status, "pending"),
+    ),
+  });
+  if (existing) {
+    res.status(409).json({
+      error: "appeal_already_open",
+      message: "You already have an appeal under review. We'll get back to you soon.",
+      appeal: serializeAppeal(existing),
+    });
+    return;
+  }
+
+  try {
+    const [created] = await db
+      .insert(accountAppealsTable)
+      .values({ playerId: player.id, message, status: "pending" })
+      .returning();
+    res.status(201).json({ appeal: serializeAppeal(created) });
+  } catch (err) {
+    req.log.error(err, "submit appeal error");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/admin/appeals?status=
+router.get("/admin/appeals", requireAuth, attachPlayer, async (req, res) => {
+  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!caller?.isAdmin) {
+    res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+  const { status } = req.query as { status?: string };
+  const rows = status
+    ? await db
+        .select()
+        .from(accountAppealsTable)
+        .where(eq(accountAppealsTable.status, status))
+        .orderBy(desc(accountAppealsTable.createdAt))
+    : await db
+        .select()
+        .from(accountAppealsTable)
+        .orderBy(desc(accountAppealsTable.createdAt));
+
+  // Hydrate each row with a minimal player summary so admins can see who
+  // submitted the appeal without firing N follow-up requests from the UI.
+  const playerIds = Array.from(new Set(rows.map(r => r.playerId)));
+  const players = playerIds.length
+    ? await db
+        .select({
+          id: playersTable.id,
+          username: playersTable.username,
+          displayName: playersTable.displayName,
+          avatarUrl: playersTable.avatarUrl,
+          isSuspended: playersTable.isSuspended,
+          suspendedAt: playersTable.suspendedAt,
+        })
+        .from(playersTable)
+        .where(or(...playerIds.map(id => eq(playersTable.id, id))) as SQL)
+    : [];
+  const byId = new Map(players.map(p => [p.id, p]));
+  res.json(rows.map(r => {
+    const p = byId.get(r.playerId);
+    return {
+      ...serializeAppeal(r),
+      player: p
+        ? { ...p, suspendedAt: p.suspendedAt ? p.suspendedAt.toISOString() : null }
+        : null,
+    };
+  }));
+});
+
+// PATCH /api/admin/appeals/:id
+// body: { status: "approved" | "denied", reviewerNote?: string, unsuspend?: boolean }
+// Approving an appeal also unsuspends the player by default (set
+// unsuspend=false to approve without lifting the suspension, e.g. partial
+// resolutions). Denying never changes suspension state.
+router.patch("/admin/appeals/:id", requireAuth, attachPlayer, async (req, res) => {
+  const caller = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!caller?.isAdmin) {
+    res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const body = req.body as { status?: unknown; reviewerNote?: unknown; unsuspend?: unknown };
+  const status = typeof body.status === "string" ? body.status : "";
+  if (!["approved", "denied"].includes(status)) {
+    res.status(400).json({ error: "Invalid status" });
+    return;
+  }
+  const reviewerNote = typeof body.reviewerNote === "string"
+    ? body.reviewerNote.trim().slice(0, 1000) || null
+    : null;
+
+  const existing = await db.query.accountAppealsTable.findFirst({
+    where: eq(accountAppealsTable.id, id),
+  });
+  if (!existing) {
+    res.status(404).json({ error: "Appeal not found" });
+    return;
+  }
+  if (existing.status !== "pending") {
+    res.status(409).json({ error: "appeal_already_resolved" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(accountAppealsTable)
+    .set({
+      status,
+      reviewerId: caller.id,
+      reviewerNote,
+      resolvedAt: new Date(),
+    })
+    .where(eq(accountAppealsTable.id, id))
+    .returning();
+
+  const shouldUnsuspend = status === "approved" && body.unsuspend !== false;
+  if (shouldUnsuspend) {
+    await db
+      .update(playersTable)
+      .set({ isSuspended: false, suspendedAt: null })
+      .where(eq(playersTable.id, existing.playerId));
+    await writeAuditLog({
+      actorId: caller.id,
+      action: "unsuspend",
+      targetPlayerId: existing.playerId,
+      reason: reviewerNote,
+      metadata: { appealId: existing.id },
+    });
+  }
+
+  await writeAuditLog({
+    actorId: caller.id,
+    action: status === "approved" ? "approve_appeal" : "deny_appeal",
+    targetPlayerId: existing.playerId,
+    reason: reviewerNote,
+    metadata: { appealId: existing.id, unsuspended: shouldUnsuspend },
+  });
+
+  res.json({ appeal: serializeAppeal(updated), unsuspended: shouldUnsuspend });
+});
 
 export default router;

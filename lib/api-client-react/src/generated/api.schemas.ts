@@ -1407,6 +1407,11 @@ export interface DiscoverablePlayer {
   reasonDetail?: string | null;
   /** Groups that both the viewer and this player are members of. */
   sharedGroups: SharedGroup[];
+  /** Up to a small number of third players who have actually worked out
+  (logged a co-workout in a shared group) with BOTH the viewer and
+  this player. Optional — only populated on people-discovery surfaces.
+   */
+  mutualWorkoutPartners?: MutualWorkoutPartner[];
 }
 
 export interface MemoryPost {

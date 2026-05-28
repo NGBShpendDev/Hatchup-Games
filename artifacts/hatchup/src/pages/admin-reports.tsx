@@ -9,7 +9,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Shield, Flag, CheckCircle, X, AlertTriangle, User, Ban, Trash2, RotateCcw, Clock, ScrollText, Snowflake } from "lucide-react";
+import { Shield, Flag, CheckCircle, X, AlertTriangle, User, Ban, Trash2, RotateCcw, Clock, ScrollText, Snowflake, MessageSquare, ThumbsUp, ThumbsDown } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface AdminReport {
@@ -49,6 +49,24 @@ interface DeletedPost {
   engagementScore: number;
   viewCount: number;
   reports: DeletedPostReport[];
+}
+
+interface AdminAppeal {
+  id: number;
+  playerId: number;
+  message: string;
+  status: "pending" | "approved" | "denied" | string;
+  reviewerNote: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  player: {
+    id: number;
+    username: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    isSuspended: boolean;
+    suspendedAt: string | null;
+  } | null;
 }
 
 interface DeletedPostsResponse {
@@ -108,7 +126,7 @@ export default function AdminReports() {
   const { playerId, player } = usePlayer();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [tab, setTab] = useState<"reports" | "deleted" | "frozen">("reports");
+  const [tab, setTab] = useState<"reports" | "deleted" | "frozen" | "appeals">("reports");
   const [filter, setFilter] = useState<"open" | "resolved" | "dismissed" | "all">("open");
 
   const isAdmin = !!(player as { isAdmin?: boolean } | null)?.isAdmin;
@@ -124,6 +142,67 @@ export default function AdminReports() {
     },
     enabled: isAdmin && !!playerId && tab === "reports",
   });
+
+  const { data: appeals, isLoading: appealsLoading } = useQuery<AdminAppeal[]>({
+    queryKey: ["admin-appeals", playerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/appeals?status=pending`, { credentials: "include" });
+      if (!res.ok) throw new Error("Unauthorized");
+      return res.json();
+    },
+    enabled: isAdmin && !!playerId && tab === "appeals",
+  });
+
+  const { data: frozenData, isLoading: frozenLoading } = useQuery<{ posts: FrozenPost[] }>({
+    queryKey: ["admin-frozen-posts", playerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/social/frozen-posts`, { credentials: "include" });
+      if (!res.ok) throw new Error("Unauthorized");
+      return res.json();
+    },
+    enabled: isAdmin && !!playerId && tab === "frozen",
+  });
+
+  const handleUnfreeze = async (postId: number) => {
+    if (!confirm(`Unfreeze post #${postId}? Views will start accruing again.`)) return;
+    const res = await fetch(`/api/admin/social/posts/${postId}/unfreeze`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (res.ok) {
+      toast({ title: `Post #${postId} unfrozen`, description: "View counter is live again." });
+      qc.invalidateQueries({ queryKey: ["admin-frozen-posts"] });
+    } else {
+      const err = await res.json().catch(() => ({}));
+      toast({ title: "Failed to unfreeze", description: err.error ?? "Try again later", variant: "destructive" });
+    }
+  };
+
+  const handleAppealAction = async (appealId: number, status: "approved" | "denied", playerId: number) => {
+    const note = window.prompt(
+      status === "approved"
+        ? `Approve appeal #${appealId} and unsuspend player #${playerId}? Optional reviewer note:`
+        : `Deny appeal #${appealId}? Optional reviewer note shown to the user:`,
+      "",
+    );
+    if (note === null) return; // user cancelled
+    const res = await fetch(`/api/admin/appeals/${appealId}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, reviewerNote: note }),
+    });
+    if (res.ok) {
+      toast({
+        title: status === "approved" ? "Appeal approved" : "Appeal denied",
+        description: status === "approved" ? `Player #${playerId} unsuspended.` : undefined,
+      });
+      qc.invalidateQueries({ queryKey: ["admin-appeals"] });
+    } else {
+      const err = await res.json().catch(() => ({}));
+      toast({ title: "Action failed", description: err.error ?? "Try again later", variant: "destructive" });
+    }
+  };
 
   const { data: deletedData, isLoading: deletedLoading } = useQuery<DeletedPostsResponse>({
     queryKey: ["admin-deleted-posts", playerId],
@@ -310,6 +389,15 @@ export default function AdminReports() {
             }`}
           >
             Frozen
+          </button>
+          <button
+            onClick={() => setTab("appeals")}
+            data-testid="tab-appeals"
+            className={`px-4 py-2 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${
+              tab === "appeals" ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            Appeals
           </button>
         </div>
 
@@ -542,7 +630,7 @@ export default function AdminReports() {
               </div>
             )}
           </>
-        ) : (
+        ) : tab === "frozen" ? (
           <>
             <p className="text-xs text-muted-foreground font-medium">
               These posts had their view counts frozen by the automated abuse detector
@@ -610,6 +698,89 @@ export default function AdminReports() {
                             <RotateCcw className="w-3 h-3 mr-1" /> Unfreeze
                           </NeonButton>
                         </div>
+                      </div>
+                    </GlassCard>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground font-medium">
+              Suspended players can file an in-app appeal. Approving an appeal unsuspends the account by default.
+            </p>
+
+            {appealsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-28 w-full rounded-2xl" />)}
+              </div>
+            ) : !appeals || appeals.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 gap-2 text-muted-foreground">
+                <MessageSquare className="w-10 h-10 opacity-30" />
+                <p className="font-bold">No pending appeals</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {appeals.map((appeal) => (
+                  <motion.div
+                    key={appeal.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    <GlassCard className="p-4">
+                      <div className="relative z-10 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <MessageSquare className="w-4 h-4 text-amber-400 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="font-black text-sm truncate">
+                                {appeal.player?.displayName ?? appeal.player?.username ?? `Player #${appeal.playerId}`}
+                                {appeal.player?.username && (
+                                  <span className="text-muted-foreground font-medium"> @{appeal.player.username}</span>
+                                )}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground font-medium">
+                                Appeal #{appeal.id} · Submitted {formatRelative(appeal.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                          <GlowBadge tone={appeal.status === "pending" ? "yellow" : appeal.status === "approved" ? "green" : "violet"}>
+                            {appeal.status}
+                          </GlowBadge>
+                        </div>
+
+                        {appeal.player?.suspendedAt && (
+                          <p className="text-[11px] text-muted-foreground font-medium">
+                            Suspended on {new Date(appeal.player.suspendedAt).toLocaleDateString()}
+                          </p>
+                        )}
+
+                        <p className="text-xs whitespace-pre-wrap break-words bg-muted/30 px-3 py-2 rounded-xl">
+                          "{appeal.message}"
+                        </p>
+
+                        {appeal.status === "pending" && (
+                          <div className="flex gap-2 pt-1">
+                            <NeonButton
+                              size="sm"
+                              onClick={() => handleAppealAction(appeal.id, "approved", appeal.playerId)}
+                              className="flex-1"
+                              data-testid={`button-approve-appeal-${appeal.id}`}
+                            >
+                              <ThumbsUp className="w-3 h-3 mr-1" /> Approve & Unsuspend
+                            </NeonButton>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleAppealAction(appeal.id, "denied", appeal.playerId)}
+                              className="flex-1"
+                              data-testid={`button-deny-appeal-${appeal.id}`}
+                            >
+                              <ThumbsDown className="w-3 h-3 mr-1" /> Deny
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </GlassCard>
                   </motion.div>

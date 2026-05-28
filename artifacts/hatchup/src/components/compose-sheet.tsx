@@ -216,12 +216,9 @@ export function ComposeSheet({
               <p className="text-xs font-medium leading-relaxed text-destructive/90">
                 You can't create posts while your account is suspended. {SUSPENDED_COPY.body}
               </p>
-              <a
-                href={SUSPENDED_COPY.supportHref}
-                className="inline-block text-xs font-black text-destructive underline underline-offset-2 hover:opacity-80"
-              >
-                {SUSPENDED_COPY.cta}
-              </a>
+              <p className="text-[11px] font-bold text-destructive/80">
+                Use the &ldquo;{SUSPENDED_COPY.cta}&rdquo; button on the suspended banner at the top of any page to send your appeal to our moderation team.
+              </p>
             </div>
           </div>
         )}

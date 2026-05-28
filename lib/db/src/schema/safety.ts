@@ -88,3 +88,28 @@ export const emailResendAttemptsTable = pgTable(
 );
 
 export type EmailResendAttempt = typeof emailResendAttemptsTable.$inferSelect;
+
+// Suspension appeals submitted in-app by suspended players. Status is one of
+// "pending" | "approved" | "denied". A player may have at most one row in the
+// "pending" state at any time — the POST handler enforces this.
+export const accountAppealsTable = pgTable("account_appeals", {
+  id: serial("id").primaryKey(),
+  playerId: integer("player_id").notNull(),
+  message: text("message").notNull(),
+  status: text("status").notNull().default("pending"),
+  reviewerId: integer("reviewer_id"),
+  reviewerNote: text("reviewer_note"),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertAccountAppealSchema = createInsertSchema(accountAppealsTable).omit({
+  id: true,
+  createdAt: true,
+  resolvedAt: true,
+  reviewerId: true,
+  reviewerNote: true,
+  status: true,
+});
+export type InsertAccountAppeal = z.infer<typeof insertAccountAppealSchema>;
+export type AccountAppeal = typeof accountAppealsTable.$inferSelect;

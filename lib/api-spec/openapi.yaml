@@ -5527,6 +5527,14 @@ components:
           description: Groups that both the viewer and this player are members of.
           items:
             $ref: "#/components/schemas/SharedGroup"
+        mutualWorkoutPartners:
+          type: array
+          description: |
+            Up to a small number of third players who have actually worked out
+            (logged a co-workout in a shared group) with BOTH the viewer and
+            this player. Optional — only populated on people-discovery surfaces.
+          items:
+            $ref: "#/components/schemas/MutualWorkoutPartner"
 
     PlayerSocialProfile:
       type: object

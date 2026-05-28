@@ -2640,7 +2640,11 @@ export const DiscoverPlayersResponseItem = zod.object({
   "sharedGroups": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string()
-})).describe('Groups that both the viewer and this player are members of.')
+})).describe('Groups that both the viewer and this player are members of.'),
+  "mutualWorkoutPartners": zod.array(zod.object({
+  "id": zod.number(),
+  "displayName": zod.string()
+})).optional().describe('Up to a small number of third players who have actually worked out\n(logged a co-workout in a shared group) with BOTH the viewer and\nthis player. Optional — only populated on people-discovery surfaces.\n')
 })
 export const DiscoverPlayersResponse = zod.array(DiscoverPlayersResponseItem)
 
@@ -2667,7 +2671,11 @@ export const SearchDiscoverablePlayersResponseItem = zod.object({
   "sharedGroups": zod.array(zod.object({
   "id": zod.number(),
   "name": zod.string()
-})).describe('Groups that both the viewer and this player are members of.')
+})).describe('Groups that both the viewer and this player are members of.'),
+  "mutualWorkoutPartners": zod.array(zod.object({
+  "id": zod.number(),
+  "displayName": zod.string()
+})).optional().describe('Up to a small number of third players who have actually worked out\n(logged a co-workout in a shared group) with BOTH the viewer and\nthis player. Optional — only populated on people-discovery surfaces.\n')
 })
 export const SearchDiscoverablePlayersResponse = zod.array(SearchDiscoverablePlayersResponseItem)
 
