@@ -1,8 +1,19 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
-import { Crown, Check, Sparkles, Trophy, X, ExternalLink, ArrowLeft, Loader2 } from "lucide-react";
+import { Crown, Check, Sparkles, Trophy, X, ExternalLink, ArrowLeft, Loader2, Palette } from "lucide-react";
 import { useSubscription, useStartCheckout, useOpenPortal } from "@/lib/subscription";
 import { useToast } from "@/hooks/use-toast";
+
+const UPSELL_SOURCE_COPY: Record<string, { eyebrow: string; title: string; body: string; icon: "palette" | "crown" }> = {
+  accent: {
+    eyebrow: "Cosmetic upgrade",
+    title: "Unlock the full accent palette",
+    body: "Premium unlocks every share-card accent gradient plus 12 customization slots so your posts, profile, and club cards stand out.",
+    icon: "palette",
+  },
+};
+
+const COSMETIC_FEATURE = "Premium cosmetics + 12 customization slots";
 
 const FREE_FEATURES = [
   "Up to 6 Hatchlings in your roster",
@@ -27,7 +38,14 @@ export default function SubscriptionPage() {
   const portal = useOpenPortal();
   const { toast } = useToast();
 
-  // Show success/cancelled toast from Stripe redirect
+  const upsellSource = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const from = new URLSearchParams(window.location.search).get("from");
+    return from && UPSELL_SOURCE_COPY[from] ? from : null;
+  }, []);
+  const upsellCopy = upsellSource ? UPSELL_SOURCE_COPY[upsellSource] : null;
+
+  // Show success/cancelled toast from Stripe redirect, log upsell entry
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const status = params.get("status");
@@ -35,6 +53,12 @@ export default function SubscriptionPage() {
       toast({ title: "Welcome to Premium!", description: "Your subscription is active." });
     } else if (status === "cancelled") {
       toast({ title: "Checkout cancelled", description: "No charges were made." });
+    }
+    const from = params.get("from");
+    if (from) {
+      // Lightweight client-side tracking so we can measure conversion from upsell surfaces.
+      // eslint-disable-next-line no-console
+      console.info("[subscription] upsell_view", { from });
     }
   }, []);
 
@@ -80,6 +104,30 @@ export default function SubscriptionPage() {
       </header>
 
       <main className="max-w-md mx-auto px-4 pt-6 space-y-6">
+        {upsellCopy && !isPremium && (
+          <section
+            className="rounded-3xl p-5 border border-amber-400/30 bg-gradient-to-br from-amber-500/15 via-pink-500/10 to-violet-500/10"
+            data-testid={`banner-upsell-${upsellSource}`}
+          >
+            <div className="flex items-start gap-3">
+              <div className="shrink-0 w-10 h-10 rounded-2xl bg-amber-400/20 flex items-center justify-center">
+                {upsellCopy.icon === "palette" ? (
+                  <Palette className="w-5 h-5 text-amber-300" />
+                ) : (
+                  <Crown className="w-5 h-5 text-amber-300" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-300/80">
+                  {upsellCopy.eyebrow}
+                </p>
+                <h2 className="text-base font-black mt-0.5">{upsellCopy.title}</h2>
+                <p className="text-xs text-white/70 mt-1 leading-relaxed">{upsellCopy.body}</p>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* Status card */}
         <section
           className="rounded-3xl p-5 border border-white/10 bg-gradient-to-br from-pink-500/10 via-violet-500/10 to-transparent"
@@ -148,12 +196,23 @@ export default function SubscriptionPage() {
               <Crown className="w-4 h-4" /> Premium
             </h3>
             <ul className="space-y-2">
-              {PREMIUM_FEATURES.map(f => (
-                <li key={f} className="text-sm text-white/90 flex items-start gap-2">
-                  <Check className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  {f}
-                </li>
-              ))}
+              {PREMIUM_FEATURES.map(f => {
+                const highlight = upsellSource === "accent" && f === COSMETIC_FEATURE;
+                return (
+                  <li
+                    key={f}
+                    className={`text-sm flex items-start gap-2 ${
+                      highlight
+                        ? "text-amber-100 font-bold bg-amber-400/10 rounded-lg px-2 py-1 -mx-2 ring-1 ring-amber-400/30"
+                        : "text-white/90"
+                    }`}
+                    data-testid={highlight ? "feature-highlight-cosmetic" : undefined}
+                  >
+                    <Check className={`w-4 h-4 mt-0.5 flex-shrink-0 ${highlight ? "text-amber-300" : "text-emerald-400"}`} />
+                    {f}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </section>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useLocation } from "wouter";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { useToast } from "@/hooks/use-toast";
@@ -82,6 +83,7 @@ const LOCATION_OPTIONS = [
 export default function SettingsPrivacy() {
   const { playerId, player } = usePlayer();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const [locationVisibility, setLocationVisibility] = useState("city");
   const [requireApproval, setRequireApproval] = useState(false);
@@ -690,12 +692,17 @@ export default function SettingsPrivacy() {
                   <button
                     key={opt.id}
                     type="button"
-                    disabled={locked}
-                    onClick={() => setShareAccentColor(opt.id === "default" ? null : opt.id)}
+                    onClick={() => {
+                      if (locked) {
+                        setLocation("/subscription?from=accent");
+                        return;
+                      }
+                      setShareAccentColor(opt.id === "default" ? null : opt.id);
+                    }}
                     className={`group relative rounded-xl p-2 border-2 transition-all ${
                       isSelected ? "border-white scale-105" : "border-white/10 hover:border-white/30"
-                    } ${locked ? "opacity-50 cursor-not-allowed" : ""}`}
-                    aria-label={`${opt.name} accent${locked ? " (Premium)" : ""}`}
+                    } ${locked ? "opacity-60 cursor-pointer hover:opacity-80" : ""}`}
+                    aria-label={`${opt.name} accent${locked ? " (Premium — tap to upgrade)" : ""}`}
                     aria-pressed={isSelected}
                     data-testid={`accent-option-${opt.id}`}
                   >
@@ -715,10 +722,18 @@ export default function SettingsPrivacy() {
               })}
             </div>
             {accentTier === "free" && accentOptions.some((o) => o.premium) && (
-              <p className="text-[11px] text-amber-300/80 font-medium flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setLocation("/subscription?from=accent")}
+                className="w-full text-left text-[11px] text-amber-300/90 hover:text-amber-200 font-medium flex items-center gap-1 group"
+                data-testid="link-accent-upsell"
+              >
                 <Crown className="w-3 h-3" />
-                Unlock the full palette with HatchUp Premium.
-              </p>
+                <span className="underline-offset-2 group-hover:underline">
+                  Unlock the full palette with HatchUp Premium.
+                </span>
+                <ChevronRight className="w-3 h-3 opacity-70" />
+              </button>
             )}
           </div>
         </GlassCard>
