@@ -181,13 +181,17 @@ router.post("/players/me/location", requireAuth, attachPlayer, locationUpdateLim
   }
   const resolvedVisibility = requestedVisibility ?? playerRow?.locationVisibility ?? existing?.visibility ?? "city";
 
-  // Build the update payload using the inferred Drizzle type
+  // Build the update payload using the inferred Drizzle type.
+  // Geographic fields (city/state/county/country) fall back to the existing
+  // record so that a failed Nominatim call or a coordinates-only update never
+  // silently wipes the city the player already set — which would cause
+  // GET /players/nearby to return locationRequired:true on subsequent requests.
   const base: Partial<typeof playerLocationTable.$inferInsert> = {
-    country:     derived.country     ?? null,
-    countryCode: derived.countryCode ?? null,
-    state:       derived.state       ?? null,
-    county:      derived.county      ?? null,
-    city:        derived.city        ?? null,
+    country:     derived.country     ?? existing?.country     ?? null,
+    countryCode: derived.countryCode ?? existing?.countryCode ?? null,
+    state:       derived.state       ?? existing?.state       ?? null,
+    county:      derived.county      ?? existing?.county      ?? null,
+    city:        derived.city        ?? existing?.city        ?? null,
     visibility:  resolvedVisibility,
     updatedAt:   new Date(),
   };
