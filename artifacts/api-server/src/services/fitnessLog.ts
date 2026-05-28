@@ -6,7 +6,7 @@ import {
   eggsTable,
   personalRecordsTable,
 } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sum } from "drizzle-orm";
 import { checkAndAwardBadges, type BadgeDefinition } from "./badgeService";
 
 export const STRENGTH_TYPES = new Set(["pushups", "burpees", "squats", "pullups", "planks", "situps"]);
@@ -15,28 +15,33 @@ export const ACTIVITY_CONFIG: Record<
   string,
   { unit: string; xpPer: number; realm: string; stepsEquiv: number }
 > = {
-  steps:         { unit: "steps",   xpPer: 0.05, realm: "cardio",   stepsEquiv: 1 },
-  running:       { unit: "minutes", xpPer: 8,    realm: "cardio",   stepsEquiv: 150 },
-  walking:       { unit: "minutes", xpPer: 4,    realm: "cardio",   stepsEquiv: 100 },
-  cycling:       { unit: "minutes", xpPer: 6,    realm: "cardio",   stepsEquiv: 80 },
-  weightlifting: { unit: "minutes", xpPer: 7,    realm: "strength", stepsEquiv: 60 },
-  hiit:          { unit: "minutes", xpPer: 10,   realm: "beast",    stepsEquiv: 200 },
-  yoga:          { unit: "minutes", xpPer: 4,    realm: "balance",  stepsEquiv: 40 },
-  meditation:    { unit: "minutes", xpPer: 3,    realm: "balance",  stepsEquiv: 30 },
-  sleep:         { unit: "hours",   xpPer: 15,   realm: "balance",  stepsEquiv: 200 },
-  hydration:     { unit: "cups",    xpPer: 5,    realm: "balance",  stepsEquiv: 25 },
-  stretching:    { unit: "minutes", xpPer: 3,    realm: "balance",  stepsEquiv: 30 },
-  swimming:      { unit: "minutes", xpPer: 7,    realm: "beast",    stepsEquiv: 120 },
-  active_minutes: { unit: "minutes", xpPer: 3,   realm: "cardio",   stepsEquiv: 80 },
-  calories:      { unit: "kcal",   xpPer: 0.01, realm: "cardio",   stepsEquiv: 0.1 },
+  steps:          { unit: "steps",   xpPer: 0.05, realm: "cardio",   stepsEquiv: 1 },
+  running:        { unit: "minutes", xpPer: 8,    realm: "cardio",   stepsEquiv: 150 },
+  walking:        { unit: "minutes", xpPer: 4,    realm: "cardio",   stepsEquiv: 100 },
+  cycling:        { unit: "minutes", xpPer: 6,    realm: "cardio",   stepsEquiv: 80 },
+  weightlifting:  { unit: "minutes", xpPer: 7,    realm: "strength", stepsEquiv: 60 },
+  hiit:           { unit: "minutes", xpPer: 10,   realm: "beast",    stepsEquiv: 200 },
+  yoga:           { unit: "minutes", xpPer: 4,    realm: "balance",  stepsEquiv: 40 },
+  meditation:     { unit: "minutes", xpPer: 3,    realm: "balance",  stepsEquiv: 30 },
+  sleep:          { unit: "hours",   xpPer: 15,   realm: "balance",  stepsEquiv: 200 },
+  hydration:      { unit: "cups",    xpPer: 5,    realm: "balance",  stepsEquiv: 25 },
+  stretching:     { unit: "minutes", xpPer: 3,    realm: "balance",  stepsEquiv: 30 },
+  swimming:       { unit: "minutes", xpPer: 7,    realm: "beast",    stepsEquiv: 120 },
+  active_minutes: { unit: "minutes", xpPer: 3,    realm: "cardio",   stepsEquiv: 80 },
+  calories:       { unit: "kcal",    xpPer: 0.01, realm: "cardio",   stepsEquiv: 0.1 },
   // Strength rep challenges — 1 rep = 1 XP
-  pushups:       { unit: "reps",   xpPer: 1,    realm: "strength", stepsEquiv: 2 },
-  burpees:       { unit: "reps",   xpPer: 1,    realm: "beast",    stepsEquiv: 5 },
-  squats:        { unit: "reps",   xpPer: 1,    realm: "strength", stepsEquiv: 2 },
-  pullups:       { unit: "reps",   xpPer: 1,    realm: "strength", stepsEquiv: 3 },
-  planks:        { unit: "reps",   xpPer: 1,    realm: "strength", stepsEquiv: 1 },
-  situps:        { unit: "reps",   xpPer: 1,    realm: "strength", stepsEquiv: 2 },
+  pushups:        { unit: "reps",    xpPer: 1,    realm: "strength", stepsEquiv: 2 },
+  burpees:        { unit: "reps",    xpPer: 1,    realm: "beast",    stepsEquiv: 5 },
+  squats:         { unit: "reps",    xpPer: 1,    realm: "strength", stepsEquiv: 2 },
+  pullups:        { unit: "reps",    xpPer: 1,    realm: "strength", stepsEquiv: 3 },
+  planks:         { unit: "reps",    xpPer: 1,    realm: "strength", stepsEquiv: 1 },
+  situps:         { unit: "reps",    xpPer: 1,    realm: "strength", stepsEquiv: 2 },
 };
+
+// Approximate miles per minute for running (avg 10 min/mile pace → 0.1 mi/min)
+const RUNNING_MILES_PER_MINUTE = 0.1;
+// Approximate miles per minute for cycling (avg ~15 mph → 0.25 mi/min)
+const CYCLING_MILES_PER_MINUTE = 0.25;
 
 export type LogActivityParams = {
   playerId: number;
@@ -60,11 +65,11 @@ export type LogActivityResult = {
   isNew: boolean;
   updatedPlayer: typeof playersTable.$inferSelect;
   activity: typeof fitnessActivitiesTable.$inferSelect | null;
-  newBadges?: import("./badgeService").BadgeDefinition[];
+  newBadges?: BadgeDefinition[];
   prResult?: PrResult;
 };
 
-/** Detect and upsert a personal record. Returns whether it's a new PR. */
+/** Upsert a personal record. Returns whether it is a new/improved PR. */
 async function detectAndSavePr(
   playerId: number,
   activityType: string,
@@ -83,15 +88,32 @@ async function detectAndSavePr(
   const isNew = !existing || (higherIsBetter ? value > existing.value : value < existing.value);
 
   if (isNew) {
-    await db.insert(personalRecordsTable)
+    await db
+      .insert(personalRecordsTable)
       .values({ playerId, activityType, metric, value })
       .onConflictDoUpdate({
-        target: [personalRecordsTable.playerId, personalRecordsTable.activityType, personalRecordsTable.metric],
+        target: [
+          personalRecordsTable.playerId,
+          personalRecordsTable.activityType,
+          personalRecordsTable.metric,
+        ],
         set: { value, achievedAt: new Date() },
       });
   }
 
   return { activityType, metric, value, isNew };
+}
+
+/** Compute cumulative running miles for a player from all activity logs. */
+async function getCumulativeRunMiles(playerId: number): Promise<number> {
+  const rows = await db.query.fitnessActivitiesTable.findMany({
+    where: and(
+      eq(fitnessActivitiesTable.playerId, playerId),
+      eq(fitnessActivitiesTable.type, "running"),
+    ),
+  });
+  const totalMinutes = rows.reduce((s, r) => s + r.value, 0);
+  return totalMinutes * RUNNING_MILES_PER_MINUTE;
 }
 
 export async function logFitnessActivity(
@@ -125,16 +147,19 @@ export async function logFitnessActivity(
   const stepsEquiv = Math.round(value * config.stepsEquiv);
   const isStrength = STRENGTH_TYPES.has(type);
 
-  const insertedRows = await db.insert(fitnessActivitiesTable).values({
-    playerId,
-    type,
-    value,
-    unit: config.unit,
-    fitnessXpEarned,
-    realm: config.realm,
-    note: note ?? null,
-    externalId: externalId ?? null,
-  }).returning();
+  const insertedRows = await db
+    .insert(fitnessActivitiesTable)
+    .values({
+      playerId,
+      type,
+      value,
+      unit: config.unit,
+      fitnessXpEarned,
+      realm: config.realm,
+      note: note ?? null,
+      externalId: externalId ?? null,
+    })
+    .returning();
 
   const player = await db.query.playersTable.findFirst({
     where: eq(playersTable.id, playerId),
@@ -152,7 +177,12 @@ export async function logFitnessActivity(
     newStreak = lastActive === yesterdayStr ? player.currentStreak + 1 : 1;
   }
 
-  const isWorkout = type !== "steps" && type !== "hydration" && type !== "sleep" && type !== "calories" && type !== "active_minutes";
+  const isWorkout =
+    type !== "steps" &&
+    type !== "hydration" &&
+    type !== "sleep" &&
+    type !== "calories" &&
+    type !== "active_minutes";
 
   const updateFields: Partial<typeof playersTable.$inferInsert> & Record<string, unknown> = {
     fitnessXp: player.fitnessXp + fitnessXpEarned,
@@ -164,22 +194,23 @@ export async function logFitnessActivity(
     lastActiveDate: today,
   };
 
-  // Update per-exercise lifetime counts
+  // Update per-exercise lifetime counts for strength activities
   if (isStrength) {
     updateFields.totalReps = (player.totalReps ?? 0) + value;
-    if (type === "pushups")  updateFields.lifetimePushups = (player.lifetimePushups ?? 0) + value;
-    if (type === "squats")   updateFields.lifetimeSquats  = (player.lifetimeSquats  ?? 0) + value;
-    if (type === "burpees")  updateFields.lifetimeBurpees = (player.lifetimeBurpees ?? 0) + value;
-    if (type === "pullups")  updateFields.lifetimePullups = (player.lifetimePullups ?? 0) + value;
-    if (type === "planks")   updateFields.lifetimePlanks  = (player.lifetimePlanks  ?? 0) + value;
-    if (type === "situps")   updateFields.lifetimeSitups  = (player.lifetimeSitups  ?? 0) + value;
+    if (type === "pushups") updateFields.lifetimePushups = (player.lifetimePushups ?? 0) + value;
+    if (type === "squats")  updateFields.lifetimeSquats  = (player.lifetimeSquats  ?? 0) + value;
+    if (type === "burpees") updateFields.lifetimeBurpees = (player.lifetimeBurpees ?? 0) + value;
+    if (type === "pullups") updateFields.lifetimePullups = (player.lifetimePullups ?? 0) + value;
+    if (type === "planks")  updateFields.lifetimePlanks  = (player.lifetimePlanks  ?? 0) + value;
+    if (type === "situps")  updateFields.lifetimeSitups  = (player.lifetimeSitups  ?? 0) + value;
   }
 
   if (isPassiveSync) {
     updateFields.passiveXpSinceLastVisit = (player.passiveXpSinceLastVisit ?? 0) + fitnessXpEarned;
   }
 
-  const updatedRows = await db.update(playersTable)
+  const updatedRows = await db
+    .update(playersTable)
     .set(updateFields)
     .where(eq(playersTable.id, playerId))
     .returning();
@@ -191,7 +222,8 @@ export async function logFitnessActivity(
     });
     for (const egg of activeEggs) {
       const newProgress = Math.min(egg.stepsRequired, egg.stepsProgress + stepsEquiv);
-      await db.update(eggsTable)
+      await db
+        .update(eggsTable)
         .set({ stepsProgress: newProgress })
         .where(eq(eggsTable.id, egg.id));
       eggsUpdated++;
@@ -207,20 +239,39 @@ export async function logFitnessActivity(
   });
   for (const quest of activeQuests) {
     const newValue = Math.min(quest.targetValue, quest.currentValue + value);
-    await db.update(fitnessQuestsTable)
+    await db
+      .update(fitnessQuestsTable)
       .set({ currentValue: newValue, isCompleted: newValue >= quest.targetValue })
       .where(eq(fitnessQuestsTable.id, quest.id));
   }
 
-  // Detect PR for this activity
+  // --- PR Detection ---
   const updatedPlayer = updatedRows[0]!;
   let prResult: PrResult | undefined;
 
   if (isStrength) {
+    // Track best reps in a single session per exercise
     prResult = await detectAndSavePr(playerId, type, "reps", value, true);
+  } else if (type === "running") {
+    // Track best single running session (minutes = proxy for distance)
+    prResult = await detectAndSavePr(playerId, "running", "session_minutes", value, true);
+  } else if (type === "cycling") {
+    // Track best single cycling session
+    prResult = await detectAndSavePr(playerId, "cycling", "session_minutes", value, true);
   }
 
-  // Check and award badges based on updated state
+  // Compute cumulative running miles for badge checks (runs once after a running log)
+  let cumulativeRunMiles: number | undefined;
+  if (type === "running") {
+    cumulativeRunMiles = await getCumulativeRunMiles(playerId);
+  }
+
+  // Estimate pace badge based on session effort: a 60+ min session → likely sub-10 pace
+  // A 45 min session → approx sub-8 pace assumption for engaged runners
+  const runPaceBadgeTrigger =
+    type === "running" ? (value >= 45 ? 7.9 : value >= 60 ? 5.9 : undefined) : undefined;
+
+  // Check and award badges
   const activityHour = new Date().getHours();
   const newBadges = await checkAndAwardBadges(playerId, {
     totalSteps: updatedPlayer.totalSteps,
@@ -232,7 +283,17 @@ export async function logFitnessActivity(
     lifetimeSquats: updatedPlayer.lifetimeSquats ?? 0,
     sessionReps: isStrength ? value : 0,
     activityType: type,
+    cumulativeRunMiles,
+    paceMinsPerMile: runPaceBadgeTrigger,
   });
 
-  return { fitnessXpEarned, eggsUpdated, isNew: true, updatedPlayer, activity: insertedRows[0]!, newBadges, prResult };
+  return {
+    fitnessXpEarned,
+    eggsUpdated,
+    isNew: true,
+    updatedPlayer,
+    activity: insertedRows[0]!,
+    newBadges,
+    prResult,
+  };
 }

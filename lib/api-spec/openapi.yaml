@@ -1818,6 +1818,14 @@ components:
         player:           { $ref: "#/components/schemas/Player" }
         groupBonusXp:     { type: integer }
         groupXpBonusPct:  { type: integer }
+        prResult:
+          nullable: true
+          type: object
+          properties:
+            activityType: { type: string }
+            metric:       { type: string }
+            value:        { type: integer }
+            isNew:        { type: boolean }
 
     FitnessQuest:
       type: object

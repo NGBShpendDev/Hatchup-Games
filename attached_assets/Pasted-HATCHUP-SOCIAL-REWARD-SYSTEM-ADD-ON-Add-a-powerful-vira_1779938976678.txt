@@ -1,0 +1,130 @@
+HATCHUP SOCIAL REWARD SYSTEM ADD-ON
+
+Add a powerful viral social-sharing reward system to HatchUp Fitness Pals that encourages users to naturally promote the game while earning in-game rewards.
+
+The system should feel rewarding, fun, and highly shareable without becoming spammy.
+
+====================================
+SOCIAL SHARE REWARD SYSTEM
+====================================
+
+Users can earn rewards by:
+- sharing HatchUp creatures
+- sharing avatar screenshots
+- posting workout progress
+- posting evolution reveals
+- sharing livestream moments
+- inviting friends to download HatchUp
+- posting achievements to social media
+
+Supported platforms:
+- TikTok
+- Instagram
+- Snapchat
+- X/Twitter
+- Facebook
+- YouTube Shorts
+- Discord
+
+====================================
+DAILY SHARE LIMITS
+====================================
+
+To prevent abuse and spam:
+- social media reward shares can only be rewarded once per day
+- friend referral rewards are capped at 20 successful invites
+- duplicate or fake accounts should not count
+- AI fraud detection should monitor abuse
+
+Only verified:
+- app installs
+- account creations
+- active users
+should count toward referral rewards.
+
+====================================
+REWARD TYPES
+====================================
+
+Users can earn:
+- coins
+- XP
+- rare eggs
+- cosmetics
+- streak boosts
+- evolution shards
+- profile badges
+- exclusive emotes
+- limited-time accessories
+
+Rare viral rewards:
+- social influencer badge
+- creator aura effects
+- legendary creator eggs
+- exclusive livestream cosmetics
+
+====================================
+SHAREABLE CONTENT SYSTEM
+====================================
+
+Automatically generate highly shareable content:
+- creature evolution clips
+- avatar victory animations
+- workout achievement cards
+- transformation posts
+- livestream highlights
+- leaderboard wins
+- streak milestones
+
+Include:
+- one-click sharing
+- auto-generated captions
+- hashtag suggestions
+- trending audio integration
+- vertical short-form video support
+
+====================================
+REFERRAL SYSTEM
+====================================
+
+Users can:
+- invite friends using referral codes
+- build referral streaks
+- unlock referral milestones
+- earn exclusive rewards for successful invites
+
+Milestone examples:
+- Invite 1 friend = coins
+- Invite 5 friends = rare egg
+- Invite 10 friends = exclusive cosmetic
+- Invite 20 friends = legendary founder-style reward
+
+Friends who join also receive:
+- starter rewards
+- beginner boosts
+- exclusive welcome cosmetics
+
+====================================
+SOCIAL COMPETITION
+====================================
+
+Encourage community engagement through:
+- social sharing leaderboards
+- creator rankings
+- viral challenge events
+- community competitions
+- monthly creator spotlights
+
+====================================
+SAFETY & QUALITY CONTROL
+====================================
+
+Include:
+- anti-spam systems
+- fake account detection
+- bot prevention
+- moderation tools
+- safe sharing settings for minors
+- privacy controls
+
+The system should reward authentic community growth while helping HatchUp spread virally across social media platforms in a fun and positive way.

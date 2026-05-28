@@ -389,6 +389,13 @@ export interface LogActivityInput {
   groupId?: number;
 }
 
+export type ActivityLogResultPrResult = {
+  activityType?: string;
+  metric?: string;
+  value?: number;
+  isNew?: boolean;
+} | null;
+
 export interface ActivityLogResult {
   activity: FitnessActivity;
   fitnessXpEarned: number;
@@ -396,6 +403,7 @@ export interface ActivityLogResult {
   player: Player;
   groupBonusXp?: number;
   groupXpBonusPct?: number;
+  prResult?: ActivityLogResultPrResult;
 }
 
 export interface FitnessQuest {

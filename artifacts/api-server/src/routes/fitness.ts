@@ -229,6 +229,7 @@ router.post("/fitness/log", requireAuth, attachPlayer, requirePlayerOwnership, a
     player: result.updatedPlayer,
     groupBonusXp: groupBonusXp > 0 ? groupBonusXp : undefined,
     groupXpBonusPct: groupXpBonusPct > 0 ? groupXpBonusPct : undefined,
+    prResult: result.prResult ?? null,
   });
 });
 

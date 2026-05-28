@@ -6,8 +6,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, Star, Flame, Zap, Gift, Lock, CheckCircle2, Crown } from "lucide-react";
+import { Trophy, Star, Flame, Zap, Gift, Lock, CheckCircle2, Crown, TrendingUp, Dumbbell, Footprints } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 
 const TIER_COLORS: Record<string, string> = {
   Common:    "from-gray-500 to-gray-400 border-gray-400",
@@ -201,6 +202,32 @@ export default function Rewards() {
             )}
           </motion.div>
         )}
+
+        {/* My Records Card */}
+        <Link href="/records" asChild>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-3xl border-2 border-primary/40 bg-gradient-to-br from-primary/10 to-pink-900/10 p-5 cursor-pointer hover:border-primary/70 transition-all active:scale-[0.98]"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h2 className="font-black text-base">My Personal Records</h2>
+                  <p className="text-xs text-muted-foreground font-semibold">PRs · Strength totals · Run miles</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Dumbbell className="w-4 h-4 text-muted-foreground" />
+                <Footprints className="w-4 h-4 text-muted-foreground" />
+                <span className="text-primary font-black text-lg">›</span>
+              </div>
+            </div>
+          </motion.div>
+        </Link>
 
         {/* Streak freeze counter */}
         {/* Badge Collection */}
