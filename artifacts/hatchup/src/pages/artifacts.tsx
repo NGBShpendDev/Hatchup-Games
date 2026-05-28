@@ -18,6 +18,7 @@ import {
   getGetMyFitnessBarsQueryKey,
 } from "@workspace/api-client-react";
 import type { ArtifactMuseumEntry } from "@workspace/api-client-react";
+import { CrownArt, isCrownSlug } from "@/lib/crownArt";
 
 const RARITY_ORDER = ["Common", "Rare", "Epic", "Legendary", "Mythic", "Ancient", "Celestial"];
 
@@ -433,19 +434,20 @@ function ArtifactCard({
   );
 }
 
-function ArtifactEmoji({ slug }: { slug: string }) {
+function ArtifactEmoji({ slug, size = "md" }: { slug: string; size?: "sm" | "md" | "lg" }) {
   const SLUG_EMOJIS: Record<string, string> = {
     ember_spark: "🔥", bronze_strider: "🥾", iron_pact: "⚙️",
     flame_keeper: "🕯️", crystal_horizon: "💎", iron_fist: "✊",
     steel_resolve: "🛡️", thunderstride: "⚡", iron_devotee: "💪",
     steel_form: "🗿", leg_day_legend: "🦵", centurion_flame: "👑",
-    crown_of_the_bracket: "👑",
     marathon_spirit: "🏃", million_paces: "🌍", phoenix_core: "🦅",
     obsidian_sovereign: "⚫", stellar_epoch: "⭐", void_whisper: "🌑",
     agile_phantom: "🐆", eternal_vigil: "🌙",
   };
-  // Per-tournament Crown of the Bracket variants share the prefix slug so
-  // every minted crown still renders as 👑.
-  if (slug.startsWith("crown_of_the_bracket")) return <span>👑</span>;
+  // Per-tournament Crown of the Bracket variants share the slug prefix
+  // `crown_of_the_bracket__c<challengeId>`; each variant gets unique art
+  // (color tint + season badge) via <CrownArt /> so collectors can tell
+  // multiple crowns apart at a glance.
+  if (isCrownSlug(slug)) return <CrownArt slug={slug} size={size} />;
   return <span>{SLUG_EMOJIS[slug] ?? "🏺"}</span>;
 }

@@ -19,6 +19,7 @@ import type { PostInsight } from "@workspace/api-client-react";
 import { useSubscription } from "@/lib/subscription";
 import { MutualWorkoutPartnersLine, type MutualPartner } from "@/components/mutual-workout-partners";
 import { ModerationHistoryPanel } from "@/components/moderation-history-panel";
+import { CrownArt, isCrownSlug } from "@/lib/crownArt";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 const MAX_FEATURED = 3;
@@ -44,11 +45,18 @@ const SLUG_EMOJIS: Record<string, string> = {
   agile_phantom: "🐆", eternal_vigil: "🌙",
 };
 
-// Per-tournament Crown of the Bracket variants share the prefix slug
-// (`crown_of_the_bracket__c<challengeId>`) so every minted crown renders 👑.
+// Per-tournament Crown of the Bracket variants share the slug prefix
+// `crown_of_the_bracket__c<challengeId>`; each variant gets its own art via
+// <CrownArt /> (color tint + season badge keyed off the challenge id) so a row
+// of crowns from different brackets reads as visually distinct/collectible.
 function emojiForSlug(slug: string): string {
-  if (slug.startsWith("crown_of_the_bracket")) return "👑";
+  if (isCrownSlug(slug)) return "👑";
   return SLUG_EMOJIS[slug] ?? "🏺";
+}
+
+function ArtifactArt({ slug, size }: { slug: string; size: "sm" | "md" | "lg" }) {
+  if (isCrownSlug(slug)) return <CrownArt slug={slug} size={size} />;
+  return <span>{emojiForSlug(slug)}</span>;
 }
 
 interface ShowcaseArtifact {
@@ -725,8 +733,10 @@ function ShowcaseCard({
           <GripVertical className="w-3.5 h-3.5" />
         </div>
       )}
-      <div className={`w-full aspect-square rounded-2xl ${styles.bg} border ${styles.border} flex items-center justify-center text-5xl mb-3`}>
-        {emojiForSlug(artifact.imageSlug)}
+      <div className={`w-full aspect-square rounded-2xl ${styles.bg} border ${styles.border} flex items-center justify-center text-5xl mb-3 overflow-hidden`}>
+        {isCrownSlug(artifact.imageSlug)
+          ? <CrownArt slug={artifact.imageSlug} size="lg" />
+          : emojiForSlug(artifact.imageSlug)}
       </div>
       <Badge className={`text-[9px] font-black uppercase tracking-wider mb-1.5 ${styles.label}`}>
         {artifact.rarity}
@@ -864,8 +874,10 @@ function AddArtifactTile({
                     data-testid={`button-swap-target-${artifact.id}`}
                     className={`text-left rounded-2xl border-2 ${s.border} ${s.bg} p-3 hover:brightness-125 transition-all disabled:opacity-50`}
                   >
-                    <div className={`w-full aspect-square rounded-xl ${s.bg} border ${s.border} flex items-center justify-center text-3xl mb-2`}>
-                      {emojiForSlug(artifact.imageSlug)}
+                    <div className={`w-full aspect-square rounded-xl ${s.bg} border ${s.border} flex items-center justify-center text-3xl mb-2 overflow-hidden`}>
+                      {isCrownSlug(artifact.imageSlug)
+                        ? <CrownArt slug={artifact.imageSlug} size="md" />
+                        : emojiForSlug(artifact.imageSlug)}
                     </div>
                     <Badge className={`text-[9px] font-black uppercase tracking-wider mb-1 ${s.label}`}>
                       {artifact.rarity}
@@ -926,8 +938,10 @@ function AddArtifactTile({
                       data-testid={`button-feature-from-sheet-${artifact.id}`}
                       className={`text-left rounded-2xl border-2 ${s.border} ${s.bg} p-3 hover:brightness-125 transition-all disabled:opacity-50`}
                     >
-                      <div className={`w-full aspect-square rounded-xl ${s.bg} border ${s.border} flex items-center justify-center text-3xl mb-2`}>
-                        {emojiForSlug(artifact.imageSlug)}
+                      <div className={`w-full aspect-square rounded-xl ${s.bg} border ${s.border} flex items-center justify-center text-3xl mb-2 overflow-hidden`}>
+                        {isCrownSlug(artifact.imageSlug)
+                          ? <CrownArt slug={artifact.imageSlug} size="md" />
+                          : emojiForSlug(artifact.imageSlug)}
                       </div>
                       <Badge className={`text-[9px] font-black uppercase tracking-wider mb-1 ${s.label}`}>
                         {artifact.rarity}

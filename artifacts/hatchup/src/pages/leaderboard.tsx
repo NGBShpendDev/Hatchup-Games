@@ -13,6 +13,7 @@ import { GlowBadge } from "@/components/ui/glow-badge";
 import { NeonButton } from "@/components/ui/neon-button";
 import { Button } from "@/components/ui/button";
 import { SafetyBanner } from "@/components/safety-banner";
+import { CrownArt, isCrownSlug } from "@/lib/crownArt";
 import {
   Trophy, Zap, Footprints, Timer, Swords, Crown, MapPin,
   Globe, Target, Map, ChevronDown, AlertCircle, Flame, Star,
@@ -983,14 +984,15 @@ function ArtifactSlugEmoji({ slug }: { slug: string }) {
     flame_keeper: "🕯️", crystal_horizon: "💎", iron_fist: "✊",
     steel_resolve: "🛡️", thunderstride: "⚡", iron_devotee: "💪",
     steel_form: "🗿", leg_day_legend: "🦵", centurion_flame: "👑",
-    crown_of_the_bracket: "👑",
     marathon_spirit: "🏃", million_paces: "🌍", phoenix_core: "🦅",
     obsidian_sovereign: "⚫", stellar_epoch: "⭐", void_whisper: "🌑",
     agile_phantom: "🐆", eternal_vigil: "🌙",
     mystery: "❓",
   };
-  // Per-tournament Crown of the Bracket variants share the prefix slug
-  // (`crown_of_the_bracket__c<challengeId>`) so every minted crown renders 👑.
-  if (slug.startsWith("crown_of_the_bracket")) return <span>👑</span>;
+  // Per-tournament Crown of the Bracket variants share the slug prefix
+  // `crown_of_the_bracket__c<challengeId>`; each variant gets its own art
+  // (color tint + season badge) via <CrownArt /> so collectors can tell
+  // multiple crowns apart at a glance even in the leaderboard chip row.
+  if (isCrownSlug(slug)) return <CrownArt slug={slug} size="sm" />;
   return <span>{SLUG_EMOJIS[slug] ?? "🏺"}</span>;
 }
