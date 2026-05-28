@@ -56,7 +56,7 @@ router.post("/players/me", requireAuth, async (req, res) => {
   res.status(201).json(player[0]);
 });
 
-router.post("/players", async (req, res) => {
+router.post("/players", requireAuth, async (req, res) => {
   const body = CreatePlayerBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: "Invalid input" });
@@ -64,7 +64,7 @@ router.post("/players", async (req, res) => {
   }
   const player = await db
     .insert(playersTable)
-    .values({ username: body.data.username, displayName: body.data.displayName, avatarUrl: body.data.avatarUrl })
+    .values({ username: body.data.username, displayName: body.data.displayName, avatarUrl: body.data.avatarUrl, clerkId: req.clerkUserId! })
     .returning();
   res.status(201).json(player[0]);
 });
