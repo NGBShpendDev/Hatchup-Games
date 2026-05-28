@@ -51,6 +51,7 @@ import type {
   ChallengeProgressResult,
   Club,
   ClubInput,
+  ClubInvite,
   ClubMember,
   CoachChatBody,
   CommentLikeInput,
@@ -121,6 +122,7 @@ import type {
   HealthStatus,
   InviteToChallenge201,
   InviteToChallengeBody,
+  InviteToClubBody,
   Item,
   JoinClubInput,
   JoinFamilyGroup200,
@@ -10086,6 +10088,227 @@ export const useMarkAllNotificationsRead = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getMarkAllNotificationsReadMutationOptions(options));
+    }
+
+export const getInviteToClubUrl = (id: number,) => {
+
+
+
+
+  return `/api/clubs/${id}/invite`
+}
+
+/**
+ * @summary Invite a player to a club (admins/leaders only)
+ */
+export const inviteToClub = async (id: number,
+    inviteToClubBody: InviteToClubBody, options?: RequestInit): Promise<ClubInvite> => {
+
+  return customFetch<ClubInvite>(getInviteToClubUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      inviteToClubBody,)
+  }
+);}
+
+
+
+
+export const getInviteToClubMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviteToClub>>, TError,{id: number;data: BodyType<InviteToClubBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof inviteToClub>>, TError,{id: number;data: BodyType<InviteToClubBody>}, TContext> => {
+
+const mutationKey = ['inviteToClub'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof inviteToClub>>, {id: number;data: BodyType<InviteToClubBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  inviteToClub(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type InviteToClubMutationResult = NonNullable<Awaited<ReturnType<typeof inviteToClub>>>
+    export type InviteToClubMutationBody = BodyType<InviteToClubBody>
+    export type InviteToClubMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Invite a player to a club (admins/leaders only)
+ */
+export const useInviteToClub = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviteToClub>>, TError,{id: number;data: BodyType<InviteToClubBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof inviteToClub>>,
+        TError,
+        {id: number;data: BodyType<InviteToClubBody>},
+        TContext
+      > => {
+      return useMutation(getInviteToClubMutationOptions(options));
+    }
+
+export const getGetMyClubInvitesUrl = () => {
+
+
+
+
+  return `/api/club-invites`
+}
+
+/**
+ * @summary Get pending club invites for the current player
+ */
+export const getMyClubInvites = async ( options?: RequestInit): Promise<ClubInvite[]> => {
+
+  return customFetch<ClubInvite[]>(getGetMyClubInvitesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyClubInvitesQueryKey = () => {
+    return [
+    `/api/club-invites`
+    ] as const;
+    }
+
+
+export const getGetMyClubInvitesQueryOptions = <TData = Awaited<ReturnType<typeof getMyClubInvites>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyClubInvites>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyClubInvitesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyClubInvites>>> = ({ signal }) => getMyClubInvites({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyClubInvites>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyClubInvitesQueryResult = NonNullable<Awaited<ReturnType<typeof getMyClubInvites>>>
+export type GetMyClubInvitesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get pending club invites for the current player
+ */
+
+export function useGetMyClubInvites<TData = Awaited<ReturnType<typeof getMyClubInvites>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyClubInvites>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyClubInvitesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getRespondToClubInviteUrl = (id: number,) => {
+
+
+
+
+  return `/api/club-invites/${id}/respond`
+}
+
+/**
+ * @summary Accept or decline a club invite
+ */
+export const respondToClubInvite = async (id: number,
+    respondToInviteBody: RespondToInviteBody, options?: RequestInit): Promise<SuccessResult> => {
+
+  return customFetch<SuccessResult>(getRespondToClubInviteUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      respondToInviteBody,)
+  }
+);}
+
+
+
+
+export const getRespondToClubInviteMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respondToClubInvite>>, TError,{id: number;data: BodyType<RespondToInviteBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof respondToClubInvite>>, TError,{id: number;data: BodyType<RespondToInviteBody>}, TContext> => {
+
+const mutationKey = ['respondToClubInvite'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof respondToClubInvite>>, {id: number;data: BodyType<RespondToInviteBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  respondToClubInvite(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RespondToClubInviteMutationResult = NonNullable<Awaited<ReturnType<typeof respondToClubInvite>>>
+    export type RespondToClubInviteMutationBody = BodyType<RespondToInviteBody>
+    export type RespondToClubInviteMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Accept or decline a club invite
+ */
+export const useRespondToClubInvite = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof respondToClubInvite>>, TError,{id: number;data: BodyType<RespondToInviteBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof respondToClubInvite>>,
+        TError,
+        {id: number;data: BodyType<RespondToInviteBody>},
+        TContext
+      > => {
+      return useMutation(getRespondToClubInviteMutationOptions(options));
     }
 
 export const getGetMyChallengeInvitesUrl = () => {

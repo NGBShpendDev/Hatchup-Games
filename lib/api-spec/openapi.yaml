@@ -2916,6 +2916,69 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResult"
 
+  /clubs/{id}/invite:
+    post:
+      operationId: inviteToClub
+      tags: [clubs]
+      summary: Invite a player to a club (admins/leaders only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteToClubBody"
+      responses:
+        "201":
+          description: Invite sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClubInvite"
+
+  /club-invites:
+    get:
+      operationId: getMyClubInvites
+      tags: [clubs]
+      summary: Get pending club invites for the current player
+      responses:
+        "200":
+          description: Pending invites
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClubInvite"
+
+  /club-invites/{id}/respond:
+    post:
+      operationId: respondToClubInvite
+      tags: [clubs]
+      summary: Accept or decline a club invite
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RespondToInviteBody"
+      responses:
+        "200":
+          description: Responded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResult"
+
   /challenge-invites:
     get:
       operationId: getMyChallengeInvites
@@ -5239,6 +5302,24 @@ components:
         reason: { type: string }
 
     InviteToChallengeBody:
+      type: object
+      required: [inviteeId]
+      properties:
+        inviteeId: { type: integer }
+
+    ClubInvite:
+      type: object
+      required: [id, clubId, inviteeId, inviterId, status, sentAt]
+      properties:
+        id:        { type: integer }
+        clubId:    { type: integer }
+        inviteeId: { type: integer }
+        inviterId: { type: integer }
+        status:    { type: string }
+        sentAt:    { type: string }
+        club:      { type: object }
+
+    InviteToClubBody:
       type: object
       required: [inviteeId]
       properties:

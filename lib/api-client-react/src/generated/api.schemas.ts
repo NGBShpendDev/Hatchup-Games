@@ -1178,6 +1178,22 @@ export interface InviteToChallengeBody {
   inviteeId: number;
 }
 
+export type ClubInviteClub = { [key: string]: unknown };
+
+export interface ClubInvite {
+  id: number;
+  clubId: number;
+  inviteeId: number;
+  inviterId: number;
+  status: string;
+  sentAt: string;
+  club?: ClubInviteClub;
+}
+
+export interface InviteToClubBody {
+  inviteeId: number;
+}
+
 export type RespondToInviteBodyStatus = typeof RespondToInviteBodyStatus[keyof typeof RespondToInviteBodyStatus];
 
 

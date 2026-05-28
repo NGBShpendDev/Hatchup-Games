@@ -10,6 +10,7 @@ const ALLOWED_TYPES = new Set([
   "challenge_ending",
   "challenge_complete",
   "club_mention",
+  "club_invite",
   "artifact_unlock",
   "rematch_invite",
   "generic",

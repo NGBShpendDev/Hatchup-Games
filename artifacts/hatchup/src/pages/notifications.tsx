@@ -49,11 +49,17 @@ function isClubMention(n: Notification): boolean {
   return n.type === "club_mention";
 }
 
+function clubInviteId(n: Notification): number | null {
+  if (n.type !== "club_invite") return null;
+  return typeof n.sourceId === "number" ? n.sourceId : null;
+}
+
 const TYPE_META: Record<string, { icon: typeof Bell; color: string }> = {
   challenge_invite:   { icon: Mail,      color: "from-pink-500 to-rose-500" },
   challenge_ending:   { icon: Clock,     color: "from-amber-500 to-orange-500" },
   challenge_complete: { icon: Trophy,    color: "from-emerald-500 to-teal-500" },
   club_mention:       { icon: Users,     color: "from-indigo-500 to-violet-500" },
+  club_invite:        { icon: Users,     color: "from-indigo-500 to-violet-500" },
   artifact_unlock:    { icon: Sparkles,  color: "from-fuchsia-500 to-purple-500" },
   rematch_invite:     { icon: Swords,    color: "from-red-500 to-pink-600" },
 };
@@ -170,6 +176,42 @@ export default function NotificationsPage() {
     }
   };
 
+  const respondToClubInvite = async (
+    n: Notification,
+    inviteId: number,
+    status: "accepted" | "declined",
+  ) => {
+    setBusyInvite({ id: n.id, action: status === "accepted" ? "accept" : "decline" });
+    try {
+      const res = await fetch(`${BASE}/api/club-invites/${inviteId}/respond`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error ?? `HTTP ${res.status}`);
+      }
+      if (!n.read) markRead.mutate({ id: n.id });
+      refresh();
+      if (status === "accepted") {
+        toast({ title: "Joined the club", description: "Welcome aboard!" });
+        navigate(n.link ?? "/club");
+      } else {
+        toast({ title: "Club invite declined" });
+      }
+    } catch (err) {
+      toast({
+        title: status === "accepted" ? "Could not accept invite" : "Could not decline invite",
+        description: String((err as Error).message),
+        variant: "destructive",
+      });
+    } finally {
+      setBusyInvite(null);
+    }
+  };
+
   const dismissNotification = async (n: Notification) => {
     setBusyInvite({ id: n.id, action: "decline" });
     try {
@@ -262,8 +304,9 @@ export default function NotificationsPage() {
               const Icon = meta.icon;
               const rematchId = isPendingRematchInvite(n) ? extractRematchId(n.link) : null;
               const challengeId = challengeInviteId(n);
+              const clubInvId = !n.read ? clubInviteId(n) : null;
               const clubMention = isClubMention(n) && !n.read ? n : null;
-              const hasInlineActions = Boolean(rematchId || challengeId || clubMention);
+              const hasInlineActions = Boolean(rematchId || challengeId || clubInvId || clubMention);
               const busy = busyInvite?.id === n.id ? busyInvite.action : null;
               const rowClass = `w-full text-left rounded-xl border bg-card/60 backdrop-blur p-3 flex items-start gap-3 transition-all hover:bg-card hover:border-border ${
                 n.read ? "border-border/30 opacity-70" : "border-primary/40 shadow-[0_0_12px_-4px_hsl(var(--primary)/0.6)]"
@@ -349,6 +392,41 @@ export default function NotificationsPage() {
                             respondToChallengeInvite(n, challengeId, "declined");
                           }}
                           data-testid={`button-decline-challenge-${n.id}`}
+                        >
+                          {busy === "decline"
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <X className="w-3.5 h-3.5" />}
+                          Decline
+                        </Button>
+                      </div>
+                    )}
+                    {clubInvId !== null && (
+                      <div className="mt-2 flex gap-2">
+                        <Button
+                          size="sm"
+                          className="h-7 px-2.5 gap-1 bg-gradient-to-br from-indigo-500 to-violet-500 hover:from-indigo-500/90 hover:to-violet-500/90"
+                          disabled={busy !== null}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            respondToClubInvite(n, clubInvId, "accepted");
+                          }}
+                          data-testid={`button-accept-club-invite-${n.id}`}
+                        >
+                          {busy === "accept"
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <Check className="w-3.5 h-3.5" />}
+                          Accept
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2.5 gap-1"
+                          disabled={busy !== null}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            respondToClubInvite(n, clubInvId, "declined");
+                          }}
+                          data-testid={`button-decline-club-invite-${n.id}`}
                         >
                           {busy === "decline"
                             ? <Loader2 className="w-3.5 h-3.5 animate-spin" />

@@ -3425,6 +3425,51 @@ export const MarkAllNotificationsReadResponse = zod.object({
 
 
 /**
+ * @summary Invite a player to a club (admins/leaders only)
+ */
+export const InviteToClubParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const InviteToClubBody = zod.object({
+  "inviteeId": zod.number()
+})
+
+
+/**
+ * @summary Get pending club invites for the current player
+ */
+export const GetMyClubInvitesResponseItem = zod.object({
+  "id": zod.number(),
+  "clubId": zod.number(),
+  "inviteeId": zod.number(),
+  "inviterId": zod.number(),
+  "status": zod.string(),
+  "sentAt": zod.string(),
+  "club": zod.object({
+
+}).passthrough().optional()
+})
+export const GetMyClubInvitesResponse = zod.array(GetMyClubInvitesResponseItem)
+
+
+/**
+ * @summary Accept or decline a club invite
+ */
+export const RespondToClubInviteParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RespondToClubInviteBody = zod.object({
+  "status": zod.enum(['accepted', 'declined'])
+})
+
+export const RespondToClubInviteResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
  * @summary Get pending challenge invites for the current player
  */
 export const GetMyChallengeInvitesResponseItem = zod.object({

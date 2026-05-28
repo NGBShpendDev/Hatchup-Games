@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { clubsTable, playersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { clubsTable, clubInvitesTable, notificationsTable, playersTable } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
 import {
   ListClubsQueryParams,
   CreateClubBody,
@@ -10,6 +10,7 @@ import {
   JoinClubBody,
 } from "@workspace/api-zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { sendPushToPlayer } from "../services/pushNotifications.ts";
 import type { RequestHandler } from "express";
 
 const router = Router();
@@ -72,6 +73,140 @@ router.post("/clubs/:id/join", requireAuth, attachPlayer, async (req, res) => {
 
   const updated = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, params.data.id) });
   res.json({ ...updated!, createdAt: updated!.createdAt.toISOString() });
+});
+
+// ── Invite a player to a club (admin/leader only) ─────────────────────────
+router.post("/clubs/:id/invite", requireAuth, attachPlayer, async (req, res) => {
+  const params = GetClubParams.safeParse({ id: Number(req.params.id) });
+  if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const { inviteeId } = req.body as { inviteeId?: number };
+  if (!inviteeId || typeof inviteeId !== "number") {
+    res.status(400).json({ error: "inviteeId required" });
+    return;
+  }
+  if (inviteeId === req.playerId) {
+    res.status(400).json({ error: "Cannot invite yourself" });
+    return;
+  }
+
+  const club = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, params.data.id) });
+  if (!club) { res.status(404).json({ error: "Club not found" }); return; }
+
+  const inviter = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!inviter || inviter.clubId !== params.data.id) {
+    res.status(403).json({ error: "Only members can invite to a club" });
+    return;
+  }
+  const role = (inviter.clubRole ?? "").toLowerCase();
+  if (role !== "leader" && role !== "admin" && role !== "officer") {
+    res.status(403).json({ error: "Only club admins can send invites" });
+    return;
+  }
+
+  const invitee = await db.query.playersTable.findFirst({ where: eq(playersTable.id, inviteeId) });
+  if (!invitee) { res.status(404).json({ error: "Invitee not found" }); return; }
+  if (invitee.clubId === params.data.id) {
+    res.status(409).json({ error: "Player is already in this club" });
+    return;
+  }
+
+  const [invite] = await db.insert(clubInvitesTable).values({
+    clubId: params.data.id,
+    inviteeId,
+    inviterId: req.playerId!,
+  }).onConflictDoNothing().returning();
+
+  if (invite) {
+    const inviterName = inviter.displayName ?? inviter.username ?? "A player";
+    await db.insert(notificationsTable).values({
+      playerId: inviteeId,
+      type: "club_invite",
+      title: "New club invite",
+      body: `${inviterName} invited you to join ${club.name}.`,
+      link: `/club/${club.id}`,
+      sourceId: invite.id,
+    });
+
+    void sendPushToPlayer(inviteeId, {
+      title: "New club invite",
+      body: `${inviterName} invited you to join ${club.name}.`,
+      link: `/club/${club.id}`,
+      category: "invites",
+      tag: `club-invite-${invite.id}`,
+    });
+  }
+
+  res.status(201).json({ ...(invite ?? {}), sentAt: invite?.sentAt?.toISOString() });
+});
+
+// ── Respond to a club invite ───────────────────────────────────────────────
+router.post("/club-invites/:id/respond", requireAuth, attachPlayer, async (req, res) => {
+  const id = Number(req.params.id);
+  const { status } = req.body as { status?: "accepted" | "declined" };
+  if (!id || (status !== "accepted" && status !== "declined")) {
+    res.status(400).json({ error: "status required" });
+    return;
+  }
+
+  const invite = await db.query.clubInvitesTable.findFirst({
+    where: and(eq(clubInvitesTable.id, id), eq(clubInvitesTable.inviteeId, req.playerId!)),
+  });
+  if (!invite) { res.status(404).json({ error: "Invite not found" }); return; }
+  if (invite.status !== "pending") {
+    res.status(409).json({ error: "Invite already responded to" });
+    return;
+  }
+
+  await db.update(clubInvitesTable).set({ status }).where(eq(clubInvitesTable.id, id));
+
+  // Mark the related club_invite notification as read.
+  await db.update(notificationsTable)
+    .set({ read: true })
+    .where(and(
+      eq(notificationsTable.playerId, req.playerId!),
+      eq(notificationsTable.type, "club_invite"),
+      eq(notificationsTable.sourceId, id),
+    ));
+
+  if (status === "accepted") {
+    const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+    const club = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, invite.clubId) });
+    if (!club) { res.status(404).json({ error: "Club no longer exists" }); return; }
+
+    // Only bump memberCount + assign clubId if the player wasn't already a member.
+    if (player && player.clubId !== invite.clubId) {
+      await db.update(playersTable)
+        .set({ clubId: invite.clubId, clubRole: player.clubRole ?? "member" })
+        .where(eq(playersTable.id, req.playerId!));
+      await db.update(clubsTable)
+        .set({ memberCount: club.memberCount + 1 })
+        .where(eq(clubsTable.id, invite.clubId));
+    }
+  }
+
+  res.json({ success: true, status });
+});
+
+// ── List my pending club invites ───────────────────────────────────────────
+router.get("/club-invites", requireAuth, attachPlayer, async (req, res) => {
+  const invites = await db.query.clubInvitesTable.findMany({
+    where: and(
+      eq(clubInvitesTable.inviteeId, req.playerId!),
+      eq(clubInvitesTable.status, "pending"),
+    ),
+  });
+
+  const enriched = await Promise.all(invites.map(async (inv) => {
+    const club = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, inv.clubId) });
+    return {
+      ...inv,
+      sentAt: inv.sentAt.toISOString(),
+      club: club ? { ...club, createdAt: club.createdAt.toISOString() } : null,
+    };
+  }));
+
+  res.json(enriched);
 });
 
 export default router;
