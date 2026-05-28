@@ -3506,6 +3506,14 @@ playerId?: number;
 limit?: number;
 };
 
+export type GetHatchlingShareImageParams = {
+/**
+ * Step count to display on the card (overrides player total).
+ * @minimum 0
+ */
+steps?: number;
+};
+
 export type ListEvolutionsParams = {
 category?: string;
 rarity?: string;

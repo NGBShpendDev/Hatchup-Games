@@ -14,6 +14,17 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth.ts";
 import { attachEntitlement, enforceHatchlingCap } from "../services/subscriptionGuards.ts";
+import { buildHatchShareSvg } from "./og-render.ts";
+import { renderSvgToPng } from "./og-router.ts";
+
+// ── Realm → emoji mapping (mirrors client-side REALM_EGG_STYLES) ──────────────
+const REALM_EMOJI: Record<string, string> = {
+  strength: "🔥",
+  cardio:   "⚡",
+  balance:  "✨",
+  beast:    "🌿",
+  mythic:   "🌌",
+};
 
 const router = Router();
 
@@ -190,6 +201,69 @@ router.get("/hatchlings/showcase", async (req, res) => {
     createdAt: h.createdAt.toISOString(),
     lastWorkoutAt: h.lastWorkoutAt?.toISOString() ?? null,
   })));
+});
+
+// ── GET /hatchlings/:id/share-image — public PNG share card ───────────────────
+// No auth required: this is the sharable image link. The endpoint is intentionally
+// public so share targets (Twitter, iMessage, etc.) can unfurl the card without
+// a session cookie.
+router.get("/hatchlings/:id/share-image", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) {
+    res.status(400).json({ error: "Invalid hatchling id" });
+    return;
+  }
+
+  // Optional steps override from query (e.g. ?steps=12345). Defaults to the
+  // player's stored total steps if available, otherwise 0.
+  const stepsParam = req.query.steps !== undefined ? Number(req.query.steps) : undefined;
+
+  try {
+    const hatchling = await db.query.hatchlingsTable.findFirst({
+      where: eq(hatchlingsTable.id, id),
+    });
+    if (!hatchling) {
+      res.status(404).json({ error: "Hatchling not found" });
+      return;
+    }
+
+    // Resolve step count: prefer query param, else look up from player row.
+    let steps = 0;
+    if (stepsParam != null && Number.isFinite(stepsParam) && stepsParam >= 0) {
+      steps = Math.floor(stepsParam);
+    } else {
+      try {
+        const player = await db.query.playersTable.findFirst({
+          where: eq(playersTable.id, hatchling.playerId),
+        });
+        steps = player?.totalSteps ?? 0;
+      } catch {
+        // best-effort — leave steps as 0 if lookup fails
+      }
+    }
+
+    const realmEmoji = REALM_EMOJI[hatchling.realm ?? "balance"] ?? "✨";
+    const rarity = hatchling.rarity ?? "Common";
+
+    const svg = buildHatchShareSvg({
+      name: hatchling.name,
+      species: hatchling.species ?? "Mystery Pal",
+      rarity,
+      realmEmoji,
+      steps,
+      level: hatchling.level,
+    });
+
+    const png = await renderSvgToPng(svg);
+
+    res.setHeader("Content-Type", "image/png");
+    // Cache for 1 hour — short enough to reflect renames, long enough to be CDN-friendly.
+    res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=3600");
+    res.send(png);
+  } catch (err) {
+    req.log?.warn({ err: (err as Error).message, hatchlingId: id }, "hatchling share-image render failed");
+    res.status(500).json({ error: "Failed to render share image" });
+  }
 });
 
 router.get("/hatchlings/:id", requireAuth, attachPlayer, async (req, res) => {

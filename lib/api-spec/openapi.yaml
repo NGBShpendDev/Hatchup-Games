@@ -460,6 +460,46 @@ paths:
         "204":
           description: Deleted
 
+  /hatchlings/{id}/share-image:
+    get:
+      operationId: getHatchlingShareImage
+      tags: [hatchlings]
+      summary: Get a shareable PNG image card for a hatchling
+      description: |
+        Renders a 1200×630 branded PNG share card for the given hatchling.
+        No authentication required — the image is intentionally public so
+        social platforms and messaging apps can unfurl the card without a
+        session cookie. An optional `steps` query parameter overrides the
+        step count shown in the footer; when omitted the player's stored
+        total steps are used.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: steps
+          in: query
+          required: false
+          description: Step count to display on the card (overrides player total).
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        "200":
+          description: PNG share card image.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid hatchling id.
+        "404":
+          description: Hatchling not found.
+        "500":
+          description: Failed to render share image.
+
   /hatchlings/{id}/evolve:
     post:
       operationId: evolveHatchling

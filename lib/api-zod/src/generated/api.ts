@@ -627,6 +627,29 @@ export const DeleteHatchlingParams = zod.object({
 
 
 /**
+ * Renders a 1200×630 branded PNG share card for the given hatchling.
+No authentication required — the image is intentionally public so
+social platforms and messaging apps can unfurl the card without a
+session cookie. An optional `steps` query parameter overrides the
+step count shown in the footer; when omitted the player's stored
+total steps are used.
+
+ * @summary Get a shareable PNG image card for a hatchling
+ */
+export const GetHatchlingShareImageParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const getHatchlingShareImageQueryStepsMin = 0;
+
+
+
+export const GetHatchlingShareImageQueryParams = zod.object({
+  "steps": zod.coerce.number().min(getHatchlingShareImageQueryStepsMin).optional().describe('Step count to display on the card (overrides player total).')
+})
+
+
+/**
  * @summary Trigger evolution for a hatchling
  */
 export const EvolveHatchlingParams = zod.object({

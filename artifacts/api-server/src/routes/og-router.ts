@@ -221,7 +221,7 @@ export function createOgRouter(loader: OgPostLoader): Router {
 // Shared helper that rasterizes an SVG (with optional remote <image> hrefs)
 // to a PNG using the cached Inter fonts. Used by every share-card endpoint
 // so we never drift between post / player / club rendering.
-async function renderSvgToPng(svg: string): Promise<Buffer> {
+export async function renderSvgToPng(svg: string): Promise<Buffer> {
   const fontFiles = await getFontFiles();
   const resvg = new Resvg(svg, {
     font: {

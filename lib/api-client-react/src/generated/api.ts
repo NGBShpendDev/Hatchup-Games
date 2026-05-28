@@ -106,6 +106,7 @@ import type {
   GetBattleEloLeaderboardParams,
   GetDailyMemoryParams,
   GetGlobalLeaderboardParams,
+  GetHatchlingShareImageParams,
   GetMealPlanParams,
   GetModeLeaderboardParams,
   GetMyPostInsights402,
@@ -1605,6 +1606,102 @@ export const useDeleteHatchling = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getDeleteHatchlingMutationOptions(options));
     }
+
+export const getGetHatchlingShareImageUrl = (id: number,
+    params?: GetHatchlingShareImageParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/hatchlings/${id}/share-image?${stringifiedParams}` : `/api/hatchlings/${id}/share-image`
+}
+
+/**
+ * Renders a 1200×630 branded PNG share card for the given hatchling.
+No authentication required — the image is intentionally public so
+social platforms and messaging apps can unfurl the card without a
+session cookie. An optional `steps` query parameter overrides the
+step count shown in the footer; when omitted the player's stored
+total steps are used.
+
+ * @summary Get a shareable PNG image card for a hatchling
+ */
+export const getHatchlingShareImage = async (id: number,
+    params?: GetHatchlingShareImageParams, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetHatchlingShareImageUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetHatchlingShareImageQueryKey = (id: number,
+    params?: GetHatchlingShareImageParams,) => {
+    return [
+    `/api/hatchlings/${id}/share-image`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetHatchlingShareImageQueryOptions = <TData = Awaited<ReturnType<typeof getHatchlingShareImage>>, TError = ErrorType<void>>(id: number,
+    params?: GetHatchlingShareImageParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHatchlingShareImage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetHatchlingShareImageQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHatchlingShareImage>>> = ({ signal }) => getHatchlingShareImage(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHatchlingShareImage>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetHatchlingShareImageQueryResult = NonNullable<Awaited<ReturnType<typeof getHatchlingShareImage>>>
+export type GetHatchlingShareImageQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a shareable PNG image card for a hatchling
+ */
+
+export function useGetHatchlingShareImage<TData = Awaited<ReturnType<typeof getHatchlingShareImage>>, TError = ErrorType<void>>(
+ id: number,
+    params?: GetHatchlingShareImageParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHatchlingShareImage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetHatchlingShareImageQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getEvolveHatchlingUrl = (id: number,) => {
 

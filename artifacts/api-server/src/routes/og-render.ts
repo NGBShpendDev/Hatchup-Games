@@ -859,3 +859,111 @@ export function buildClubOgSvg(opts: BuildClubOgSvgArgs): string {
   ${pillBlocks}
 </svg>`;
 }
+
+// ── Hatch share-card SVG ─────────────────────────────────────────────────────
+// Generates a 1200x630 branded share card for a legendary hatch moment.
+// Rarity drives the gradient palette; the realm emoji is rendered as a
+// large Unicode glyph in the centre so no external image is needed.
+
+const HATCH_RARITY_GRADIENT: Record<string, [string, string]> = {
+  Legendary: ["#3b1f00", "#6b3a00"],
+  Mythic:    ["#3b0011", "#6b0022"],
+  Ancient:   ["#003b35", "#006b5f"],
+  Celestial: ["#0a0038", "#1a0060"],
+  Epic:      ["#1a003b", "#2d0060"],
+  Rare:      ["#001a3b", "#002b6b"],
+  Common:    ["#0a0a0f", "#1a0a1a"],
+};
+
+const HATCH_RARITY_ACCENT: Record<string, [string, string]> = {
+  Legendary: ["#facc15", "#f59e0b"],
+  Mythic:    ["#f87171", "#ef4444"],
+  Ancient:   ["#2dd4bf", "#14b8a6"],
+  Celestial: ["#a5b4fc", "#818cf8"],
+  Epic:      ["#c084fc", "#a855f7"],
+  Rare:      ["#60a5fa", "#3b82f6"],
+  Common:    ["#a1a1aa", "#71717a"],
+};
+
+export interface BuildHatchShareSvgArgs {
+  name: string;
+  species: string;
+  rarity: string;
+  realmEmoji: string;
+  steps: number;
+  level?: number;
+}
+
+export function buildHatchShareSvg(opts: BuildHatchShareSvgArgs): string {
+  const width = 1200;
+  const height = 630;
+  const padding = 80;
+
+  const [bg1, bg2] = HATCH_RARITY_GRADIENT[opts.rarity] ?? HATCH_RARITY_GRADIENT.Common!;
+  const [acc1, acc2] = HATCH_RARITY_ACCENT[opts.rarity] ?? HATCH_RARITY_ACCENT.Common!;
+
+  const rarityLabel = `✦ ${opts.rarity.toUpperCase()} ✦`;
+  const stepsLabel = Number(opts.steps).toLocaleString("en-US") + " steps";
+  const levelLabel = opts.level != null ? `Lv.${opts.level}` : null;
+
+  const nameLines = wrapText(opts.name, 900, 80, 2);
+  const nameTspans = nameLines
+    .map((line, i) => `<tspan x="${width / 2}" y="${350 + i * 96}">${escapeXml(line)}</tspan>`)
+    .join("");
+
+  const footerParts = [stepsLabel];
+  if (levelLabel) footerParts.push(levelLabel);
+  footerParts.push("HatchUp");
+  const footerText = footerParts.join(" · ");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${escapeAttr(bg1)}"/>
+      <stop offset="100%" stop-color="${escapeAttr(bg2)}"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="${escapeAttr(acc1)}"/>
+      <stop offset="100%" stop-color="${escapeAttr(acc2)}"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="45%" r="40%">
+      <stop offset="0%" stop-color="${escapeAttr(acc1)}" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="${escapeAttr(bg1)}" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="${width}" height="${height}" fill="url(#bg)"/>
+  <rect width="${width}" height="${height}" fill="url(#glow)"/>
+
+  <!-- Accent stripes -->
+  <rect x="0" y="0" width="${width}" height="10" fill="url(#accent)"/>
+  <rect x="0" y="${height - 10}" width="${width}" height="10" fill="url(#accent)"/>
+
+  <!-- Brand mark (top-left) -->
+  <text x="${padding}" y="${padding + 20}" font-family="Inter, sans-serif" font-weight="700" font-size="38" fill="#ffffff" letter-spacing="2" opacity="0.9">HATCHUP</text>
+  <text x="${padding}" y="${padding + 54}" font-family="Inter, sans-serif" font-weight="400" font-size="18" fill="#a1a1aa">Every step hatches a creature</text>
+
+  <!-- Rarity pill (top-right) -->
+  <rect x="${width - padding - 240}" y="${padding - 4}" rx="24" ry="24" width="240" height="52" fill="url(#accent)" opacity="0.9"/>
+  <text x="${width - padding - 120}" y="${padding + 29}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="20" fill="#000000" letter-spacing="3">${escapeXml(rarityLabel)}</text>
+
+  <!-- Realm emoji (large, centred) -->
+  <text x="${width / 2}" y="240" text-anchor="middle" font-family="serif" font-size="140" dominant-baseline="central">${escapeXml(opts.realmEmoji)}</text>
+
+  <!-- Creature name -->
+  <text text-anchor="middle" font-family="Inter, sans-serif" font-weight="700" font-size="80" fill="#ffffff">
+    ${nameTspans}
+  </text>
+
+  <!-- Species -->
+  <text x="${width / 2}" y="${350 + nameLines.length * 96}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="400" font-size="32" fill="${escapeAttr(acc1)}">${escapeXml(opts.species)}</text>
+
+  <!-- Divider -->
+  <line x1="${padding + 80}" y1="${height - padding - 56}" x2="${width - padding - 80}" y2="${height - padding - 56}" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1"/>
+
+  <!-- Footer: steps + branding -->
+  <text x="${width / 2}" y="${height - padding - 22}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="400" font-size="22" fill="#a1a1aa">${escapeXml(footerText)}</text>
+</svg>`;
+}
