@@ -26,6 +26,7 @@ import socialRouter from "./social";
 import accessibilityRouter from "./accessibility";
 import locationsRouter from "./locations";
 import subscriptionRouter from "./subscription";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -56,5 +57,6 @@ router.use(socialRouter);
 router.use(accessibilityRouter);
 router.use(locationsRouter);
 router.use(subscriptionRouter);
+router.use(storageRouter);
 
 export default router;

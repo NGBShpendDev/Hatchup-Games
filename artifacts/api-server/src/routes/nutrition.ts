@@ -15,6 +15,10 @@ import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middleware
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { awardBadge } from "../services/badgeService";
 import { getHiddenPlayerIds } from "./safety";
+import { verifyUploadToken } from "./storage";
+import { ObjectStorageService } from "../lib/objectStorage";
+
+const objectStorageService = new ObjectStorageService();
 
 const router = Router();
 
@@ -71,6 +75,8 @@ const CreateMealPostBody = z.object({
   emoji: z.string().optional(),
   tag: z.string().optional(),
   description: z.string().optional(),
+  imageUrl: z.string().regex(/^\/objects\//, "imageUrl must be an /objects/ path").max(500).optional(),
+  uploadToken: z.string().min(1).max(256).optional(),
   calories: z.number().optional(),
   proteinG: z.number().optional(),
   carbsG: z.number().optional(),
@@ -167,7 +173,27 @@ router.post("/nutrition/posts", requireAuth, attachPlayer, requirePlayerOwnershi
   const body = CreateMealPostBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
-  const { playerId, name, emoji, tag, description, calories, proteinG, carbsG, fatG, aiAnalyzed, qualityScore } = body.data;
+  const { playerId, name, emoji, tag, description, imageUrl, uploadToken, calories, proteinG, carbsG, fatG, aiAnalyzed, qualityScore } = body.data;
+
+  // If an image is attached, verify the requesting user actually uploaded it
+  // (HMAC token issued when the presigned URL was generated) and mark the
+  // object's ACL as publicly readable so other feed viewers can fetch it.
+  if (imageUrl) {
+    if (!uploadToken || !verifyUploadToken(imageUrl, req.clerkUserId!, uploadToken)) {
+      res.status(403).json({ error: "Invalid or missing uploadToken for imageUrl" });
+      return;
+    }
+    try {
+      await objectStorageService.trySetObjectEntityAclPolicy(imageUrl, {
+        owner: req.clerkUserId!,
+        visibility: "public",
+      });
+    } catch (err) {
+      req.log.error({ err, imageUrl }, "Failed to set ACL on uploaded meal image");
+      res.status(400).json({ error: "Image upload not found or expired" });
+      return;
+    }
+  }
 
   const [post] = await db.insert(mealPostsTable).values({
     playerId,
@@ -175,6 +201,7 @@ router.post("/nutrition/posts", requireAuth, attachPlayer, requirePlayerOwnershi
     emoji: emoji ?? "🍽️",
     tag: tag ?? "healthy-snack",
     description: description ?? null,
+    imageUrl: imageUrl ?? null,
     calories: calories ?? null,
     proteinG: proteinG ?? null,
     carbsG: carbsG ?? null,

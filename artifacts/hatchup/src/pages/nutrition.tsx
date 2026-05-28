@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Heart, MessageCircle, Zap, ChefHat, Plus, X, Sparkles, Droplets, Flame, Dumbbell, MoreHorizontal, Compass, Trophy } from "lucide-react";
+import { Heart, MessageCircle, Zap, ChefHat, Plus, X, Sparkles, Droplets, Flame, Dumbbell, MoreHorizontal, Compass, Trophy, Camera, Loader2 } from "lucide-react";
 import { ReportBlockMenu } from "@/components/report-block-menu";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
@@ -41,6 +41,7 @@ const MEAL_EMOJIS = ["🍽️","🥗","🍗","🥩","🥑","🍳","🥛","🍱",
 interface MealPost {
   id: number;
   playerId: number;
+  imageUrl: string | null;
   emoji: string;
   name: string;
   tag: string;
@@ -102,6 +103,64 @@ export default function Nutrition() {
   });
   const [analyzing, setAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<{ quality_score?: number; suggestions?: string[] } | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [uploadToken, setUploadToken] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB
+  const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+  const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      toast({ title: "Unsupported image", description: "Use JPG, PNG, WebP, or GIF.", variant: "destructive" });
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast({ title: "Image too large", description: "Max size is 8 MB.", variant: "destructive" });
+      return;
+    }
+    setUploadingImage(true);
+    const localPreview = URL.createObjectURL(file);
+    setImagePreview(localPreview);
+    try {
+      const res = await fetch(`${BASE}/api/storage/uploads/request-url`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+      });
+      if (!res.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath, uploadToken: token } = await res.json();
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      if (!putRes.ok) throw new Error("Upload failed");
+      setImageUrl(objectPath);
+      setUploadToken(token ?? null);
+      toast({ title: "Photo added!", description: "Looking tasty." });
+    } catch (err) {
+      setImagePreview(null);
+      setImageUrl(null);
+      setUploadToken(null);
+      toast({ title: "Upload failed", description: "Try a different photo.", variant: "destructive" });
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const clearImage = () => {
+    setImageUrl(null);
+    setUploadToken(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   // ── Queries ─────────────────────────────────────────────────────────────────
   const feedMode = activeTab === "discover" ? "discover" : "feed";
@@ -181,6 +240,8 @@ export default function Nutrition() {
           emoji: form.emoji,
           tag: form.tag,
           description: form.description || undefined,
+          imageUrl: imageUrl ?? undefined,
+          uploadToken: uploadToken ?? undefined,
           calories: form.calories ? Number(form.calories) : undefined,
           proteinG: form.proteinG ? Number(form.proteinG) : undefined,
           carbsG: form.carbsG ? Number(form.carbsG) : undefined,
@@ -203,6 +264,9 @@ export default function Nutrition() {
       setShowCreateSheet(false);
       setForm({ name: "", emoji: "🍽️", tag: "healthy-snack", description: "", calories: "", proteinG: "", carbsG: "", fatG: "" });
       setAiResult(null);
+      setImageUrl(null);
+      setUploadToken(null);
+      setImagePreview(null);
       if (data.newBadges?.length > 0) {
         toast({ title: "New badge unlocked! 🏅", description: data.newBadges.join(", ") });
       } else if (data.hatchlingStatChange) {
@@ -476,6 +540,55 @@ export default function Nutrition() {
                   />
                 </div>
 
+                {/* Photo upload */}
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground mb-2">Photo</p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleImagePick}
+                    className="hidden"
+                  />
+                  {imagePreview ? (
+                    <div className="relative rounded-2xl overflow-hidden border border-border bg-muted/40">
+                      <img src={imagePreview} alt="Meal preview" className="w-full h-48 object-cover" />
+                      {uploadingImage && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          <Loader2 className="w-6 h-6 text-white animate-spin" />
+                        </div>
+                      )}
+                      <button
+                        onClick={clearImage}
+                        disabled={uploadingImage}
+                        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black/90 disabled:opacity-50"
+                        aria-label="Remove photo"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingImage}
+                      className="w-full h-32 rounded-2xl border-2 border-dashed border-border bg-muted/20 hover:bg-muted/40 transition-colors flex flex-col items-center justify-center gap-2 text-muted-foreground"
+                    >
+                      {uploadingImage ? (
+                        <>
+                          <Loader2 className="w-6 h-6 animate-spin" />
+                          <span className="text-xs font-bold">Uploading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="w-6 h-6" />
+                          <span className="text-xs font-bold">Add a real food photo</span>
+                          <span className="text-[10px]">JPG, PNG, WebP, GIF · max 8 MB</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+
                 {/* Tag selector */}
                 <div>
                   <p className="text-xs font-bold text-muted-foreground mb-2">Tag</p>
@@ -666,11 +779,27 @@ function MealCard({ post, index, onLike }: { post: MealPost; index: number; onLi
         )}
       </div>
 
+      {/* Real food photo (if uploaded) */}
+      {post.imageUrl && (
+        <div className="px-4 pb-3">
+          <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden bg-muted/40">
+            <img
+              src={`${BASE}/api/storage${post.imageUrl}`}
+              alt={post.name}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Emoji + meal info */}
       <div className="px-4 pb-3 flex items-center gap-4">
-        <div className="w-16 h-16 rounded-2xl bg-muted/40 flex items-center justify-center text-4xl shrink-0">
-          {post.emoji}
-        </div>
+        {!post.imageUrl && (
+          <div className="w-16 h-16 rounded-2xl bg-muted/40 flex items-center justify-center text-4xl shrink-0">
+            {post.emoji}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <p className="font-black text-base truncate">{post.name}</p>
           {(post.proteinG || post.carbsG || post.fatG) && (
