@@ -41,6 +41,8 @@ export const playersTable = pgTable("players", {
   prestige: integer("prestige").notNull().default(0),
   title: text("title"),
   streakFreezes: integer("streak_freezes").notNull().default(0),
+  streakShields: integer("streak_shields").notNull().default(0),
+  lastShieldUsedAt: timestamp("last_shield_used_at", { withTimezone: true }),
   // Daily reward
   lastRewardClaimedAt: timestamp("last_reward_claimed_at", { withTimezone: true }),
   dailyRewardStreak: integer("daily_reward_streak").notNull().default(0),

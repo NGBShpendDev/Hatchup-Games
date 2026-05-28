@@ -985,6 +985,28 @@ paths:
                 properties:
                   error: { type: string }
 
+  /players/me/streak-shield/buy:
+    post:
+      operationId: buyStreakShield
+      tags: [players]
+      summary: Purchase a Streak Shield for 200 coins
+      responses:
+        "200":
+          description: Shield purchased successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuyStreakShieldResult"
+        "400":
+          description: Not enough coins
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error: { type: string }
+
   /artifacts/world-notifications:
     get:
       operationId: getArtifactWorldNotifications
@@ -5944,12 +5966,14 @@ components:
 
     DailyStreakState:
       type: object
-      required: [currentDay, streakBroken, alreadyClaimed, lastClaimedAt, schedule]
+      required: [currentDay, streakBroken, alreadyClaimed, lastClaimedAt, schedule, streakShields, shieldActive]
       properties:
         currentDay:    { type: integer, description: "Current streak day (1-30), or 1 if streak was just reset" }
         streakBroken:  { type: boolean, description: "True if the streak reset today due to a missed day" }
         alreadyClaimed: { type: boolean, description: "Whether today has already been claimed" }
         lastClaimedAt: { type: ["string", "null"], format: date-time }
+        streakShields: { type: integer, description: "Number of Streak Shields the player owns" }
+        shieldActive:  { type: boolean, description: "True if a Streak Shield was auto-consumed in the last 48 hours" }
         todayReward:
           $ref: "#/components/schemas/DailyRewardDay"
         schedule:
@@ -5959,7 +5983,7 @@ components:
 
     DailyClaimResult:
       type: object
-      required: [ok, day, coinsGranted, xpGranted, streakDay, newStreakDay, eggAdded, newBadges]
+      required: [ok, day, coinsGranted, xpGranted, streakDay, newStreakDay, eggAdded, newBadges, shieldConsumed]
       properties:
         ok:                { type: boolean }
         day:               { type: integer }
@@ -5969,6 +5993,7 @@ components:
         newStreakDay:       { type: integer, description: "Next unclaimed day (for badge/UI purposes)" }
         eggAdded:          { type: boolean }
         bonus:             { type: ["string", "null"] }
+        shieldConsumed:    { type: boolean, description: "True if a Streak Shield was auto-consumed to preserve the streak" }
         artifactGranted:
           nullable: true
           type: object
@@ -5986,6 +6011,15 @@ components:
               name: { type: string }
               icon: { type: string }
               tier: { type: string }
+
+    BuyStreakShieldResult:
+      type: object
+      required: [ok, streakShields, coinsSpent, coinsRemaining]
+      properties:
+        ok:              { type: boolean }
+        streakShields:   { type: integer, description: "Updated shield count" }
+        coinsSpent:      { type: integer }
+        coinsRemaining:  { type: integer }
 
     FitnessBar:
       type: object

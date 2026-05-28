@@ -1223,6 +1223,8 @@ export const GetDailyStreakResponse = zod.object({
   "streakBroken": zod.boolean().describe('True if the streak reset today due to a missed day'),
   "alreadyClaimed": zod.boolean().describe('Whether today has already been claimed'),
   "lastClaimedAt": zod.coerce.date().nullable(),
+  "streakShields": zod.number().describe('Number of Streak Shields the player owns'),
+  "shieldActive": zod.boolean().describe('True if a Streak Shield was auto-consumed in the last 48 hours'),
   "todayReward": zod.object({
   "day": zod.number().describe('Day number (1-30)'),
   "coins": zod.number(),
@@ -1256,6 +1258,7 @@ export const ClaimDailyRewardResponse = zod.object({
   "newStreakDay": zod.number().describe('Next unclaimed day (for badge\/UI purposes)'),
   "eggAdded": zod.boolean(),
   "bonus": zod.string().nullish(),
+  "shieldConsumed": zod.boolean().describe('True if a Streak Shield was auto-consumed to preserve the streak'),
   "artifactGranted": zod.object({
   "artifactId": zod.number(),
   "artifactName": zod.string()
@@ -1266,6 +1269,17 @@ export const ClaimDailyRewardResponse = zod.object({
   "icon": zod.string(),
   "tier": zod.string()
 }))
+})
+
+
+/**
+ * @summary Purchase a Streak Shield for 200 coins
+ */
+export const BuyStreakShieldResponse = zod.object({
+  "ok": zod.boolean(),
+  "streakShields": zod.number().describe('Updated shield count'),
+  "coinsSpent": zod.number(),
+  "coinsRemaining": zod.number()
 })
 
 

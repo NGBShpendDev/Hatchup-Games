@@ -50,6 +50,8 @@ import type {
   BattleWsClientMessage,
   BattleWsServerMessage,
   BattleWsTokenResponse,
+  BuyStreakShield400,
+  BuyStreakShieldResult,
   Challenge,
   ChallengeDetail,
   ChallengeInvite,
@@ -3551,6 +3553,76 @@ export const useClaimDailyReward = <TError = ErrorType<ClaimDailyReward400>,
         TContext
       > => {
       return useMutation(getClaimDailyRewardMutationOptions(options));
+    }
+
+export const getBuyStreakShieldUrl = () => {
+
+
+
+
+  return `/api/players/me/streak-shield/buy`
+}
+
+/**
+ * @summary Purchase a Streak Shield for 200 coins
+ */
+export const buyStreakShield = async ( options?: RequestInit): Promise<BuyStreakShieldResult> => {
+
+  return customFetch<BuyStreakShieldResult>(getBuyStreakShieldUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getBuyStreakShieldMutationOptions = <TError = ErrorType<BuyStreakShield400>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof buyStreakShield>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof buyStreakShield>>, TError,void, TContext> => {
+
+const mutationKey = ['buyStreakShield'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof buyStreakShield>>, void> = () => {
+
+
+          return  buyStreakShield(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BuyStreakShieldMutationResult = NonNullable<Awaited<ReturnType<typeof buyStreakShield>>>
+
+    export type BuyStreakShieldMutationError = ErrorType<BuyStreakShield400>
+
+    /**
+ * @summary Purchase a Streak Shield for 200 coins
+ */
+export const useBuyStreakShield = <TError = ErrorType<BuyStreakShield400>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof buyStreakShield>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof buyStreakShield>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getBuyStreakShieldMutationOptions(options));
     }
 
 export const getGetArtifactWorldNotificationsUrl = (params?: GetArtifactWorldNotificationsParams,) => {

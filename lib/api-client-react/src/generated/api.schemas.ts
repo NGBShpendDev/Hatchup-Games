@@ -1061,6 +1061,10 @@ export interface DailyStreakState {
   alreadyClaimed: boolean;
   /** @nullable */
   lastClaimedAt: string | null;
+  /** Number of Streak Shields the player owns */
+  streakShields: number;
+  /** True if a Streak Shield was auto-consumed in the last 48 hours */
+  shieldActive: boolean;
   todayReward?: DailyRewardDay;
   schedule: DailyRewardDay[];
 }
@@ -1089,8 +1093,18 @@ export interface DailyClaimResult {
   eggAdded: boolean;
   /** @nullable */
   bonus?: string | null;
+  /** True if a Streak Shield was auto-consumed to preserve the streak */
+  shieldConsumed: boolean;
   artifactGranted?: DailyClaimResultArtifactGranted;
   newBadges: DailyClaimResultNewBadgesItem[];
+}
+
+export interface BuyStreakShieldResult {
+  ok: boolean;
+  /** Updated shield count */
+  streakShields: number;
+  coinsSpent: number;
+  coinsRemaining: number;
 }
 
 export interface FitnessBar {
@@ -3596,6 +3610,10 @@ limit?: number;
 };
 
 export type ClaimDailyReward400 = {
+  error: string;
+};
+
+export type BuyStreakShield400 = {
   error: string;
 };
 

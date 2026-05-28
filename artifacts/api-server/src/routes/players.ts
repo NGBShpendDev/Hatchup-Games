@@ -443,6 +443,8 @@ function isYesterdayUTC(yesterday: Date, today: Date): boolean {
   return d.toISOString().slice(0, 10) === yesterday.toISOString().slice(0, 10);
 }
 
+const STREAK_SHIELD_COST = 200;
+
 // GET /players/me/daily-streak — streak state + 30-day schedule
 router.get("/players/me/daily-streak", requireAuth, attachPlayer, async (req, res) => {
   const playerId = req.playerId!;
@@ -469,11 +471,19 @@ router.get("/players/me/daily-streak", requireAuth, attachPlayer, async (req, re
   const nextDay = currentDay + 1;
   const todayReward = getDailyReward(nextDay);
 
+  // Shield active if a shield was consumed within the last 48 hours
+  const lastShieldUsedAt = player.lastShieldUsedAt ? new Date(player.lastShieldUsedAt) : null;
+  const shieldActive = lastShieldUsedAt
+    ? now.getTime() - lastShieldUsedAt.getTime() < 48 * 60 * 60 * 1000
+    : false;
+
   res.json({
     currentDay,
     streakBroken,
     alreadyClaimed,
     lastClaimedAt: lastClaimed ? lastClaimed.toISOString() : null,
+    streakShields: player.streakShields ?? 0,
+    shieldActive,
     todayReward,
     schedule: DAILY_REWARD_SCHEDULE,
   });
@@ -497,6 +507,7 @@ router.post("/players/me/daily-claim", requireAuth, attachPlayer, async (req, re
   // Compute new streak day
   let newStreakDay: number;
   let streakBroken = false;
+  let shieldConsumed = false;
   if (!lastClaimed) {
     // First ever claim
     newStreakDay = 1;
@@ -505,9 +516,17 @@ router.post("/players/me/daily-claim", requireAuth, attachPlayer, async (req, re
     if (wasYesterday) {
       newStreakDay = (player.dailyRewardStreak ?? 0) + 1;
     } else {
-      // Missed one or more days — reset
-      newStreakDay = 1;
-      streakBroken = true;
+      // Missed one or more days — check for a Streak Shield
+      const shields = player.streakShields ?? 0;
+      if (shields > 0) {
+        // Auto-consume one shield and preserve the streak
+        shieldConsumed = true;
+        newStreakDay = (player.dailyRewardStreak ?? 0) + 1;
+      } else {
+        // No shields available — reset
+        newStreakDay = 1;
+        streakBroken = true;
+      }
     }
   }
 
@@ -517,13 +536,17 @@ router.post("/players/me/daily-claim", requireAuth, attachPlayer, async (req, re
   const coinsGranted = reward.coins;
   const xpGranted = reward.xp;
 
-  // Apply base reward grants (coins + XP)
+  // Apply base reward grants (coins + XP), and consume a shield if needed
   await db.update(playersTable)
     .set({
       coins: sql`${playersTable.coins} + ${coinsGranted}`,
       xp: sql`${playersTable.xp} + ${xpGranted}`,
       dailyRewardStreak: newStreakDay,
       lastRewardClaimedAt: now,
+      ...(shieldConsumed ? {
+        streakShields: sql`${playersTable.streakShields} - 1`,
+        lastShieldUsedAt: now,
+      } : {}),
     })
     .where(eq(playersTable.id, playerId));
 
@@ -626,7 +649,37 @@ router.post("/players/me/daily-claim", requireAuth, attachPlayer, async (req, re
     streakFreezeGranted,
     bonus: reward.bonus ?? null,
     streakBroken,
+    shieldConsumed,
     newBadges: newBadges.map(b => ({ key: b.key, name: b.name, icon: b.icon, tier: b.tier })),
+  });
+});
+
+// POST /players/me/streak-shield/buy — purchase one Streak Shield for coins
+router.post("/players/me/streak-shield/buy", requireAuth, attachPlayer, async (req, res) => {
+  const playerId = req.playerId!;
+  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
+  if (!player) { res.status(404).json({ error: "Player not found" }); return; }
+
+  const coins = player.coins ?? 0;
+  if (coins < STREAK_SHIELD_COST) {
+    res.status(400).json({ error: "not_enough_coins" });
+    return;
+  }
+
+  const updated = await db.update(playersTable)
+    .set({
+      coins: sql`${playersTable.coins} - ${STREAK_SHIELD_COST}`,
+      streakShields: sql`${playersTable.streakShields} + 1`,
+    })
+    .where(eq(playersTable.id, playerId))
+    .returning({ coins: playersTable.coins, streakShields: playersTable.streakShields });
+
+  const row = updated[0]!;
+  res.json({
+    ok: true,
+    streakShields: row.streakShields,
+    coinsSpent: STREAK_SHIELD_COST,
+    coinsRemaining: row.coins,
   });
 });
 
