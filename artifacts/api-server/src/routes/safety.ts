@@ -8,6 +8,7 @@ import { emailResendLimiter, consumeEmailResendBudget } from "../middlewares/rat
 import { issueEmailVerification } from "../services/emailVerification.ts";
 import { isEmailBouncing, recordEmailBounce, clearEmailBounce } from "../services/bouncedEmails.ts";
 import { notifyModerationAction } from "../services/moderationNotify.ts";
+import { logger } from "../lib/logger.ts";
 
 const router = Router();
 
@@ -133,8 +134,18 @@ async function writeAuditLog(entry: {
       reason: entry.reason ?? null,
       metadata: entry.metadata ? JSON.stringify(entry.metadata) : null,
     });
-  } catch {
+  } catch (err) {
     // Audit logging is best-effort; never break the moderation action itself.
+    logger.warn(
+      {
+        err,
+        action: entry.action,
+        actorId: entry.actorId,
+        targetPlayerId: entry.targetPlayerId ?? null,
+        targetReportId: entry.targetReportId ?? null,
+      },
+      "moderation audit log insert failed",
+    );
   }
 }
 
