@@ -102,7 +102,7 @@ const fakeDb = {
           if (args.columns) {
             const out: Record<string, unknown> = {};
             for (const k of Object.keys(args.columns)) {
-              out[k] = (found as Record<string, unknown>)[k];
+              out[k] = (found as unknown as Record<string, unknown>)[k];
             }
             return out;
           }
@@ -147,7 +147,7 @@ const fakeDb = {
           ? rows.map((r) => {
               const out: Record<string, unknown> = {};
               for (const key of Object.keys(projection)) {
-                out[key] = (r as Record<string, unknown>)[key];
+                out[key] = (r as unknown as Record<string, unknown>)[key];
               }
               return out;
             })

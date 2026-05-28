@@ -399,9 +399,7 @@ mock.module("@workspace/db", {
     groupsTable: makeTable("groupsTable"),
     hatchlingsTable: makeTable("hatchlingsTable"),
     notificationsTable: makeTable("notificationsTable"),
-    userReportsTable: makeTable("userReportsTable"),
     blockedUsersTable: makeTable("blockedUsersTable"),
-    postCommentRevisionsTable: makeTable("postCommentRevisionsTable"),
   },
 });
 

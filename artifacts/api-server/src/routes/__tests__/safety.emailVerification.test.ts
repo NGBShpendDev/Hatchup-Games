@@ -289,7 +289,8 @@ async function patchPrivacy(playerId: number, body: unknown) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  return { status: res.status, body: await res.json().catch(() => null) };
+  const parsed = (await res.json().catch(() => null)) as Record<string, any> | null;
+  return { status: res.status, body: parsed as any };
 }
 
 async function getVerify(token: string | undefined) {
@@ -302,7 +303,8 @@ async function getVerify(token: string | undefined) {
 
 async function resendVerification() {
   const res = await fetch(`${baseUrl}/email/resend-verification`, { method: "POST" });
-  return { status: res.status, body: await res.json().catch(() => null) };
+  const parsed = (await res.json().catch(() => null)) as Record<string, any> | null;
+  return { status: res.status, body: parsed as any };
 }
 
 // ── PATCH /players/:id/privacy-settings ──────────────────────────────────────
