@@ -9,8 +9,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { GlassCard } from "@/components/ui/glass-card";
 import { NeonButton } from "@/components/ui/neon-button";
 import { useToast } from "@/hooks/use-toast";
-import { Heart, MessageCircle, Zap, ChefHat, Plus, X, Sparkles, Droplets, Flame, Dumbbell, MoreHorizontal, Compass, Trophy, Camera, Loader2, Target, AlertTriangle, RefreshCw } from "lucide-react";
+import { Heart, MessageCircle, Zap, ChefHat, Plus, X, Sparkles, Droplets, Flame, Dumbbell, MoreHorizontal, Compass, Trophy, Camera, Loader2, Target } from "lucide-react";
 import { ReportBlockMenu } from "@/components/report-block-menu";
+import { ErrorCard } from "@/components/error-card";
+import { errorMessage } from "@/lib/errorMessage";
 import { HatchlingReaction, type HatchlingReactionData } from "@/components/hatchling-reaction";
 import { RewardSummaryModal, type RewardEntry } from "@/components/reward-summary-modal";
 import {
@@ -68,51 +70,6 @@ const PHYSIQUE_GOALS = [
 ];
 
 const MEAL_EMOJIS = ["🍽️","🥗","🍗","🥩","🥑","🍳","🥛","🍱","🥙","🌮","🥦","🍠","🫐","🥜","🍚","🐟","🥚","🧇","🍎","🫚"];
-
-function errorMessage(err: unknown, fallback: string): string {
-  if (!err) return fallback;
-  if (typeof err === "object" && err !== null) {
-    const anyErr = err as { response?: { data?: { error?: string; message?: string } }; message?: string };
-    const apiErr = anyErr.response?.data?.error ?? anyErr.response?.data?.message;
-    if (apiErr) return apiErr;
-    if (anyErr.message) return anyErr.message;
-  }
-  if (typeof err === "string") return err;
-  return fallback;
-}
-
-function ErrorCard({
-  title,
-  description,
-  onRetry,
-  className,
-}: {
-  title: string;
-  description?: string;
-  onRetry: () => void;
-  className?: string;
-}) {
-  return (
-    <div className={`rounded-2xl border border-red-500/40 bg-red-500/10 p-4 flex items-start gap-3 ${className ?? ""}`}>
-      <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-      <div className="flex-1 min-w-0">
-        <p className="font-black text-sm text-red-200">{title}</p>
-        <p className="text-[11px] text-red-300/80 mt-0.5">
-          {description ?? "We couldn't reach the server. Check your connection and try again."}
-        </p>
-      </div>
-      <Button
-        size="sm"
-        variant="outline"
-        className="border-red-500/40 text-red-200 hover:bg-red-500/20 text-xs font-black gap-1.5"
-        onClick={onRetry}
-      >
-        <RefreshCw className="w-3 h-3" />
-        Retry
-      </Button>
-    </div>
-  );
-}
 
 const MOOD_STYLES: Record<NutritionWeeklySummaryHatchlingMood, { ring: string; bg: string; label: string; tint: string }> = {
   thriving: { ring: "ring-green-500/60",  bg: "from-green-500/15 to-emerald-500/5",   label: "Thriving",    tint: "text-green-300"  },
