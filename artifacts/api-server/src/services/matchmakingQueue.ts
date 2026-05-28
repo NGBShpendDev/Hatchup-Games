@@ -24,7 +24,14 @@ import {
 import { loadActiveLoadoutModifiers, awardArtifactBattleXp } from "./artifactLoadoutService.ts";
 import { checkAndConsumeBattleCap } from "./subscriptionGuards.ts";
 import { logger } from "../lib/logger.ts";
-import { BattleWsClientMessageSchema } from "@workspace/api-zod";
+import { BattleWsClientMessageSchema, BattleWsServerMessageSchema } from "@workspace/api-zod";
+
+// Validate outbound payloads against the shared OpenAPI-derived schema in
+// non-production so any drift between the server and the documented
+// `BattleWsServerMessage` envelope fails loud in logs instead of silently
+// breaking the frontend (which `safeParse`s and drops unknown shapes).
+// Production opts out for the per-frame perf cost on `battle_state`.
+const VALIDATE_OUTBOUND_WS = process.env.NODE_ENV !== "production";
 
 // ── In-memory state ──────────────────────────────────────────────────────────
 interface QueueEntry {
@@ -182,9 +189,26 @@ export function issueWsToken(playerId: number): string {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function send(ws: WebSocket | null, payload: unknown) {
-  if (ws && ws.readyState === 1 /* OPEN */) {
-    ws.send(JSON.stringify(payload));
+  if (!ws || ws.readyState !== 1 /* OPEN */) return;
+  if (VALIDATE_OUTBOUND_WS) {
+    const parsed = BattleWsServerMessageSchema.safeParse(payload);
+    if (!parsed.success) {
+      // Log loudly with the offending payload + zod issues, but still send
+      // so an unexpected schema gap doesn't crash an in-flight battle.
+      logger.error(
+        {
+          payload,
+          issues: parsed.error.issues,
+          payloadType:
+            payload && typeof payload === "object" && "type" in payload
+              ? (payload as { type?: unknown }).type
+              : undefined,
+        },
+        "Outbound battle WS payload failed BattleWsServerMessageSchema validation",
+      );
+    }
   }
+  ws.send(JSON.stringify(payload));
 }
 
 function broadcast(battle: ActiveBattle, payload: unknown) {
@@ -671,7 +695,10 @@ export function attachBattleWss(server: import("http").Server) {
       if (timer) { clearTimeout(timer); botTimers.delete(playerId); }
     });
 
-    send(ws, { type: "connected", playerId });
+    // Intentionally no greeting frame here — the documented
+    // `BattleWsServerMessage` envelope has no "connected" variant, and the
+    // frontend doesn't react to one. Sending it would fail outbound
+    // validation and the client's `safeParse` would drop it anyway.
   });
 
   logger.info("Battle WebSocket server attached at /api/ws/battle");
