@@ -2,15 +2,19 @@ import { Layout } from "@/components/layout";
 import {
   useListEvolutions, getListEvolutionsQueryKey,
   useGetEvolutionRealms, getGetEvolutionRealmsQueryKey,
+  useListHatchlings, getListHatchlingsQueryKey,
 } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, Lock } from "lucide-react";
+import { Zap, Lock, Share2 } from "lucide-react";
 import { useState } from "react";
 import { ErrorCard } from "@/components/error-card";
+import { ComposeSheet } from "@/components/compose-sheet";
+import { usePlayer } from "@/lib/playerContext";
 
 // ── Realm visual config ────────────────────────────────────────────────────────
 const REALM_STYLES: Record<string, {
@@ -62,7 +66,7 @@ function rarityColor(rarity: string): string {
 }
 
 // ── Evolution card ─────────────────────────────────────────────────────────────
-function EvoCard({ evo, realmColor, isPrestige }: { evo: any; realmColor: string; isPrestige: boolean }) {
+function EvoCard({ evo, realmColor, isPrestige, onShare }: { evo: any; realmColor: string; isPrestige: boolean; onShare?: (evo: any) => void }) {
   if (isPrestige) {
     return (
       <div className="relative rounded-2xl border-2 border-dashed border-white/10 bg-card/20 p-5 flex flex-col items-center justify-center text-center gap-2 min-h-[160px]">
@@ -114,13 +118,27 @@ function EvoCard({ evo, realmColor, isPrestige }: { evo: any; realmColor: string
             <Lock className="w-2.5 h-2.5" /> {evo.unlockHint}
           </p>
         )}
+
+        {onShare && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onShare(evo)}
+            className="mt-3 w-full h-8 rounded-xl text-xs font-black"
+            style={{ borderColor: realmColor + "60", color: realmColor }}
+            data-testid={`button-share-evolution-${evo.id}`}
+          >
+            <Share2 className="w-3.5 h-3.5 mr-1.5" /> Share
+          </Button>
+        )}
       </div>
     </motion.div>
   );
 }
 
 // ── Evolution path column ──────────────────────────────────────────────────────
-function PathColumn({ path, evos, realmColor, pathLabel }: { path: string; evos: any[]; realmColor: string; pathLabel: string }) {
+function PathColumn({ path, evos, realmColor, pathLabel, onShare }: { path: string; evos: any[]; realmColor: string; pathLabel: string; onShare?: (evo: any) => void }) {
   const isPrestige = path === "C";
   const sorted = [...evos].sort((a, b) => a.stage - b.stage);
 
@@ -143,7 +161,13 @@ function PathColumn({ path, evos, realmColor, pathLabel }: { path: string; evos:
           style={{ background: isPrestige ? "rgba(255,255,255,0.05)" : `linear-gradient(to bottom, ${realmColor}60, transparent)` }} />
         <div className="space-y-4 relative z-10">
           {sorted.map(evo => (
-            <EvoCard key={evo.id} evo={evo} realmColor={realmColor} isPrestige={isPrestige && evo.isPrestige} />
+            <EvoCard
+              key={evo.id}
+              evo={evo}
+              realmColor={realmColor}
+              isPrestige={isPrestige && evo.isPrestige}
+              onShare={isPrestige && evo.isPrestige ? undefined : onShare}
+            />
           ))}
         </div>
       </div>
@@ -152,7 +176,7 @@ function PathColumn({ path, evos, realmColor, pathLabel }: { path: string; evos:
 }
 
 // ── Realm tab ──────────────────────────────────────────────────────────────────
-function RealmEvolutions({ realm, evolutions }: { realm: string; evolutions: any[] }) {
+function RealmEvolutions({ realm, evolutions, onShare }: { realm: string; evolutions: any[]; onShare?: (evo: any) => void }) {
   const style = REALM_STYLES[realm] ?? REALM_STYLES["balance"];
 
   const pathA = evolutions.filter(e => e.evolutionPath === "A");
@@ -178,11 +202,11 @@ function RealmEvolutions({ realm, evolutions }: { realm: string; evolutions: any
 
       {/* Branching paths */}
       <div className="flex gap-6 items-start">
-        <PathColumn path="A" evos={pathA} realmColor={style.color} pathLabel="Path Alpha" />
+        <PathColumn path="A" evos={pathA} realmColor={style.color} pathLabel="Path Alpha" onShare={onShare} />
         <div className="w-px self-stretch bg-white/5 shrink-0" />
-        <PathColumn path="B" evos={pathB} realmColor={style.auraColor} pathLabel="Path Beta" />
+        <PathColumn path="B" evos={pathB} realmColor={style.auraColor} pathLabel="Path Beta" onShare={onShare} />
         <div className="w-px self-stretch bg-white/5 shrink-0" />
-        <PathColumn path="C" evos={pathC} realmColor={style.color} pathLabel="Prestige Path" />
+        <PathColumn path="C" evos={pathC} realmColor={style.color} pathLabel="Prestige Path" onShare={onShare} />
       </div>
     </motion.div>
   );
@@ -191,6 +215,8 @@ function RealmEvolutions({ realm, evolutions }: { realm: string; evolutions: any
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function Evolutions() {
   const [selectedRealm, setSelectedRealm] = useState<string>("strength");
+  const [shareEvo, setShareEvo] = useState<any | null>(null);
+  const { player } = usePlayer();
 
   const { data: realms, isLoading: isLoadingRealms, isError: isErrorRealms, refetch: refetchRealms } = useGetEvolutionRealms({
     query: { queryKey: getGetEvolutionRealmsQueryKey() }
@@ -201,7 +227,21 @@ export default function Evolutions() {
     { query: { queryKey: getListEvolutionsQueryKey({ realm: selectedRealm }) } }
   );
 
+  const { data: hatchlings = [] } = useListHatchlings(
+    { playerId: player?.id ?? 0 },
+    { query: { queryKey: getListHatchlingsQueryKey({ playerId: player?.id ?? 0 }), enabled: !!player?.id } }
+  );
+
   const activeStyle = REALM_STYLES[selectedRealm] ?? REALM_STYLES["balance"];
+
+  const shareCreatureId = shareEvo
+    ? hatchlings.find(h => h.realm === shareEvo.realm)?.id ?? hatchlings[0]?.id
+    : undefined;
+  const shareEmoji = shareEvo ? (REALM_STYLES[shareEvo.realm]?.emoji ?? "✨") : "";
+  const shareCaption = shareEvo
+    ? `Eyes on my next evolution: ${shareEvo.name} ${shareEmoji} — ${shareEvo.rarity} Stage ${shareEvo.stage} form on the ${shareEvo.realm} path!`
+    : "";
+  const shareTags = shareEvo ? `evolution, ${shareEvo.realm}, ${shareEvo.name.toLowerCase().replace(/\s+/g, "")}` : "";
 
   return (
     <Layout>
@@ -297,10 +337,24 @@ export default function Evolutions() {
               key={selectedRealm}
               realm={selectedRealm}
               evolutions={evolutions ?? []}
+              onShare={player ? (evo) => setShareEvo(evo) : undefined}
             />
           </AnimatePresence>
         )}
       </div>
+
+      {player && (
+        <ComposeSheet
+          open={!!shareEvo}
+          onClose={() => setShareEvo(null)}
+          playerId={player.id}
+          initialCreatureId={shareCreatureId}
+          initialPostType="evolution"
+          initialContent={shareCaption}
+          initialTags={shareTags}
+          title={shareEvo ? `Share ${shareEvo.name} ✨` : "Share Evolution ✨"}
+        />
+      )}
     </Layout>
   );
 }
