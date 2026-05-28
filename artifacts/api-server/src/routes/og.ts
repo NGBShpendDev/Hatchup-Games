@@ -3,6 +3,8 @@ import { postsTable, playersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { createOgRouter, type OgLoadResult, type OgPostLoader } from "./og-router.ts";
 import type { OgPostInput, OgAuthorInput } from "./og-render.ts";
+import { getEntitlement } from "../services/entitlement.ts";
+import { resolveAccentColor, resolveAccentColorId } from "../services/accentColors.ts";
 
 const defaultLoader: OgPostLoader = async (id: number): Promise<OgLoadResult> => {
   const row = await db.query.postsTable.findFirst({ where: eq(postsTable.id, id) });
@@ -24,14 +26,21 @@ const defaultLoader: OgPostLoader = async (id: number): Promise<OgLoadResult> =>
     const authorRow = await db.query.playersTable.findFirst({
       where: eq(playersTable.id, row.playerId),
     });
-    const author: OgAuthorInput | null = authorRow
-      ? {
-          displayName: authorRow.displayName,
-          username: authorRow.username,
-          avatarUrl: authorRow.avatarUrl,
-          isSuspended: authorRow.isSuspended,
-        }
-      : null;
+    if (!authorRow) return { post, author: null };
+    // Resolve accent color server-side using the author's entitlement tier so
+    // a free player can't paint share cards with a premium-only gradient by
+    // patching `share_accent_color` directly.
+    const tier = getEntitlement(authorRow).tier;
+    const accentId = resolveAccentColorId(authorRow.shareAccentColor, tier);
+    const accent = resolveAccentColor(authorRow.shareAccentColor, tier);
+    const author: OgAuthorInput = {
+      displayName: authorRow.displayName,
+      username: authorRow.username,
+      avatarUrl: authorRow.avatarUrl,
+      isSuspended: authorRow.isSuspended,
+      accentId,
+      accent,
+    };
     return { post, author };
   } catch {
     return { post, author: null };

@@ -3,6 +3,8 @@ import { playersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { createPlayerOgRouter, type OgPlayerLoader } from "./og-router.ts";
 import type { OgPlayerInput } from "./og-render.ts";
+import { getEntitlement } from "../services/entitlement.ts";
+import { resolveAccentColor, resolveAccentColorId } from "../services/accentColors.ts";
 
 const playerLoader: OgPlayerLoader = async (username: string): Promise<OgPlayerInput | null> => {
   try {
@@ -10,6 +12,9 @@ const playerLoader: OgPlayerLoader = async (username: string): Promise<OgPlayerI
       where: eq(playersTable.username, username),
     });
     if (!row) return null;
+    const tier = getEntitlement(row).tier;
+    const accentId = resolveAccentColorId(row.shareAccentColor, tier);
+    const accent = resolveAccentColor(row.shareAccentColor, tier);
     return {
       id: row.id,
       username: row.username,
@@ -21,6 +26,8 @@ const playerLoader: OgPlayerLoader = async (username: string): Promise<OgPlayerI
       totalSteps: row.totalSteps,
       currentStreak: row.currentStreak,
       isVerified: row.isVerified,
+      accentId,
+      accent,
     };
   } catch {
     return null;

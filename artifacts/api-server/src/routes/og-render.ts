@@ -70,6 +70,11 @@ export interface OgAuthorInput {
   // default so suspended/blocked accounts can't keep getting impressions via
   // already-pasted share links.
   isSuspended?: boolean | null;
+  // Already-resolved (id + tier) accent palette id, used purely for ETag
+  // construction so changing the player's accent in settings busts the
+  // crawler cache. The actual gradient is on `accent`.
+  accentId?: string | null;
+  accent?: { from: string; to: string } | null;
 }
 
 /** True when the post or its author is in a state that must not be publicly previewed. */
@@ -181,12 +186,30 @@ export function renderOgHtml({ baseUrl, id, post, author }: RenderOgArgs): strin
 // handler is responsible for handing the resulting SVG to resvg-js and
 // resolving the avatar <image href="..."> if one was emitted.
 
+export interface AccentGradientInput {
+  from: string;
+  to: string;
+}
+
+const DEFAULT_ACCENT_FROM = "#ff3d8b";
+const DEFAULT_ACCENT_TO = "#ff6b3d";
+
+function resolveAccent(accent: AccentGradientInput | null | undefined): AccentGradientInput {
+  if (!accent) return { from: DEFAULT_ACCENT_FROM, to: DEFAULT_ACCENT_TO };
+  return {
+    from: typeof accent.from === "string" && accent.from ? accent.from : DEFAULT_ACCENT_FROM,
+    to: typeof accent.to === "string" && accent.to ? accent.to : DEFAULT_ACCENT_TO,
+  };
+}
+
 export interface BuildOgSvgArgs {
   authorName: string;
   authorHandle: string;
   postTypeLabel: string;
   content: string;
   avatarHref: string | null;
+  /** Optional accent gradient — defaults to the HatchUp pink→orange brand stripe. */
+  accent?: AccentGradientInput | null;
 }
 
 // Naive word-wrap for SVG <text> rendering. resvg does not lay out text, so we
@@ -239,6 +262,7 @@ export function buildOgSvg(opts: BuildOgSvgArgs): string {
   const height = 630;
   const padding = 80;
   const innerWidth = width - padding * 2;
+  const accent = resolveAccent(opts.accent);
 
   const contentLines = wrapText(opts.content, innerWidth, 56, 5);
   const initials = initialsFor(opts.authorName);
@@ -268,8 +292,8 @@ export function buildOgSvg(opts: BuildOgSvgArgs): string {
       <stop offset="100%" stop-color="#1a0a1a"/>
     </linearGradient>
     <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#ff3d8b"/>
-      <stop offset="100%" stop-color="#ff6b3d"/>
+      <stop offset="0%" stop-color="${escapeAttr(accent.from)}"/>
+      <stop offset="100%" stop-color="${escapeAttr(accent.to)}"/>
     </linearGradient>
   </defs>
   <rect width="${width}" height="${height}" fill="url(#bg)"/>
@@ -379,6 +403,8 @@ export interface OgPlayerInput {
   totalSteps?: number | null;
   currentStreak?: number | null;
   isVerified?: boolean | null;
+  accentId?: string | null;
+  accent?: { from: string; to: string } | null;
 }
 
 export interface OgClubInput {
@@ -390,6 +416,8 @@ export interface OgClubInput {
   maxMembers?: number | null;
   level: number;
   totalWins?: number | null;
+  accentId?: string | null;
+  accent?: { from: string; to: string } | null;
 }
 
 export interface RenderPlayerOgHtmlArgs {
@@ -574,12 +602,14 @@ export interface BuildPlayerOgSvgArgs {
   currentStreak: number | null;
   isVerified: boolean;
   avatarHref: string | null;
+  accent?: AccentGradientInput | null;
 }
 
 export function buildPlayerOgSvg(opts: BuildPlayerOgSvgArgs): string {
   const width = 1200;
   const height = 630;
   const padding = 80;
+  const accent = resolveAccent(opts.accent);
   const initials = initialsFor(opts.displayName || opts.username);
 
   const avatarCx = padding + 110;
@@ -639,8 +669,8 @@ export function buildPlayerOgSvg(opts: BuildPlayerOgSvgArgs): string {
       <stop offset="100%" stop-color="#1a0a1a"/>
     </linearGradient>
     <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#ff3d8b"/>
-      <stop offset="100%" stop-color="#ff6b3d"/>
+      <stop offset="0%" stop-color="${escapeAttr(accent.from)}"/>
+      <stop offset="100%" stop-color="${escapeAttr(accent.to)}"/>
     </linearGradient>
   </defs>
   <rect width="${width}" height="${height}" fill="url(#bg)"/>
@@ -677,6 +707,7 @@ export interface BuildClubOgSvgArgs {
   maxMembers: number | null;
   totalWins: number | null;
   emblem: string | null;
+  accent?: AccentGradientInput | null;
 }
 
 export function buildClubOgSvg(opts: BuildClubOgSvgArgs): string {
@@ -684,6 +715,7 @@ export function buildClubOgSvg(opts: BuildClubOgSvgArgs): string {
   const height = 630;
   const padding = 80;
   const innerWidth = width - padding * 2;
+  const accent = resolveAccent(opts.accent);
 
   const nameLines = wrapText(opts.name, innerWidth - 240, 64, 2);
   const descLines = opts.description ? wrapText(opts.description, innerWidth - 240, 28, 3) : [];
@@ -739,8 +771,8 @@ export function buildClubOgSvg(opts: BuildClubOgSvgArgs): string {
       <stop offset="100%" stop-color="#1a0a1a"/>
     </linearGradient>
     <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#ff3d8b"/>
-      <stop offset="100%" stop-color="#ff6b3d"/>
+      <stop offset="0%" stop-color="${escapeAttr(accent.from)}"/>
+      <stop offset="100%" stop-color="${escapeAttr(accent.to)}"/>
     </linearGradient>
   </defs>
   <rect width="${width}" height="${height}" fill="url(#bg)"/>

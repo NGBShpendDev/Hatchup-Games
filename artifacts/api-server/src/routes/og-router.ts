@@ -120,8 +120,9 @@ export function createOgRouter(loader: OgPostLoader): Router {
       const label = postTypeLabel(post.postType);
       const content = ogTruncate(post.content || "", 240);
 
+      const accentId = author?.accentId ?? "default";
       const etag = `W/"${createHash("sha1")
-        .update(`${id}|${post.postType}|${authorName}|${authorHandle}|${avatarUrl ?? ""}|${content}`)
+        .update(`${id}|${post.postType}|${authorName}|${authorHandle}|${avatarUrl ?? ""}|${content}|${accentId}`)
         .digest("hex")}"`;
 
       if (req.headers["if-none-match"] === etag) {
@@ -135,6 +136,7 @@ export function createOgRouter(loader: OgPostLoader): Router {
         postTypeLabel: label,
         content,
         avatarHref: avatarUrl,
+        accent: author?.accent ?? null,
       });
       const fontFiles = await getFontFiles();
       const resvg = new Resvg(svg, {
@@ -265,6 +267,7 @@ export function createPlayerOgRouter(loader: OgPlayerLoader): Router {
       const avatarUrl = player.avatarUrl && /^https?:\/\//i.test(player.avatarUrl)
         ? player.avatarUrl
         : null;
+      const accentId = player.accentId ?? "default";
       const etag = `W/"${createHash("sha1")
         .update([
           player.id,
@@ -277,6 +280,7 @@ export function createPlayerOgRouter(loader: OgPlayerLoader): Router {
           player.currentStreak ?? 0,
           player.isVerified ? 1 : 0,
           avatarUrl ?? "",
+          accentId,
         ].join("|"))
         .digest("hex")}"`;
 
@@ -295,6 +299,7 @@ export function createPlayerOgRouter(loader: OgPlayerLoader): Router {
         currentStreak: player.currentStreak ?? null,
         isVerified: !!player.isVerified,
         avatarHref: avatarUrl,
+        accent: player.accent ?? null,
       });
       const png = await renderSvgToPng(svg);
 
@@ -353,6 +358,7 @@ export function createClubOgRouter(loader: OgClubLoader): Router {
       }
 
       const emblemUrl = club.emblem && /^https?:\/\//i.test(club.emblem) ? club.emblem : null;
+      const accentId = club.accentId ?? "default";
       const etag = `W/"${createHash("sha1")
         .update([
           club.id,
@@ -363,6 +369,7 @@ export function createClubOgRouter(loader: OgClubLoader): Router {
           club.maxMembers ?? 0,
           club.totalWins ?? 0,
           club.emblem ?? "",
+          accentId,
         ].join("|"))
         .digest("hex")}"`;
 
@@ -379,6 +386,7 @@ export function createClubOgRouter(loader: OgClubLoader): Router {
         maxMembers: club.maxMembers ?? null,
         totalWins: club.totalWins ?? null,
         emblem: emblemUrl ?? (club.emblem ?? null),
+        accent: club.accent ?? null,
       });
       const png = await renderSvgToPng(svg);
 

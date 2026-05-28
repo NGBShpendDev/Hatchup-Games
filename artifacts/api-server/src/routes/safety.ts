@@ -10,6 +10,13 @@ import { issueEmailVerification } from "../services/emailVerification.ts";
 import { isEmailBouncing, recordEmailBounce, clearEmailBounce } from "../services/bouncedEmails.ts";
 import { notifyModerationAction } from "../services/moderationNotify.ts";
 import { logger } from "../lib/logger.ts";
+import { getEntitlement } from "../services/entitlement.ts";
+import {
+  ACCENT_COLOR_OPTIONS,
+  getAvailableAccents,
+  isKnownAccentId,
+  resolveAccentColorId,
+} from "../services/accentColors.ts";
 
 const router = Router();
 
@@ -441,6 +448,8 @@ router.get("/players/:id/privacy-settings", requireAuth, attachPlayer, async (re
     orderBy: [desc(notificationsTable.createdAt)],
     columns: { createdAt: true },
   });
+  const tier = getEntitlement(player).tier;
+  const effectiveAccent = resolveAccentColorId(player.shareAccentColor, tier);
   res.json({
     locationVisibility: player.locationVisibility,
     requireWorkoutApproval: player.requireWorkoutApproval,
@@ -449,6 +458,13 @@ router.get("/players/:id/privacy-settings", requireAuth, attachPlayer, async (re
     isVerified: player.isVerified,
     isMinor: player.isMinor,
     emailVerifiedAt: player.emailVerifiedAt?.toISOString() ?? null,
+    shareAccentColor: player.shareAccentColor,
+    shareAccentColorEffective: effectiveAccent,
+    shareAccentColorOptions: ACCENT_COLOR_OPTIONS.map((opt) => ({
+      ...opt,
+      available: !opt.premium || tier === "premium",
+    })),
+    shareAccentColorTier: tier,
     weeklyRecapEnabled: player.weeklyRecapEnabled,
     weeklyRecapDayOfWeek: player.weeklyRecapDayOfWeek,
     weeklyRecapHourLocal: player.weeklyRecapHourLocal,
@@ -480,6 +496,7 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
     emergencyContactName?: unknown;
     emergencyContactPhone?: unknown;
     isMinor?: unknown;
+    shareAccentColor?: unknown;
     weeklyRecapEnabled?: unknown;
     weeklyRecapDayOfWeek?: unknown;
     weeklyRecapHourLocal?: unknown;
@@ -517,6 +534,20 @@ router.patch("/players/:id/privacy-settings", requireAuth, attachPlayer, async (
   }
   if (body.emergencyContactPhone !== undefined) {
     updates.emergencyContactPhone = body.emergencyContactPhone as string | null;
+  }
+  if (body.shareAccentColor !== undefined) {
+    const raw = body.shareAccentColor;
+    if (raw === null || raw === "") {
+      updates.shareAccentColor = null;
+    } else if (typeof raw === "string" && isKnownAccentId(raw)) {
+      // Allow storing premium-only ids even on free accounts so the choice
+      // sticks if/when the player upgrades. The OG renderer falls back to the
+      // brand default until they're entitled — gating happens at render time.
+      updates.shareAccentColor = raw;
+    } else {
+      res.status(400).json({ error: "Invalid shareAccentColor" });
+      return;
+    }
   }
   if (typeof body.weeklyRecapEnabled === "boolean") {
     updates.weeklyRecapEnabled = body.weeklyRecapEnabled;

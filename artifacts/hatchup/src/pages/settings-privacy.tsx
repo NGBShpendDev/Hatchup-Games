@@ -37,6 +37,8 @@ import {
   Bell,
   CalendarClock,
   Mail,
+  Palette,
+  Crown,
 } from "lucide-react";
 import { usePushSubscription } from "@/hooks/use-push-subscription";
 
@@ -86,6 +88,11 @@ export default function SettingsPrivacy() {
   const [emergencyName, setEmergencyName] = useState("");
   const [emergencyPhone, setEmergencyPhone] = useState("");
   const [isMinor, setIsMinor] = useState(false);
+  const [shareAccentColor, setShareAccentColor] = useState<string | null>(null);
+  const [accentOptions, setAccentOptions] = useState<Array<{
+    id: string; name: string; from: string; to: string; premium: boolean; available: boolean;
+  }>>([]);
+  const [accentTier, setAccentTier] = useState<"free" | "premium">("free");
   const [recapEnabled, setRecapEnabled] = useState(true);
   const [recapDay, setRecapDay] = useState(0);
   const [recapHour, setRecapHour] = useState(9);
@@ -225,6 +232,15 @@ export default function SettingsPrivacy() {
         setEmergencyName(data.emergencyContactName ?? "");
         setEmergencyPhone(data.emergencyContactPhone ?? "");
         setIsMinor(Boolean(data.isMinor));
+        if (data.shareAccentColor === null || typeof data.shareAccentColor === "string") {
+          setShareAccentColor(data.shareAccentColor ?? null);
+        }
+        if (Array.isArray(data.shareAccentColorOptions)) {
+          setAccentOptions(data.shareAccentColorOptions);
+        }
+        if (data.shareAccentColorTier === "premium" || data.shareAccentColorTier === "free") {
+          setAccentTier(data.shareAccentColorTier);
+        }
         if (typeof data.weeklyRecapEnabled === "boolean") setRecapEnabled(data.weeklyRecapEnabled);
         if (typeof data.weeklyRecapDayOfWeek === "number") setRecapDay(data.weeklyRecapDayOfWeek);
         if (typeof data.weeklyRecapHourLocal === "number") setRecapHour(data.weeklyRecapHourLocal);
@@ -399,6 +415,7 @@ export default function SettingsPrivacy() {
           emergencyContactName: emergencyName || null,
           emergencyContactPhone: emergencyPhone || null,
           isMinor,
+          shareAccentColor: shareAccentColor,
           weeklyRecapEnabled: recapEnabled,
           weeklyRecapDayOfWeek: recapDay,
           weeklyRecapHourLocal: recapHour,
@@ -606,6 +623,66 @@ export default function SettingsPrivacy() {
               checked={requireApproval}
               onCheckedChange={setRequireApproval}
             />
+          </div>
+        </GlassCard>
+
+        {/* Share card accent color */}
+        <GlassCard glow="primary" className="p-4">
+          <div className="relative z-10 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-base font-black flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-pink-400" />
+                  Share card accent
+                </div>
+                <p className="text-xs text-muted-foreground font-medium mt-1">
+                  Pick the gradient used on your shared post, profile, and club preview cards.
+                </p>
+              </div>
+              {accentTier === "premium" ? (
+                <Badge className="bg-gradient-to-r from-amber-400 to-orange-400 text-black font-black gap-1 shrink-0">
+                  <Crown className="w-3 h-3" /> Premium
+                </Badge>
+              ) : null}
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {accentOptions.map((opt) => {
+                const isSelected = (shareAccentColor ?? "default") === opt.id;
+                const locked = !opt.available;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    disabled={locked}
+                    onClick={() => setShareAccentColor(opt.id === "default" ? null : opt.id)}
+                    className={`group relative rounded-xl p-2 border-2 transition-all ${
+                      isSelected ? "border-white scale-105" : "border-white/10 hover:border-white/30"
+                    } ${locked ? "opacity-50 cursor-not-allowed" : ""}`}
+                    aria-label={`${opt.name} accent${locked ? " (Premium)" : ""}`}
+                    aria-pressed={isSelected}
+                    data-testid={`accent-option-${opt.id}`}
+                  >
+                    <div
+                      className="w-full h-10 rounded-lg"
+                      style={{ background: `linear-gradient(90deg, ${opt.from}, ${opt.to})` }}
+                    />
+                    <div className="flex items-center justify-center gap-1 mt-1">
+                      <p className="text-[10px] font-bold truncate">{opt.name}</p>
+                      {opt.premium && <Crown className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
+                    </div>
+                    {locked && (
+                      <Lock className="absolute top-1 right-1 w-3 h-3 text-amber-400" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {accentTier === "free" && accentOptions.some((o) => o.premium) && (
+              <p className="text-[11px] text-amber-300/80 font-medium flex items-center gap-1">
+                <Crown className="w-3 h-3" />
+                Unlock the full palette with HatchUp Premium.
+              </p>
+            )}
           </div>
         </GlassCard>
 

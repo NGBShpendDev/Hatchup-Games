@@ -162,6 +162,92 @@ describe("buildPlayerOgSvg / buildClubOgSvg — branded SVG output", () => {
     assert.ok(svg.includes("32 / 50"));
     assert.ok(svg.includes("WINS"));
   });
+
+  it("uses the default brand pink→orange accent when no accent is provided", () => {
+    const svg = buildPlayerOgSvg({
+      displayName: "DragonMaster",
+      username: "dragon",
+      level: 17,
+      rank: null,
+      title: null,
+      totalSteps: null,
+      currentStreak: null,
+      isVerified: false,
+      avatarHref: null,
+    });
+    assert.ok(svg.includes("#ff3d8b"));
+    assert.ok(svg.includes("#ff6b3d"));
+  });
+
+  it("uses the supplied accent gradient on player share cards", () => {
+    const svg = buildPlayerOgSvg({
+      displayName: "DragonMaster",
+      username: "dragon",
+      level: 17,
+      rank: null,
+      title: null,
+      totalSteps: null,
+      currentStreak: null,
+      isVerified: false,
+      avatarHref: null,
+      accent: { from: "#3da6ff", to: "#5cf2d6" },
+    });
+    assert.ok(svg.includes("#3da6ff"));
+    assert.ok(svg.includes("#5cf2d6"));
+    assert.ok(!svg.includes("#ff3d8b"));
+  });
+
+  it("uses the supplied accent gradient on club share cards", () => {
+    const svg = buildClubOgSvg({
+      name: "Iron Hatchers",
+      description: null,
+      level: 7,
+      memberCount: 32,
+      maxMembers: 50,
+      totalWins: 188,
+      emblem: null,
+      accent: { from: "#a855f7", to: "#ec4899" },
+    });
+    assert.ok(svg.includes("#a855f7"));
+    assert.ok(svg.includes("#ec4899"));
+    assert.ok(!svg.includes("#ff3d8b"));
+  });
+});
+
+describe("player og.png — ETag includes accent color id", () => {
+  it("changes the ETag when the player's accent color changes", async () => {
+    delete process.env.REPLIT_DOMAINS;
+    let accentId: string = "default";
+    const { url, close } = await startServer({
+      player: async () => basicPlayer({
+        accentId,
+        accent: accentId === "default"
+          ? { from: "#ff3d8b", to: "#ff6b3d" }
+          : { from: "#3da6ff", to: "#5cf2d6" },
+      }),
+    });
+    try {
+      const first = await fetch(`${url}/player/dragon/og.png`);
+      const firstEtag = first.headers.get("etag");
+      assert.ok(firstEtag, "first response should have an ETag");
+      // Same accent → same ETag (cacheable)
+      const cached = await fetch(`${url}/player/dragon/og.png`, {
+        headers: { "if-none-match": firstEtag! },
+      });
+      assert.equal(cached.status, 304);
+      // Different accent → ETag changes, cache busts
+      accentId = "ocean";
+      const second = await fetch(`${url}/player/dragon/og.png`, {
+        headers: { "if-none-match": firstEtag! },
+      });
+      assert.equal(second.status, 200);
+      const secondEtag = second.headers.get("etag");
+      assert.ok(secondEtag);
+      assert.notEqual(firstEtag, secondEtag);
+    } finally {
+      await close();
+    }
+  });
 });
 
 async function startServer(handlers: {
