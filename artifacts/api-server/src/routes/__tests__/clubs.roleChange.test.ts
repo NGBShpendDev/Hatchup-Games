@@ -45,6 +45,7 @@ function resetState() {
   state.players = new Map();
   state.clubs = new Map();
   state.authPlayerId = null;
+  writeCounter.playerUpdates = 0;
 }
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -116,7 +117,10 @@ const notificationsTable = {
   sourceId: col("notifications", "sourceId"),
 };
 
+const writeCounter = { playerUpdates: 0 };
+
 function updatePlayer(cond: Pred, vals: Record<string, unknown>) {
+  writeCounter.playerUpdates++;
   const id = findPred(cond, "players", "id")?.val as number | undefined;
   const player = id !== undefined ? state.players.get(id) : undefined;
   if (player) Object.assign(player, vals);
@@ -183,6 +187,8 @@ mock.module("@workspace/api-zod", {
     JoinClubBody: { safeParse: (d: unknown) => ({ success: true, data: d }) },
     UpdateClubMemberRoleParams: { safeParse: (d: unknown) => ({ success: true, data: d }) },
     UpdateClubMemberRoleBody: { safeParse: (d: unknown) => ({ success: true, data: d }) },
+    TransferClubOwnershipParams: { safeParse: (d: unknown) => ({ success: true, data: d }) },
+    TransferClubOwnershipBody: { safeParse: (d: unknown) => ({ success: true, data: d }) },
   },
 });
 
@@ -305,6 +311,33 @@ describe("PATCH /clubs/:id/members/:playerId — role transitions", () => {
     assert.equal(body.clubRole, "member");
     assert.equal(state.players.get(OFFICER_ID)!.clubRole, "member");
     assert.equal(state.players.get(OWNER_ID)!.clubRole, "owner");
+  });
+
+  it("no-op: target already has the requested role — 200 with no DB write", async () => {
+    state.authPlayerId = OWNER_ID;
+    writeCounter.playerUpdates = 0;
+
+    const { status, body } = await patchRole(CLUB_ID, OFFICER_ID, "officer");
+    assert.equal(status, 200);
+    assert.equal(body.clubRole, "officer");
+    // Endpoint should short-circuit before issuing any player update.
+    assert.equal(
+      writeCounter.playerUpdates,
+      0,
+      "no-op role change must not write to the players table",
+    );
+    assert.equal(state.players.get(OFFICER_ID)!.clubRole, "officer");
+  });
+
+  it("no-op: member→member also short-circuits with no DB write", async () => {
+    state.authPlayerId = OWNER_ID;
+    writeCounter.playerUpdates = 0;
+
+    const { status, body } = await patchRole(CLUB_ID, MEMBER_ID, "member");
+    assert.equal(status, 200);
+    assert.equal(body.clubRole, "member");
+    assert.equal(writeCounter.playerUpdates, 0);
+    assert.equal(state.players.get(MEMBER_ID)!.clubRole, "member");
   });
 });
 
