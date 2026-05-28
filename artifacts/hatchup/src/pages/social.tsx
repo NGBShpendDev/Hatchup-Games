@@ -492,19 +492,44 @@ function FollowersListSheet({
   onClose: () => void;
   onViewProfile: (pid: number) => void;
 }) {
-  const { data, isLoading } = useListFollowers(
+  const [cursor, setCursor] = useState(0);
+  const [accumulated, setAccumulated] = useState<PlayerStubRow[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      setCursor(0);
+      setAccumulated([]);
+    }
+  }, [open, profileId]);
+
+  const { data, isLoading, isFetching } = useListFollowers(
     profileId,
-    undefined,
+    { cursor, limit: 20 },
     {
       query: {
-        queryKey: getListFollowersQueryKey(profileId),
+        queryKey: getListFollowersQueryKey(profileId, { cursor, limit: 20 }),
         enabled: open && !!profileId,
       },
     },
   );
 
-  const players = data?.players ?? [];
-  const total = data?.total ?? 0;
+  useEffect(() => {
+    if (!data) return;
+    setAccumulated(prev => {
+      const seen = new Set(prev.map(p => p.id));
+      const next = [...prev];
+      for (const p of data.players) {
+        if (!seen.has(p.id)) {
+          next.push(p as PlayerStubRow);
+          seen.add(p.id);
+        }
+      }
+      return next;
+    });
+  }, [data]);
+
+  const total = data?.total ?? accumulated.length;
+  const hasMore = data?.nextCursor != null;
 
   return (
     <Sheet open={open} onOpenChange={v => { if (!v) onClose(); }}>
@@ -513,32 +538,46 @@ function FollowersListSheet({
           <SheetTitle className="text-lg font-black flex items-center gap-2">
             <Users className="w-4 h-4 text-primary" />
             Followers
-            {data && (
+            {total > 0 && (
               <span className="text-xs font-bold text-muted-foreground">({total})</span>
             )}
           </SheetTitle>
         </SheetHeader>
 
         <div className="mt-4 space-y-2">
-          {isLoading ? (
+          {isLoading && accumulated.length === 0 ? (
             <>
               <Skeleton className="h-14 w-full rounded-2xl" />
               <Skeleton className="h-14 w-full rounded-2xl" />
               <Skeleton className="h-14 w-full rounded-2xl" />
             </>
-          ) : players.length === 0 ? (
+          ) : accumulated.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
               No followers yet.
             </p>
           ) : (
-            players.map(p => (
+            accumulated.map(p => (
               <PlayerListRow
                 key={p.id}
-                player={p as PlayerStubRow}
+                player={p}
                 testIdPrefix="follower"
                 onViewProfile={pid => { if (pid !== viewerId) onViewProfile(pid); }}
               />
             ))
+          )}
+
+          {hasMore && (
+            <Button
+              variant="ghost"
+              className="w-full rounded-xl font-bold mt-2"
+              data-testid="button-load-more-followers"
+              disabled={isFetching}
+              onClick={() => {
+                if (data?.nextCursor != null) setCursor(data.nextCursor);
+              }}
+            >
+              {isFetching ? "Loading..." : "Load more"}
+            </Button>
           )}
         </div>
       </SheetContent>
@@ -559,19 +598,44 @@ function FollowingListSheet({
   onClose: () => void;
   onViewProfile: (pid: number) => void;
 }) {
-  const { data, isLoading } = useListFollowing(
+  const [cursor, setCursor] = useState(0);
+  const [accumulated, setAccumulated] = useState<PlayerStubRow[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      setCursor(0);
+      setAccumulated([]);
+    }
+  }, [open, profileId]);
+
+  const { data, isLoading, isFetching } = useListFollowing(
     profileId,
-    undefined,
+    { cursor, limit: 20 },
     {
       query: {
-        queryKey: getListFollowingQueryKey(profileId),
+        queryKey: getListFollowingQueryKey(profileId, { cursor, limit: 20 }),
         enabled: open && !!profileId,
       },
     },
   );
 
-  const players = data?.players ?? [];
-  const total = data?.total ?? 0;
+  useEffect(() => {
+    if (!data) return;
+    setAccumulated(prev => {
+      const seen = new Set(prev.map(p => p.id));
+      const next = [...prev];
+      for (const p of data.players) {
+        if (!seen.has(p.id)) {
+          next.push(p as PlayerStubRow);
+          seen.add(p.id);
+        }
+      }
+      return next;
+    });
+  }, [data]);
+
+  const total = data?.total ?? accumulated.length;
+  const hasMore = data?.nextCursor != null;
 
   return (
     <Sheet open={open} onOpenChange={v => { if (!v) onClose(); }}>
@@ -580,32 +644,46 @@ function FollowingListSheet({
           <SheetTitle className="text-lg font-black flex items-center gap-2">
             <UserPlus className="w-4 h-4 text-primary" />
             Following
-            {data && (
+            {total > 0 && (
               <span className="text-xs font-bold text-muted-foreground">({total})</span>
             )}
           </SheetTitle>
         </SheetHeader>
 
         <div className="mt-4 space-y-2">
-          {isLoading ? (
+          {isLoading && accumulated.length === 0 ? (
             <>
               <Skeleton className="h-14 w-full rounded-2xl" />
               <Skeleton className="h-14 w-full rounded-2xl" />
               <Skeleton className="h-14 w-full rounded-2xl" />
             </>
-          ) : players.length === 0 ? (
+          ) : accumulated.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
               Not following anyone yet.
             </p>
           ) : (
-            players.map(p => (
+            accumulated.map(p => (
               <PlayerListRow
                 key={p.id}
-                player={p as PlayerStubRow}
+                player={p}
                 testIdPrefix="following"
                 onViewProfile={pid => { if (pid !== viewerId) onViewProfile(pid); }}
               />
             ))
+          )}
+
+          {hasMore && (
+            <Button
+              variant="ghost"
+              className="w-full rounded-xl font-bold mt-2"
+              data-testid="button-load-more-following"
+              disabled={isFetching}
+              onClick={() => {
+                if (data?.nextCursor != null) setCursor(data.nextCursor);
+              }}
+            >
+              {isFetching ? "Loading..." : "Load more"}
+            </Button>
           )}
         </div>
       </SheetContent>
