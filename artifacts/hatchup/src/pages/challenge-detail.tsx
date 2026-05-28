@@ -11,6 +11,7 @@ import {
   useInviteToChallenge,
   useSearchPlayers,
   getSearchPlayersQueryKey,
+  useCreatePost,
   type PlayerStub,
 } from "@workspace/api-client-react";
 import {
@@ -86,6 +87,7 @@ export default function ChallengeDetail() {
   const [invitedIds, setInvitedIds] = useState<Set<number>>(new Set());
   const [rewardSummary, setRewardSummary] = useState<{ open: boolean; entries: RewardEntry[]; title?: string }>({ open: false, entries: [] });
   const [championOverlayOpen, setChampionOverlayOpen] = useState(false);
+  const [victoryShared, setVictoryShared] = useState(false);
 
   // Debounce the search input by 300ms to avoid hammering the API
   useEffect(() => {
@@ -230,6 +232,23 @@ export default function ChallengeDetail() {
     },
   });
 
+  const createPostMutation = useCreatePost({
+    mutation: {
+      onSuccess: () => {
+        setVictoryShared(true);
+        queryClient.invalidateQueries({ queryKey: ["/api/social/feed"] });
+        toast({ title: "Victory shared! 🏆", description: "Your win is live on the feed." });
+      },
+      onError: (err: { response?: { data?: { error?: string } } }) => {
+        toast({
+          title: "Could not share",
+          description: err?.response?.data?.error ?? "Try again in a moment.",
+          variant: "destructive",
+        });
+      },
+    },
+  });
+
   const reportMutation = useReportChallenge({
     mutation: {
       onSuccess: () => toast({ title: "Reported", description: "Sent for moderation review." }),
@@ -301,6 +320,55 @@ export default function ChallengeDetail() {
         localStorage.setItem(`champion-overlay-seen:${player.id}:${challengeId}`, "1");
       } catch {
         // ignore — the overlay just won't be suppressed across reloads
+      }
+    }
+  };
+
+  // Tournament bracket size for the victory share. Falls back to the live
+  // participant count when maxParticipants isn't set on the challenge row.
+  const bracketSize =
+    (rich as { maxParticipants?: number | null }).maxParticipants ??
+    (rich as { participantCount?: number }).participantCount ??
+    0;
+
+  const challengeUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/challenges/${challengeId}`
+      : `/challenges/${challengeId}`;
+
+  const victoryShareText =
+    `👑 I just won "${challenge.title}" — a ${bracketSize}-player elimination tournament on HatchUp! ` +
+    `Boosted reward: ${boostedXp.toLocaleString()} XP + ${boostedCoins.toLocaleString()} coins. ` +
+    `Join the next bracket: ${challengeUrl}`;
+
+  const handleShareVictory = async () => {
+    if (!player || victoryShared || createPostMutation.isPending) return;
+    try {
+      await createPostMutation.mutateAsync({
+        data: {
+          playerId: player.id,
+          content: victoryShareText,
+          postType: "streak_milestone",
+        },
+      });
+    } catch {
+      // toast handled in mutation onError
+      return;
+    }
+    // Native share sheet / copy-to-clipboard fallback (mirrors handleShare)
+    if (typeof navigator === "undefined") return;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: challenge.title, text: victoryShareText, url: challengeUrl });
+      } catch {
+        // user canceled — that's fine
+      }
+    } else if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(victoryShareText);
+        toast({ title: "Copied!", description: "Victory details copied to clipboard." });
+      } catch {
+        // clipboard unavailable — the feed post is still up
       }
     }
   };
@@ -731,6 +799,9 @@ export default function ChallengeDetail() {
         boostedXp={boostedXp}
         boostedCoins={boostedCoins}
         onDismiss={dismissChampionOverlay}
+        onShare={handleShareVictory}
+        isSharing={createPostMutation.isPending}
+        shared={victoryShared}
       />
 
       {/* Unified reward summary — fires on join and every progress submission */}

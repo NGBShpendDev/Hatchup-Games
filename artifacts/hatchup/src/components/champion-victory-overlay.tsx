@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Crown, Zap, Coins, Trophy } from "lucide-react";
+import { Crown, Zap, Coins, Trophy, Share2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ChampionVictoryOverlayProps {
@@ -8,6 +8,9 @@ interface ChampionVictoryOverlayProps {
   boostedXp: number;
   boostedCoins: number;
   onDismiss: () => void;
+  onShare?: () => void;
+  isSharing?: boolean;
+  shared?: boolean;
 }
 
 export function ChampionVictoryOverlay({
@@ -16,6 +19,9 @@ export function ChampionVictoryOverlay({
   boostedXp,
   boostedCoins,
   onDismiss,
+  onShare,
+  isSharing,
+  shared,
 }: ChampionVictoryOverlayProps) {
   return (
     <AnimatePresence>
@@ -131,8 +137,29 @@ export function ChampionVictoryOverlay({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 1.05 }}
-              className="mt-6"
+              className="mt-6 space-y-2"
             >
+              {onShare && (
+                <Button
+                  onClick={onShare}
+                  disabled={isSharing || shared}
+                  variant="outline"
+                  className="w-full border-yellow-400/40 bg-yellow-500/10 text-yellow-200 hover:bg-yellow-500/20 font-black"
+                  data-testid="button-share-champion"
+                >
+                  {shared ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2" /> Shared to feed
+                    </>
+                  ) : isSharing ? (
+                    "Sharing…"
+                  ) : (
+                    <>
+                      <Share2 className="w-4 h-4 mr-2" /> Share Victory
+                    </>
+                  )}
+                </Button>
+              )}
               <Button
                 onClick={onDismiss}
                 className="w-full bg-yellow-400 text-yellow-950 hover:bg-yellow-300 font-black"
