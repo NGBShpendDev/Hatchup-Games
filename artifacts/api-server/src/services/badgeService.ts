@@ -3,7 +3,7 @@ import { playerBadgesTable, playersTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 
 export type BadgeTier = "Common" | "Rare" | "Epic" | "Legendary" | "Mythic";
-export type BadgeCategory = "fitness" | "streak" | "hatchling" | "social" | "achievement" | "event" | "secret" | "strength" | "speed";
+export type BadgeCategory = "fitness" | "streak" | "hatchling" | "social" | "achievement" | "event" | "secret" | "strength" | "speed" | "nutrition";
 
 export interface BadgeDefinition {
   key: string;
@@ -68,6 +68,14 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
   { key: "PUSHUP_CENTURY",   name: "Pushup Century",    description: "Log 100 pushups in a single session",         tier: "Rare",      category: "strength", icon: "💥", isSecret: false, xpReward: 400,   coinsReward: 200  },
   { key: "IRON_WILL",        name: "Iron Will",         description: "Log 1,000 total pushups lifetime",            tier: "Epic",      category: "strength", icon: "⚙️", isSecret: false, xpReward: 800,   coinsReward: 400  },
   { key: "SQUAT_LEGEND",     name: "Squat Legend",      description: "Log 10,000 total squats lifetime",            tier: "Legendary", category: "strength", icon: "🏋️", isSecret: false, xpReward: 3000,  coinsReward: 1500 },
+
+  // ---- NUTRITION BADGES ----
+  { key: "PROTEIN_KING",       name: "Protein King",       description: "Log 150g+ protein in a single day",                         tier: "Rare",      category: "nutrition", icon: "🥩", isSecret: false, xpReward: 400,   coinsReward: 200  },
+  { key: "MACRO_MASTER",       name: "Macro Master",       description: "Log macros (protein, carbs, fat) on 10 meal posts",          tier: "Epic",      category: "nutrition", icon: "📊", isSecret: false, xpReward: 800,   coinsReward: 400  },
+  { key: "MEAL_PREP_LEGEND",   name: "Meal Prep Legend",   description: "Complete the 5 home-cooked meals challenge",                 tier: "Epic",      category: "nutrition", icon: "🍱", isSecret: false, xpReward: 1000,  coinsReward: 500  },
+  { key: "HYDRATION_HERO",     name: "Hydration Hero",     description: "Complete the 8 cups/day hydration challenge",                tier: "Rare",      category: "nutrition", icon: "💧", isSecret: false, xpReward: 350,   coinsReward: 175  },
+  { key: "BULK_BEAST",         name: "Bulk Beast",         description: "Log 10 high-protein or lean-bulk meal posts",                tier: "Rare",      category: "nutrition", icon: "🦣", isSecret: false, xpReward: 500,   coinsReward: 250  },
+  { key: "LEAN_MACHINE",       name: "Lean Machine",       description: "Complete the 7-day protein streak challenge",                tier: "Epic",      category: "nutrition", icon: "⚗️", isSecret: false, xpReward: 1200,  coinsReward: 600  },
 
   // ---- RUNNING / SPEED BADGES ----
   { key: "SPEED_DEMON",      name: "Speed Demon",       description: "Log a run at sub-8 minute mile pace",         tier: "Rare",      category: "speed",    icon: "⚡", isSecret: false, xpReward: 500,   coinsReward: 250  },

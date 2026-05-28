@@ -52,10 +52,10 @@ interface DailyReward {
   lastClaimedAt: string | null;
 }
 
-const CATEGORIES = ["all", "fitness", "streak", "hatchling", "achievement", "event", "secret"];
+const CATEGORIES = ["all", "fitness", "strength", "speed", "nutrition", "streak", "hatchling", "achievement", "event", "secret"];
 const CATEGORY_LABELS: Record<string, string> = {
-  all: "All", fitness: "Fitness", streak: "Streak", hatchling: "Pals",
-  achievement: "Achievement", event: "Event", secret: "🔒 Secret",
+  all: "All", fitness: "Fitness", strength: "Strength", speed: "Speed", nutrition: "🥗 Nutrition",
+  streak: "Streak", hatchling: "Pals", achievement: "Achievement", event: "Event", secret: "🔒 Secret",
 };
 
 export default function Rewards() {

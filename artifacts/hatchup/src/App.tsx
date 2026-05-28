@@ -26,6 +26,7 @@ import AdminReports from "@/pages/admin-reports";
 import SafetyGuidelines from "@/pages/safety-guidelines";
 import Coach from "@/pages/coach";
 import Records from "@/pages/records";
+import Nutrition from "@/pages/nutrition";
 
 const queryClient = new QueryClient();
 
@@ -226,6 +227,7 @@ function AppRoutes() {
         <Route path="/safety/guidelines" component={SafetyGuidelines} />
         <Route path="/coach" component={Coach} />
         <Route path="/records" component={Records} />
+        <Route path="/nutrition" component={Nutrition} />
         <Route component={NotFound} />
       </Switch>
     </>

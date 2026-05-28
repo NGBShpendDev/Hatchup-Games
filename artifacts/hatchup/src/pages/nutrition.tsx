@@ -1,0 +1,681 @@
+import { useState } from "react";
+import { Layout } from "@/components/layout";
+import { usePlayer } from "@/lib/playerContext";
+import { motion, AnimatePresence } from "framer-motion";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { Heart, MessageCircle, Zap, Target, ChefHat, Plus, X, Sparkles, Droplets, Flame, Dumbbell } from "lucide-react";
+
+const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+
+const MEAL_TAGS = [
+  { key: "weight-loss",    label: "Weight Loss",   color: "bg-green-500/20 text-green-400 border-green-500/40" },
+  { key: "lean-bulk",      label: "Lean Bulk",     color: "bg-blue-500/20 text-blue-400 border-blue-500/40"   },
+  { key: "muscle-gain",    label: "Muscle Gain",   color: "bg-red-500/20 text-red-400 border-red-500/40"     },
+  { key: "keto",           label: "Keto",           color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/40" },
+  { key: "high-protein",   label: "High Protein",  color: "bg-orange-500/20 text-orange-400 border-orange-500/40" },
+  { key: "vegan",          label: "Vegan",          color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/40" },
+  { key: "pre-workout",    label: "Pre-Workout",   color: "bg-purple-500/20 text-purple-400 border-purple-500/40" },
+  { key: "post-workout",   label: "Post-Workout",  color: "bg-pink-500/20 text-pink-400 border-pink-500/40"  },
+  { key: "cheat-meal",     label: "Cheat Meal",    color: "bg-rose-500/20 text-rose-400 border-rose-500/40"  },
+  { key: "healthy-snack",  label: "Healthy Snack", color: "bg-teal-500/20 text-teal-400 border-teal-500/40"  },
+];
+
+const TAG_MAP = Object.fromEntries(MEAL_TAGS.map(t => [t.key, t]));
+
+const PHYSIQUE_GOALS = [
+  { key: "shredded",         label: "Shredded",         icon: "🔥" },
+  { key: "lean_athlete",     label: "Lean Athlete",     icon: "⚡" },
+  { key: "muscle_gain",      label: "Muscle Gain",      icon: "💪" },
+  { key: "slim_thick",       label: "Slim Thick",       icon: "✨" },
+  { key: "endurance_runner", label: "Endurance Runner", icon: "🏃" },
+  { key: "weight_loss",      label: "Weight Loss",      icon: "📉" },
+];
+
+const MEAL_EMOJIS = ["🍽️","🥗","🍗","🥩","🥑","🍳","🥛","🍱","🥙","🌮","🥦","🍠","🫐","🥜","🍚","🐟","🥚","🧇","🍎","🫚"];
+
+interface MealPost {
+  id: number;
+  playerId: number;
+  emoji: string;
+  name: string;
+  tag: string;
+  description: string | null;
+  calories: number | null;
+  proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
+  aiAnalyzed: boolean;
+  likesCount: number;
+  commentsCount: number;
+  createdAt: string;
+  liked: boolean;
+  author: { id: number; username: string; displayName: string | null };
+}
+
+interface NutritionChallenge {
+  key: string;
+  name: string;
+  description: string;
+  target: number;
+  unit: string;
+  xpReward: number;
+  coinsReward: number;
+  icon: string;
+  currentValue: number;
+  completedAt: string | null;
+}
+
+interface MacroTarget {
+  goal: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  tip: string;
+}
+
+export default function Nutrition() {
+  const { playerId, player } = usePlayer();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const pid = playerId ?? 0;
+
+  const [activeTab, setActiveTab] = useState<"feed" | "challenges">("feed");
+  const [showCreateSheet, setShowCreateSheet] = useState(false);
+  const [showGoalPicker, setShowGoalPicker] = useState(false);
+
+  // Create form state
+  const [form, setForm] = useState({
+    name: "",
+    emoji: "🍽️",
+    tag: "healthy-snack",
+    description: "",
+    calories: "",
+    proteinG: "",
+    carbsG: "",
+    fatG: "",
+  });
+  const [analyzing, setAnalyzing] = useState(false);
+  const [aiResult, setAiResult] = useState<{ quality_score?: number; suggestions?: string[] } | null>(null);
+
+  // ── Queries ─────────────────────────────────────────────────────────────────
+  const { data: posts = [], isLoading: postsLoading } = useQuery<MealPost[]>({
+    queryKey: ["nutrition-posts", pid],
+    queryFn: () => fetch(`${BASE}/api/nutrition/posts?playerId=${pid}&limit=30`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!pid,
+  });
+
+  const { data: challenges = [], isLoading: challengesLoading } = useQuery<NutritionChallenge[]>({
+    queryKey: ["nutrition-challenges", pid],
+    queryFn: () => fetch(`${BASE}/api/nutrition/challenges?playerId=${pid}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!pid,
+  });
+
+  const { data: macroTarget } = useQuery<MacroTarget>({
+    queryKey: ["macro-target", pid],
+    queryFn: () => fetch(`${BASE}/api/nutrition/macro-target?playerId=${pid}`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!pid,
+  });
+
+  // ── Mutations ────────────────────────────────────────────────────────────────
+  const likeMutation = useMutation({
+    mutationFn: (postId: number) =>
+      fetch(`${BASE}/api/nutrition/posts/${postId}/like`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: pid }),
+      }).then(r => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["nutrition-posts", pid] }),
+  });
+
+  const challengeMutation = useMutation({
+    mutationFn: (key: string) =>
+      fetch(`${BASE}/api/nutrition/challenges/${key}/progress`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: pid, increment: 1 }),
+      }).then(r => r.json()),
+    onSuccess: (data, key) => {
+      qc.invalidateQueries({ queryKey: ["nutrition-challenges", pid] });
+      if (data.isComplete) {
+        toast({ title: "Challenge Complete! 🏆", description: `You earned a new badge!` });
+      } else {
+        toast({ title: "Progress logged!", description: `${data.currentValue} / ${data.target}` });
+      }
+    },
+  });
+
+  const goalMutation = useMutation({
+    mutationFn: (goal: string) =>
+      fetch(`${BASE}/api/nutrition/physique-goal`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: pid, physiqueGoal: goal }),
+      }).then(r => r.json()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["macro-target", pid] });
+      setShowGoalPicker(false);
+      toast({ title: "Goal updated!", description: "Your macro targets have been updated." });
+    },
+  });
+
+  const postMutation = useMutation({
+    mutationFn: () =>
+      fetch(`${BASE}/api/nutrition/posts`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          playerId: pid,
+          name: form.name,
+          emoji: form.emoji,
+          tag: form.tag,
+          description: form.description || undefined,
+          calories: form.calories ? Number(form.calories) : undefined,
+          proteinG: form.proteinG ? Number(form.proteinG) : undefined,
+          carbsG: form.carbsG ? Number(form.carbsG) : undefined,
+          fatG: form.fatG ? Number(form.fatG) : undefined,
+          aiAnalyzed: !!aiResult,
+        }),
+      }).then(r => r.json()),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["nutrition-posts", pid] });
+      setShowCreateSheet(false);
+      setForm({ name: "", emoji: "🍽️", tag: "healthy-snack", description: "", calories: "", proteinG: "", carbsG: "", fatG: "" });
+      setAiResult(null);
+      if (data.newBadges?.length > 0) {
+        toast({ title: "New badge unlocked! 🏅", description: data.newBadges.join(", ") });
+      } else {
+        toast({ title: "Meal posted!", description: "Your meal is on the feed." });
+      }
+    },
+  });
+
+  const handleAnalyze = async () => {
+    if (!form.description) return;
+    setAnalyzing(true);
+    try {
+      const res = await fetch(`${BASE}/api/nutrition/analyze`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: form.description }),
+      });
+      const data = await res.json();
+      setForm(f => ({
+        ...f,
+        calories: String(data.calories ?? f.calories),
+        proteinG: String(data.protein_g ?? f.proteinG),
+        carbsG: String(data.carbs_g ?? f.carbsG),
+        fatG: String(data.fat_g ?? f.fatG),
+      }));
+      setAiResult(data);
+      toast({ title: "AI Analysis complete!", description: `Quality score: ${data.quality_score}/10` });
+    } catch {
+      toast({ title: "Analysis failed", description: "Try again.", variant: "destructive" });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const goalLabel = PHYSIQUE_GOALS.find(g => g.key === macroTarget?.goal)?.label ?? macroTarget?.goal ?? "Lean Athlete";
+  const goalIcon  = PHYSIQUE_GOALS.find(g => g.key === macroTarget?.goal)?.icon ?? "⚡";
+
+  return (
+    <Layout>
+      <div className="max-w-lg mx-auto pb-24">
+        {/* Header */}
+        <div className="pt-4 pb-3 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-black flex items-center gap-2">
+              <ChefHat className="w-6 h-6 text-primary" /> Nutrition Feed
+            </h1>
+            <p className="text-xs text-muted-foreground font-medium mt-0.5">Share meals · Track macros · Earn badges</p>
+          </div>
+          <button
+            onClick={() => setShowCreateSheet(true)}
+            className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/40 active:scale-95 transition-transform"
+          >
+            <Plus className="w-5 h-5 text-white" />
+          </button>
+        </div>
+
+        {/* Macro Target Banner */}
+        {macroTarget && (
+          <div className="rounded-2xl border border-border bg-card p-4 mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">{goalIcon}</span>
+                <div>
+                  <p className="font-black text-sm">Daily Target · {goalLabel}</p>
+                  <p className="text-[11px] text-muted-foreground">{macroTarget.tip}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowGoalPicker(true)} className="text-xs text-primary font-bold hover:underline">
+                Change
+              </button>
+            </div>
+            <div className="grid grid-cols-4 gap-2 mt-3">
+              {[
+                { label: "Cals", val: macroTarget.calories, icon: <Flame className="w-3 h-3" />, color: "text-orange-400" },
+                { label: "Protein", val: `${macroTarget.protein}g`, icon: <Dumbbell className="w-3 h-3" />, color: "text-red-400" },
+                { label: "Carbs",   val: `${macroTarget.carbs}g`,   icon: <Zap className="w-3 h-3" />,      color: "text-yellow-400" },
+                { label: "Fat",     val: `${macroTarget.fat}g`,     icon: <Droplets className="w-3 h-3" />, color: "text-blue-400" },
+              ].map(m => (
+                <div key={m.label} className="bg-muted/30 rounded-xl p-2 text-center">
+                  <div className={`flex justify-center mb-1 ${m.color}`}>{m.icon}</div>
+                  <p className="font-black text-sm">{m.val}</p>
+                  <p className="text-[9px] text-muted-foreground font-bold uppercase">{m.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div className="flex gap-1 bg-muted/30 rounded-xl p-1 mb-4">
+          {(["feed", "challenges"] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-wide transition-all ${
+                activeTab === tab ? "bg-primary text-white shadow" : "text-muted-foreground"
+              }`}
+            >
+              {tab === "feed" ? "🍽️ Meal Feed" : "🏆 Challenges"}
+            </button>
+          ))}
+        </div>
+
+        {/* ── FEED TAB ── */}
+        {activeTab === "feed" && (
+          <div className="space-y-4">
+            {postsLoading
+              ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-2xl" />)
+              : posts.length === 0
+                ? (
+                  <div className="text-center py-16">
+                    <div className="text-5xl mb-4">🍽️</div>
+                    <p className="font-black text-lg mb-1">No meals yet</p>
+                    <p className="text-muted-foreground text-sm">Be the first to post a meal!</p>
+                    <Button onClick={() => setShowCreateSheet(true)} className="mt-4 bg-primary">
+                      Post a Meal
+                    </Button>
+                  </div>
+                )
+                : posts.map((post, i) => (
+                  <MealCard key={post.id} post={post} index={i} onLike={() => likeMutation.mutate(post.id)} />
+                ))
+            }
+          </div>
+        )}
+
+        {/* ── CHALLENGES TAB ── */}
+        {activeTab === "challenges" && (
+          <div className="space-y-4">
+            {challengesLoading
+              ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-2xl" />)
+              : challenges.map((c, i) => {
+                const progress = Math.min(100, Math.round((c.currentValue / c.target) * 100));
+                const done = c.completedAt != null;
+                return (
+                  <motion.div
+                    key={c.key}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.08 }}
+                    className={`rounded-2xl border p-4 ${done ? "border-green-500/40 bg-green-500/5" : "border-border bg-card"}`}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{c.icon}</span>
+                        <div>
+                          <p className="font-black text-sm">{c.name}</p>
+                          <p className="text-[11px] text-muted-foreground">{c.description}</p>
+                        </div>
+                      </div>
+                      {done
+                        ? <span className="text-green-400 text-xs font-black">✓ Done!</span>
+                        : <span className="text-xs text-primary font-black">+{c.xpReward} XP</span>
+                      }
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs font-bold text-muted-foreground">
+                        <span>{c.currentValue} / {c.target} {c.unit}</span>
+                        <span>{progress}%</span>
+                      </div>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <motion.div
+                          className={`h-full rounded-full ${done ? "bg-green-500" : "bg-gradient-to-r from-primary to-purple-600"}`}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${progress}%` }}
+                          transition={{ duration: 0.6 }}
+                        />
+                      </div>
+                    </div>
+                    {!done && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-3 w-full text-xs font-black"
+                        onClick={() => challengeMutation.mutate(c.key)}
+                        disabled={challengeMutation.isPending}
+                      >
+                        Log Progress +1
+                      </Button>
+                    )}
+                  </motion.div>
+                );
+              })
+            }
+          </div>
+        )}
+      </div>
+
+      {/* ── CREATE POST SHEET ── */}
+      <AnimatePresence>
+        {showCreateSheet && (
+          <>
+            <motion.div
+              className="fixed inset-0 bg-black/60 z-40"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowCreateSheet(false)}
+            />
+            <motion.div
+              className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl border-t border-border max-h-[90vh] overflow-y-auto"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+            >
+              <div className="p-5 space-y-4 pb-safe-bottom pb-8">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-black text-lg">Post a Meal</h2>
+                  <button onClick={() => setShowCreateSheet(false)} className="text-muted-foreground hover:text-foreground">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Emoji picker */}
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground mb-2">Pick an emoji</p>
+                  <div className="flex flex-wrap gap-2">
+                    {MEAL_EMOJIS.map(e => (
+                      <button
+                        key={e}
+                        onClick={() => setForm(f => ({ ...f, emoji: e }))}
+                        className={`text-xl w-9 h-9 rounded-xl flex items-center justify-center transition-all ${form.emoji === e ? "bg-primary/30 ring-2 ring-primary" : "bg-muted/40 hover:bg-muted"}`}
+                      >
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Meal name */}
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground mb-1">Meal name *</p>
+                  <input
+                    type="text"
+                    placeholder="e.g. Grilled chicken rice bowl"
+                    value={form.name}
+                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                    className="w-full bg-muted/40 border border-border rounded-xl px-4 py-2.5 text-sm font-medium placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+
+                {/* Tag selector */}
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground mb-2">Tag</p>
+                  <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                    {MEAL_TAGS.map(t => (
+                      <button
+                        key={t.key}
+                        onClick={() => setForm(f => ({ ...f, tag: t.key }))}
+                        className={`shrink-0 text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${
+                          form.tag === t.key ? t.color + " ring-1 ring-current" : "bg-muted/30 border-border text-muted-foreground"
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* AI Analyze */}
+                <div className="bg-muted/20 rounded-2xl p-4 border border-border">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-4 h-4 text-purple-400" />
+                    <p className="text-xs font-black text-purple-400">AI Macro Analysis</p>
+                  </div>
+                  <textarea
+                    placeholder='Describe your meal: e.g. "200g chicken breast, 150g rice, broccoli, olive oil"'
+                    value={form.description}
+                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                    rows={2}
+                    className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-purple-500 resize-none"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-2 text-purple-400 border-purple-500/40 hover:bg-purple-500/10 text-xs font-black"
+                    onClick={handleAnalyze}
+                    disabled={analyzing || !form.description}
+                  >
+                    {analyzing ? "Analyzing..." : "✨ AI Analyze"}
+                  </Button>
+                  {aiResult?.quality_score != null && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground font-bold">Quality score:</span>
+                      <span className={`text-sm font-black ${aiResult.quality_score >= 7 ? "text-green-400" : aiResult.quality_score >= 5 ? "text-yellow-400" : "text-red-400"}`}>
+                        {aiResult.quality_score}/10
+                      </span>
+                      {aiResult.suggestions?.map((s, i) => (
+                        <span key={i} className="text-[10px] text-muted-foreground">· {s}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Macro fields */}
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: "calories", label: "Calories", placeholder: "kcal" },
+                    { key: "proteinG", label: "Protein (g)", placeholder: "g" },
+                    { key: "carbsG",   label: "Carbs (g)",   placeholder: "g" },
+                    { key: "fatG",     label: "Fat (g)",     placeholder: "g" },
+                  ].map(f => (
+                    <div key={f.key}>
+                      <p className="text-[10px] font-bold text-muted-foreground mb-1">{f.label}</p>
+                      <input
+                        type="number"
+                        placeholder={f.placeholder}
+                        value={form[f.key as keyof typeof form]}
+                        onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                        className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-sm font-medium placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <Button
+                  className="w-full font-black bg-primary h-12"
+                  onClick={() => postMutation.mutate()}
+                  disabled={!form.name || postMutation.isPending}
+                >
+                  {postMutation.isPending ? "Posting..." : "Post Meal 🍽️"}
+                </Button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ── GOAL PICKER ── */}
+      <AnimatePresence>
+        {showGoalPicker && (
+          <>
+            <motion.div className="fixed inset-0 bg-black/60 z-40" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowGoalPicker(false)} />
+            <motion.div
+              className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl border-t border-border p-5 pb-10"
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-black text-lg">Your Physique Goal</h2>
+                <button onClick={() => setShowGoalPicker(false)}><X className="w-5 h-5 text-muted-foreground" /></button>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">Choose your goal to get a daily macro target tailored for you.</p>
+              <div className="grid grid-cols-2 gap-3">
+                {PHYSIQUE_GOALS.map(g => (
+                  <button
+                    key={g.key}
+                    onClick={() => goalMutation.mutate(g.key)}
+                    className={`rounded-2xl border p-4 text-left transition-all ${
+                      macroTarget?.goal === g.key ? "border-primary bg-primary/10" : "border-border bg-muted/20 hover:bg-muted/40"
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">{g.icon}</div>
+                    <p className="font-black text-sm">{g.label}</p>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </Layout>
+  );
+}
+
+function MealCard({ post, index, onLike }: { post: MealPost; index: number; onLike: () => void }) {
+  const tag = TAG_MAP[post.tag];
+  const [showComments, setShowComments] = useState(false);
+  const [newComment, setNewComment] = useState("");
+  const { playerId } = usePlayer();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const pid = playerId ?? 0;
+
+  const { data: comments = [], refetch } = useQuery<any[]>({
+    queryKey: ["meal-comments", post.id],
+    queryFn: () => fetch(`${BASE}/api/nutrition/posts/${post.id}/comments`, { credentials: "include" }).then(r => r.json()),
+    enabled: showComments,
+  });
+
+  const addComment = async () => {
+    if (!newComment.trim()) return;
+    await fetch(`${BASE}/api/nutrition/posts/${post.id}/comments`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerId: pid, content: newComment }),
+    });
+    setNewComment("");
+    refetch();
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.04 }}
+      className="rounded-2xl border border-border bg-card overflow-hidden"
+    >
+      {/* Post header */}
+      <div className="flex items-center gap-3 px-4 pt-4 pb-2">
+        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-black text-primary">
+          {(post.author.displayName ?? post.author.username)?.[0]?.toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-black text-sm truncate">{post.author.displayName ?? post.author.username}</p>
+          <p className="text-[10px] text-muted-foreground">
+            {new Date(post.createdAt).toLocaleDateString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+          </p>
+        </div>
+        {tag && (
+          <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${tag.color}`}>{tag.label}</span>
+        )}
+      </div>
+
+      {/* Emoji + meal info */}
+      <div className="px-4 pb-3 flex items-center gap-4">
+        <div className="w-16 h-16 rounded-2xl bg-muted/40 flex items-center justify-center text-4xl shrink-0">
+          {post.emoji}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-black text-base truncate">{post.name}</p>
+          {(post.proteinG || post.carbsG || post.fatG) && (
+            <div className="flex gap-3 mt-1 flex-wrap">
+              {post.proteinG   != null && <span className="text-[11px] font-bold text-red-400">P {post.proteinG}g</span>}
+              {post.carbsG     != null && <span className="text-[11px] font-bold text-yellow-400">C {post.carbsG}g</span>}
+              {post.fatG       != null && <span className="text-[11px] font-bold text-blue-400">F {post.fatG}g</span>}
+              {post.calories   != null && <span className="text-[11px] font-bold text-muted-foreground">{post.calories} kcal</span>}
+            </div>
+          )}
+          {post.aiAnalyzed && (
+            <span className="text-[10px] text-purple-400 font-bold flex items-center gap-1 mt-1">
+              <Sparkles className="w-2.5 h-2.5" /> AI analyzed
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Like / comment */}
+      <div className="flex items-center gap-4 px-4 py-2 border-t border-border">
+        <button onClick={onLike} className="flex items-center gap-1.5 text-sm font-bold group">
+          <Heart className={`w-4 h-4 transition-all ${post.liked ? "fill-red-500 text-red-500" : "text-muted-foreground group-hover:text-red-400"}`} />
+          <span className={post.liked ? "text-red-400" : "text-muted-foreground"}>{post.likesCount}</span>
+        </button>
+        <button onClick={() => setShowComments(v => !v)} className="flex items-center gap-1.5 text-sm font-bold text-muted-foreground hover:text-foreground">
+          <MessageCircle className="w-4 h-4" />
+          <span>{post.commentsCount}</span>
+        </button>
+      </div>
+
+      {/* Comments section */}
+      <AnimatePresence>
+        {showComments && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="border-t border-border overflow-hidden"
+          >
+            <div className="px-4 py-3 space-y-2 max-h-48 overflow-y-auto">
+              {comments.length === 0
+                ? <p className="text-xs text-muted-foreground">No comments yet. Be first!</p>
+                : comments.map((c: any) => (
+                  <div key={c.id} className="flex gap-2 text-xs">
+                    <span className="font-black text-primary shrink-0">{c.author?.displayName ?? c.author?.username}</span>
+                    <span className="text-muted-foreground">{c.content}</span>
+                  </div>
+                ))
+              }
+            </div>
+            <div className="flex gap-2 px-4 pb-3">
+              <input
+                type="text"
+                placeholder="Add a comment..."
+                value={newComment}
+                onChange={e => setNewComment(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && addComment()}
+                className="flex-1 bg-muted/40 border border-border rounded-xl px-3 py-1.5 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <button onClick={addComment} className="text-primary font-black text-xs px-2">Post</button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}

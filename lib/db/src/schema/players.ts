@@ -49,6 +49,8 @@ export const playersTable = pgTable("players", {
   requireWorkoutApproval: boolean("require_workout_approval").notNull().default(false),
   isAdmin: boolean("is_admin").notNull().default(false),
   isVerified: boolean("is_verified").notNull().default(false),
+  // Nutrition / body goal
+  physiqueGoal: text("physique_goal"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
