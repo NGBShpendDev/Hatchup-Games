@@ -20,6 +20,9 @@ export const eggsTable = pgTable("eggs", {
   source: text("source").notNull().default("training"),
   // Egg lifecycle: available (in bag, not yet incubating) | incubating | hatched
   status: text("status").notNull().default("incubating"),
+  // True when this egg occupies a purchased extra incubator slot (not one of the base 3).
+  // When the egg hatches the extra slot is permanently consumed.
+  inExtraSlot: boolean("in_extra_slot").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   hatchedAt: timestamp("hatched_at", { withTimezone: true }),
 });

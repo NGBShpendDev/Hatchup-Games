@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { eggsTable, hatchlingsTable } from "@workspace/db";
+import { eggsTable, hatchlingsTable, playersTable } from "@workspace/db";
 import { eq, and, count, gte, sql, inArray } from "drizzle-orm";
 import {
   ListEggsQueryParams,
@@ -10,7 +10,21 @@ import {
   AddEggBody,
 } from "@workspace/api-zod";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth.ts";
+import { isPremium } from "../services/entitlement.ts";
 import { z } from "zod/v4";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function tryGetStripe(): Promise<any | null> {
+  try {
+    const mod = await import("../stripeClient.js");
+    return await mod.getUncachableStripeClient();
+  } catch {
+    return null;
+  }
+}
+
+const MAX_EXTRA_SLOTS = 5;
+const INCUBATOR_BUY_AMOUNT = 300; // $3.00 in cents
 
 const router = Router();
 
@@ -263,6 +277,13 @@ router.post("/eggs/:id/hatch", requireAuth, attachPlayer, requirePlayerOwnership
     .where(eq(eggsTable.id, egg.id))
     .returning();
 
+  // If the egg occupied a purchased extra slot, consume it (one-use)
+  if (egg.inExtraSlot) {
+    await db.update(playersTable)
+      .set({ extraIncubatorSlots: sql`GREATEST(0, ${playersTable.extraIncubatorSlots} - 1)` })
+      .where(eq(playersTable.id, egg.playerId));
+  }
+
   res.json({
     egg: serializeEgg(updatedEgg[0]),
     hatchling: {
@@ -334,7 +355,12 @@ router.post("/eggs/daily-refill", requireAuth, attachPlayer, requirePlayerOwners
 
   const canGet = Math.max(0, DAILY_CAP - alreadyGotToday);
 
-  const MAX_INCUBATOR_SLOTS = 3;
+  // Fetch player for entitlement + extra incubator slots
+  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
+  if (!player) { res.status(404).json({ error: "Player not found" }); return; }
+
+  const premium = isPremium(player);
+  const totalSlots = INCUBATOR_CAP + player.extraIncubatorSlots;
 
   // Count how many incubator slots are currently occupied
   const [{ value: incubatingNow }] = await db
@@ -342,19 +368,25 @@ router.post("/eggs/daily-refill", requireAuth, attachPlayer, requirePlayerOwners
     .from(eggsTable)
     .where(and(eq(eggsTable.playerId, playerId), eq(eggsTable.status, "incubating")));
 
-  const freeSlots = Math.max(0, MAX_INCUBATOR_SLOTS - incubatingNow);
+  const freeSlots = Math.max(0, totalSlots - incubatingNow);
+
+  // Non-premium: eggs can only go to incubator — no bag storage allowed
+  const maxEggs = premium ? canGet : Math.min(canGet, freeSlots);
 
   let placedInIncubator = 0;
 
-  if (canGet > 0) {
-    const newEggs = Array.from({ length: canGet }, (_, i) => {
+  if (maxEggs > 0) {
+    const newEggs = Array.from({ length: maxEggs }, (_, i) => {
       const eggType = pickRandom(DAILY_EGG_TYPE_POOL);
       const config = EGG_TYPE_CONFIG[eggType] ?? EGG_TYPE_CONFIG["balanced"];
       const realm = EGG_TYPE_TO_REALM[eggType] ?? "balance";
       const rarity = pickDailyRarity();
       const stepsRequired = rarity === "Epic" ? 20000 : rarity === "Rare" ? 12000 : config.stepsRequired;
-      // Auto-place into incubator for the first freeSlots eggs
+      // Auto-place into incubator for the first freeSlots eggs; overflow to bag (premium only)
       const status: "incubating" | "available" = i < freeSlots ? "incubating" : "available";
+      // Mark extra-slot eggs (slot index >= base 3)
+      const slotIndex = incubatingNow + i;
+      const inExtraSlot = status === "incubating" && slotIndex >= INCUBATOR_CAP;
       return {
         playerId,
         eggType,
@@ -366,11 +398,12 @@ router.post("/eggs/daily-refill", requireAuth, attachPlayer, requirePlayerOwners
         description: config.description,
         source: "daily" as const,
         status,
+        inExtraSlot,
       };
     });
 
     await db.insert(eggsTable).values(newEggs);
-    placedInIncubator = Math.min(canGet, freeSlots);
+    placedInIncubator = Math.min(maxEggs, freeSlots);
   }
 
   // Return all available eggs for the player (any unplaced from today + previous days)
@@ -401,22 +434,85 @@ router.post("/eggs/:id/place", requireAuth, attachPlayer, async (req, res) => {
     return;
   }
 
+  const placePlayer = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!placePlayer) { res.status(404).json({ error: "Player not found" }); return; }
+
   const [{ value: incubating }] = await db
     .select({ value: count() })
     .from(eggsTable)
     .where(and(eq(eggsTable.playerId, req.playerId!), eq(eggsTable.status, "incubating")));
 
-  if (incubating >= INCUBATOR_CAP) {
-    res.status(400).json({ error: "incubator_full", message: "Your incubator is full. Hatch an egg first." });
+  const totalCap = INCUBATOR_CAP + placePlayer.extraIncubatorSlots;
+
+  if (incubating >= totalCap) {
+    res.status(400).json({ error: "incubator_full", message: "Your incubator is full. Hatch an egg or purchase an extra slot." });
     return;
   }
 
+  // Mark as extra-slot if it's going into a slot beyond the base 3
+  const useExtraSlot = incubating >= INCUBATOR_CAP;
+
   const updated = await db.update(eggsTable)
-    .set({ status: "incubating" })
+    .set({ status: "incubating", inExtraSlot: useExtraSlot })
     .where(eq(eggsTable.id, egg.id))
     .returning();
 
   res.json(serializeEgg(updated[0]));
+});
+
+// POST /eggs/buy-incubator — purchase one extra incubator slot for $3 (max 5 active)
+router.post("/eggs/buy-incubator", requireAuth, attachPlayer, async (req, res) => {
+  const stripe = await tryGetStripe();
+  if (!stripe) {
+    res.status(503).json({ error: "stripe_not_configured", message: "Payment processing isn't connected yet." });
+    return;
+  }
+
+  const buyPlayer = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+  if (!buyPlayer) { res.status(404).json({ error: "Player not found" }); return; }
+
+  if (buyPlayer.extraIncubatorSlots >= MAX_EXTRA_SLOTS) {
+    res.status(400).json({
+      error: "max_extra_slots_reached",
+      message: `You already have the maximum of ${MAX_EXTRA_SLOTS} extra incubator slots.`,
+    });
+    return;
+  }
+
+  let customerId = buyPlayer.stripeCustomerId;
+  if (!customerId) {
+    const customer = await stripe.customers.create({
+      metadata: { playerId: String(buyPlayer.id), clerkId: buyPlayer.clerkId ?? "" },
+      name: buyPlayer.displayName ?? buyPlayer.username,
+    });
+    customerId = customer.id;
+    await db.update(playersTable).set({ stripeCustomerId: customerId }).where(eq(playersTable.id, buyPlayer.id));
+  }
+
+  const origin = `https://${(process.env.REPLIT_DOMAINS ?? "").split(",")[0]}`;
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    payment_method_types: ["card"],
+    customer: customerId,
+    line_items: [{
+      price_data: {
+        currency: "usd",
+        product_data: {
+          name: "Extra Incubator Slot",
+          description: "One extra incubator slot — hatches once and is gone. Up to 5 active at a time.",
+        },
+        unit_amount: INCUBATOR_BUY_AMOUNT,
+      },
+      quantity: 1,
+    }],
+    success_url: `${origin}/hatch?status=incubator_success`,
+    cancel_url:  `${origin}/hatch`,
+    metadata: { playerId: String(buyPlayer.id), kind: "extra_incubator" },
+  });
+
+  req.log.info({ playerId: buyPlayer.id, sessionId: session.id }, "incubator_checkout_created");
+  res.json({ url: session.url, sessionId: session.id });
 });
 
 export default router;

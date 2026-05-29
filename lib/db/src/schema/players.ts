@@ -46,6 +46,9 @@ export const playersTable = pgTable("players", {
   streakFreezes: integer("streak_freezes").notNull().default(0),
   streakShields: integer("streak_shields").notNull().default(0),
   lastShieldUsedAt: timestamp("last_shield_used_at", { withTimezone: true }),
+  // Purchased extra incubator slots (0-5). Each slot is one-use: when the egg
+  // in that slot hatches the slot is permanently consumed and this count decrements.
+  extraIncubatorSlots: integer("extra_incubator_slots").notNull().default(0),
   // Daily reward
   lastRewardClaimedAt: timestamp("last_reward_claimed_at", { withTimezone: true }),
   dailyRewardStreak: integer("daily_reward_streak").notNull().default(0),

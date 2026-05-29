@@ -50,6 +50,7 @@ import type {
   BattleWsClientMessage,
   BattleWsServerMessage,
   BattleWsTokenResponse,
+  BuyExtraIncubatorSlot200,
   BuyStreakShield400,
   BuyStreakShieldResult,
   Challenge,
@@ -5910,6 +5911,76 @@ export const usePlaceEggInIncubator = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getPlaceEggInIncubatorMutationOptions(options));
+    }
+
+export const getBuyExtraIncubatorSlotUrl = () => {
+
+
+
+
+  return `/api/eggs/buy-incubator`
+}
+
+/**
+ * @summary Purchase one extra incubator slot for $3 (max 5 active at a time)
+ */
+export const buyExtraIncubatorSlot = async ( options?: RequestInit): Promise<BuyExtraIncubatorSlot200> => {
+
+  return customFetch<BuyExtraIncubatorSlot200>(getBuyExtraIncubatorSlotUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getBuyExtraIncubatorSlotMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof buyExtraIncubatorSlot>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof buyExtraIncubatorSlot>>, TError,void, TContext> => {
+
+const mutationKey = ['buyExtraIncubatorSlot'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof buyExtraIncubatorSlot>>, void> = () => {
+
+
+          return  buyExtraIncubatorSlot(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BuyExtraIncubatorSlotMutationResult = NonNullable<Awaited<ReturnType<typeof buyExtraIncubatorSlot>>>
+
+    export type BuyExtraIncubatorSlotMutationError = ErrorType<void>
+
+    /**
+ * @summary Purchase one extra incubator slot for $3 (max 5 active at a time)
+ */
+export const useBuyExtraIncubatorSlot = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof buyExtraIncubatorSlot>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof buyExtraIncubatorSlot>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getBuyExtraIncubatorSlotMutationOptions(options));
     }
 
 export const getGetFitnessStatsUrl = (playerId: number,) => {

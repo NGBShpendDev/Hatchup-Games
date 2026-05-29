@@ -1713,6 +1713,29 @@ paths:
         "400":
           description: Incubator full or egg not available
 
+  /eggs/buy-incubator:
+    post:
+      operationId: buyExtraIncubatorSlot
+      tags: [eggs]
+      summary: Purchase one extra incubator slot for $3 (max 5 active at a time)
+      responses:
+        "200":
+          description: Stripe Checkout session URL
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url, sessionId]
+                properties:
+                  url:
+                    type: string
+                  sessionId:
+                    type: string
+        "400":
+          description: Max extra slots already reached
+        "503":
+          description: Stripe not configured
+
   # ── Fitness ──────────────────────────────────────────────────────────────
   /fitness/stats/{playerId}:
     get:
@@ -5169,6 +5192,9 @@ components:
         dailyWorkoutDeadlineHour: { type: integer }
         lastActiveDate: { type: ["string", "null"] }
         createdAt:      { type: string }
+        paidUntil:      { type: ["string", "null"] }
+        trialEndsAt:    { type: ["string", "null"] }
+        extraIncubatorSlots: { type: integer }
 
     PlayerInput:
       type: object

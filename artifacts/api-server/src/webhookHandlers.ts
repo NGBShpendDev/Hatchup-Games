@@ -9,7 +9,7 @@
  */
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient.ts";
 import { db } from "@workspace/db";
-import { playersTable, stripeShieldFulfillmentsTable } from "@workspace/db";
+import { playersTable, stripeShieldFulfillmentsTable, stripeIncubatorFulfillmentsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { logger } from "./lib/logger.ts";
 
@@ -28,6 +28,7 @@ export const WebhookHandlers = {
       );
       await projectSubscriptionState(event);
       await projectShieldGrant(event);
+      await projectIncubatorGrant(event);
     } catch (err) {
       logger.warn({ err }, "stripe_event_projection_failed");
     }
@@ -103,4 +104,44 @@ async function projectShieldGrant(event: import("stripe").default.Event): Promis
   });
 
   logger.info({ playerId: id, pack, shields, sessionId: session.id, eventId: event.id }, "stripe_shield_granted");
+}
+
+async function projectIncubatorGrant(event: import("stripe").default.Event): Promise<void> {
+  if (event.type !== "checkout.session.completed") return;
+  const session = event.data.object as import("stripe").default.Checkout.Session;
+  const { kind, playerId } = session.metadata ?? {};
+  if (kind !== "extra_incubator" || !playerId) return;
+
+  if (session.payment_status !== "paid") {
+    logger.warn({ sessionId: session.id, paymentStatus: session.payment_status }, "stripe_incubator_skipped_unconfirmed_payment");
+    return;
+  }
+
+  const id = parseInt(playerId, 10);
+
+  // Idempotency guard
+  const existing = await db.query.stripeIncubatorFulfillmentsTable.findFirst({
+    where: eq(stripeIncubatorFulfillmentsTable.checkoutSessionId, session.id),
+  });
+  if (existing) {
+    logger.warn({ sessionId: session.id, eventId: event.id }, "stripe_incubator_duplicate_skipped");
+    return;
+  }
+
+  const MAX_EXTRA = 5;
+
+  await db.transaction(async (tx) => {
+    await tx.insert(stripeIncubatorFulfillmentsTable).values({
+      checkoutSessionId: session.id,
+      stripeEventId: event.id,
+      playerId: id,
+    });
+    // Increment extra slots, capped at MAX_EXTRA
+    await tx
+      .update(playersTable)
+      .set({ extraIncubatorSlots: sql`LEAST(${MAX_EXTRA}, ${playersTable.extraIncubatorSlots} + 1)` })
+      .where(eq(playersTable.id, id));
+  });
+
+  logger.info({ playerId: id, sessionId: session.id, eventId: event.id }, "stripe_incubator_granted");
 }

@@ -240,7 +240,10 @@ export const GetCurrentPlayerResponse = zod.object({
   "dailyStepGoal": zod.number().optional(),
   "dailyWorkoutDeadlineHour": zod.number().optional(),
   "lastActiveDate": zod.string().nullish(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "paidUntil": zod.string().nullish(),
+  "trialEndsAt": zod.string().nullish(),
+  "extraIncubatorSlots": zod.number().optional()
 })
 
 
@@ -275,7 +278,10 @@ export const GetPlayerResponse = zod.object({
   "dailyStepGoal": zod.number().optional(),
   "dailyWorkoutDeadlineHour": zod.number().optional(),
   "lastActiveDate": zod.string().nullish(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "paidUntil": zod.string().nullish(),
+  "trialEndsAt": zod.string().nullish(),
+  "extraIncubatorSlots": zod.number().optional()
 })
 
 
@@ -322,7 +328,10 @@ export const UpdatePlayerResponse = zod.object({
   "dailyStepGoal": zod.number().optional(),
   "dailyWorkoutDeadlineHour": zod.number().optional(),
   "lastActiveDate": zod.string().nullish(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "paidUntil": zod.string().nullish(),
+  "trialEndsAt": zod.string().nullish(),
+  "extraIncubatorSlots": zod.number().optional()
 })
 
 
@@ -358,7 +367,10 @@ export const GetPlayerDashboardResponse = zod.object({
   "dailyStepGoal": zod.number().optional(),
   "dailyWorkoutDeadlineHour": zod.number().optional(),
   "lastActiveDate": zod.string().nullish(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "paidUntil": zod.string().nullish(),
+  "trialEndsAt": zod.string().nullish(),
+  "extraIncubatorSlots": zod.number().optional()
 }),
   "hatchlingCount": zod.number(),
   "totalWins": zod.number(),
@@ -2082,6 +2094,15 @@ export const PlaceEggInIncubatorResponse = zod.object({
 
 
 /**
+ * @summary Purchase one extra incubator slot for $3 (max 5 active at a time)
+ */
+export const BuyExtraIncubatorSlotResponse = zod.object({
+  "url": zod.string(),
+  "sessionId": zod.string()
+})
+
+
+/**
  * @summary Get player's fitness stats and today's summary
  */
 export const GetFitnessStatsParams = zod.object({
@@ -2612,7 +2633,10 @@ export const LogGroupWorkoutResponse = zod.object({
   "dailyStepGoal": zod.number().optional(),
   "dailyWorkoutDeadlineHour": zod.number().optional(),
   "lastActiveDate": zod.string().nullish(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "paidUntil": zod.string().nullish(),
+  "trialEndsAt": zod.string().nullish(),
+  "extraIncubatorSlots": zod.number().optional()
 }).optional()
 })
 

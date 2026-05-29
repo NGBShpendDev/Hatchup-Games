@@ -4,12 +4,16 @@ import {
   useCollectDailyEggs,
   usePlaceEggInIncubator,
   useHatchEgg,
+  useGetPlayer,
+  useBuyExtraIncubatorSlot,
   getListEggsQueryKey,
+  getGetPlayerQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -24,7 +28,8 @@ import { GradientButton } from "@/components/GradientButton";
 import { ScreenGradientBg } from "@/components/ScreenGradientBg";
 
 const PLAYER_ID = 1;
-const MAX_SLOTS = 3;
+const BASE_SLOTS = 3;
+const MAX_EXTRA_SLOTS = 5;
 
 const RARITY_COLORS: Record<string, string> = {
   common: "#9ca3af",
@@ -66,6 +71,7 @@ interface EggType {
   stepsRequired?: number | null;
   stepsWalked?: number | null;
   isReady?: boolean | null;
+  inExtraSlot?: boolean | null;
 }
 
 function SourceBadge({ source }: { source?: string | null }) {
@@ -95,20 +101,26 @@ function IncubatorSlot({
   egg,
   onHatch,
   hatching,
+  isExtra = false,
 }: {
   egg?: EggType;
   onHatch?: () => void;
   hatching?: boolean;
+  isExtra?: boolean;
 }) {
   const colors = useColors();
+  const extraColor = "#f59e0b";
 
   if (!egg) {
+    const borderColor = isExtra ? extraColor + "88" : colors.border;
     return (
-      <View style={[slotStyles.emptySlot, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={[slotStyles.emptyIcon, { borderColor: colors.border }]}>
-          <Feather name="plus" size={18} color={colors.mutedForeground} />
+      <View style={[slotStyles.emptySlot, { backgroundColor: isExtra ? extraColor + "0a" : colors.card, borderColor }]}>
+        <View style={[slotStyles.emptyIcon, { borderColor }]}>
+          <Feather name={isExtra ? "star" : "plus"} size={18} color={isExtra ? extraColor : colors.mutedForeground} />
         </View>
-        <Text style={[slotStyles.emptyLabel, { color: colors.mutedForeground }]}>Empty</Text>
+        <Text style={[slotStyles.emptyLabel, { color: isExtra ? extraColor : colors.mutedForeground }]}>
+          {isExtra ? "Extra" : "Empty"}
+        </Text>
       </View>
     );
   }
@@ -256,7 +268,7 @@ export default function HatchScreen() {
 
   const incubating = incubatingQuery.data ?? [];
   const available = availableQuery.data ?? [];
-  const incubatorFull = incubating.length >= MAX_SLOTS;
+  // incubatorFull is recomputed after playerQuery is available — see below
 
   const [collectMsg, setCollectMsg] = useState<string | null>(null);
 
@@ -303,14 +315,40 @@ export default function HatchScreen() {
           setHatchResult({ name: result.hatchling.name, rarity: result.hatchling.rarity ?? "common" });
         }
         queryClient.invalidateQueries({ queryKey: getListEggsQueryKey({ playerId: PLAYER_ID, status: "incubating" }) });
+        queryClient.invalidateQueries({ queryKey: getGetPlayerQueryKey(PLAYER_ID) });
       },
       onError: () => setHatchingId(null),
     },
   });
 
+  const playerQuery = useGetPlayer(PLAYER_ID);
+  const playerData = playerQuery.data;
+  const extraSlots = playerData?.extraIncubatorSlots ?? 0;
+  const totalSlots = BASE_SLOTS + extraSlots;
+
+  const isPremiumUser = !!(
+    (playerData?.paidUntil && new Date(playerData.paidUntil) > new Date()) ||
+    (playerData?.trialEndsAt && new Date(playerData.trialEndsAt) > new Date())
+  );
+
+  const buySlot = useBuyExtraIncubatorSlot({
+    mutation: {
+      onSuccess: (result) => {
+        if (result?.url) {
+          Linking.openURL(result.url);
+        }
+      },
+    },
+  });
+
   const isLoading = incubatingQuery.isLoading || availableQuery.isLoading;
 
-  const emptySlots = Array.from({ length: Math.max(0, MAX_SLOTS - incubating.length) });
+  const baseIncubating = incubating.filter((e) => !(e as EggType).inExtraSlot);
+  const extraIncubating = incubating.filter((e) => !!(e as EggType).inExtraSlot);
+  const emptyBaseSlots = Math.max(0, BASE_SLOTS - baseIncubating.length);
+  const emptyExtraSlots = Math.max(0, extraSlots - extraIncubating.length);
+  const incubatorFull = incubating.length >= totalSlots;
+  const canBuyMoreSlots = extraSlots < MAX_EXTRA_SLOTS;
 
   return (
     <ScreenGradientBg>
@@ -323,7 +361,7 @@ export default function HatchScreen() {
           <View>
             <Text style={[styles.title, { color: colors.foreground }]}>Incubator</Text>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-              {incubating.length}/{MAX_SLOTS} slots occupied
+              {incubating.length}/{totalSlots} slots occupied
             </Text>
           </View>
           <GradientButton
@@ -367,22 +405,65 @@ export default function HatchScreen() {
         {isLoading ? (
           <ActivityIndicator color={colors.primary} style={{ marginVertical: 24 }} />
         ) : (
-          <View style={styles.slotsRow}>
-            {incubating.map((egg) => (
-              <IncubatorSlot
-                key={egg.id}
-                egg={egg as EggType}
-                onHatch={() => {
-                  setHatchingId(egg.id);
-                  hatchEgg.mutate({ id: egg.id, data: { playerId: PLAYER_ID, name: `Hatchling ${egg.id}` } });
-                }}
-                hatching={hatchingId === egg.id}
-              />
-            ))}
-            {emptySlots.map((_, i) => (
-              <IncubatorSlot key={`empty-${i}`} />
-            ))}
-          </View>
+          <>
+            <View style={styles.slotsRow}>
+              {baseIncubating.map((egg) => (
+                <IncubatorSlot
+                  key={egg.id}
+                  egg={egg as EggType}
+                  onHatch={() => {
+                    setHatchingId(egg.id);
+                    hatchEgg.mutate({ id: egg.id, data: { playerId: PLAYER_ID, name: `Hatchling ${egg.id}` } });
+                  }}
+                  hatching={hatchingId === egg.id}
+                />
+              ))}
+              {Array.from({ length: emptyBaseSlots }).map((_, i) => (
+                <IncubatorSlot key={`base-empty-${i}`} />
+              ))}
+            </View>
+
+            {(extraSlots > 0 || canBuyMoreSlots) && (
+              <View style={styles.extraRow}>
+                <Text style={[styles.extraLabel, { color: "#f59e0b" }]}>
+                  ⭐ Extra Slots ({extraSlots}/{MAX_EXTRA_SLOTS})
+                </Text>
+                {canBuyMoreSlots && (
+                  <Pressable
+                    onPress={() => buySlot.mutate()}
+                    disabled={buySlot.isPending}
+                    style={[styles.buyBtn, { opacity: buySlot.isPending ? 0.6 : 1 }]}
+                  >
+                    {buySlot.isPending ? (
+                      <ActivityIndicator size="small" color="#f59e0b" />
+                    ) : (
+                      <Text style={styles.buyBtnText}>+ Buy Slot $3.00</Text>
+                    )}
+                  </Pressable>
+                )}
+              </View>
+            )}
+
+            {extraSlots > 0 && (
+              <View style={styles.slotsRow}>
+                {extraIncubating.map((egg) => (
+                  <IncubatorSlot
+                    key={egg.id}
+                    egg={egg as EggType}
+                    isExtra
+                    onHatch={() => {
+                      setHatchingId(egg.id);
+                      hatchEgg.mutate({ id: egg.id, data: { playerId: PLAYER_ID, name: `Hatchling ${egg.id}` } });
+                    }}
+                    hatching={hatchingId === egg.id}
+                  />
+                ))}
+                {Array.from({ length: emptyExtraSlots }).map((_, i) => (
+                  <IncubatorSlot key={`extra-empty-${i}`} isExtra />
+                ))}
+              </View>
+            )}
+          </>
         )}
 
         {/* Daily Bag section */}
@@ -393,40 +474,54 @@ export default function HatchScreen() {
           </View>
         </View>
 
-        {incubatorFull && (
-          <View style={[styles.fullBanner, { backgroundColor: "#f59e0b18", borderColor: "#f59e0b55" }]}>
-            <Feather name="alert-circle" size={14} color="#f59e0b" />
-            <Text style={[styles.fullBannerText, { color: "#f59e0b" }]}>
-              Incubator full — hatch an egg to free a slot
-            </Text>
-          </View>
-        )}
-
-        {availableQuery.isLoading ? (
-          <ActivityIndicator color={colors.primary} style={{ marginVertical: 24 }} />
-        ) : available.length === 0 ? (
-          <View style={[styles.emptyBag, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="inbox" size={36} color={colors.mutedForeground} />
-            <Text style={[styles.emptyBagTitle, { color: colors.mutedForeground }]}>Bag is empty</Text>
-            <Text style={[styles.emptyBagHint, { color: colors.mutedForeground }]}>
-              Tap "Daily Eggs" to collect today's batch
-            </Text>
+        {!isPremiumUser ? (
+          <View style={[styles.premiumGate, { backgroundColor: "#ee2b8c11", borderColor: "#ee2b8c44" }]}>
+            <Feather name="lock" size={20} color="#ee2b8c" />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.premiumGateTitle, { color: "#ee2b8c" }]}>Premium Only</Text>
+              <Text style={[styles.premiumGateHint, { color: colors.mutedForeground }]}>
+                Upgrade to Premium to store eggs in your bag. Free players can only use incubator slots.
+              </Text>
+            </View>
           </View>
         ) : (
-          <View style={styles.bagGrid}>
-            {available.map((egg) => (
-              <BagEggCard
-                key={egg.id}
-                egg={egg as EggType}
-                disabled={incubatorFull}
-                placing={placingId === egg.id}
-                onPlace={() => {
-                  setPlacingId(egg.id);
-                  placeEgg.mutate({ id: egg.id });
-                }}
-              />
-            ))}
-          </View>
+          <>
+            {incubatorFull && (
+              <View style={[styles.fullBanner, { backgroundColor: "#f59e0b18", borderColor: "#f59e0b55" }]}>
+                <Feather name="alert-circle" size={14} color="#f59e0b" />
+                <Text style={[styles.fullBannerText, { color: "#f59e0b" }]}>
+                  Incubator full — hatch an egg or buy an extra slot
+                </Text>
+              </View>
+            )}
+
+            {availableQuery.isLoading ? (
+              <ActivityIndicator color={colors.primary} style={{ marginVertical: 24 }} />
+            ) : available.length === 0 ? (
+              <View style={[styles.emptyBag, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Feather name="inbox" size={36} color={colors.mutedForeground} />
+                <Text style={[styles.emptyBagTitle, { color: colors.mutedForeground }]}>Bag is empty</Text>
+                <Text style={[styles.emptyBagHint, { color: colors.mutedForeground }]}>
+                  Tap "Daily Eggs" to collect today's batch
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.bagGrid}>
+                {available.map((egg) => (
+                  <BagEggCard
+                    key={egg.id}
+                    egg={egg as EggType}
+                    disabled={incubatorFull}
+                    placing={placingId === egg.id}
+                    onPlace={() => {
+                      setPlacingId(egg.id);
+                      placeEgg.mutate({ id: egg.id });
+                    }}
+                  />
+                ))}
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     </ScreenGradientBg>
@@ -453,4 +548,11 @@ const styles = StyleSheet.create({
   hatchBanner: { marginHorizontal: 16, borderRadius: 12, borderWidth: 1.5, flexDirection: "row", alignItems: "center", gap: 10, padding: 14, marginBottom: 4 },
   hatchBannerTitle: { fontSize: 15, fontWeight: "700" },
   hatchBannerSub: { fontSize: 11, marginTop: 1 },
+  extraRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, marginTop: 14, marginBottom: 8 },
+  extraLabel: { fontSize: 13, fontWeight: "700" },
+  buyBtn: { flexDirection: "row", alignItems: "center", backgroundColor: "#f59e0b22", borderColor: "#f59e0b88", borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 },
+  buyBtnText: { color: "#f59e0b", fontSize: 13, fontWeight: "700" },
+  premiumGate: { marginHorizontal: 16, borderRadius: 14, borderWidth: 1.5, flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 16, marginBottom: 8 },
+  premiumGateTitle: { fontSize: 14, fontWeight: "700", marginBottom: 3 },
+  premiumGateHint: { fontSize: 12, lineHeight: 17 },
 });

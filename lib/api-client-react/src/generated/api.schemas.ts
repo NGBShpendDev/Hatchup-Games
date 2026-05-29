@@ -95,6 +95,11 @@ export interface Player {
   /** @nullable */
   lastActiveDate?: string | null;
   createdAt: string;
+  /** @nullable */
+  paidUntil?: string | null;
+  /** @nullable */
+  trialEndsAt?: string | null;
+  extraIncubatorSlots?: number;
 }
 
 export interface PlayerInput {
@@ -3857,6 +3862,11 @@ status?: string;
 
 export type CollectDailyEggsBody = {
   playerId: number;
+};
+
+export type BuyExtraIncubatorSlot200 = {
+  url: string;
+  sessionId: string;
 };
 
 export type ListFitnessActivitiesParams = {
