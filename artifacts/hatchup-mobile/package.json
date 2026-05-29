@@ -66,6 +66,7 @@
   },
   "dependencies": {
     "expo-background-fetch": "^56.0.15",
+    "expo-crypto": "~14.1.5",
     "expo-sensors": "^56.0.5",
     "expo-task-manager": "^56.0.15"
   }
