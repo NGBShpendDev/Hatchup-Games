@@ -45,6 +45,7 @@ export const ADMIN_SESSION_TTL_MS = 30 * 60 * 1000;
 export type AdminGateReason =
   | "not_signed_in"
   | "not_admin"
+  | "account_suspended"
   | "not_whitelisted"
   | "session_locked"
   | "session_expired";
@@ -126,6 +127,11 @@ export const requireAdminPanel: RequestHandler = async (req, res, next) => {
   if (!player.isAdmin) {
     await logGateDenial(playerId, "not_admin", req);
     res.status(403).json({ error: "not_admin" });
+    return;
+  }
+  if (player.isSuspended) {
+    await logGateDenial(playerId, "account_suspended", req);
+    res.status(403).json({ error: "account_suspended" });
     return;
   }
   // Whitelist is checked against the Clerk-authenticated primary email, not

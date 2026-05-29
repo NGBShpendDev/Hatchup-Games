@@ -366,6 +366,10 @@ router.post("/admin/audit/:id/undo", requireAuth, attachPlayer, requireAdminPane
         res.status(400).json({ error: "Audit entry missing target player" });
         return;
       }
+      if (entry.targetPlayerId === caller.id) {
+        res.status(403).json({ error: "Admins cannot undo their own suspension" });
+        return;
+      }
       await db
         .update(playersTable)
         .set({ isSuspended: false, suspendedAt: null })
@@ -1335,6 +1339,10 @@ router.patch("/admin/appeals/:id", requireAuth, attachPlayer, requireAdminPanel,
   }
   if (existing.status !== "pending") {
     res.status(409).json({ error: "appeal_already_resolved" });
+    return;
+  }
+  if (existing.playerId === caller.id) {
+    res.status(403).json({ error: "Admins cannot review their own appeal" });
     return;
   }
 

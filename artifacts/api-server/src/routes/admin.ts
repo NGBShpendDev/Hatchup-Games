@@ -132,6 +132,10 @@ router.post(
       res.status(403).json({ error: "not_admin" });
       return;
     }
+    if (player.isSuspended) {
+      res.status(403).json({ error: "account_suspended" });
+      return;
+    }
     const email = req.clerkUserId ? await getClerkPrimaryEmail(req.clerkUserId) : null;
     if (!email) {
       res.status(403).json({ error: "not_whitelisted" });
