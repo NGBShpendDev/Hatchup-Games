@@ -452,7 +452,8 @@ export const GetPlayerDashboardResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "name": zod.string(),
   "description": zod.string().nullish(),
-  "source": zod.string().describe('Where the egg came from: training | challenge | event'),
+  "source": zod.string().describe('Where the egg came from: training | challenge | event | daily'),
+  "status": zod.string().describe('Lifecycle: available | incubating | hatched'),
   "progressPct": zod.number().optional(),
   "isReady": zod.boolean().optional(),
   "createdAt": zod.string(),
@@ -1871,7 +1872,8 @@ export const LeaveClubResponse = zod.object({
  */
 export const ListEggsQueryParams = zod.object({
   "playerId": zod.coerce.number(),
-  "hatched": zod.coerce.boolean().optional()
+  "hatched": zod.coerce.boolean().optional(),
+  "status": zod.coerce.string().optional().describe('Filter by lifecycle status: available | incubating | hatched')
 })
 
 export const ListEggsResponseItem = zod.object({
@@ -1887,7 +1889,8 @@ export const ListEggsResponseItem = zod.object({
   "imageUrl": zod.string().nullish(),
   "name": zod.string(),
   "description": zod.string().nullish(),
-  "source": zod.string().describe('Where the egg came from: training | challenge | event'),
+  "source": zod.string().describe('Where the egg came from: training | challenge | event | daily'),
+  "status": zod.string().describe('Lifecycle: available | incubating | hatched'),
   "progressPct": zod.number().optional(),
   "isReady": zod.boolean().optional(),
   "createdAt": zod.string(),
@@ -1916,7 +1919,8 @@ export const GetEggResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "name": zod.string(),
   "description": zod.string().nullish(),
-  "source": zod.string().describe('Where the egg came from: training | challenge | event'),
+  "source": zod.string().describe('Where the egg came from: training | challenge | event | daily'),
+  "status": zod.string().describe('Lifecycle: available | incubating | hatched'),
   "progressPct": zod.number().optional(),
   "isReady": zod.boolean().optional(),
   "createdAt": zod.string(),
@@ -1954,7 +1958,8 @@ export const HatchEggResponse = zod.object({
   "imageUrl": zod.string().nullish(),
   "name": zod.string(),
   "description": zod.string().nullish(),
-  "source": zod.string().describe('Where the egg came from: training | challenge | event'),
+  "source": zod.string().describe('Where the egg came from: training | challenge | event | daily'),
+  "status": zod.string().describe('Lifecycle: available | incubating | hatched'),
   "progressPct": zod.number().optional(),
   "isReady": zod.boolean().optional(),
   "createdAt": zod.string(),
@@ -2010,6 +2015,69 @@ export const AddEggBody = zod.object({
   "playerId": zod.number(),
   "eggType": zod.string(),
   "rarity": zod.string().optional()
+})
+
+
+/**
+ * @summary Collect today's daily egg batch (up to 10 per UTC day)
+ */
+export const CollectDailyEggsBody = zod.object({
+  "playerId": zod.number()
+})
+
+export const CollectDailyEggsResponse = zod.object({
+  "eggsGranted": zod.number().describe('How many new eggs were just granted'),
+  "alreadyGotToday": zod.number().describe('How many daily eggs were already collected today'),
+  "remainingToday": zod.number().describe('How many more daily eggs can be collected today'),
+  "availableEggs": zod.array(zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "rarity": zod.string(),
+  "eggType": zod.string(),
+  "realm": zod.string(),
+  "stepsRequired": zod.number(),
+  "stepsProgress": zod.number(),
+  "isHatched": zod.boolean(),
+  "hatchlingId": zod.number().nullish(),
+  "imageUrl": zod.string().nullish(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "source": zod.string().describe('Where the egg came from: training | challenge | event | daily'),
+  "status": zod.string().describe('Lifecycle: available | incubating | hatched'),
+  "progressPct": zod.number().optional(),
+  "isReady": zod.boolean().optional(),
+  "createdAt": zod.string(),
+  "hatchedAt": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Move an available egg from the bag into the incubator
+ */
+export const PlaceEggInIncubatorParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PlaceEggInIncubatorResponse = zod.object({
+  "id": zod.number(),
+  "playerId": zod.number(),
+  "rarity": zod.string(),
+  "eggType": zod.string(),
+  "realm": zod.string(),
+  "stepsRequired": zod.number(),
+  "stepsProgress": zod.number(),
+  "isHatched": zod.boolean(),
+  "hatchlingId": zod.number().nullish(),
+  "imageUrl": zod.string().nullish(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "source": zod.string().describe('Where the egg came from: training | challenge | event | daily'),
+  "status": zod.string().describe('Lifecycle: available | incubating | hatched'),
+  "progressPct": zod.number().optional(),
+  "isReady": zod.boolean().optional(),
+  "createdAt": zod.string(),
+  "hatchedAt": zod.string().nullish()
 })
 
 

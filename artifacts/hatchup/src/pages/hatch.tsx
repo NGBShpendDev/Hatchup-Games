@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import { usePlayer } from "@/lib/playerContext";
 import {
   useListEggs, getListEggsQueryKey,
   useHatchEgg,
   useAddEgg,
+  useCollectDailyEggs,
+  usePlaceEggInIncubator,
   useListHatchlings, getListHatchlingsQueryKey
 } from "@workspace/api-client-react";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -14,15 +16,15 @@ import { RarityBadge } from "@/components/rarity-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";
-import { Egg as EggIcon, Sparkles, Plus, Footprints, Trophy, Star, Zap } from "lucide-react";
+import { Egg as EggIcon, Sparkles, Footprints, Trophy, Star, ArrowDown, Package } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { Link, useLocation } from "wouter";
 import { ApiError } from "@workspace/api-client-react";
-import { ErrorCard } from "@/components/error-card";
 import { Input } from "@/components/ui/input";
 import { LegendaryCinematic, type LegendaryRarity } from "@/components/legendary-hatch-cinematic";
+import { ErrorCard } from "@/components/error-card";
 
 // ── Realm visual config ────────────────────────────────────────────────────────
 const REALM_EGG_STYLES: Record<string, {
@@ -76,14 +78,6 @@ const REALM_EGG_STYLES: Record<string, {
   },
 };
 
-const PERSONALITY_FLAVOR: Record<string, string> = {
-  Sleepy: "Slow to wake, but unstoppable once it gets going.",
-  Hyper: "Bursting with energy — it never stops moving.",
-  Loyal: "Devoted to its Trainer above all else.",
-  Competitive: "Born to win. It trains hardest when challenged.",
-  Calm: "Measured and steady — wise beyond its years.",
-};
-
 const EGG_TYPE_TO_REALM: Record<string, string> = {
   strength: "strength", cardio: "cardio", balance: "balance",
   beast: "beast", balanced: "balance", legendary: "mythic", mythic: "mythic",
@@ -94,19 +88,24 @@ function getRealm(eggType: string): string {
 }
 
 // ── SVG Egg Shape ──────────────────────────────────────────────────────────────
-function EggSvg({ realm, isReady, progress }: { realm: string; isReady: boolean; progress: number }) {
+function EggSvg({ realm, isReady, progress, size = "md" }: {
+  realm: string; isReady: boolean; progress: number; size?: "sm" | "md";
+}) {
   const style = REALM_EGG_STYLES[realm] ?? REALM_EGG_STYLES["balance"];
   const crackColor = style.crackColor;
-  const circumference = 351.86;
+  const dim = size === "sm" ? "w-16 h-16" : "w-28 h-28";
+  const r = size === "sm" ? 26 : 50;
+  const cx = size === "sm" ? 32 : 64;
+  const viewBox = size === "sm" ? "0 0 64 64" : "0 0 128 128";
+  const circumference = 2 * Math.PI * r;
 
   return (
-    <div className="relative w-32 h-32">
-      {/* Progress ring */}
-      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 128 128">
-        <circle cx="64" cy="64" r="56" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
+    <div className={`relative ${dim}`}>
+      <svg className="w-full h-full transform -rotate-90" viewBox={viewBox}>
+        <circle cx={cx} cy={cx} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={size === "sm" ? 5 : 8} />
         <motion.circle
-          cx="64" cy="64" r="56" fill="none"
-          stroke={crackColor} strokeWidth="8" strokeLinecap="round"
+          cx={cx} cy={cx} r={r} fill="none"
+          stroke={crackColor} strokeWidth={size === "sm" ? 5 : 8} strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={circumference - (circumference * (progress / 100))}
           initial={{ strokeDashoffset: circumference }}
@@ -115,17 +114,12 @@ function EggSvg({ realm, isReady, progress }: { realm: string; isReady: boolean;
           style={{ filter: isReady ? `drop-shadow(0 0 6px ${crackColor})` : "none" }}
         />
       </svg>
-
-      {/* Egg center */}
       <div className="absolute inset-0 flex items-center justify-center">
         <motion.div
           className="relative"
-          animate={isReady
-            ? { scale: [1, 1.15, 1], rotate: [0, -6, 6, -6, 0] }
-            : {}}
+          animate={isReady ? { scale: [1, 1.15, 1], rotate: [0, -6, 6, -6, 0] } : {}}
           transition={isReady ? { repeat: Infinity, duration: 0.7 } : {}}
         >
-          {/* Crack effect when ready */}
           {isReady && (
             <motion.div
               className="absolute inset-0 rounded-full"
@@ -134,15 +128,77 @@ function EggSvg({ realm, isReady, progress }: { realm: string; isReady: boolean;
               transition={{ repeat: Infinity, duration: 0.8 }}
             />
           )}
-          <span className="text-4xl">{style.emoji}</span>
+          <span className={size === "sm" ? "text-2xl" : "text-4xl"}>{style.emoji}</span>
         </motion.div>
       </div>
     </div>
   );
 }
 
+// ── Source badge ───────────────────────────────────────────────────────────────
+function SourceBadge({ source }: { source?: string }) {
+  if (source === "challenge") return (
+    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-yellow-400 text-[10px] font-black uppercase tracking-wider">
+      <Trophy className="w-2.5 h-2.5" /> Challenge Win
+    </div>
+  );
+  if (source === "event") return (
+    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-pink-500/20 border border-pink-500/40 text-pink-400 text-[10px] font-black uppercase tracking-wider">
+      <Star className="w-2.5 h-2.5" /> Live Event
+    </div>
+  );
+  return null;
+}
+
 // ── Hatch animation phases ─────────────────────────────────────────────────────
 type HatchPhase = "idle" | "cracking" | "burst" | "reveal";
+
+// ── Small egg bag card (tappable) ──────────────────────────────────────────────
+function BagEggCard({
+  egg,
+  onPlace,
+  isPlacing,
+  incubatorFull,
+}: {
+  egg: any;
+  onPlace: (id: number) => void;
+  isPlacing: boolean;
+  incubatorFull: boolean;
+}) {
+  const realm = getRealm(egg.eggType);
+  const style = REALM_EGG_STYLES[realm] ?? REALM_EGG_STYLES["balance"];
+  const disabled = incubatorFull || isPlacing;
+
+  return (
+    <motion.div
+      whileHover={disabled ? {} : { y: -4, scale: 1.03 }}
+      whileTap={disabled ? {} : { scale: 0.97 }}
+      className={`cursor-pointer ${disabled ? "opacity-60" : ""}`}
+      onClick={() => !disabled && onPlace(egg.id)}
+    >
+      <GlassCard className={`p-4 flex flex-col items-center text-center relative overflow-hidden ${style.bg} border ${style.border}`}
+        style={{ boxShadow: `0 0 18px ${style.crackColor}25` }}>
+        <SourceBadge source={egg.source} />
+        <div className="mt-1 mb-2">
+          <EggSvg realm={realm} isReady={false} progress={0} size="sm" />
+        </div>
+        <p className="text-xs font-black truncate w-full leading-tight">{egg.name}</p>
+        <div className="mt-1.5">
+          <RarityBadge rarity={egg.rarity ?? "Common"} />
+        </div>
+        <div className="mt-2 w-full">
+          {incubatorFull ? (
+            <span className="text-[10px] text-muted-foreground font-bold">Incubator full</span>
+          ) : (
+            <div className="flex items-center justify-center gap-1 text-[10px] font-black text-primary/80">
+              <ArrowDown className="w-2.5 h-2.5" /> Tap to incubate
+            </div>
+          )}
+        </div>
+      </GlassCard>
+    </motion.div>
+  );
+}
 
 export default function Hatch() {
   const queryClient = useQueryClient();
@@ -151,16 +207,67 @@ export default function Hatch() {
   const pid = playerId ?? 0;
   const [, setLocation] = useLocation();
 
-  const { data: eggs, isLoading: isLoadingEggs, isError: isErrorEggs, refetch: refetchEggs } = useListEggs(
+  // ── Fetch all non-hatched eggs ──────────────────────────────────────────
+  const allEggsKey = getListEggsQueryKey({ playerId: pid, hatched: false });
+  const { data: allEggs, isLoading: isLoadingEggs, isError: isErrorEggs, refetch: refetchEggs } = useListEggs(
     { playerId: pid, hatched: false },
-    { query: { queryKey: getListEggsQueryKey({ playerId: pid, hatched: false }), enabled: !!playerId } }
+    { query: { queryKey: allEggsKey, enabled: !!playerId } }
   );
 
+  const availableEggs = (allEggs ?? []).filter((e: any) => e.status === "available");
+  const incubatingEggs = (allEggs ?? []).filter((e: any) => e.status !== "available");
+
+  // ── Hatchlings for the Pals mini-grid ──────────────────────────────────
   const { data: hatchlings, isLoading: isLoadingHatchlings, isError: isErrorHatchlings, refetch: refetchHatchlings } = useListHatchlings(
     { playerId: pid },
     { query: { queryKey: getListHatchlingsQueryKey({ playerId: pid }), enabled: !!playerId } }
   );
 
+  // ── Daily refill (runs once on mount when player is known) ──────────────
+  const dailyRefillMutation = useCollectDailyEggs();
+  useEffect(() => {
+    if (!pid) return;
+    dailyRefillMutation.mutate(
+      { data: { playerId: pid } },
+      {
+        onSuccess: (res: any) => {
+          if (res.eggsGranted > 0) {
+            queryClient.invalidateQueries({ queryKey: allEggsKey });
+            toast({
+              title: `🥚 ${res.eggsGranted} new egg${res.eggsGranted !== 1 ? "s" : ""} added to your bag!`,
+              description: "Tap an egg to start incubating it.",
+            });
+          }
+        },
+      }
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pid]);
+
+  // ── Place egg in incubator ──────────────────────────────────────────────
+  const placeEggMutation = usePlaceEggInIncubator();
+
+  const handlePlaceEgg = (eggId: number) => {
+    placeEggMutation.mutate(
+      { id: eggId },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: allEggsKey });
+          toast({ title: "🥚 Egg placed in incubator!", description: "Start walking to hatch it." });
+        },
+        onError: (err: unknown) => {
+          const msg = (err as any)?.response?.data?.error ?? (err as any)?.data?.error;
+          if (msg === "incubator_full") {
+            toast({ title: "Incubator full", description: "Hatch one of your eggs first to free up a slot.", variant: "destructive" });
+          } else {
+            toast({ title: "Couldn't place egg", variant: "destructive" });
+          }
+        },
+      }
+    );
+  };
+
+  // ── Hatch mutations ─────────────────────────────────────────────────────
   const hatchMutation = useHatchEgg();
   const addEggMutation = useAddEgg();
 
@@ -173,13 +280,8 @@ export default function Hatch() {
   const [hatchPhase, setHatchPhase] = useState<HatchPhase>("idle");
 
   const [cinematicData, setCinematicData] = useState<{
-    species: string;
-    name: string;
-    rarity: LegendaryRarity;
-    realmColor: string;
-    realmEmoji: string;
-    steps: number;
-    hatchlingId: number;
+    species: string; name: string; rarity: LegendaryRarity;
+    realmColor: string; realmEmoji: string; steps: number; hatchlingId: number;
   } | null>(null);
 
   const LEGENDARY_RARITIES = new Set(["Legendary", "Mythic", "Ancient", "Celestial"]);
@@ -197,8 +299,6 @@ export default function Hatch() {
   const submitHatch = () => {
     if (!selectedEgg) return;
     setHatchPhase("cracking");
-
-    // Animate through phases
     setTimeout(() => setHatchPhase("burst"), 800);
     setTimeout(() => {
       hatchMutation.mutate(
@@ -206,28 +306,20 @@ export default function Hatch() {
         {
           onSuccess: (res) => {
             const rarity: string = (res as any)?.hatchling?.rarity ?? "Common";
-            queryClient.invalidateQueries({ queryKey: getListEggsQueryKey({ playerId: pid, hatched: false }) });
+            queryClient.invalidateQueries({ queryKey: allEggsKey });
             queryClient.invalidateQueries({ queryKey: getListHatchlingsQueryKey({ playerId: pid }) });
 
             if (LEGENDARY_RARITIES.has(rarity)) {
-              // Close the basic modal and hand off to the full-screen cinematic
               const style = REALM_EGG_STYLES[selectedEggRealm] ?? REALM_EGG_STYLES["balance"];
-              const realmColor =
-                rarity === "Celestial" ? "#22d3ee"
-                : rarity === "Ancient"  ? "#14b8a6"
-                : style.crackColor;
-              const realmEmoji =
-                rarity === "Celestial" ? "🌌"
-                : rarity === "Ancient"  ? "🏺"
-                : style.emoji;
+              const realmColor = rarity === "Celestial" ? "#22d3ee" : rarity === "Ancient" ? "#14b8a6" : style.crackColor;
+              const realmEmoji = rarity === "Celestial" ? "🌌" : rarity === "Ancient" ? "🏺" : style.emoji;
               setShowHatchModal(false);
               setTimeout(() => {
                 setCinematicData({
                   species: (res as any)?.hatchling?.species ?? "Mystery Pal",
-                  name:    ((res as any)?.hatchling?.name ?? hatchName) || "Mystery Pal",
-                  rarity:  rarity as LegendaryRarity,
-                  realmColor,
-                  realmEmoji,
+                  name: ((res as any)?.hatchling?.name ?? hatchName) || "Mystery Pal",
+                  rarity: rarity as LegendaryRarity,
+                  realmColor, realmEmoji,
                   steps: selectedEggSteps,
                   hatchlingId: (res as any)?.hatchling?.id ?? 0,
                 });
@@ -249,10 +341,7 @@ export default function Hatch() {
                 title: "Roster full",
                 description: `Free accounts hold up to ${cap} Hatchlings. Upgrade for unlimited storage.`,
                 action: (
-                  <ToastAction
-                    altText="Upgrade to Premium"
-                    onClick={() => setLocation("/subscription?from=hatchling_cap")}
-                  >
+                  <ToastAction altText="Upgrade" onClick={() => setLocation("/subscription?from=hatchling_cap")}>
                     Upgrade
                   </ToastAction>
                 ),
@@ -260,30 +349,10 @@ export default function Hatch() {
               return;
             }
             toast({ title: "Failed to hatch", variant: "destructive" });
-          }
+          },
         }
       );
     }, 1600);
-  };
-
-  const handleAddEgg = () => {
-    addEggMutation.mutate(
-      { data: { playerId: pid, eggType: "balanced" } },
-      {
-        onSuccess: () => {
-          toast({ title: "🥚 New egg found!" });
-          queryClient.invalidateQueries({ queryKey: getListEggsQueryKey({ playerId: pid, hatched: false }) });
-        },
-        onError: (err: unknown) => {
-          const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-          if (msg === "incubator_full") {
-            toast({ title: "Incubator full", description: "You can only hold 3 eggs at a time. Hatch one first!", variant: "destructive" });
-          } else {
-            toast({ title: "Couldn't find a new egg", description: "Try again in a moment.", variant: "destructive" });
-          }
-        }
-      }
-    );
   };
 
   const closeHatchModal = () => {
@@ -294,10 +363,13 @@ export default function Hatch() {
   const resultStyle = REALM_EGG_STYLES[selectedEggRealm] ?? REALM_EGG_STYLES["balance"];
   const genetics = hatchResult?.hatchling?.genetics as Record<string, number> | undefined;
 
+  const incubatorFull = incubatingEggs.length >= 3;
+
   return (
     <Layout>
       <div className="max-w-5xl mx-auto space-y-12 pb-28">
-        {/* Header */}
+
+        {/* ── Header ────────────────────────────────────────────────────────── */}
         <div className="text-center max-w-2xl mx-auto py-8 relative">
           <motion.div
             className="absolute top-0 right-0 -mr-10 -mt-10 opacity-10 pointer-events-none text-primary"
@@ -310,25 +382,29 @@ export default function Hatch() {
             <EggIcon className="w-10 h-10" /> Incubator
           </h1>
           <p className="text-lg text-muted-foreground font-medium">
-            Choose a focus for your Pals and watch them evolve. Every step, rep, and stretch counts!
+            You get up to 10 fresh eggs every day. Tap one to start incubating — walk to hatch it!
           </p>
-          <NeonButton onClick={handleAddEgg} disabled={addEggMutation.isPending} variant="secondary" className="mt-6">
-            <Plus className="w-4 h-4 mr-2" /> Find New Egg
-          </NeonButton>
         </div>
 
-        {/* Active Eggs */}
+        {/* ── Incubator slots (3 max) ───────────────────────────────────────── */}
         <div>
-          <h2 className="text-2xl font-black mb-6">Active Eggs</h2>
-          {isErrorEggs && !eggs ? (
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-black">Incubator</h2>
+            <span className="text-sm font-bold text-muted-foreground">
+              {incubatingEggs.length} / 3 slots used
+            </span>
+          </div>
+
+          {isErrorEggs && !allEggs ? (
             <ErrorCard title="Couldn't load your eggs" onRetry={() => refetchEggs()} />
           ) : isLoadingEggs ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-72 w-full rounded-3xl" />)}
             </div>
-          ) : eggs?.length ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {eggs.map(egg => {
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Occupied slots */}
+              {incubatingEggs.map((egg: any) => {
                 const realm = getRealm(egg.eggType);
                 const style = REALM_EGG_STYLES[realm] ?? REALM_EGG_STYLES["balance"];
                 return (
@@ -345,25 +421,12 @@ export default function Hatch() {
                         />
                       )}
                       <div className="p-6 flex flex-col items-center text-center relative z-10">
-                        {/* Source badge — only for special eggs */}
-                        {(egg as any).source === "challenge" && (
-                          <div className="flex items-center gap-1 mb-2 px-2 py-0.5 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-yellow-400 text-[10px] font-black uppercase tracking-wider">
-                            <Trophy className="w-3 h-3" /> Challenge Win
-                          </div>
-                        )}
-                        {(egg as any).source === "event" && (
-                          <div className="flex items-center gap-1 mb-2 px-2 py-0.5 rounded-full bg-pink-500/20 border border-pink-500/40 text-pink-400 text-[10px] font-black uppercase tracking-wider">
-                            <Star className="w-3 h-3" /> Live Event
-                          </div>
-                        )}
-                        {/* Realm badge */}
-                        <div className="flex gap-2 mb-4 items-center">
+                        <SourceBadge source={egg.source} />
+                        <div className="flex gap-2 mt-2 mb-4 items-center">
                           <GlowBadge tone="primary">{egg.eggType}</GlowBadge>
                           <span className="text-xs font-black text-muted-foreground">{style.label}</span>
                         </div>
-
                         <EggSvg realm={realm} isReady={egg.isReady ?? false} progress={egg.progressPct ?? 0} />
-
                         <div className="w-full mt-4">
                           <div className="flex justify-between text-xs font-bold mb-1">
                             <span className="flex items-center text-muted-foreground gap-1">
@@ -375,7 +438,6 @@ export default function Hatch() {
                             <RarityBadge rarity={egg.rarity ?? "Common"} />
                           </div>
                         </div>
-
                         {egg.isReady ? (
                           <motion.div className="w-full mt-4" whileTap={{ scale: 0.97 }}>
                             <NeonButton
@@ -395,18 +457,84 @@ export default function Hatch() {
                   </motion.div>
                 );
               })}
+
+              {/* Empty slots */}
+              {Array.from({ length: Math.max(0, 3 - incubatingEggs.length) }).map((_, i) => (
+                <motion.div key={`empty-${i}`} whileHover={{ y: -3 }}>
+                  <GlassCard className="overflow-hidden h-full border-dashed border-white/10 bg-white/[0.02]">
+                    <div className="p-6 flex flex-col items-center justify-center text-center min-h-[200px] gap-3">
+                      <div className="w-16 h-16 rounded-full border-2 border-dashed border-white/20 flex items-center justify-center">
+                        <EggIcon className="w-7 h-7 text-muted-foreground/40" />
+                      </div>
+                      <p className="text-sm font-bold text-muted-foreground/60">Empty slot</p>
+                      {availableEggs.length > 0 ? (
+                        <p className="text-xs text-primary/70 font-medium">Tap an egg below to fill it</p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground/40 font-medium">Check back tomorrow for more eggs</p>
+                      )}
+                    </div>
+                  </GlassCard>
+                </motion.div>
+              ))}
             </div>
+          )}
+        </div>
+
+        {/* ── Daily Egg Bag ─────────────────────────────────────────────────── */}
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-black flex items-center gap-2">
+                <Package className="w-6 h-6 text-primary" /> Your Egg Bag
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Tap any egg to place it in an open incubator slot
+              </p>
+            </div>
+            <div className="text-right">
+              <span className="text-2xl font-black text-primary">{availableEggs.length}</span>
+              <p className="text-xs text-muted-foreground font-bold">eggs waiting</p>
+            </div>
+          </div>
+
+          {isLoadingEggs ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {[...Array(10)].map((_, i) => <Skeleton key={i} className="h-44 w-full rounded-2xl" />)}
+            </div>
+          ) : availableEggs.length > 0 ? (
+            <>
+              {incubatorFull && (
+                <div className="mb-4 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm font-bold text-center">
+                  Incubator is full — hatch an egg first to free up a slot!
+                </div>
+              )}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {availableEggs.map((egg: any) => (
+                  <BagEggCard
+                    key={egg.id}
+                    egg={egg}
+                    onPlace={handlePlaceEgg}
+                    isPlacing={placeEggMutation.isPending}
+                    incubatorFull={incubatorFull}
+                  />
+                ))}
+              </div>
+            </>
           ) : (
             <GlassCard className="text-center p-12">
               <div className="relative z-10">
-                <p className="text-muted-foreground font-bold text-lg mb-4">Your incubator is empty — time to train!</p>
-                <NeonButton onClick={handleAddEgg} disabled={addEggMutation.isPending}>Find an Egg</NeonButton>
+                <div className="text-5xl mb-4">🥚</div>
+                <p className="text-muted-foreground font-bold text-lg mb-2">Your egg bag is empty for today</p>
+                <p className="text-sm text-muted-foreground">Come back tomorrow for 10 fresh eggs!</p>
+                {!isLoadingEggs && dailyRefillMutation.isIdle && (
+                  <p className="text-xs text-muted-foreground/60 mt-4">Loading today's eggs…</p>
+                )}
               </div>
             </GlassCard>
           )}
         </div>
 
-        {/* Your Pals mini-grid */}
+        {/* ── Your Pals mini-grid ────────────────────────────────────────────── */}
         <div>
           <h2 className="text-2xl font-black mb-6">Your Pals</h2>
           {isErrorHatchlings && !hatchlings ? (
@@ -417,8 +545,8 @@ export default function Hatch() {
             </div>
           ) : hatchlings?.length ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {hatchlings.map(h => {
-                const realm = (h.realm as string | undefined) ?? "balance";
+              {hatchlings.map((h: any) => {
+                const realm = h.realm ?? "balance";
                 const style = REALM_EGG_STYLES[realm] ?? REALM_EGG_STYLES["balance"];
                 return (
                   <Link key={h.id} href={`/hatchlings/${h.id}`}>
@@ -437,12 +565,12 @@ export default function Hatch() {
               })}
             </div>
           ) : (
-            <p className="text-muted-foreground font-medium">No Pals hatched yet. Train to fill your incubator!</p>
+            <p className="text-muted-foreground font-medium">No Pals hatched yet — tap an egg to get started!</p>
           )}
         </div>
       </div>
 
-      {/* ── Legendary+ Cinematic (full-screen, outside modal) ───────────────── */}
+      {/* ── Legendary Cinematic ─────────────────────────────────────────────── */}
       <AnimatePresence>
         {cinematicData && (
           <LegendaryCinematic
@@ -453,28 +581,21 @@ export default function Hatch() {
             realmColor={cinematicData.realmColor}
             realmEmoji={cinematicData.realmEmoji}
             steps={cinematicData.steps}
-            onClose={() => {
-              setCinematicData(null);
-              setHatchResult(null);
-              setHatchPhase("idle");
-            }}
+            onClose={() => { setCinematicData(null); setHatchResult(null); setHatchPhase("idle"); }}
             onViewPal={() => {
-              setCinematicData(null);
-              setHatchResult(null);
-              setHatchPhase("idle");
+              setCinematicData(null); setHatchResult(null); setHatchPhase("idle");
               setLocation(`/hatchlings/${cinematicData.hatchlingId}`);
             }}
           />
         )}
       </AnimatePresence>
 
-      {/* ── Hatch Modal ─────────────────────────────────────────────────────────── */}
+      {/* ── Hatch Modal ──────────────────────────────────────────────────────── */}
       <Dialog open={showHatchModal} onOpenChange={setShowHatchModal}>
         <DialogContent className={`sm:max-w-md border-2 ${resultStyle.border} bg-background`}
           style={{ boxShadow: `0 0 60px ${resultStyle.crackColor}30` }}>
           <AnimatePresence mode="wait">
 
-            {/* Phase: naming input */}
             {hatchPhase === "idle" && (
               <motion.div key="input" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <DialogHeader>
@@ -509,7 +630,6 @@ export default function Hatch() {
               </motion.div>
             )}
 
-            {/* Phase: cracking */}
             {hatchPhase === "cracking" && (
               <motion.div key="cracking" className="py-16 flex flex-col items-center text-center"
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -533,107 +653,74 @@ export default function Hatch() {
               </motion.div>
             )}
 
-            {/* Phase: energy burst */}
             {hatchPhase === "burst" && (
               <motion.div key="burst" className="py-16 flex flex-col items-center text-center"
-                initial={{ scale: 0.5, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: "spring", damping: 8 }}>
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <motion.div
-                  className="text-8xl mb-4"
-                  animate={{ scale: [1, 1.5, 0.8, 1.2, 1], rotate: [0, 20, -20, 10, 0] }}
-                  transition={{ duration: 0.8 }}
+                  className="text-7xl mb-6"
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: [0.5, 1.4, 1], opacity: 1 }}
+                  transition={{ duration: 0.6, ease: "easeOut" }}
                 >
-                  💥
+                  ✨
                 </motion.div>
-                <motion.div
-                  className="absolute inset-0 rounded-2xl"
-                  style={{ background: `radial-gradient(circle, ${resultStyle.crackColor}40 0%, transparent 70%)` }}
-                  animate={{ opacity: [0, 1, 0] }}
-                  transition={{ duration: 0.8 }}
-                />
-                <p className="font-black text-3xl" style={{ color: resultStyle.crackColor }}>It's hatching!</p>
+                <p className="font-black text-2xl" style={{ color: resultStyle.crackColor }}>Hatching!</p>
               </motion.div>
             )}
 
-            {/* Phase: creature reveal */}
             {hatchPhase === "reveal" && hatchResult && (
-              <motion.div key="reveal" className="text-center py-6 relative"
-                initial={{ scale: 0.7, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: "spring", damping: 10 }}>
-
-                {/* Aura bg */}
-                <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${resultStyle.auraClass} pointer-events-none`} />
-
-                <motion.h2
-                  className="text-3xl font-black mb-1 relative z-10"
-                  style={{ color: resultStyle.crackColor }}
-                  animate={{ scale: [0.8, 1.05, 1] }}
-                  transition={{ duration: 0.5 }}>
-                  It's a {hatchResult.hatchling.species}!
-                </motion.h2>
-
-                <p className="text-sm text-muted-foreground mb-4 font-bold relative z-10">{resultStyle.label}</p>
-
-                {/* Creature visual */}
-                <div className="w-36 h-36 mx-auto rounded-full flex items-center justify-center mb-4 relative z-10 border-4 text-7xl"
-                  style={{ borderColor: resultStyle.crackColor, boxShadow: `0 0 30px ${resultStyle.crackColor}60`, background: `radial-gradient(circle, ${resultStyle.crackColor}20, transparent)` }}>
-                  <motion.span
-                    animate={{ scale: [0.5, 1.1, 1], rotate: [0, 10, -5, 0] }}
-                    transition={{ duration: 0.6 }}
+              <motion.div key="reveal" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                <DialogHeader>
+                  <DialogTitle className="text-3xl font-black text-center" style={{ color: resultStyle.crackColor }}>
+                    {resultStyle.emoji} A new Pal!
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="py-6 text-center space-y-3">
+                  <motion.div
+                    className="text-6xl"
+                    animate={{ scale: [1, 1.2, 1], rotate: [0, 10, -10, 0] }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
                   >
                     {resultStyle.emoji}
-                  </motion.span>
-                </div>
-
-                <p className="text-2xl font-black text-foreground mb-1 relative z-10">{hatchResult.hatchling.name}</p>
-
-                {/* Badges */}
-                <div className="flex gap-2 justify-center mb-4 relative z-10 flex-wrap">
-                  <GlowBadge tone="primary">{resultStyle.label}</GlowBadge>
-                  <RarityBadge rarity={hatchResult.hatchling.rarity ?? "Common"} />
-                  {hatchResult.hatchling.isShiny && <GlowBadge tone="yellow">✦ SHINY</GlowBadge>}
-                </div>
-
-                {/* Personality */}
-                <div className="bg-black/20 rounded-xl p-3 mb-4 relative z-10 mx-2">
-                  <p className="text-xs font-black uppercase text-muted-foreground mb-0.5">Personality</p>
-                  <p className="font-black text-lg capitalize" style={{ color: resultStyle.crackColor }}>
-                    {hatchResult.hatchling.personality}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {PERSONALITY_FLAVOR[hatchResult.hatchling.personality] ?? "A mysterious and unique spirit."}
-                  </p>
-                </div>
-
-                {/* Genetics preview */}
-                {genetics && (
-                  <div className="bg-black/20 rounded-xl p-3 mb-4 relative z-10 mx-2">
-                    <p className="text-xs font-black uppercase text-muted-foreground mb-2">Genetics Preview</p>
-                    <div className="grid grid-cols-3 gap-1.5 text-[10px]">
-                      {Object.entries(genetics).slice(0, 6).map(([key, val]) => (
-                        <div key={key} className="text-center">
-                          <div className="h-1 bg-white/10 rounded-full mb-0.5">
-                            <div className="h-full rounded-full" style={{ width: `${val}%`, background: resultStyle.crackColor }} />
-                          </div>
-                          <span className="text-muted-foreground capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                  </motion.div>
+                  <div>
+                    <p className="text-2xl font-black">{hatchResult?.hatchling?.name}</p>
+                    <p className="text-sm text-muted-foreground font-medium">{hatchResult?.hatchling?.species}</p>
+                  </div>
+                  <RarityBadge rarity={hatchResult?.hatchling?.rarity ?? "Common"} />
+                  {hatchResult?.hatchling?.personality && (
+                    <p className="text-xs font-bold text-muted-foreground">
+                      {hatchResult.hatchling.personality} personality
+                    </p>
+                  )}
+                  {genetics && (
+                    <div className="grid grid-cols-3 gap-2 mt-2">
+                      {Object.entries(genetics).map(([k, v]) => (
+                        <div key={k} className="rounded-lg bg-white/5 p-2">
+                          <p className="text-[9px] uppercase tracking-wider text-muted-foreground font-black">{k}</p>
+                          <p className="font-black text-sm" style={{ color: resultStyle.crackColor }}>{v}</p>
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
-
-                <div className="flex gap-3 relative z-10">
-                  <NeonButton variant="secondary" className="flex-1 h-11" onClick={closeHatchModal}>Close</NeonButton>
-                  <Link href={`/hatchlings/${hatchResult.hatchling.id}`} className="flex-1">
-                    <NeonButton className="w-full h-11">
-                      <Zap className="w-4 h-4 mr-1" /> View Pal
-                    </NeonButton>
-                  </Link>
+                  )}
                 </div>
+                <DialogFooter className="gap-2">
+                  <NeonButton variant="secondary" onClick={closeHatchModal} className="flex-1">
+                    Close
+                  </NeonButton>
+                  <NeonButton
+                    onClick={() => {
+                      closeHatchModal();
+                      setLocation(`/hatchlings/${hatchResult?.hatchling?.id}`);
+                    }}
+                    className="flex-1"
+                  >
+                    View Pal
+                  </NeonButton>
+                </DialogFooter>
               </motion.div>
             )}
+
           </AnimatePresence>
         </DialogContent>
       </Dialog>

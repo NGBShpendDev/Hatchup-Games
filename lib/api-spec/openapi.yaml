@@ -1592,6 +1592,11 @@ paths:
           in: query
           schema:
             type: boolean
+        - name: status
+          in: query
+          description: "Filter by lifecycle status: available | incubating | hatched"
+          schema:
+            type: string
       responses:
         "200":
           description: Eggs
@@ -1664,6 +1669,49 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Egg"
+
+  /eggs/daily-refill:
+    post:
+      operationId: collectDailyEggs
+      tags: [eggs]
+      summary: Collect today's daily egg batch (up to 10 per UTC day)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [playerId]
+              properties:
+                playerId: { type: integer }
+      responses:
+        "200":
+          description: Daily eggs result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyEggRefillResult"
+
+  /eggs/{id}/place:
+    post:
+      operationId: placeEggInIncubator
+      tags: [eggs]
+      summary: Move an available egg from the bag into the incubator
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Egg placed in incubator
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Egg"
+        "400":
+          description: Incubator full or egg not available
 
   # ── Fitness ──────────────────────────────────────────────────────────────
   /fitness/stats/{playerId}:
@@ -5493,7 +5541,7 @@ components:
     # ── Eggs ─────────────────────────────────────────────────────────────────
     Egg:
       type: object
-      required: [id, playerId, rarity, eggType, stepsRequired, stepsProgress, isHatched, name, realm, source, createdAt]
+      required: [id, playerId, rarity, eggType, stepsRequired, stepsProgress, isHatched, name, realm, source, status, createdAt]
       properties:
         id:            { type: integer }
         playerId:      { type: integer }
@@ -5507,11 +5555,24 @@ components:
         imageUrl:      { type: ["string", "null"] }
         name:          { type: string }
         description:   { type: ["string", "null"] }
-        source:        { type: string, description: "Where the egg came from: training | challenge | event" }
+        source:        { type: string, description: "Where the egg came from: training | challenge | event | daily" }
+        status:        { type: string, description: "Lifecycle: available | incubating | hatched" }
         progressPct:   { type: number }
         isReady:       { type: boolean }
         createdAt:     { type: string }
         hatchedAt:     { type: ["string", "null"] }
+
+    DailyEggRefillResult:
+      type: object
+      required: [eggsGranted, alreadyGotToday, remainingToday, availableEggs]
+      properties:
+        eggsGranted:     { type: integer, description: "How many new eggs were just granted" }
+        alreadyGotToday: { type: integer, description: "How many daily eggs were already collected today" }
+        remainingToday:  { type: integer, description: "How many more daily eggs can be collected today" }
+        availableEggs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Egg"
 
     AddEggInput:
       type: object

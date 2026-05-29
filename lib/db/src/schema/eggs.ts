@@ -16,8 +16,10 @@ export const eggsTable = pgTable("eggs", {
   description: text("description"),
   // Realm system
   realm: text("realm").notNull().default("balance"),
-  // Where the egg came from: training | challenge | event
+  // Where the egg came from: training | challenge | event | daily
   source: text("source").notNull().default("training"),
+  // Egg lifecycle: available (in bag, not yet incubating) | incubating | hatched
+  status: text("status").notNull().default("incubating"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   hatchedAt: timestamp("hatched_at", { withTimezone: true }),
 });

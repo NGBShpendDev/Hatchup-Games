@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { eggsTable, hatchlingsTable } from "@workspace/db";
-import { eq, and, count } from "drizzle-orm";
+import { eq, and, count, gte, sql } from "drizzle-orm";
 import {
   ListEggsQueryParams,
   GetEggParams,
@@ -10,6 +10,7 @@ import {
   AddEggBody,
 } from "@workspace/api-zod";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth.ts";
+import { z } from "zod/v4";
 
 const router = Router();
 
@@ -117,32 +118,62 @@ function derivePersonality(genetics: ReturnType<typeof generateGenetics>): strin
   return "Calm";
 }
 
-// GET /eggs
-router.get("/eggs", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
-  const query = ListEggsQueryParams.safeParse({
-    playerId: req.query.playerId ? Number(req.query.playerId) : undefined,
-    hatched: req.query.hatched !== undefined ? req.query.hatched === "true" : undefined,
-  });
-  if (!query.success || !query.data.playerId) {
-    res.status(400).json({ error: "playerId is required" }); return;
-  }
-
-  const conditions = [eq(eggsTable.playerId, query.data.playerId)];
-  if (query.data.hatched !== undefined) {
-    conditions.push(eq(eggsTable.isHatched, query.data.hatched));
-  }
-
-  const eggs = await db.query.eggsTable.findMany({
-    where: conditions.length === 1 ? conditions[0] : and(...conditions),
-  });
-
-  res.json(eggs.map(e => ({
+function serializeEgg(e: typeof eggsTable.$inferSelect) {
+  return {
     ...e,
     createdAt: e.createdAt.toISOString(),
     hatchedAt: e.hatchedAt?.toISOString() ?? null,
     progressPct: Math.min(100, Math.round((e.stepsProgress / e.stepsRequired) * 100)),
     isReady: e.stepsProgress >= e.stepsRequired && !e.isHatched,
-  })));
+  };
+}
+
+// ── Daily egg variety pool ─────────────────────────────────────────────────────
+// Weighted: balanced(40%) | strength(20%) | cardio(20%) | balance(10%) | beast(10%)
+const DAILY_EGG_TYPE_POOL = [
+  "balanced", "balanced", "balanced", "balanced",
+  "strength", "strength",
+  "cardio", "cardio",
+  "balance",
+  "beast",
+];
+
+function pickDailyRarity(): string {
+  const roll = Math.random();
+  if (roll < 0.05) return "Epic";
+  if (roll < 0.15) return "Rare";
+  if (roll < 0.40) return "Uncommon";
+  return "Common";
+}
+
+const DAILY_CAP = 10;
+const INCUBATOR_CAP = 3;
+
+// ── GET /eggs ──────────────────────────────────────────────────────────────────
+router.get("/eggs", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
+  const query = ListEggsQueryParams.safeParse({
+    playerId: req.query.playerId ? Number(req.query.playerId) : undefined,
+    hatched: req.query.hatched !== undefined ? req.query.hatched === "true" : undefined,
+    status: req.query.status as string | undefined,
+  });
+  if (!query.success || !query.data.playerId) {
+    res.status(400).json({ error: "playerId is required" }); return;
+  }
+
+  const conditions: ReturnType<typeof eq>[] = [eq(eggsTable.playerId, query.data.playerId)];
+  if (query.data.hatched !== undefined) {
+    conditions.push(eq(eggsTable.isHatched, query.data.hatched));
+  }
+  if ((query.data as any).status) {
+    conditions.push(eq(eggsTable.status, (query.data as any).status as string));
+  }
+
+  const eggs = await db.query.eggsTable.findMany({
+    where: conditions.length === 1 ? conditions[0] : and(...conditions),
+    orderBy: (t, { desc }) => [desc(t.createdAt)],
+  });
+
+  res.json(eggs.map(serializeEgg));
 });
 
 // GET /eggs/:id
@@ -154,13 +185,7 @@ router.get("/eggs/:id", requireAuth, attachPlayer, async (req, res) => {
   if (!egg) { res.status(404).json({ error: "Egg not found" }); return; }
   if (egg.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
 
-  res.json({
-    ...egg,
-    createdAt: egg.createdAt.toISOString(),
-    hatchedAt: egg.hatchedAt?.toISOString() ?? null,
-    progressPct: Math.min(100, Math.round((egg.stepsProgress / egg.stepsRequired) * 100)),
-    isReady: egg.stepsProgress >= egg.stepsRequired && !egg.isHatched,
-  });
+  res.json(serializeEgg(egg));
 });
 
 // POST /eggs/:id/hatch
@@ -174,6 +199,10 @@ router.post("/eggs/:id/hatch", requireAuth, attachPlayer, requirePlayerOwnership
   if (!egg) { res.status(404).json({ error: "Egg not found" }); return; }
   if (egg.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
   if (egg.isHatched) { res.status(400).json({ error: "Egg already hatched" }); return; }
+  if (egg.status === "available") {
+    res.status(400).json({ error: "Egg must be incubating before it can hatch. Place it in the incubator first." });
+    return;
+  }
   if (egg.stepsProgress < egg.stepsRequired) {
     res.status(400).json({ error: `Egg needs ${egg.stepsRequired - egg.stepsProgress} more steps to hatch` });
     return;
@@ -230,18 +259,12 @@ router.post("/eggs/:id/hatch", requireAuth, attachPlayer, requirePlayerOwnership
   }).returning();
 
   const updatedEgg = await db.update(eggsTable)
-    .set({ isHatched: true, hatchlingId: hatchling[0].id, hatchedAt: new Date() })
+    .set({ isHatched: true, status: "hatched", hatchlingId: hatchling[0].id, hatchedAt: new Date() })
     .where(eq(eggsTable.id, egg.id))
     .returning();
 
   res.json({
-    egg: {
-      ...updatedEgg[0],
-      createdAt: updatedEgg[0].createdAt.toISOString(),
-      hatchedAt: updatedEgg[0].hatchedAt?.toISOString() ?? null,
-      progressPct: 100,
-      isReady: false,
-    },
+    egg: serializeEgg(updatedEgg[0]),
     hatchling: {
       ...hatchling[0],
       createdAt: hatchling[0].createdAt.toISOString(),
@@ -249,16 +272,15 @@ router.post("/eggs/:id/hatch", requireAuth, attachPlayer, requirePlayerOwnership
   });
 });
 
-// POST /eggs/incubate
+// POST /eggs/incubate  (legacy — direct-to-incubator, still used by special/reward eggs)
 router.post("/eggs/incubate", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
   const body = AddEggBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
-  const INCUBATOR_CAP = 3;
   const [{ value: activeEggCount }] = await db
     .select({ value: count() })
     .from(eggsTable)
-    .where(and(eq(eggsTable.playerId, body.data.playerId), eq(eggsTable.isHatched, false)));
+    .where(and(eq(eggsTable.playerId, body.data.playerId), eq(eggsTable.status, "incubating")));
   if (activeEggCount >= INCUBATOR_CAP) {
     res.status(400).json({ error: "incubator_full", message: "Your incubator is full. Hatch an egg to make room." });
     return;
@@ -281,19 +303,104 @@ router.post("/eggs/incubate", requireAuth, attachPlayer, requirePlayerOwnership,
     rarity,
     eggType,
     realm,
+    status: "incubating",
     stepsRequired,
     stepsProgress: 0,
     name: config.name,
     description: config.description,
   }).returning();
 
-  res.status(201).json({
-    ...egg[0],
-    createdAt: egg[0].createdAt.toISOString(),
-    hatchedAt: null,
-    progressPct: 0,
-    isReady: false,
+  res.status(201).json(serializeEgg(egg[0]));
+});
+
+// POST /eggs/daily-refill  ── grant up to DAILY_CAP eggs per UTC day
+router.post("/eggs/daily-refill", requireAuth, attachPlayer, requirePlayerOwnership, async (req, res) => {
+  const body = z.object({ playerId: z.number().int().positive() }).safeParse(req.body);
+  if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
+  const playerId = body.data.playerId;
+
+  // Count daily eggs already granted today (UTC day boundary)
+  const todayStart = new Date();
+  todayStart.setUTCHours(0, 0, 0, 0);
+
+  const [{ value: alreadyGotToday }] = await db
+    .select({ value: count() })
+    .from(eggsTable)
+    .where(and(
+      eq(eggsTable.playerId, playerId),
+      eq(eggsTable.source, "daily"),
+      gte(eggsTable.createdAt, todayStart),
+    ));
+
+  const canGet = Math.max(0, DAILY_CAP - alreadyGotToday);
+
+  if (canGet > 0) {
+    const newEggs = Array.from({ length: canGet }, () => {
+      const eggType = pickRandom(DAILY_EGG_TYPE_POOL);
+      const config = EGG_TYPE_CONFIG[eggType] ?? EGG_TYPE_CONFIG["balanced"];
+      const realm = EGG_TYPE_TO_REALM[eggType] ?? "balance";
+      const rarity = pickDailyRarity();
+      const stepsRequired = rarity === "Epic" ? 20000 : rarity === "Rare" ? 12000 : config.stepsRequired;
+      return {
+        playerId,
+        eggType,
+        realm,
+        rarity,
+        stepsRequired,
+        stepsProgress: 0,
+        name: config.name,
+        description: config.description,
+        source: "daily" as const,
+        status: "available" as const,
+      };
+    });
+
+    await db.insert(eggsTable).values(newEggs);
+  }
+
+  // Return all available eggs for the player (today's + any unplaced from previous days)
+  const availableEggs = await db.query.eggsTable.findMany({
+    where: and(eq(eggsTable.playerId, playerId), eq(eggsTable.status, "available")),
+    orderBy: (t, { asc }) => [asc(t.createdAt)],
   });
+
+  res.json({
+    eggsGranted: canGet,
+    alreadyGotToday: alreadyGotToday,
+    remainingToday: 0,
+    availableEggs: availableEggs.map(serializeEgg),
+  });
+});
+
+// POST /eggs/:id/place  ── move an available egg into the incubator
+router.post("/eggs/:id/place", requireAuth, attachPlayer, async (req, res) => {
+  const params = GetEggParams.safeParse({ id: Number(req.params.id) });
+  if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const egg = await db.query.eggsTable.findFirst({ where: eq(eggsTable.id, params.data.id) });
+  if (!egg) { res.status(404).json({ error: "Egg not found" }); return; }
+  if (egg.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (egg.status !== "available") {
+    res.status(400).json({ error: "egg_not_available", message: "This egg is not in your bag." });
+    return;
+  }
+
+  const [{ value: incubating }] = await db
+    .select({ value: count() })
+    .from(eggsTable)
+    .where(and(eq(eggsTable.playerId, req.playerId!), eq(eggsTable.status, "incubating")));
+
+  if (incubating >= INCUBATOR_CAP) {
+    res.status(400).json({ error: "incubator_full", message: "Your incubator is full. Hatch an egg first." });
+    return;
+  }
+
+  const updated = await db.update(eggsTable)
+    .set({ status: "incubating" })
+    .where(eq(eggsTable.id, egg.id))
+    .returning();
+
+  res.json(serializeEgg(updated[0]));
 });
 
 export default router;

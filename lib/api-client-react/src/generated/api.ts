@@ -65,6 +65,7 @@ import type {
   ClubInvite,
   ClubMember,
   CoachChatBody,
+  CollectDailyEggsBody,
   CommentLikeInput,
   CommentLikeResult,
   Competition,
@@ -78,6 +79,7 @@ import type {
   CreateMealPostResult,
   CreatePostInput,
   DailyClaimResult,
+  DailyEggRefillResult,
   DailyStreakState,
   DeleteMealPostResult,
   DeletePostCommentParams,
@@ -5767,6 +5769,147 @@ export const useAddEgg = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getAddEggMutationOptions(options));
+    }
+
+export const getCollectDailyEggsUrl = () => {
+
+
+
+
+  return `/api/eggs/daily-refill`
+}
+
+/**
+ * @summary Collect today's daily egg batch (up to 10 per UTC day)
+ */
+export const collectDailyEggs = async (collectDailyEggsBody: CollectDailyEggsBody, options?: RequestInit): Promise<DailyEggRefillResult> => {
+
+  return customFetch<DailyEggRefillResult>(getCollectDailyEggsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      collectDailyEggsBody,)
+  }
+);}
+
+
+
+
+export const getCollectDailyEggsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof collectDailyEggs>>, TError,{data: BodyType<CollectDailyEggsBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof collectDailyEggs>>, TError,{data: BodyType<CollectDailyEggsBody>}, TContext> => {
+
+const mutationKey = ['collectDailyEggs'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof collectDailyEggs>>, {data: BodyType<CollectDailyEggsBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  collectDailyEggs(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CollectDailyEggsMutationResult = NonNullable<Awaited<ReturnType<typeof collectDailyEggs>>>
+    export type CollectDailyEggsMutationBody = BodyType<CollectDailyEggsBody>
+    export type CollectDailyEggsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Collect today's daily egg batch (up to 10 per UTC day)
+ */
+export const useCollectDailyEggs = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof collectDailyEggs>>, TError,{data: BodyType<CollectDailyEggsBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof collectDailyEggs>>,
+        TError,
+        {data: BodyType<CollectDailyEggsBody>},
+        TContext
+      > => {
+      return useMutation(getCollectDailyEggsMutationOptions(options));
+    }
+
+export const getPlaceEggInIncubatorUrl = (id: number,) => {
+
+
+
+
+  return `/api/eggs/${id}/place`
+}
+
+/**
+ * @summary Move an available egg from the bag into the incubator
+ */
+export const placeEggInIncubator = async (id: number, options?: RequestInit): Promise<Egg> => {
+
+  return customFetch<Egg>(getPlaceEggInIncubatorUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPlaceEggInIncubatorMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof placeEggInIncubator>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof placeEggInIncubator>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['placeEggInIncubator'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof placeEggInIncubator>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  placeEggInIncubator(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PlaceEggInIncubatorMutationResult = NonNullable<Awaited<ReturnType<typeof placeEggInIncubator>>>
+
+    export type PlaceEggInIncubatorMutationError = ErrorType<void>
+
+    /**
+ * @summary Move an available egg from the bag into the incubator
+ */
+export const usePlaceEggInIncubator = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof placeEggInIncubator>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof placeEggInIncubator>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getPlaceEggInIncubatorMutationOptions(options));
     }
 
 export const getGetFitnessStatsUrl = (playerId: number,) => {

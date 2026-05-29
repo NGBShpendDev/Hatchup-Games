@@ -257,8 +257,10 @@ export interface Egg {
   name: string;
   /** @nullable */
   description?: string | null;
-  /** Where the egg came from: training | challenge | event */
+  /** Where the egg came from: training | challenge | event | daily */
   source: string;
+  /** Lifecycle: available | incubating | hatched */
+  status: string;
   progressPct?: number;
   isReady?: boolean;
   createdAt: string;
@@ -536,6 +538,16 @@ export interface ClubInput {
 
 export interface JoinClubInput {
   playerId: number;
+}
+
+export interface DailyEggRefillResult {
+  /** How many new eggs were just granted */
+  eggsGranted: number;
+  /** How many daily eggs were already collected today */
+  alreadyGotToday: number;
+  /** How many more daily eggs can be collected today */
+  remainingToday: number;
+  availableEggs: Egg[];
 }
 
 export interface AddEggInput {
@@ -3837,6 +3849,14 @@ export type LeaveClub200 = {
 export type ListEggsParams = {
 playerId: number;
 hatched?: boolean;
+/**
+ * Filter by lifecycle status: available | incubating | hatched
+ */
+status?: string;
+};
+
+export type CollectDailyEggsBody = {
+  playerId: number;
 };
 
 export type ListFitnessActivitiesParams = {
