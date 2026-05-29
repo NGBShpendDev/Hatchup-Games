@@ -23,6 +23,7 @@ import {
   playerArtifactsTable,
   artifactWorldNotificationsTable,
 } from "@workspace/db";
+import { awardSpecialEgg } from "./eggService.ts";
 import { eq, desc, and, gt, lt, lte, sql, inArray } from "drizzle-orm";
 import { awardBadge } from "./badgeService.ts";
 import {
@@ -375,6 +376,16 @@ function makeTxRewardStore(tx: FinalizeDbHandle): RewardStoreTx {
         new Date(),
         tx,
       );
+      // Award a Championship Egg if the incubator has space
+      await awardSpecialEgg(playerId, {
+        eggType: "legendary",
+        rarity: "Epic",
+        stepsRequired: 25000,
+        name: "Champion's Egg",
+        description: `Forged in the heat of competition — won by defeating all challengers in "${challenge?.title ?? "a tournament"}". Pulses with raw competitive energy.`,
+        source: "challenge",
+        realm: "mythic",
+      }, tx);
     },
   };
 }

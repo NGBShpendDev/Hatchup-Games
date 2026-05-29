@@ -16,6 +16,8 @@ export const eggsTable = pgTable("eggs", {
   description: text("description"),
   // Realm system
   realm: text("realm").notNull().default("balance"),
+  // Where the egg came from: training | challenge | event
+  source: text("source").notNull().default("training"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   hatchedAt: timestamp("hatched_at", { withTimezone: true }),
 });

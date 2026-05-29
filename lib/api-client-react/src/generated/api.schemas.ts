@@ -257,6 +257,8 @@ export interface Egg {
   name: string;
   /** @nullable */
   description?: string | null;
+  /** Where the egg came from: training | challenge | event */
+  source: string;
   progressPct?: number;
   isReady?: boolean;
   createdAt: string;

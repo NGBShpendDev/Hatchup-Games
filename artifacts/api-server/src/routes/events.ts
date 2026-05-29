@@ -6,6 +6,7 @@ import { and, eq, inArray, sql, desc } from "drizzle-orm";
 import { ListEventsQueryParams, GetLiveEventParams } from "@workspace/api-zod";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { applyHatchlingXp, getActivePalId, shouldTriggerSharePrompt } from "../services/hatchlingXp.ts";
+import { awardSpecialEgg } from "../services/eggService.ts";
 
 // Live event entry-reward XP grant. Kept small and flat so it can't replace
 // real progression — it exists so a level-up that crosses an evolution
@@ -194,6 +195,17 @@ router.post("/events/:id/join", requireAuth, attachPlayer, async (req, res) => {
   const palId = await getActivePalId(req.playerId!);
   const xpResult = palId ? await applyHatchlingXp(palId, EVENT_JOIN_XP) : null;
 
+  // Award a Festival Egg if the incubator has space (first-join only, silently skip if full)
+  const eggAwarded = await awardSpecialEgg(req.playerId!, {
+    eggType: "balance",
+    rarity: "Rare",
+    stepsRequired: 8000,
+    name: "Festival Egg",
+    description: `A shimmering egg born from the energy of "${event.name}". Infused with the spirit of the crowd, it crackles with vibrant life.`,
+    source: "event",
+    realm: "balance",
+  }, db);
+
   // Derive the participant counter from the dedup table to keep it
   // race-safe under concurrent first-joins.
   await db
@@ -211,6 +223,7 @@ router.post("/events/:id/join", requireAuth, attachPlayer, async (req, res) => {
     joinedAt: inserted[0].joinedAt.toISOString(),
     xpEarned: xpResult ? xpResult.xpDelta : 0,
     coinsEarned: 0,
+    eggAwarded,
     palXpResult: xpResult
       ? { ...xpResult, evolutionSharePrompt: shouldTriggerSharePrompt(xpResult) }
       : null,

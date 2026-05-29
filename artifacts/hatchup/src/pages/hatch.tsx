@@ -14,7 +14,7 @@ import { RarityBadge } from "@/components/rarity-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";
-import { Egg as EggIcon, Sparkles, Plus, Footprints, Zap } from "lucide-react";
+import { Egg as EggIcon, Sparkles, Plus, Footprints, Trophy, Star, Zap } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -345,6 +345,17 @@ export default function Hatch() {
                         />
                       )}
                       <div className="p-6 flex flex-col items-center text-center relative z-10">
+                        {/* Source badge — only for special eggs */}
+                        {(egg as any).source === "challenge" && (
+                          <div className="flex items-center gap-1 mb-2 px-2 py-0.5 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-yellow-400 text-[10px] font-black uppercase tracking-wider">
+                            <Trophy className="w-3 h-3" /> Challenge Win
+                          </div>
+                        )}
+                        {(egg as any).source === "event" && (
+                          <div className="flex items-center gap-1 mb-2 px-2 py-0.5 rounded-full bg-pink-500/20 border border-pink-500/40 text-pink-400 text-[10px] font-black uppercase tracking-wider">
+                            <Star className="w-3 h-3" /> Live Event
+                          </div>
+                        )}
                         {/* Realm badge */}
                         <div className="flex gap-2 mb-4 items-center">
                           <GlowBadge tone="primary">{egg.eggType}</GlowBadge>

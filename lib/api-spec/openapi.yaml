@@ -5493,7 +5493,7 @@ components:
     # ── Eggs ─────────────────────────────────────────────────────────────────
     Egg:
       type: object
-      required: [id, playerId, rarity, eggType, stepsRequired, stepsProgress, isHatched, name, realm, createdAt]
+      required: [id, playerId, rarity, eggType, stepsRequired, stepsProgress, isHatched, name, realm, source, createdAt]
       properties:
         id:            { type: integer }
         playerId:      { type: integer }
@@ -5507,6 +5507,7 @@ components:
         imageUrl:      { type: ["string", "null"] }
         name:          { type: string }
         description:   { type: ["string", "null"] }
+        source:        { type: string, description: "Where the egg came from: training | challenge | event" }
         progressPct:   { type: number }
         isReady:       { type: boolean }
         createdAt:     { type: string }
