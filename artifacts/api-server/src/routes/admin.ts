@@ -436,39 +436,19 @@ router.post(
 // ── Bootstrap helper exported for app boot ───────────────────────────────────
 
 /**
- * One-shot bootstrap that runs on server start:
- * - Backfills the allowlist with every existing `isAdmin=true` player's email.
- * - Promotes existing admins to `isSuperAdmin=true` IF no super-admin exists
- *   yet, so the first admin in the system can manage the panel without being
- *   locked out.
- * - Seeds an initial access code if none exists, logging the plaintext code
- *   ONCE at WARN level so the operator can read it from the boot logs.
+ * One-shot bootstrap that runs on server start.
+ * Seeds an initial access code if none exists.
+ *
+ * The plaintext is NOT logged. Retrieve the hash from the
+ * admin_access_codes table and rotate via /admin/settings.
+ *
+ * Intentionally does NOT backfill the allowlist from isAdmin rows (the
+ * allowlist is an independent, durable control that must not be silently
+ * re-granted on every restart) and does NOT auto-promote admins to
+ * super-admin (privilege escalation must be an explicit operator action).
  */
 export async function bootstrapAdminPanel(): Promise<void> {
   try {
-    const admins = await db
-      .select({ id: playersTable.id, email: playersTable.email, isSuperAdmin: playersTable.isSuperAdmin })
-      .from(playersTable)
-      .where(eq(playersTable.isAdmin, true));
-    for (const a of admins) {
-      const email = a.email ? normalizeEmail(a.email) : null;
-      if (!email) continue;
-      await db
-        .insert(adminAllowlistTable)
-        .values({ email })
-        .onConflictDoNothing();
-    }
-    const anySuper = admins.some((a) => a.isSuperAdmin);
-    if (!anySuper && admins.length > 0) {
-      await db
-        .update(playersTable)
-        .set({ isSuperAdmin: true })
-        .where(eq(playersTable.isAdmin, true));
-      logger.warn(
-        { count: admins.length },
-        "bootstrap: promoted existing admins to super-admin (no super-admin existed)",
-      );
-    }
     const code = await db.query.adminAccessCodesTable.findFirst({
       orderBy: [desc(adminAccessCodesTable.rotatedAt)],
     });
@@ -478,8 +458,7 @@ export async function bootstrapAdminPanel(): Promise<void> {
         codeHash: createHash("sha256").update(plaintext, "utf8").digest("hex"),
       });
       logger.warn(
-        { code: plaintext },
-        "bootstrap: seeded initial admin access code — rotate this from /admin/settings",
+        "bootstrap: seeded initial admin access code — retrieve hash from admin_access_codes table and rotate from /admin/settings",
       );
     }
   } catch (err) {
