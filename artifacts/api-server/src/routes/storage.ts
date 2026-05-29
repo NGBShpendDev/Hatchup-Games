@@ -9,7 +9,38 @@ import { requireAuth } from "../middlewares/auth.ts";
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
 
-const MAX_UPLOAD_BYTES = 8 * 1024 * 1024; // 8 MB
+export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024; // 8 MB
+
+// ── Orphan-upload cleanup ─────────────────────────────────────────────────────
+// Presigned PUT URLs are signed for 900 s. We track every issued path in memory
+// so that if a client uploads a file but never attaches it to a record (either
+// because the post was abandoned or because it was oversized and we rejected
+// attachment), the orphaned GCS object is deleted once its TTL window closes.
+//
+// The in-memory map resets on restart, which is acceptable: the cleanup job
+// runs every 5 minutes so the worst-case orphan lifetime is ~20 minutes
+// (15-min URL TTL + 5-min sweep interval). Any object still un-attached by
+// then is treated as abandoned and removed from storage.
+const UPLOAD_URL_TTL_MS = 900 * 1000; // must match ttlSec in getObjectEntityUploadURL
+const ORPHAN_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+const pendingUploads = new Map<string, number>(); // objectPath -> expiresAt epoch ms
+
+const orphanSweepTimer = setInterval(async () => {
+  const now = Date.now();
+  const expired: string[] = [];
+  for (const [objectPath, expiresAt] of pendingUploads) {
+    if (expiresAt <= now) expired.push(objectPath);
+  }
+  for (const objectPath of expired) {
+    pendingUploads.delete(objectPath);
+    // Deletes the object only if it was never promoted to public (i.e., never
+    // successfully attached to a meal post, social post, or other record).
+    await objectStorageService.deleteObjectIfPrivate(objectPath);
+  }
+}, ORPHAN_SWEEP_INTERVAL_MS);
+// Allow the process to exit even if this timer is still pending.
+orphanSweepTimer.unref();
+
 const ALLOWED_CONTENT_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -95,6 +126,12 @@ router.post("/storage/uploads/request-url", requireAuth, async (req: Request, re
     const uploadURL = await objectStorageService.getObjectEntityUploadURL(contentType);
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
     const uploadToken = signUploadToken(objectPath, clerkUserId, contentType);
+
+    // Register this path for orphan cleanup. If the client never attaches the
+    // object to a record within the presigned URL's TTL window, the sweep job
+    // will delete it from storage, preventing quota/cost exhaustion from
+    // abandoned or oversized uploads.
+    pendingUploads.set(objectPath, Date.now() + UPLOAD_URL_TTL_MS);
 
     res.json({
       uploadURL,

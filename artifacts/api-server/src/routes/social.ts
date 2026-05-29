@@ -44,7 +44,7 @@ import { notificationsTable } from "@workspace/db";
 import { resolveMentionedPlayers } from "../services/mentions.ts";
 import { createHmac } from "node:crypto";
 import { logger } from "../lib/logger.ts";
-import { verifyUploadToken } from "./storage.ts";
+import { verifyUploadToken, MAX_UPLOAD_BYTES } from "./storage.ts";
 import { ObjectStorageService } from "../lib/objectStorage.ts";
 import {
   CreatePostBody,
@@ -583,8 +583,12 @@ router.post("/social/posts", requireAuth, attachPlayer, socialWriteLimiter, bloc
       await socialObjectStorageService.trySetObjectEntityAclPolicy(mediaUrl, {
         owner: req.clerkUserId!,
         visibility: "public",
-      });
-    } catch (err) {
+      }, { maxSizeBytes: MAX_UPLOAD_BYTES });
+    } catch (err: any) {
+      if (err?.code === "UPLOAD_TOO_LARGE") {
+        res.status(413).json({ error: "Media exceeds the 8 MB upload limit" });
+        return;
+      }
       req.log.error({ err, mediaUrl }, "Failed to set ACL on uploaded social post media");
       res.status(400).json({ error: "Media upload not found or expired" });
       return;

@@ -17,7 +17,7 @@ import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middleware
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { awardBadge } from "../services/badgeService.ts";
 import { getHiddenPlayerIds } from "./safety.ts";
-import { verifyUploadToken } from "./storage.ts";
+import { verifyUploadToken, MAX_UPLOAD_BYTES } from "./storage.ts";
 import { ObjectStorageService } from "../lib/objectStorage.ts";
 import { computeWeeklyRecap, sendWeeklyRecapNotification, buildRecapMessage, MACRO_GOAL_TARGETS } from "../services/nutritionRecap.ts";
 import {
@@ -346,8 +346,12 @@ router.post("/nutrition/posts", requireAuth, attachPlayer, requirePlayerOwnershi
       await objectStorageService.trySetObjectEntityAclPolicy(imageUrl, {
         owner: req.clerkUserId!,
         visibility: "public",
-      });
-    } catch (err) {
+      }, { maxSizeBytes: MAX_UPLOAD_BYTES });
+    } catch (err: any) {
+      if (err?.code === "UPLOAD_TOO_LARGE") {
+        res.status(413).json({ error: "Image exceeds the 8 MB upload limit" });
+        return;
+      }
       req.log.error({ err, imageUrl }, "Failed to set ACL on uploaded meal image");
       res.status(400).json({ error: "Image upload not found or expired" });
       return;
@@ -1071,8 +1075,12 @@ router.patch("/nutrition/posts/:id", requireAuth, attachPlayer, async (req, res)
       await objectStorageService.trySetObjectEntityAclPolicy(imageUrl, {
         owner: req.clerkUserId!,
         visibility: "public",
-      });
-    } catch (err) {
+      }, { maxSizeBytes: MAX_UPLOAD_BYTES });
+    } catch (err: any) {
+      if (err?.code === "UPLOAD_TOO_LARGE") {
+        res.status(413).json({ error: "Image exceeds the 8 MB upload limit" });
+        return;
+      }
       req.log.error({ err, imageUrl }, "Failed to set ACL on updated meal image");
       res.status(400).json({ error: "Image upload not found or expired" });
       return;

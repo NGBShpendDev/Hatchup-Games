@@ -178,7 +178,8 @@ export class ObjectStorageService {
 
   async trySetObjectEntityAclPolicy(
     rawPath: string,
-    aclPolicy: ObjectAclPolicy
+    aclPolicy: ObjectAclPolicy,
+    options?: { maxSizeBytes?: number }
   ): Promise<string> {
     const normalizedPath = this.normalizeObjectEntityPath(rawPath);
     if (!normalizedPath.startsWith("/")) {
@@ -186,8 +187,53 @@ export class ObjectStorageService {
     }
 
     const objectFile = await this.getObjectEntityFile(normalizedPath);
+
+    // Enforce the file-size cap at attachment time. The presigned PUT URL
+    // cannot carry a byte-range constraint, so an attacker could declare a
+    // small size during URL generation and then upload a much larger payload
+    // directly. Checking the actual GCS-reported size here prevents oversized
+    // objects from ever being promoted to public or bound to a record.
+    // Critically, we also delete the oversized object immediately so it cannot
+    // accumulate as an orphaned blob and exhaust storage quota.
+    if (options?.maxSizeBytes != null) {
+      const [meta] = await objectFile.getMetadata();
+      const actualSize = Number(meta.size ?? 0);
+      if (actualSize > options.maxSizeBytes) {
+        // Best-effort delete — if this fails the object will eventually be
+        // swept by the regular TTL/orphan cleanup pass, but we still throw so
+        // the caller gets a clear rejection.
+        try {
+          await objectFile.delete();
+        } catch {
+          // Intentionally swallowed; the rejection below is the primary signal.
+        }
+        throw Object.assign(
+          new Error(`Upload exceeds the ${options.maxSizeBytes}-byte limit (actual: ${actualSize} bytes)`),
+          { code: "UPLOAD_TOO_LARGE" }
+        );
+      }
+    }
+
     await setObjectAclPolicy(objectFile, aclPolicy);
     return normalizedPath;
+  }
+
+  /**
+   * Delete an object if it is still private (unattached / never promoted to
+   * public). Used by the orphan-upload cleanup pass to purge presigned-URL
+   * uploads that were never bound to a record within their TTL window.
+   * Any error is silently swallowed because the object may already be gone.
+   */
+  async deleteObjectIfPrivate(normalizedPath: string): Promise<void> {
+    try {
+      const objectFile = await this.getObjectEntityFile(normalizedPath);
+      const policy = await getObjectAclPolicy(objectFile);
+      if (!policy || policy.visibility !== "public") {
+        await objectFile.delete();
+      }
+    } catch {
+      // Object already gone or unreachable — no action needed.
+    }
   }
 
   async canAccessObjectEntity({
