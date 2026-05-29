@@ -342,9 +342,14 @@ export default function SubscriptionPage() {
                 <span className={canAffordShield ? "text-cyan-300 font-bold" : "text-amber-400 font-bold"}>{coins} coins</span>
               </p>
               {!canAffordShield && (
-                <p className="text-xs text-amber-400 font-bold mt-0.5" data-testid="not-enough-coins">
-                  Not enough coins
-                </p>
+                <>
+                  <p className="text-xs text-amber-400 font-bold mt-0.5" data-testid="not-enough-coins">
+                    Not enough coins
+                  </p>
+                  <p className="text-xs text-white/50 mt-1 leading-relaxed" data-testid="earn-coins-tip">
+                    Earn coins by completing workouts, daily check-ins, and challenges.
+                  </p>
+                </>
               )}
             </div>
             <button
