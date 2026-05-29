@@ -27,6 +27,12 @@ const defaultLoader: OgPostLoader = async (id: number): Promise<OgLoadResult> =>
       where: eq(playersTable.id, row.playerId),
     });
     if (!authorRow) return { post, author: null };
+    // Apply the same visibility gates as the authenticated social permalink:
+    // posts from hidden-visibility or minor accounts must not be surfaced via
+    // the public OG routes (mirrors isPlayerVisibleToViewer in social.ts).
+    if (authorRow.locationVisibility === "hidden" || authorRow.isMinor) {
+      return { post: null, author: null };
+    }
     // Resolve accent color server-side using the author's entitlement tier so
     // a free player can't paint share cards with a premium-only gradient by
     // patching `share_accent_color` directly.

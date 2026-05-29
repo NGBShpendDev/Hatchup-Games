@@ -12,6 +12,9 @@ const playerLoader: OgPlayerLoader = async (username: string): Promise<OgPlayerI
       where: eq(playersTable.username, username),
     });
     if (!row) return null;
+    // Honour the same privacy gates as the authenticated profile endpoint:
+    // hidden accounts and minor accounts must not be discoverable via OG routes.
+    if (row.locationVisibility === "hidden" || row.isMinor) return null;
     const tier = getEntitlement(row).tier;
     const accentId = resolveAccentColorId(row.shareAccentColor, tier);
     const accent = resolveAccentColor(row.shareAccentColor, tier);

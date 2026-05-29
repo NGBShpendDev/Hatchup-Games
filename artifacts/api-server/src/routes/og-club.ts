@@ -23,6 +23,9 @@ const clubLoader: OgClubLoader = async (id: number): Promise<OgClubInput | null>
   try {
     const row = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, id) });
     if (!row) return null;
+    // Private clubs must not be discoverable via public OG routes —
+    // mirrors the membership gate in GET /clubs/:id.
+    if (!row.isPublic) return null;
     const accent = clubColorToAccent(row.color);
     return {
       id: row.id,
