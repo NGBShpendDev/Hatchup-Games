@@ -152,6 +152,7 @@ router.get("/health/google/connect", requireAuth, async (req, res) => {
     redirect_uri: getCallbackUri(req, "google"),
     response_type: "code",
     scope: [
+      "openid",
       "https://www.googleapis.com/auth/fitness.activity.read",
       "https://www.googleapis.com/auth/fitness.sleep.read",
     ].join(" "),
@@ -204,23 +205,68 @@ router.get("/health/google/callback", requireAuth, async (req, res) => {
   }
 
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
+
+  // Fetch the provider subject identifier for one-to-one account binding (fail-closed).
+  // Linking is rejected if we cannot resolve a stable provider subject ID, preventing
+  // bypass via network failures or misconfigured credentials.
+  let googleProviderAccountId: string | null = null;
+  try {
+    const profileRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+    if (profileRes.ok) {
+      const profile = await profileRes.json() as { sub?: string };
+      googleProviderAccountId = profile.sub ?? null;
+    }
+  } catch {
+    logger.warn({ playerId }, "Google Fit: could not fetch userinfo for provider binding check");
+  }
+
+  // Fail-closed: require a resolved subject ID to proceed.
+  if (!googleProviderAccountId) {
+    res.redirect(`${base}/health-settings?error=provider_identity_unavailable`);
+    return;
+  }
+
+  // Enforce one-to-one: reject if this Google account is already bound to a different player.
+  const googleConflict = await db.query.healthConnectionsTable.findFirst({
+    where: and(
+      eq(healthConnectionsTable.platform, "google_fit"),
+      eq(healthConnectionsTable.providerAccountId, googleProviderAccountId),
+    ),
+  });
+  if (googleConflict && googleConflict.playerId !== playerId) {
+    res.redirect(`${base}/health-settings?error=provider_account_already_linked`);
+    return;
+  }
+
   const existing = await db.query.healthConnectionsTable.findFirst({
     where: and(eq(healthConnectionsTable.playerId, playerId), eq(healthConnectionsTable.platform, "google_fit")),
   });
   let connectionId: number;
-  if (existing) {
-    await db.update(healthConnectionsTable)
-      .set({ accessToken: encryptToken(tokens.access_token), refreshToken: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null, tokenExpiresAt: expiresAt })
-      .where(eq(healthConnectionsTable.id, existing.id));
-    connectionId = existing.id;
-  } else {
-    const [inserted] = await db.insert(healthConnectionsTable).values({
-      playerId, platform: "google_fit",
-      accessToken: encryptToken(tokens.access_token),
-      refreshToken: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null,
-      tokenExpiresAt: expiresAt, consentGivenAt: new Date(),
-    }).returning({ id: healthConnectionsTable.id });
-    connectionId = inserted.id;
+  try {
+    if (existing) {
+      await db.update(healthConnectionsTable)
+        .set({ accessToken: encryptToken(tokens.access_token), refreshToken: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null, tokenExpiresAt: expiresAt, providerAccountId: googleProviderAccountId })
+        .where(eq(healthConnectionsTable.id, existing.id));
+      connectionId = existing.id;
+    } else {
+      const [inserted] = await db.insert(healthConnectionsTable).values({
+        playerId, platform: "google_fit",
+        providerAccountId: googleProviderAccountId,
+        accessToken: encryptToken(tokens.access_token),
+        refreshToken: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null,
+        tokenExpiresAt: expiresAt, consentGivenAt: new Date(),
+      }).returning({ id: healthConnectionsTable.id });
+      connectionId = inserted.id;
+    }
+  } catch (err: unknown) {
+    // Unique constraint violation — race condition where another player linked first
+    if ((err as { code?: string }).code === "23505") {
+      res.redirect(`${base}/health-settings?error=provider_account_already_linked`);
+      return;
+    }
+    throw err;
   }
 
   res.redirect(`${base}/health-settings?connected=google_fit`);
@@ -302,23 +348,65 @@ router.get("/health/fitbit/callback", requireAuth, async (req, res) => {
   }
 
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
+
+  // Fetch the provider subject identifier for one-to-one account binding (fail-closed).
+  let fitbitProviderAccountId: string | null = null;
+  try {
+    const profileRes = await fetch("https://api.fitbit.com/1/user/-/profile.json", {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+    if (profileRes.ok) {
+      const profile = await profileRes.json() as { user?: { encodedId?: string } };
+      fitbitProviderAccountId = profile.user?.encodedId ?? null;
+    }
+  } catch {
+    logger.warn({ playerId }, "Fitbit: could not fetch profile for provider binding check");
+  }
+
+  // Fail-closed: require a resolved subject ID to proceed.
+  if (!fitbitProviderAccountId) {
+    res.redirect(`${base}/health-settings?error=provider_identity_unavailable`);
+    return;
+  }
+
+  // Enforce one-to-one: reject if this Fitbit account is already bound to a different player.
+  const fitbitConflict = await db.query.healthConnectionsTable.findFirst({
+    where: and(
+      eq(healthConnectionsTable.platform, "fitbit"),
+      eq(healthConnectionsTable.providerAccountId, fitbitProviderAccountId),
+    ),
+  });
+  if (fitbitConflict && fitbitConflict.playerId !== playerId) {
+    res.redirect(`${base}/health-settings?error=provider_account_already_linked`);
+    return;
+  }
+
   const existing = await db.query.healthConnectionsTable.findFirst({
     where: and(eq(healthConnectionsTable.playerId, playerId), eq(healthConnectionsTable.platform, "fitbit")),
   });
   let connectionId: number;
-  if (existing) {
-    await db.update(healthConnectionsTable)
-      .set({ accessToken: encryptToken(tokens.access_token), refreshToken: encryptToken(tokens.refresh_token), tokenExpiresAt: expiresAt })
-      .where(eq(healthConnectionsTable.id, existing.id));
-    connectionId = existing.id;
-  } else {
-    const [inserted] = await db.insert(healthConnectionsTable).values({
-      playerId, platform: "fitbit",
-      accessToken: encryptToken(tokens.access_token),
-      refreshToken: encryptToken(tokens.refresh_token),
-      tokenExpiresAt: expiresAt, consentGivenAt: new Date(),
-    }).returning({ id: healthConnectionsTable.id });
-    connectionId = inserted.id;
+  try {
+    if (existing) {
+      await db.update(healthConnectionsTable)
+        .set({ accessToken: encryptToken(tokens.access_token), refreshToken: encryptToken(tokens.refresh_token), tokenExpiresAt: expiresAt, providerAccountId: fitbitProviderAccountId })
+        .where(eq(healthConnectionsTable.id, existing.id));
+      connectionId = existing.id;
+    } else {
+      const [inserted] = await db.insert(healthConnectionsTable).values({
+        playerId, platform: "fitbit",
+        providerAccountId: fitbitProviderAccountId,
+        accessToken: encryptToken(tokens.access_token),
+        refreshToken: encryptToken(tokens.refresh_token),
+        tokenExpiresAt: expiresAt, consentGivenAt: new Date(),
+      }).returning({ id: healthConnectionsTable.id });
+      connectionId = inserted.id;
+    }
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === "23505") {
+      res.redirect(`${base}/health-settings?error=provider_account_already_linked`);
+      return;
+    }
+    throw err;
   }
 
   res.redirect(`${base}/health-settings?connected=fitbit`);
@@ -398,23 +486,65 @@ router.get("/health/garmin/callback", requireAuth, async (req, res) => {
   }
 
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
+
+  // Fetch the provider subject identifier for one-to-one account binding (fail-closed).
+  let garminProviderAccountId: string | null = null;
+  try {
+    const profileRes = await fetch("https://apis.garmin.com/wellness-api/rest/user/id", {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+    if (profileRes.ok) {
+      const profile = await profileRes.json() as { userId?: string };
+      garminProviderAccountId = profile.userId ?? null;
+    }
+  } catch {
+    logger.warn({ playerId }, "Garmin: could not fetch user ID for provider binding check");
+  }
+
+  // Fail-closed: require a resolved subject ID to proceed.
+  if (!garminProviderAccountId) {
+    res.redirect(`${base}/health-settings?error=provider_identity_unavailable`);
+    return;
+  }
+
+  // Enforce one-to-one: reject if this Garmin account is already bound to a different player.
+  const garminConflict = await db.query.healthConnectionsTable.findFirst({
+    where: and(
+      eq(healthConnectionsTable.platform, "garmin"),
+      eq(healthConnectionsTable.providerAccountId, garminProviderAccountId),
+    ),
+  });
+  if (garminConflict && garminConflict.playerId !== playerId) {
+    res.redirect(`${base}/health-settings?error=provider_account_already_linked`);
+    return;
+  }
+
   const existing = await db.query.healthConnectionsTable.findFirst({
     where: and(eq(healthConnectionsTable.playerId, playerId), eq(healthConnectionsTable.platform, "garmin")),
   });
   let connectionId: number;
-  if (existing) {
-    await db.update(healthConnectionsTable)
-      .set({ accessToken: encryptToken(tokens.access_token), refreshToken: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null, tokenExpiresAt: expiresAt })
-      .where(eq(healthConnectionsTable.id, existing.id));
-    connectionId = existing.id;
-  } else {
-    const [inserted] = await db.insert(healthConnectionsTable).values({
-      playerId, platform: "garmin",
-      accessToken: encryptToken(tokens.access_token),
-      refreshToken: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null,
-      tokenExpiresAt: expiresAt, consentGivenAt: new Date(),
-    }).returning({ id: healthConnectionsTable.id });
-    connectionId = inserted.id;
+  try {
+    if (existing) {
+      await db.update(healthConnectionsTable)
+        .set({ accessToken: encryptToken(tokens.access_token), refreshToken: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null, tokenExpiresAt: expiresAt, providerAccountId: garminProviderAccountId })
+        .where(eq(healthConnectionsTable.id, existing.id));
+      connectionId = existing.id;
+    } else {
+      const [inserted] = await db.insert(healthConnectionsTable).values({
+        playerId, platform: "garmin",
+        providerAccountId: garminProviderAccountId,
+        accessToken: encryptToken(tokens.access_token),
+        refreshToken: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null,
+        tokenExpiresAt: expiresAt, consentGivenAt: new Date(),
+      }).returning({ id: healthConnectionsTable.id });
+      connectionId = inserted.id;
+    }
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === "23505") {
+      res.redirect(`${base}/health-settings?error=provider_account_already_linked`);
+      return;
+    }
+    throw err;
   }
 
   res.redirect(`${base}/health-settings?connected=garmin`);
@@ -494,23 +624,65 @@ router.get("/health/oura/callback", requireAuth, async (req, res) => {
   }
 
   const expiresAt = tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null;
+
+  // Fetch the provider subject identifier for one-to-one account binding (fail-closed).
+  let ouraProviderAccountId: string | null = null;
+  try {
+    const profileRes = await fetch("https://api.ouraring.com/v2/usercollection/personal_info", {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+    if (profileRes.ok) {
+      const profile = await profileRes.json() as { id?: string };
+      ouraProviderAccountId = profile.id ?? null;
+    }
+  } catch {
+    logger.warn({ playerId }, "Oura: could not fetch personal info for provider binding check");
+  }
+
+  // Fail-closed: require a resolved subject ID to proceed.
+  if (!ouraProviderAccountId) {
+    res.redirect(`${base}/health-settings?error=provider_identity_unavailable`);
+    return;
+  }
+
+  // Enforce one-to-one: reject if this Oura account is already bound to a different player.
+  const ouraConflict = await db.query.healthConnectionsTable.findFirst({
+    where: and(
+      eq(healthConnectionsTable.platform, "oura"),
+      eq(healthConnectionsTable.providerAccountId, ouraProviderAccountId),
+    ),
+  });
+  if (ouraConflict && ouraConflict.playerId !== playerId) {
+    res.redirect(`${base}/health-settings?error=provider_account_already_linked`);
+    return;
+  }
+
   const existing = await db.query.healthConnectionsTable.findFirst({
     where: and(eq(healthConnectionsTable.playerId, playerId), eq(healthConnectionsTable.platform, "oura")),
   });
   let connectionId: number;
-  if (existing) {
-    await db.update(healthConnectionsTable)
-      .set({ accessToken: encryptToken(tokens.access_token), refreshToken: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null, tokenExpiresAt: expiresAt })
-      .where(eq(healthConnectionsTable.id, existing.id));
-    connectionId = existing.id;
-  } else {
-    const [inserted] = await db.insert(healthConnectionsTable).values({
-      playerId, platform: "oura",
-      accessToken: encryptToken(tokens.access_token),
-      refreshToken: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null,
-      tokenExpiresAt: expiresAt, consentGivenAt: new Date(),
-    }).returning({ id: healthConnectionsTable.id });
-    connectionId = inserted.id;
+  try {
+    if (existing) {
+      await db.update(healthConnectionsTable)
+        .set({ accessToken: encryptToken(tokens.access_token), refreshToken: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null, tokenExpiresAt: expiresAt, providerAccountId: ouraProviderAccountId })
+        .where(eq(healthConnectionsTable.id, existing.id));
+      connectionId = existing.id;
+    } else {
+      const [inserted] = await db.insert(healthConnectionsTable).values({
+        playerId, platform: "oura",
+        providerAccountId: ouraProviderAccountId,
+        accessToken: encryptToken(tokens.access_token),
+        refreshToken: tokens.refresh_token ? encryptToken(tokens.refresh_token) : null,
+        tokenExpiresAt: expiresAt, consentGivenAt: new Date(),
+      }).returning({ id: healthConnectionsTable.id });
+      connectionId = inserted.id;
+    }
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === "23505") {
+      res.redirect(`${base}/health-settings?error=provider_account_already_linked`);
+      return;
+    }
+    throw err;
   }
 
   res.redirect(`${base}/health-settings?connected=oura`);

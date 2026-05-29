@@ -96,16 +96,16 @@ function safeLocationRecord(loc: typeof playerLocationTable.$inferSelect) {
 // Accepts lat/lng → calls Nominatim → encrypts coords with AES-256-GCM → stores.
 // Raw GPS values are used ONLY for the geocoding call; only ciphertext is persisted.
 // Encrypted fields are NEVER returned in API responses.
+//
+// SECURITY: Geographic labels (city/state/county/country) are derived ONLY from
+// Nominatim reverse geocoding of verified coordinates. Client-supplied label
+// values are ignored entirely — accepting them would allow any user to declare
+// an arbitrary region and bypass location-scoped access controls.
 router.post("/players/me/location", requireAuth, attachPlayer, locationUpdateLimiter, async (req, res) => {
-  const { latitude, longitude, accuracyMeters, city, state, county, country, countryCode, visibility } = req.body as {
+  const { latitude, longitude, accuracyMeters, visibility } = req.body as {
     latitude?: number;
     longitude?: number;
     accuracyMeters?: number;
-    city?: string;
-    state?: string;
-    county?: string;
-    country?: string;
-    countryCode?: string;
     visibility?: string;
   };
 
@@ -115,11 +115,13 @@ router.post("/players/me/location", requireAuth, attachPlayer, locationUpdateLim
     return;
   }
 
-  let derived = { city, state, county, country, countryCode };
+  // Geographic labels start empty — they are ONLY populated via Nominatim below.
+  // Client-supplied city/state/county/country are ignored to prevent region spoofing.
+  let derived: { city?: string; state?: string; county?: string; country?: string; countryCode?: string } = {};
 
-  // If coordinates provided but no city, attempt Nominatim reverse geocoding.
+  // If coordinates are provided, always derive geographic labels from Nominatim.
   // Coordinates are used ONLY for this HTTP call; they are encrypted before any persistence.
-  if (latitude != null && longitude != null && !city) {
+  if (latitude != null && longitude != null) {
     try {
       const geoRes = await fetch(
         `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`,
@@ -137,7 +139,7 @@ router.post("/players/me/location", requireAuth, attachPlayer, locationUpdateLim
         };
       }
     } catch (err) {
-      req.log?.warn?.({ err }, "Nominatim geocoding failed, using provided values");
+      req.log?.warn?.({ err }, "Nominatim geocoding failed, keeping existing geographic labels");
     }
   }
 
