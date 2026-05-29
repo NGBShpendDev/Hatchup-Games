@@ -5,7 +5,7 @@ const CurrentPlayerContext = createContext<number>(1);
 
 export function CurrentPlayerProvider({ children }: { children: React.ReactNode }) {
   const { data } = useGetCurrentPlayer({
-    query: { retry: 1, retryDelay: 500, staleTime: 5 * 60 * 1000 },
+    query: { retry: 1, retryDelay: 500, staleTime: 0 },
   });
 
   return (
