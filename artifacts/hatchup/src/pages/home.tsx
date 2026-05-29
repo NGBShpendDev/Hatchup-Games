@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot, Dumbbell, Minus, Plus, Users, MessageCircle, ChevronDown, ChevronUp, Send, Heart, RefreshCw, ShieldCheck, ShoppingBag } from "lucide-react";
+import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot, Dumbbell, Minus, Plus, Users, MessageCircle, ChevronDown, ChevronUp, Send, Heart, RefreshCw, ShieldCheck, ShoppingBag, Mic, Utensils } from "lucide-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { XpBar } from "@/components/xp-bar";
@@ -699,6 +699,66 @@ export default function Home() {
             </div>
           </div>
         </motion.div>
+
+        {/* ── Training Hub ── */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Dumbbell className="w-4 h-4" /> Train
+            </h2>
+            <Link href="/training" className="text-xs font-bold text-primary hover:underline">All training →</Link>
+          </div>
+
+          {/* Rep Counter — featured full-width card */}
+          <Link href="/workout">
+            <motion.div
+              whileTap={{ scale: 0.97 }}
+              className="w-full rounded-2xl p-5 bg-gradient-to-r from-pink-600 to-purple-700 relative overflow-hidden mb-3 cursor-pointer shadow-[0_0_28px_rgba(236,72,153,0.4)]"
+            >
+              <div className="absolute -right-6 -top-6 opacity-10 pointer-events-none">
+                <Mic className="w-36 h-36" />
+              </div>
+              <div className="relative z-10 flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-white font-black text-xl">Rep Counter</span>
+                    <span className="text-[10px] bg-green-400/30 text-green-200 px-1.5 py-0.5 rounded-full font-semibold border border-green-300/30">NEW</span>
+                  </div>
+                  <p className="text-white/70 text-xs">Voice &amp; camera · Verified reps hatch eggs faster</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-yellow-300 font-black text-3xl leading-none">3×</p>
+                  <p className="text-white/60 text-[10px]">XP bonus</p>
+                </div>
+              </div>
+            </motion.div>
+          </Link>
+
+          {/* 3-column quick links */}
+          <div className="grid grid-cols-3 gap-2.5">
+            <Link href="/training">
+              <motion.div whileTap={{ scale: 0.95 }} className="rounded-2xl p-4 bg-gradient-to-br from-blue-600/90 to-cyan-700/70 border border-blue-400/30 cursor-pointer active:opacity-80 transition-opacity">
+                <Bot className="w-6 h-6 text-blue-200 mb-2" />
+                <p className="font-black text-sm text-white leading-tight">AI Coach</p>
+                <p className="text-[10px] text-blue-200/70 mt-0.5">Workout plan</p>
+              </motion.div>
+            </Link>
+            <Link href="/training">
+              <motion.div whileTap={{ scale: 0.95 }} className="rounded-2xl p-4 bg-gradient-to-br from-yellow-500/90 to-amber-600/70 border border-yellow-400/30 cursor-pointer active:opacity-80 transition-opacity">
+                <Trophy className="w-6 h-6 text-yellow-100 mb-2" />
+                <p className="font-black text-sm text-white leading-tight">Quests</p>
+                <p className="text-[10px] text-yellow-100/70 mt-0.5">Daily goals</p>
+              </motion.div>
+            </Link>
+            <Link href="/nutrition">
+              <motion.div whileTap={{ scale: 0.95 }} className="rounded-2xl p-4 bg-gradient-to-br from-green-600/90 to-emerald-700/70 border border-green-400/30 cursor-pointer active:opacity-80 transition-opacity">
+                <Utensils className="w-6 h-6 text-green-200 mb-2" />
+                <p className="font-black text-sm text-white leading-tight">Nutrition</p>
+                <p className="text-[10px] text-green-200/70 mt-0.5">Meals &amp; buffs</p>
+              </motion.div>
+            </Link>
+          </div>
+        </section>
 
         {/* Daily Reward CTA */}
         {dailyReward && !dailyReward.alreadyClaimed && (
