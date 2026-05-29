@@ -457,8 +457,8 @@ export default function HomeScreen() {
       {/* Quick Stats */}
       <View style={styles.statsRow}>
         {[
-          { label: "Steps", value: (dashboard?.fitnessStats.todaySteps ?? 0).toLocaleString(), icon: "activity" },
-          { label: "Streak", value: `${dashboard?.fitnessStats.currentStreak ?? 0}d`, icon: "zap" },
+          { label: "Steps", value: (dashboard?.fitnessStats?.todaySteps ?? 0).toLocaleString(), icon: "activity" },
+          { label: "Streak", value: `${dashboard?.fitnessStats?.currentStreak ?? 0}d`, icon: "zap" },
           { label: "Wins", value: String(dashboard?.totalWins ?? 0), icon: "award" },
         ].map((s) => (
           <View key={s.label} style={[styles.statChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
