@@ -12,6 +12,7 @@ import {
 } from "@workspace/db";
 import { eq, and, gte, lte, or, sql } from "drizzle-orm";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { getHiddenPlayerIds } from "./safety.ts";
 
 const router = Router();
 
@@ -358,12 +359,19 @@ router.get("/local-challenges/:id/leaderboard", requireAuth, attachPlayer, async
     ? await db.query.playersTable.findMany({ where: (t, { inArray }) => inArray(t.id, playerIds) })
     : [];
 
-  // Hidden-visibility players are fully excluded from location-based challenge leaderboards
-  // (no viewer exception — they shouldn't be on a location board at all).
-  // For world-scope challenges they remain visible.
+  // Apply the canonical people-discovery policy (safety.ts:1100-1127):
+  //   1. Exclude players blocked in either direction with the viewer.
+  //   2. Exclude players with locationVisibility === "hidden" (for non-world scopes).
+  //   3. Exclude minor accounts (isMinor === true).
+  // The viewer's own row is never in the blocked set (getHiddenPlayerIds removes viewerId).
+  const hiddenIds = new Set(await getHiddenPlayerIds(req.playerId!));
   const playerMap = new Map(
     players
-      .filter(p => challenge.scope === "world" || p.locationVisibility !== "hidden")
+      .filter(p =>
+        !hiddenIds.has(p.id) &&
+        !p.isMinor &&
+        (challenge.scope === "world" || p.locationVisibility !== "hidden"),
+      )
       .map(p => [p.id, p])
   );
 
