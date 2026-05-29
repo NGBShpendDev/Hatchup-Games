@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { ScreenGradientBg } from "@/components/ScreenGradientBg";
 
 const SHIELD_COST = 200;
 
@@ -247,8 +248,9 @@ export default function ProfileScreen() {
   const rankColor = Object.entries(RANK_COLORS).find(([key]) => rankLabel.includes(key))?.[1] ?? colors.mutedForeground;
 
   return (
+    <ScreenGradientBg>
     <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={styles.container}
       contentContainerStyle={{ paddingBottom: bottomPad + 90 }}
       showsVerticalScrollIndicator={false}
     >
@@ -339,6 +341,7 @@ export default function ProfileScreen() {
         </Text>
       )}
     </ScrollView>
+    </ScreenGradientBg>
   );
 }
 

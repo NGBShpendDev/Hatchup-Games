@@ -67,6 +67,7 @@
   "dependencies": {
     "expo-background-fetch": "~14.0.9",
     "expo-crypto": "~15.0.9",
+    "expo-secure-store": "^56.0.4",
     "expo-sensors": "~15.0.8",
     "expo-task-manager": "~14.0.9"
   }

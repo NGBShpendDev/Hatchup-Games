@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { usePalMilestoneShare } from "@/hooks/usePalMilestoneShare";
+import { ScreenGradientBg } from "@/components/ScreenGradientBg";
 
 const PLAYER_ID = 1;
 
@@ -76,8 +77,9 @@ export default function CompeteScreen() {
   }
 
   return (
+    <ScreenGradientBg>
     <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={styles.container}
       contentContainerStyle={{ paddingBottom: bottomPad + 90 }}
       showsVerticalScrollIndicator={false}
     >
@@ -201,6 +203,7 @@ export default function CompeteScreen() {
         })
       )}
     </ScrollView>
+    </ScreenGradientBg>
   );
 }
 

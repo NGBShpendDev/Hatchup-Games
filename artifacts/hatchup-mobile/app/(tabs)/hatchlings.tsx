@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { getRarityColor, capitalize } from "@/constants/rarity";
+import { ScreenGradientBg } from "@/components/ScreenGradientBg";
 
 const PLAYER_ID = 1;
 const RARITIES = ["all", "common", "uncommon", "rare", "epic", "legendary", "mythic", "ancient", "celestial"];
@@ -102,7 +103,7 @@ export default function HatchlingsScreen() {
     : (hatchlings ?? []).filter((h) => h.rarity === selectedRarity);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScreenGradientBg>
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 12 }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>My Pals</Text>
@@ -178,7 +179,7 @@ export default function HatchlingsScreen() {
           scrollEnabled={filtered.length > 0}
         />
       )}
-    </View>
+    </ScreenGradientBg>
   );
 }
 

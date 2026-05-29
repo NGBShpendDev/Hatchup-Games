@@ -18,6 +18,8 @@ const config: ExpoConfig = {
   },
   ios: {
     supportsTablet: false,
+    bundleIdentifier: "com.hatchup.fitnesspals",
+    buildNumber: "1",
     infoPlist: {
       CFBundleDisplayName: "HatchUp",
       // Background fetch — lets iOS wake the app to sync steps every ~15 min
@@ -37,6 +39,8 @@ const config: ExpoConfig = {
       : {}),
   },
   android: {
+    package: "com.hatchup.fitnesspals",
+    versionCode: 1,
     permissions: [
       "android.permission.ACTIVITY_RECOGNITION",
       "android.permission.RECEIVE_BOOT_COMPLETED",

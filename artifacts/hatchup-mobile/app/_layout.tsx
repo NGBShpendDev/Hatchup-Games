@@ -7,11 +7,12 @@ import {
 } from "@expo-google-fonts/inter";
 import { ClerkProvider, useAuth } from "@clerk/clerk-expo";
 import { setBaseUrl, setAuthTokenGetter, type AuthTokenGetter } from "@workspace/api-client-react";
+import * as SecureStore from "expo-secure-store";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef } from "react";
-import { ActivityIndicator, AppState, AppStateStatus, View } from "react-native";
+import { ActivityIndicator, AppState, AppStateStatus, Platform, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -31,6 +32,16 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+
+const tokenCache =
+  Platform.OS !== "web"
+    ? {
+        getToken: (key: string) => SecureStore.getItemAsync(key),
+        saveToken: (key: string, value: string) =>
+          SecureStore.setItemAsync(key, value),
+        clearToken: (key: string) => SecureStore.deleteItemAsync(key),
+      }
+    : undefined;
 
 const SCREENS: Array<{ name: string }> = [
   { name: "sign-in" },
@@ -156,7 +167,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <ClerkProvider publishableKey={publishableKey}>
+        <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
           <QueryClientProvider client={queryClient}>
             <GestureHandlerRootView>
               <KeyboardProvider>

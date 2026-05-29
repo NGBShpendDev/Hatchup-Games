@@ -28,6 +28,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import { getRarityColor, capitalize } from "@/constants/rarity";
+import { GradientButton } from "@/components/GradientButton";
+import { ScreenGradientBg } from "@/components/ScreenGradientBg";
 
 const PLAYER_ID = 1;
 
@@ -357,8 +359,9 @@ export default function HomeScreen() {
   const rarityColor = activePal ? getRarityColor(activePal.rarity) : colors.primary;
 
   return (
+    <ScreenGradientBg>
     <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={styles.container}
       contentContainerStyle={{ paddingTop: topPad + 12, paddingBottom: bottomPad + 90 }}
       showsVerticalScrollIndicator={false}
     >
@@ -492,6 +495,7 @@ export default function HomeScreen() {
         </>
       )}
     </ScrollView>
+    </ScreenGradientBg>
   );
 }
 
