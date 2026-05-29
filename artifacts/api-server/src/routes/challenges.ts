@@ -12,6 +12,7 @@ import {
 import { eq, desc, and, or, sql, inArray } from "drizzle-orm";
 import { sendPushToPlayer } from "../services/pushNotifications.ts";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
+import { isLocationEstablished } from "./locations.ts";
 import {
   finalizeChallenge,
   sendEndingSoonPushes,
@@ -35,6 +36,9 @@ interface AccessContext {
   playerId: number;
   playerClubId: number | null | undefined;
   playerCity: string | null | undefined;
+  /** updatedAt of the player's location record — used to enforce the minimum
+   *  location-age requirement before granting city-scoped challenge access. */
+  playerLocationUpdatedAt: Date | string | null | undefined;
   /** challenge IDs the player has already joined */
   participatingIds: Set<number>;
   /** challenge IDs the player has a pending or accepted invite for */
@@ -70,7 +74,11 @@ async function canAccess(
 
   if (challenge.type === "city") {
     // Default-deny: both parties must have a known city and they must match.
+    // Additionally, the player's location record must be established (not freshly
+    // set) to prevent a spoofing attack where an attacker posts fake coordinates
+    // for a target city and immediately gains access to its city-scoped challenges.
     if (!ctx.playerCity) return false;
+    if (!isLocationEstablished({ updatedAt: ctx.playerLocationUpdatedAt })) return false;
     const cCity = creatorCity !== undefined
       ? creatorCity
       : (await db.query.playerLocationTable.findFirst({ where: eq(playerLocationTable.playerId, challenge.creatorId) }))?.city;
@@ -109,6 +117,7 @@ async function buildAccessContext(playerId: number, challengeIds: number[]): Pro
     playerId,
     playerClubId: player?.clubId,
     playerCity: playerLocation?.city,
+    playerLocationUpdatedAt: playerLocation?.updatedAt,
     participatingIds: new Set(participations.map(p => p.challengeId)),
     invitedIds: new Set(invites.map(i => i.challengeId)),
   };
@@ -392,14 +401,24 @@ router.post("/challenges/:id/join", requireAuth, attachPlayer, async (req, res) 
       return;
     }
   } else if (challenge.type === "city") {
-    // Only players in the same city as the creator may join
+    // Only players in the same city as the creator may join.
+    // The player's location record must also be established (not freshly set)
+    // to prevent coordinate spoofing from granting immediate city access.
     const [playerLocation, creatorLocation] = await Promise.all([
       db.query.playerLocationTable.findFirst({ where: eq(playerLocationTable.playerId, playerId) }),
       db.query.playerLocationTable.findFirst({ where: eq(playerLocationTable.playerId, challenge.creatorId) }),
     ]);
-    // Default-deny: both parties must have a known city and they must match.
+    // Default-deny: both parties must have a known city and they must match,
+    // and the player's location must have been stable for the minimum required period.
     if (!playerLocation?.city || !creatorLocation?.city || playerLocation.city !== creatorLocation.city) {
       res.status(403).json({ error: "This challenge is restricted to players in the same city." });
+      return;
+    }
+    if (!isLocationEstablished(playerLocation)) {
+      res.status(403).json({
+        error: "location_not_established",
+        message: "Your location must be stable for at least 1 hour before you can join city-scoped challenges.",
+      });
       return;
     }
   }
@@ -555,6 +574,13 @@ router.post("/challenge-invites/:id/respond", requireAuth, attachPlayer, async (
       ]);
       if (!playerLocation?.city || !creatorLocation?.city || playerLocation.city !== creatorLocation.city) {
         res.status(403).json({ error: "This challenge is restricted to players in the same city." });
+        return;
+      }
+      if (!isLocationEstablished(playerLocation)) {
+        res.status(403).json({
+          error: "location_not_established",
+          message: "Your location must be stable for at least 1 hour before you can join city-scoped challenges.",
+        });
         return;
       }
     }
