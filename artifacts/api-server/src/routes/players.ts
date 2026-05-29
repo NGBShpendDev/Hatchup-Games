@@ -20,23 +20,36 @@ import { BADGE_MAP, DAILY_REWARD_SCHEDULE, computeLevelProgress, getDailyReward,
 
 const router = Router();
 
-// GET /players/me — returns current player, JIT-provisioning on first sign-in
+// GET /players/me — returns current player, linking or JIT-provisioning on first sign-in
 router.get("/players/me", requireAuth, async (req, res) => {
   const clerkId = req.clerkUserId!;
   let player = await db.query.playersTable.findFirst({ where: eq(playersTable.clerkId, clerkId) });
   if (!player) {
-    const base = `player_${clerkId.slice(-8).replace(/[^a-z0-9]/gi, "")}`;
-    const username = base || `player_${Date.now()}`;
-    const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const rows = await db.insert(playersTable).values({
-      clerkId,
-      username,
-      displayName: username,
-      subscriptionTier: "premium",
-      subscriptionSource: "trial",
-      trialEndsAt: trialEnd,
-    }).returning();
-    player = rows[0]!;
+    // Try to claim an existing unlinked player (covers dev/MVP scenario where
+    // player rows were seeded before Clerk auth was added).
+    const unlinked = await db.query.playersTable.findFirst({
+      where: sql`${playersTable.clerkId} IS NULL`,
+    });
+    if (unlinked) {
+      const rows = await db.update(playersTable)
+        .set({ clerkId })
+        .where(eq(playersTable.id, unlinked.id))
+        .returning();
+      player = rows[0]!;
+    } else {
+      const base = `player_${clerkId.slice(-8).replace(/[^a-z0-9]/gi, "")}`;
+      const username = base || `player_${Date.now()}`;
+      const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const rows = await db.insert(playersTable).values({
+        clerkId,
+        username,
+        displayName: username,
+        subscriptionTier: "premium",
+        subscriptionSource: "trial",
+        trialEndsAt: trialEnd,
+      }).returning();
+      player = rows[0]!;
+    }
   }
   res.json(player);
 });
