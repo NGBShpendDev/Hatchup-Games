@@ -1,9 +1,10 @@
 import { Feather } from "@expo/vector-icons";
-import { useGetHatchling, useGetPlayer } from "@workspace/api-client-react";
+import { useGetHatchling, useGetPlayer, useUpdateHatchling } from "@workspace/api-client-react";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -14,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { getRarityColor, capitalize } from "@/constants/rarity";
+import { ComebackStreakCelebration, ComebackStreakData } from "@/components/ComebackStreakCelebration";
 
 const PLAYER_ID = 1;
 
@@ -22,8 +24,6 @@ function RingStat({ label, value, color, sublabel }: {
 }) {
   const colors = useColors();
   const pct = Math.min(1, value / 100);
-  const circumference = 2 * Math.PI * 28;
-  const strokeDashoffset = circumference * (1 - pct);
 
   return (
     <View style={styles.ringStat}>
@@ -59,7 +59,10 @@ export default function MyPalScreen() {
 
   const { data: player } = useGetPlayer(PLAYER_ID);
   const palId = player?.activeHatchlingId;
-  const { data: pal, isLoading } = useGetHatchling(palId ?? 0);
+  const { data: pal, isLoading, refetch } = useGetHatchling(palId ?? 0);
+
+  const updateMutation = useUpdateHatchling();
+  const [comebackCelebration, setComebackCelebration] = useState<ComebackStreakData | null>(null);
 
   const rarityColor = getRarityColor(pal?.rarity);
   const readiness = Math.round(
@@ -69,8 +72,92 @@ export default function MyPalScreen() {
     (pal?.confidenceScore ?? 50) * 0.2
   );
 
+  const handleComebackResponse = useCallback((updatedPal: any, palName: string) => {
+    if (updatedPal?.comebackStreakBonus === true) {
+      const streakCount = updatedPal?.comebackStreak ?? 3;
+      setTimeout(() => {
+        setComebackCelebration({ palName, streakCount });
+      }, 600);
+    }
+  }, []);
+
+  const handleFeed = useCallback(() => {
+    if (!pal || !palId) return;
+    updateMutation.mutate(
+      { id: palId, data: { hunger: Math.min(100, (pal.hunger ?? 0) + 20) } },
+      {
+        onSuccess: async (updatedPal: any) => {
+          await refetch();
+          handleComebackResponse(updatedPal, pal.name);
+        },
+        onError: () => Alert.alert("Couldn't feed", "Please try again later."),
+      }
+    );
+  }, [pal, palId, updateMutation, refetch, handleComebackResponse]);
+
+  const handlePlay = useCallback(() => {
+    if (!pal || !palId) return;
+    updateMutation.mutate(
+      { id: palId, data: { happiness: Math.min(100, (pal.happiness ?? 0) + 15) } },
+      {
+        onSuccess: async (updatedPal: any) => {
+          await refetch();
+          handleComebackResponse(updatedPal, pal.name);
+        },
+        onError: () => Alert.alert("Couldn't play", "Please try again later."),
+      }
+    );
+  }, [pal, palId, updateMutation, refetch, handleComebackResponse]);
+
+  const handleTrain = useCallback(() => {
+    if (!pal || !palId) return;
+    updateMutation.mutate(
+      {
+        id: palId,
+        data: {
+          happiness: Math.min(100, (pal.happiness ?? 0) + 15),
+          energy: Math.max(0, (pal.energy ?? 100) - 10),
+          lastWorkoutAt: new Date().toISOString(),
+        },
+      },
+      {
+        onSuccess: async (updatedPal: any) => {
+          await refetch();
+          handleComebackResponse(updatedPal, pal.name);
+        },
+        onError: () => Alert.alert("Couldn't train", "Please try again later."),
+      }
+    );
+  }, [pal, palId, updateMutation, refetch, handleComebackResponse]);
+
+  const handleRest = useCallback(() => {
+    if (!pal || !palId) return;
+    updateMutation.mutate(
+      { id: palId, data: { energy: Math.min(100, (pal.energy ?? 0) + 25) } },
+      {
+        onSuccess: async (updatedPal: any) => {
+          await refetch();
+          handleComebackResponse(updatedPal, pal.name);
+        },
+        onError: () => Alert.alert("Couldn't rest", "Please try again later."),
+      }
+    );
+  }, [pal, palId, updateMutation, refetch, handleComebackResponse]);
+
+  const actions = [
+    { label: "Feed", icon: "coffee", color: "#f59e0b", onPress: handleFeed },
+    { label: "Play", icon: "smile", color: "#22c55e", onPress: handlePlay },
+    { label: "Train", icon: "activity", color: "#3b82f6", onPress: handleTrain },
+    { label: "Rest", icon: "moon", color: "#a855f7", onPress: handleRest },
+  ] as const;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ComebackStreakCelebration
+        data={comebackCelebration}
+        onDismiss={() => setComebackCelebration(null)}
+      />
+
       <View style={[styles.header, { paddingTop: topPad + 12 }]}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color={colors.foreground} />
@@ -152,17 +239,22 @@ export default function MyPalScreen() {
           {/* Actions */}
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Actions</Text>
           <View style={styles.actionsRow}>
-            {[
-              { label: "Feed", icon: "coffee", color: "#f59e0b" },
-              { label: "Play", icon: "smile", color: "#22c55e" },
-              { label: "Train", icon: "activity", color: "#3b82f6" },
-              { label: "Rest", icon: "moon", color: "#a855f7" },
-            ].map((action) => (
+            {actions.map((action) => (
               <Pressable
                 key={action.label}
-                style={[styles.actionBtn, { backgroundColor: action.color + "22", borderColor: action.color + "55" }]}
+                onPress={action.onPress}
+                disabled={updateMutation.isPending}
+                style={[
+                  styles.actionBtn,
+                  { backgroundColor: action.color + "22", borderColor: action.color + "55" },
+                  updateMutation.isPending && styles.actionBtnDisabled,
+                ]}
               >
-                <Feather name={action.icon as any} size={22} color={action.color} />
+                {updateMutation.isPending ? (
+                  <ActivityIndicator size="small" color={action.color} />
+                ) : (
+                  <Feather name={action.icon as any} size={22} color={action.color} />
+                )}
                 <Text style={[styles.actionLabel, { color: action.color }]}>{action.label}</Text>
               </Pressable>
             ))}
@@ -207,6 +299,7 @@ const styles = StyleSheet.create({
   vitalValue: { width: 28, fontSize: 12, fontWeight: "600", textAlign: "right" },
   actionsRow: { flexDirection: "row", gap: 10 },
   actionBtn: { flex: 1, borderRadius: 14, borderWidth: 1, paddingVertical: 14, alignItems: "center", gap: 6 },
+  actionBtnDisabled: { opacity: 0.5 },
   actionLabel: { fontSize: 11, fontWeight: "700" },
   motivationBanner: {
     flexDirection: "row", alignItems: "center", gap: 10,
