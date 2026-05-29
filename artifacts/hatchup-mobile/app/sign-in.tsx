@@ -1,31 +1,77 @@
-import { useSignIn, useSignUp } from "@clerk/clerk-expo";
+import { useSignIn, useSignUp, useSSO } from "@clerk/clerk-expo";
+import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import * as WebBrowser from "expo-web-browser";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
+import { TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+WebBrowser.maybeCompleteAuthSession();
 
 const PRIMARY = "#ee2b8c";
 const BG = "#080912";
 const CARD = "#111122";
 const BORDER = "rgba(255,255,255,0.1)";
 const MUTED = "rgba(255,255,255,0.5)";
+const SOCIAL_BTN = "rgba(255,255,255,0.07)";
 
 type Mode = "sign-in" | "sign-up";
+
+function useWarmUpBrowser() {
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    void WebBrowser.warmUpAsync();
+    return () => {
+      void WebBrowser.coolDownAsync();
+    };
+  }, []);
+}
+
+function SocialButton({
+  label,
+  icon,
+  onPress,
+  loading,
+}: {
+  label: string;
+  icon: string;
+  onPress: () => void;
+  loading: boolean;
+}) {
+  return (
+    <Pressable
+      style={[styles.socialBtn, loading && styles.btnDisabled]}
+      onPress={onPress}
+      disabled={loading}
+    >
+      {loading ? (
+        <ActivityIndicator color="#fff" size="small" />
+      ) : (
+        <>
+          <Text style={styles.socialIcon}>{icon}</Text>
+          <Text style={styles.socialBtnText}>{label}</Text>
+        </>
+      )}
+    </Pressable>
+  );
+}
 
 export default function SignInScreen() {
   const { signIn, setActive: setActiveSignIn, isLoaded: signInLoaded } = useSignIn();
   const { signUp, setActive: setActiveSignUp, isLoaded: signUpLoaded } = useSignUp();
+  const { startSSOFlow } = useSSO();
   const router = useRouter();
+  useWarmUpBrowser();
 
   const [mode, setMode] = useState<Mode>("sign-in");
   const [email, setEmail] = useState("");
@@ -35,6 +81,8 @@ export default function SignInScreen() {
   const [pendingVerification, setPendingVerification] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
 
   const handleSignIn = async () => {
     if (!signInLoaded) return;
@@ -85,6 +133,33 @@ export default function SignInScreen() {
     }
   };
 
+  const handleOAuth = useCallback(
+    async (strategy: "oauth_google" | "oauth_apple", setOAuthLoading: (v: boolean) => void) => {
+      setOAuthLoading(true);
+      setError("");
+      try {
+        const { createdSessionId, setActive, signUp: oauthSignUp } = await startSSOFlow({
+          strategy,
+          redirectUrl: AuthSession.makeRedirectUri({ scheme: "hatchup-mobile" }),
+        });
+
+        if (createdSessionId) {
+          await setActive!({ session: createdSessionId });
+          router.replace("/" as any);
+        } else if (oauthSignUp?.status === "missing_requirements") {
+          setError("Additional information required. Please sign up with email instead.");
+        }
+      } catch (e: any) {
+        setError(e.errors?.[0]?.message ?? "Social sign-in failed. Please try again.");
+      } finally {
+        setOAuthLoading(false);
+      }
+    },
+    [startSSOFlow, router],
+  );
+
+  const anySocialLoading = googleLoading || appleLoading;
+
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
@@ -98,6 +173,29 @@ export default function SignInScreen() {
             {!pendingVerification ? (
               <>
                 <Text style={styles.title}>{mode === "sign-in" ? "Welcome back" : "Create account"}</Text>
+
+                <View style={styles.socialRow}>
+                  <SocialButton
+                    label="Continue with Google"
+                    icon="G"
+                    onPress={() => handleOAuth("oauth_google", setGoogleLoading)}
+                    loading={googleLoading}
+                  />
+                  {Platform.OS === "ios" && (
+                    <SocialButton
+                      label="Continue with Apple"
+                      icon=""
+                      onPress={() => handleOAuth("oauth_apple", setAppleLoading)}
+                      loading={appleLoading}
+                    />
+                  )}
+                </View>
+
+                <View style={styles.dividerRow}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>or</Text>
+                  <View style={styles.dividerLine} />
+                </View>
 
                 {mode === "sign-up" && (
                   <View style={styles.field}>
@@ -143,9 +241,9 @@ export default function SignInScreen() {
                 {!!error && <Text style={styles.error}>{error}</Text>}
 
                 <Pressable
-                  style={[styles.btn, loading && styles.btnDisabled]}
+                  style={[styles.btn, (loading || anySocialLoading) && styles.btnDisabled]}
                   onPress={mode === "sign-in" ? handleSignIn : handleSignUp}
-                  disabled={loading}
+                  disabled={loading || anySocialLoading}
                 >
                   {loading ? (
                     <ActivityIndicator color="#fff" />
@@ -154,7 +252,12 @@ export default function SignInScreen() {
                   )}
                 </Pressable>
 
-                <Pressable onPress={() => { setMode(mode === "sign-in" ? "sign-up" : "sign-in"); setError(""); }}>
+                <Pressable
+                  onPress={() => {
+                    setMode(mode === "sign-in" ? "sign-up" : "sign-in");
+                    setError("");
+                  }}
+                >
                   <Text style={styles.toggle}>
                     {mode === "sign-in" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
                   </Text>
@@ -212,8 +315,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: BORDER,
   },
-  title: { fontSize: 22, fontWeight: "800", color: "#fff", marginBottom: 4 },
+  title: { fontSize: 22, fontWeight: "800", color: "#fff", marginBottom: 16 },
   subtitle: { fontSize: 14, color: MUTED, marginBottom: 20 },
+  socialRow: { gap: 10, marginBottom: 4 },
+  socialBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: SOCIAL_BTN,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  socialIcon: { fontSize: 17, color: "#fff", fontWeight: "700", width: 22, textAlign: "center" },
+  socialBtnText: { color: "#fff", fontWeight: "600", fontSize: 15 },
+  dividerRow: { flexDirection: "row", alignItems: "center", marginVertical: 18, gap: 10 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: BORDER },
+  dividerText: { color: MUTED, fontSize: 13 },
   field: { marginBottom: 16 },
   label: { fontSize: 13, color: MUTED, marginBottom: 6 },
   input: {
