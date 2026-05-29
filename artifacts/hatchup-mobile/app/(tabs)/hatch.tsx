@@ -258,10 +258,28 @@ export default function HatchScreen() {
   const available = availableQuery.data ?? [];
   const incubatorFull = incubating.length >= MAX_SLOTS;
 
+  const [collectMsg, setCollectMsg] = useState<string | null>(null);
+
   const collectDaily = useCollectDailyEggs({
     mutation: {
-      onSuccess: () => {
+      onSuccess: (result) => {
+        queryClient.invalidateQueries({ queryKey: getListEggsQueryKey({ playerId: PLAYER_ID, status: "incubating" }) });
         queryClient.invalidateQueries({ queryKey: getListEggsQueryKey({ playerId: PLAYER_ID, status: "available" }) });
+        const placed = (result as any).placedInIncubator ?? 0;
+        const granted = result.eggsGranted ?? 0;
+        if (granted === 0) {
+          setCollectMsg("Already collected today — come back tomorrow!");
+        } else if (placed > 0) {
+          const overflow = granted - placed;
+          setCollectMsg(
+            overflow > 0
+              ? `${placed} egg${placed !== 1 ? "s" : ""} added to incubator · ${overflow} in bag`
+              : `${placed} egg${placed !== 1 ? "s" : ""} added to incubator!`
+          );
+        } else {
+          setCollectMsg(`${granted} egg${granted !== 1 ? "s" : ""} added to bag — incubator full`);
+        }
+        setTimeout(() => setCollectMsg(null), 3500);
       },
     },
   });
@@ -317,6 +335,14 @@ export default function HatchScreen() {
             style={{ paddingHorizontal: 4 }}
           />
         </View>
+
+        {/* Collect feedback banner */}
+        {collectMsg && (
+          <View style={[styles.collectBanner, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "55" }]}>
+            <Feather name="check-circle" size={14} color={colors.primary} />
+            <Text style={[styles.collectBannerText, { color: colors.primary }]}>{collectMsg}</Text>
+          </View>
+        )}
 
         {/* Hatch result banner */}
         {hatchResult && (
@@ -417,6 +443,8 @@ const styles = StyleSheet.create({
   bagCount: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10, borderWidth: 1 },
   bagCountText: { fontSize: 11, fontWeight: "700" },
   bagGrid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 12, gap: 10 },
+  collectBanner: { marginHorizontal: 16, borderRadius: 10, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 6 },
+  collectBannerText: { fontSize: 13, fontWeight: "600", flex: 1 },
   emptyBag: { marginHorizontal: 16, borderRadius: 16, borderWidth: 1, padding: 32, alignItems: "center", gap: 8 },
   emptyBagTitle: { fontSize: 15, fontWeight: "600" },
   emptyBagHint: { fontSize: 12, textAlign: "center" },

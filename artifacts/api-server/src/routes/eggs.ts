@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { eggsTable, hatchlingsTable } from "@workspace/db";
-import { eq, and, count, gte, sql } from "drizzle-orm";
+import { eq, and, count, gte, sql, inArray } from "drizzle-orm";
 import {
   ListEggsQueryParams,
   GetEggParams,
@@ -334,13 +334,27 @@ router.post("/eggs/daily-refill", requireAuth, attachPlayer, requirePlayerOwners
 
   const canGet = Math.max(0, DAILY_CAP - alreadyGotToday);
 
+  const MAX_INCUBATOR_SLOTS = 3;
+
+  // Count how many incubator slots are currently occupied
+  const [{ value: incubatingNow }] = await db
+    .select({ value: count() })
+    .from(eggsTable)
+    .where(and(eq(eggsTable.playerId, playerId), eq(eggsTable.status, "incubating")));
+
+  const freeSlots = Math.max(0, MAX_INCUBATOR_SLOTS - incubatingNow);
+
+  let placedInIncubator = 0;
+
   if (canGet > 0) {
-    const newEggs = Array.from({ length: canGet }, () => {
+    const newEggs = Array.from({ length: canGet }, (_, i) => {
       const eggType = pickRandom(DAILY_EGG_TYPE_POOL);
       const config = EGG_TYPE_CONFIG[eggType] ?? EGG_TYPE_CONFIG["balanced"];
       const realm = EGG_TYPE_TO_REALM[eggType] ?? "balance";
       const rarity = pickDailyRarity();
       const stepsRequired = rarity === "Epic" ? 20000 : rarity === "Rare" ? 12000 : config.stepsRequired;
+      // Auto-place into incubator for the first freeSlots eggs
+      const status: "incubating" | "available" = i < freeSlots ? "incubating" : "available";
       return {
         playerId,
         eggType,
@@ -351,14 +365,15 @@ router.post("/eggs/daily-refill", requireAuth, attachPlayer, requirePlayerOwners
         name: config.name,
         description: config.description,
         source: "daily" as const,
-        status: "available" as const,
+        status,
       };
     });
 
     await db.insert(eggsTable).values(newEggs);
+    placedInIncubator = Math.min(canGet, freeSlots);
   }
 
-  // Return all available eggs for the player (today's + any unplaced from previous days)
+  // Return all available eggs for the player (any unplaced from today + previous days)
   const availableEggs = await db.query.eggsTable.findMany({
     where: and(eq(eggsTable.playerId, playerId), eq(eggsTable.status, "available")),
     orderBy: (t, { asc }) => [asc(t.createdAt)],
@@ -368,6 +383,7 @@ router.post("/eggs/daily-refill", requireAuth, attachPlayer, requirePlayerOwners
     eggsGranted: canGet,
     alreadyGotToday: alreadyGotToday,
     remainingToday: 0,
+    placedInIncubator,
     availableEggs: availableEggs.map(serializeEgg),
   });
 });
