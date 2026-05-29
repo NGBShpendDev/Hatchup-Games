@@ -162,13 +162,21 @@ router.get("/health/google/connect", requireAuth, async (req, res) => {
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
 });
 
-router.get("/health/google/callback", async (req, res) => {
+router.get("/health/google/callback", requireAuth, async (req, res) => {
   const { code, state, error } = req.query as Record<string, string>;
   const base = getFrontendBase();
   if (error || !code || !state) { res.redirect(`${base}/health-settings?error=oauth_denied`); return; }
 
   const verified = verifyOAuthState(state);
   if (!verified) { res.redirect(`${base}/health-settings?error=invalid_state`); return; }
+
+  const sessionPlayer = await db.query.playersTable.findFirst({
+    where: eq(playersTable.clerkId, req.clerkUserId!),
+  });
+  if (!sessionPlayer || sessionPlayer.id !== verified.playerId) {
+    res.redirect(`${base}/health-settings?error=session_mismatch`);
+    return;
+  }
   const playerId = verified.playerId;
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -250,13 +258,21 @@ router.get("/health/fitbit/connect", requireAuth, async (req, res) => {
   res.redirect(`https://www.fitbit.com/oauth2/authorize?${params.toString()}`);
 });
 
-router.get("/health/fitbit/callback", async (req, res) => {
+router.get("/health/fitbit/callback", requireAuth, async (req, res) => {
   const { code, state, error } = req.query as Record<string, string>;
   const base = getFrontendBase();
   if (error || !code || !state) { res.redirect(`${base}/health-settings?error=oauth_denied`); return; }
 
   const verified = verifyOAuthState(state);
   if (!verified) { res.redirect(`${base}/health-settings?error=invalid_state`); return; }
+
+  const sessionPlayer = await db.query.playersTable.findFirst({
+    where: eq(playersTable.clerkId, req.clerkUserId!),
+  });
+  if (!sessionPlayer || sessionPlayer.id !== verified.playerId) {
+    res.redirect(`${base}/health-settings?error=session_mismatch`);
+    return;
+  }
   const playerId = verified.playerId;
 
   const clientId = process.env.FITBIT_CLIENT_ID;
@@ -340,13 +356,21 @@ router.get("/health/garmin/connect", requireAuth, async (req, res) => {
   res.redirect(`https://connect.garmin.com/oauth2/authorize?${params.toString()}`);
 });
 
-router.get("/health/garmin/callback", async (req, res) => {
+router.get("/health/garmin/callback", requireAuth, async (req, res) => {
   const { code, state, error } = req.query as Record<string, string>;
   const base = getFrontendBase();
   if (error || !code || !state) { res.redirect(`${base}/health-settings?error=oauth_denied`); return; }
 
   const verified = verifyOAuthState(state);
   if (!verified) { res.redirect(`${base}/health-settings?error=invalid_state`); return; }
+
+  const sessionPlayer = await db.query.playersTable.findFirst({
+    where: eq(playersTable.clerkId, req.clerkUserId!),
+  });
+  if (!sessionPlayer || sessionPlayer.id !== verified.playerId) {
+    res.redirect(`${base}/health-settings?error=session_mismatch`);
+    return;
+  }
   const playerId = verified.playerId;
 
   const clientId = process.env.GARMIN_CLIENT_ID;
@@ -428,13 +452,21 @@ router.get("/health/oura/connect", requireAuth, async (req, res) => {
   res.redirect(`https://cloud.ouraring.com/oauth/authorize?${params.toString()}`);
 });
 
-router.get("/health/oura/callback", async (req, res) => {
+router.get("/health/oura/callback", requireAuth, async (req, res) => {
   const { code, state, error } = req.query as Record<string, string>;
   const base = getFrontendBase();
   if (error || !code || !state) { res.redirect(`${base}/health-settings?error=oauth_denied`); return; }
 
   const verified = verifyOAuthState(state);
   if (!verified) { res.redirect(`${base}/health-settings?error=invalid_state`); return; }
+
+  const sessionPlayer = await db.query.playersTable.findFirst({
+    where: eq(playersTable.clerkId, req.clerkUserId!),
+  });
+  if (!sessionPlayer || sessionPlayer.id !== verified.playerId) {
+    res.redirect(`${base}/health-settings?error=session_mismatch`);
+    return;
+  }
   const playerId = verified.playerId;
 
   const clientId = process.env.OURA_CLIENT_ID;

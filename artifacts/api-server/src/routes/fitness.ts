@@ -269,7 +269,7 @@ router.post("/fitness/log", requireAuth, attachPlayer, fitnessLogLimiter, requir
     note: body.data.note ?? null,
     isPassiveSync: false,
     distanceMiles: body.data.distanceMiles ?? null,
-    verificationLevel: body.data.verificationLevel ?? null,
+    verificationLevel: "bronze",
   });
 
   if (!result.updatedPlayer) {
