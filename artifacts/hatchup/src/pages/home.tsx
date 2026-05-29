@@ -501,7 +501,7 @@ export default function Home() {
         </AnimatePresence>
       </div>
 
-      <div className="max-w-5xl mx-auto space-y-5 pb-28">
+      <div className="max-w-5xl mx-auto space-y-3 pb-28">
         {/* Top Bar */}
         <header className="flex justify-between items-center py-2">
           <div className="flex items-center gap-3">
@@ -680,31 +680,28 @@ export default function Home() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-br from-primary to-purple-800 rounded-3xl p-6 text-white relative overflow-hidden shadow-2xl neon-glow"
+          className="bg-gradient-to-r from-primary to-purple-800 rounded-2xl px-4 py-3 text-white relative overflow-hidden shadow-lg neon-glow"
         >
-          <div className="absolute top-0 right-0 -mt-10 -mr-10 opacity-20 pointer-events-none">
-            <Zap className="w-64 h-64" />
+          <div className="absolute right-0 top-0 opacity-10 pointer-events-none">
+            <Zap className="w-24 h-24" />
           </div>
-          <div className="relative z-10 flex flex-col h-full justify-between gap-5">
-            <div>
-              <h2 className="text-3xl font-black mb-1 drop-shadow-md">Keep Moving!</h2>
-              <p className="text-white/80 font-medium text-sm">Your Pals are waiting to evolve.</p>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm font-bold">
-                <span className="flex items-center gap-1"><Footprints className="w-4 h-4"/> Today's Steps</span>
+          <div className="relative z-10 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-base leading-tight">Keep Moving!</p>
+              <div className="flex justify-between text-[11px] font-bold text-white/80 mt-1">
+                <span className="flex items-center gap-1"><Footprints className="w-3 h-3"/> Today's Steps</span>
                 <span>{(dashboard as any).fitness.todaySteps.toLocaleString()} / {(dashboard as any).fitness.dailyStepGoal.toLocaleString()}</span>
               </div>
-              <Progress value={(dashboard as any).fitness.stepGoalPct} className="h-4 bg-black/20 [&>div]:bg-white" />
+              <Progress value={(dashboard as any).fitness.stepGoalPct} className="h-2 bg-black/20 [&>div]:bg-white mt-1" />
             </div>
           </div>
         </motion.div>
 
         {/* ── Training Hub ── */}
         <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Dumbbell className="w-4 h-4" /> Train
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xs font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Dumbbell className="w-3.5 h-3.5" /> Train
             </h2>
             <Link href="/training" className="text-xs font-bold text-primary hover:underline">All training →</Link>
           </div>
@@ -713,48 +710,54 @@ export default function Home() {
           <Link href="/workout">
             <motion.div
               whileTap={{ scale: 0.97 }}
-              className="w-full rounded-2xl p-5 bg-gradient-to-r from-pink-600 to-purple-700 relative overflow-hidden mb-3 cursor-pointer shadow-[0_0_28px_rgba(236,72,153,0.4)]"
+              className="w-full rounded-xl p-3.5 bg-gradient-to-r from-pink-600 to-purple-700 relative overflow-hidden mb-2 cursor-pointer shadow-[0_0_20px_rgba(236,72,153,0.35)]"
             >
-              <div className="absolute -right-6 -top-6 opacity-10 pointer-events-none">
-                <Mic className="w-36 h-36" />
+              <div className="absolute -right-4 -top-4 opacity-10 pointer-events-none">
+                <Mic className="w-24 h-24" />
               </div>
-              <div className="relative z-10 flex items-center justify-between gap-4">
+              <div className="relative z-10 flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-white font-black text-xl">Rep Counter</span>
-                    <span className="text-[10px] bg-green-400/30 text-green-200 px-1.5 py-0.5 rounded-full font-semibold border border-green-300/30">NEW</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white font-black text-base">Rep Counter</span>
+                    <span className="text-[9px] bg-green-400/30 text-green-200 px-1.5 py-0.5 rounded-full font-semibold border border-green-300/30">NEW</span>
                   </div>
-                  <p className="text-white/70 text-xs">Voice &amp; camera · Verified reps hatch eggs faster</p>
+                  <p className="text-white/70 text-[11px] mt-0.5">Voice &amp; camera · Verified reps hatch eggs faster</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-yellow-300 font-black text-3xl leading-none">3×</p>
-                  <p className="text-white/60 text-[10px]">XP bonus</p>
+                  <p className="text-yellow-300 font-black text-2xl leading-none">3×</p>
+                  <p className="text-white/60 text-[9px]">XP bonus</p>
                 </div>
               </div>
             </motion.div>
           </Link>
 
           {/* 3-column quick links */}
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-3 gap-2">
             <Link href="/training">
-              <motion.div whileTap={{ scale: 0.95 }} className="rounded-2xl p-4 bg-gradient-to-br from-blue-600/90 to-cyan-700/70 border border-blue-400/30 cursor-pointer active:opacity-80 transition-opacity">
-                <Bot className="w-6 h-6 text-blue-200 mb-2" />
-                <p className="font-black text-sm text-white leading-tight">AI Coach</p>
-                <p className="text-[10px] text-blue-200/70 mt-0.5">Workout plan</p>
+              <motion.div whileTap={{ scale: 0.95 }} className="rounded-xl p-3 bg-gradient-to-br from-blue-600/90 to-cyan-700/70 border border-blue-400/30 cursor-pointer active:opacity-80 transition-opacity flex items-center gap-2">
+                <Bot className="w-5 h-5 text-blue-200 shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-black text-xs text-white leading-tight">AI Coach</p>
+                  <p className="text-[9px] text-blue-200/70">Workout plan</p>
+                </div>
               </motion.div>
             </Link>
             <Link href="/training">
-              <motion.div whileTap={{ scale: 0.95 }} className="rounded-2xl p-4 bg-gradient-to-br from-yellow-500/90 to-amber-600/70 border border-yellow-400/30 cursor-pointer active:opacity-80 transition-opacity">
-                <Trophy className="w-6 h-6 text-yellow-100 mb-2" />
-                <p className="font-black text-sm text-white leading-tight">Quests</p>
-                <p className="text-[10px] text-yellow-100/70 mt-0.5">Daily goals</p>
+              <motion.div whileTap={{ scale: 0.95 }} className="rounded-xl p-3 bg-gradient-to-br from-yellow-500/90 to-amber-600/70 border border-yellow-400/30 cursor-pointer active:opacity-80 transition-opacity flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-100 shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-black text-xs text-white leading-tight">Quests</p>
+                  <p className="text-[9px] text-yellow-100/70">Daily goals</p>
+                </div>
               </motion.div>
             </Link>
             <Link href="/nutrition">
-              <motion.div whileTap={{ scale: 0.95 }} className="rounded-2xl p-4 bg-gradient-to-br from-green-600/90 to-emerald-700/70 border border-green-400/30 cursor-pointer active:opacity-80 transition-opacity">
-                <Utensils className="w-6 h-6 text-green-200 mb-2" />
-                <p className="font-black text-sm text-white leading-tight">Nutrition</p>
-                <p className="text-[10px] text-green-200/70 mt-0.5">Meals &amp; buffs</p>
+              <motion.div whileTap={{ scale: 0.95 }} className="rounded-xl p-3 bg-gradient-to-br from-green-600/90 to-emerald-700/70 border border-green-400/30 cursor-pointer active:opacity-80 transition-opacity flex items-center gap-2">
+                <Utensils className="w-5 h-5 text-green-200 shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-black text-xs text-white leading-tight">Nutrition</p>
+                  <p className="text-[9px] text-green-200/70">Meals &amp; buffs</p>
+                </div>
               </motion.div>
             </Link>
           </div>
@@ -790,13 +793,13 @@ export default function Home() {
         {/* Fitness Bars Mini-Dashboard */}
         {fitnessBars && fitnessBars.length > 0 && (
           <section>
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="text-sm font-black uppercase tracking-wider text-muted-foreground">Fitness Bars</h2>
+            <div className="flex justify-between items-center mb-1.5">
+              <h2 className="text-xs font-black uppercase tracking-wider text-muted-foreground">Fitness Bars</h2>
               <Link href="/artifacts" className="text-xs font-bold text-primary hover:underline">Museum →</Link>
             </div>
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-4 gap-1">
               {fitnessBars.map(bar => (
-                <div key={bar.barType} className="bg-muted/40 rounded-xl p-2 space-y-1">
+                <div key={bar.barType} className="bg-muted/40 rounded-lg p-1.5 space-y-0.5">
                   <div className="flex items-center justify-between">
                     <span className="text-xs">{BAR_MINI_ICONS[bar.barType] ?? "💪"}</span>
                     <span className="text-[10px] font-black text-white">{bar.level}</span>
@@ -900,13 +903,13 @@ export default function Home() {
         <TrendingStrip playerId={pid} />
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-2">
           <Link href="/hatch">
-            <GlassCard interactive glow="primary" className="p-4 h-full">
-              <div className="relative z-10 flex flex-col items-center text-center gap-2 h-full justify-center">
+            <GlassCard interactive glow="primary" className="p-3 h-full">
+              <div className="relative z-10 flex flex-col items-center text-center gap-1.5 h-full justify-center">
                 <div className="relative">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-                    <EggIcon className="w-6 h-6" />
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                    <EggIcon className="w-5 h-5" />
                   </div>
                   {(dashboard as any).eggs?.readyCount > 0 && (
                     <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-[10px] font-black text-white animate-pulse">
@@ -928,10 +931,10 @@ export default function Home() {
             if (!open) { setRepMode(false); setRepCount(10); setActivityValue(""); setDistanceMiles(""); }
           }}>
             <DialogTrigger asChild>
-              <GlassCard interactive glow="cyan" className="p-4 h-full">
-                <div className="relative z-10 flex flex-col items-center text-center gap-2 h-full justify-center">
-                  <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center text-accent group-hover:scale-110 transition-transform">
-                    <PlusCircle className="w-6 h-6" />
+              <GlassCard interactive glow="cyan" className="p-3 h-full">
+                <div className="relative z-10 flex flex-col items-center text-center gap-1.5 h-full justify-center">
+                  <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent group-hover:scale-110 transition-transform">
+                    <PlusCircle className="w-5 h-5" />
                   </div>
                   <div>
                     <h3 className="font-bold text-sm">Log Activity</h3>
