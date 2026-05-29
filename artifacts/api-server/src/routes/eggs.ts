@@ -460,59 +460,13 @@ router.post("/eggs/:id/place", requireAuth, attachPlayer, async (req, res) => {
   res.json(serializeEgg(updated[0]));
 });
 
-// POST /eggs/buy-incubator — purchase one extra incubator slot for $3 (max 5 active)
+// POST /eggs/buy-incubator — legacy redirect; use POST /shop/buy-incubator-slot (coins) instead.
+// Kept for backwards compatibility — forwards to the coins route response shape.
 router.post("/eggs/buy-incubator", requireAuth, attachPlayer, async (req, res) => {
-  const stripe = await tryGetStripe();
-  if (!stripe) {
-    res.status(503).json({ error: "stripe_not_configured", message: "Payment processing isn't connected yet." });
-    return;
-  }
-
-  const buyPlayer = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
-  if (!buyPlayer) { res.status(404).json({ error: "Player not found" }); return; }
-
-  if (buyPlayer.extraIncubatorSlots >= MAX_EXTRA_SLOTS) {
-    res.status(400).json({
-      error: "max_extra_slots_reached",
-      message: `You already have the maximum of ${MAX_EXTRA_SLOTS} extra incubator slots.`,
-    });
-    return;
-  }
-
-  let customerId = buyPlayer.stripeCustomerId;
-  if (!customerId) {
-    const customer = await stripe.customers.create({
-      metadata: { playerId: String(buyPlayer.id), clerkId: buyPlayer.clerkId ?? "" },
-      name: buyPlayer.displayName ?? buyPlayer.username,
-    });
-    customerId = customer.id;
-    await db.update(playersTable).set({ stripeCustomerId: customerId }).where(eq(playersTable.id, buyPlayer.id));
-  }
-
-  const origin = `https://${(process.env.REPLIT_DOMAINS ?? "").split(",")[0]}`;
-
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    payment_method_types: ["card"],
-    customer: customerId,
-    line_items: [{
-      price_data: {
-        currency: "usd",
-        product_data: {
-          name: "Extra Incubator Slot",
-          description: "One extra incubator slot — hatches once and is gone. Up to 5 active at a time.",
-        },
-        unit_amount: INCUBATOR_BUY_AMOUNT,
-      },
-      quantity: 1,
-    }],
-    success_url: `${origin}/hatch?status=incubator_success`,
-    cancel_url:  `${origin}/hatch`,
-    metadata: { playerId: String(buyPlayer.id), kind: "extra_incubator" },
+  res.status(410).json({
+    error: "use_shop_route",
+    message: "Extra incubator slots are now purchased with coins. Use POST /api/shop/buy-incubator-slot.",
   });
-
-  req.log.info({ playerId: buyPlayer.id, sessionId: session.id }, "incubator_checkout_created");
-  res.json({ url: session.url, sessionId: session.id });
 });
 
 export default router;

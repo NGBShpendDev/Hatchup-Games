@@ -1,69 +1,132 @@
 import React, { useState } from "react";
 import {
-  View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, Alert, Linking,
+  View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator,
+  Alert, Linking, Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Platform } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  useGetCurrentPlayer, getGetCurrentPlayerQueryKey,
   useGetDailyStreak, getGetDailyStreakQueryKey,
+  useGetCoinPacks, getGetCoinPacksQueryKey,
+  useBuyCoinPack,
+  useBuyIncubatorSlotWithCoins,
   useBuyStreakShield,
   useUpdateShieldAutoReplenish,
-  useGetCurrentPlayer, getGetCurrentPlayerQueryKey,
 } from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
 import { useCurrentPlayerId } from "@/providers/CurrentPlayerProvider";
 
-const SHIELD_COST = 200;
+const SHIELD_COST  = 200;
+const SLOT_COST    = 300;
+
+type Msg = { text: string; ok: boolean };
 
 export default function ShopScreen() {
-  const PLAYER_ID = useCurrentPlayerId();
-  const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  useCurrentPlayerId();
+  const colors       = useColors();
+  const insets       = useSafeAreaInsets();
+  const router       = useRouter();
+  const qc           = useQueryClient();
+  const topPad       = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPad    = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const { data: player } = useGetCurrentPlayer();
+  const { data: player }    = useGetCurrentPlayer();
   const { data: streakData } = useGetDailyStreak();
+  const { data: catalog }   = useGetCoinPacks();
 
-  const coins = player?.coins ?? 0;
-  const shieldCount = streakData?.streakShields ?? 0;
-  const autoReplenish = player?.autoReplenishShields ?? false;
-  const replenishThreshold = player?.shieldAutoReplenishThreshold ?? 2;
-  const canAfford = coins >= SHIELD_COST;
+  const coins         = player?.coins ?? 0;
+  const shieldCount   = streakData?.streakShields ?? 0;
+  const extraSlots    = player?.extraIncubatorSlots ?? 0;
+  const autoReplenish      = streakData?.autoReplenishShields ?? false;
+  const replenishThreshold = streakData?.shieldAutoReplenishThreshold ?? 2;
 
-  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
-  const [usdPending, setUsdPending] = useState(false);
+  const [shieldMsg, setShieldMsg]   = useState<Msg | null>(null);
+  const [slotMsg,   setSlotMsg]     = useState<Msg | null>(null);
+  const [coinPending, setCoinPending] = useState<string | null>(null);
+
+  function flash(setter: (m: Msg | null) => void, msg: Msg) {
+    setter(msg);
+    setTimeout(() => setter(null), 3500);
+  }
+
+  function invalidateAll() {
+    qc.invalidateQueries({ queryKey: getGetCurrentPlayerQueryKey() });
+    qc.invalidateQueries({ queryKey: getGetDailyStreakQueryKey() });
+    qc.invalidateQueries({ queryKey: getGetCoinPacksQueryKey() });
+  }
 
   const buyShield = useBuyStreakShield({
     mutation: {
       onSuccess: (data) => {
-        queryClient.invalidateQueries({ queryKey: getGetDailyStreakQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetCurrentPlayerQueryKey() });
-        setMessage({ text: `Shield purchased! You now have ${data.streakShields} shield${data.streakShields !== 1 ? "s" : ""}.`, ok: true });
-        setTimeout(() => setMessage(null), 3000);
+        invalidateAll();
+        flash(setShieldMsg, {
+          text: `Shield purchased! You now have ${data.streakShields} shield${data.streakShields !== 1 ? "s" : ""}.`,
+          ok: true,
+        });
       },
       onError: (err: any) => {
-        const msg = err?.response?.data?.error ?? "Could not purchase shield.";
-        setMessage({ text: msg, ok: false });
-        setTimeout(() => setMessage(null), 3000);
+        flash(setShieldMsg, { text: err?.response?.data?.error ?? "Could not buy shield.", ok: false });
+      },
+    },
+  });
+
+  const buySlot = useBuyIncubatorSlotWithCoins({
+    mutation: {
+      onSuccess: (data) => {
+        invalidateAll();
+        flash(setSlotMsg, {
+          text: `Slot added! You now have ${data.totalSlots} incubator slots. ${data.coinsRemaining.toLocaleString()} coins remaining.`,
+          ok: true,
+        });
+      },
+      onError: (err: any) => {
+        const d = err?.response?.data;
+        const msg = d?.message ?? d?.error ?? "Could not buy slot.";
+        flash(setSlotMsg, { text: msg, ok: false });
+      },
+    },
+  });
+
+  const purchaseCoinPack = useBuyCoinPack({
+    mutation: {
+      onSuccess: async (data) => {
+        setCoinPending(null);
+        if (data.url) await Linking.openURL(data.url);
+      },
+      onError: (err: any) => {
+        setCoinPending(null);
+        Alert.alert("Checkout unavailable", err?.response?.data?.message ?? "Please try again.");
       },
     },
   });
 
   const updateAutoReplenish = useUpdateShieldAutoReplenish({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetCurrentPlayerQueryKey() });
-      },
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetCurrentPlayerQueryKey() }); },
     },
   });
 
-  function handleCoinBuy() {
+  function handleBuyPack(packId: string) {
+    Alert.alert(
+      "Buy Coins",
+      "You'll be taken to a secure checkout — Apple Pay, Google Pay, and card are all accepted.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Continue",
+          onPress: () => {
+            setCoinPending(packId);
+            purchaseCoinPack.mutate({ data: { packId: packId as any } });
+          },
+        },
+      ]
+    );
+  }
+
+  function handleBuyShield() {
     Alert.alert(
       "Buy Streak Shield",
       `Spend ${SHIELD_COST} coins to protect your streak for one missed day?`,
@@ -74,46 +137,26 @@ export default function ShopScreen() {
     );
   }
 
-  async function handleUsdBuy(pack: "single" | "bundle") {
-    const label = pack === "bundle" ? "10 Streak Shields for $20" : "1 Streak Shield for $3";
+  function handleBuySlot() {
     Alert.alert(
-      "Buy with Card",
-      `Purchase ${label}? You'll be taken to a secure checkout.`,
+      "Buy Extra Egg Slot",
+      `Spend ${SLOT_COST} coins to add one extra incubator slot (max 8 total)?`,
       [
         { text: "Cancel", style: "cancel" },
-        {
-          text: "Continue",
-          onPress: async () => {
-            try {
-              setUsdPending(true);
-              const res = await fetch("/api/shields/checkout", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ pack }),
-              });
-              const data = await res.json() as { url?: string; message?: string };
-              if (!res.ok || !data.url) throw new Error(data.message ?? "Checkout unavailable");
-              await Linking.openURL(data.url);
-            } catch (e) {
-              const msg = e instanceof Error ? e.message : "Checkout unavailable";
-              setMessage({ text: msg, ok: false });
-              setTimeout(() => setMessage(null), 3000);
-            } finally {
-              setUsdPending(false);
-            }
-          },
-        },
+        { text: "Buy", onPress: () => buySlot.mutate() },
       ]
     );
   }
 
+  const packs = catalog?.packs ?? [];
+
   return (
     <ScrollView
-      style={[s.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingBottom: bottomPad + 90 }}
+      style={[s.root, { backgroundColor: colors.background }]}
+      contentContainerStyle={{ paddingBottom: bottomPad + 100 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
+      {/* ── Header ────────────────────────────────────────────────────── */}
       <View style={[s.header, { paddingTop: topPad + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <Pressable onPress={() => router.back()} style={s.backBtn} hitSlop={8}>
           <Feather name="arrow-left" size={20} color={colors.foreground} />
@@ -122,100 +165,168 @@ export default function ShopScreen() {
           <Feather name="shopping-bag" size={18} color={colors.primary} />
           <Text style={[s.title, { color: colors.foreground }]}>Shop</Text>
         </View>
+        {/* Coin balance pill */}
+        <View style={[s.coinPill, { backgroundColor: "#f59e0b18", borderColor: "#f59e0b44" }]}>
+          <Text style={s.coinPillIcon}>🪙</Text>
+          <Text style={[s.coinPillText, { color: "#f59e0b" }]}>{coins.toLocaleString()}</Text>
+        </View>
       </View>
 
       <View style={s.content}>
 
-        {/* Shield Section */}
-        <View style={[s.section, { backgroundColor: "#22d3ee0a", borderColor: "#22d3ee33" }]}>
+        {/* ── Buy Coins ──────────────────────────────────────────────── */}
+        <View style={[s.section, { backgroundColor: "#a855f70a", borderColor: "#a855f733" }]}>
+          <View style={s.sectionHead}>
+            <View style={[s.iconWrap, { backgroundColor: "#a855f718" }]}>
+              <Text style={{ fontSize: 18 }}>🪙</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.sectionTitle, { color: "#d8b4fe" }]}>Buy Coins</Text>
+              <Text style={[s.sectionSub, { color: colors.mutedForeground }]}>
+                Apple Pay, Google Pay &amp; card accepted
+              </Text>
+            </View>
+          </View>
 
-          {/* Section header */}
+          <View style={s.packGrid}>
+            {packs.map((pack) => {
+              const isLoading = coinPending === pack.id;
+              const dollars   = (pack.price / 100).toFixed(0);
+              return (
+                <Pressable
+                  key={pack.id}
+                  onPress={() => handleBuyPack(pack.id)}
+                  disabled={!!coinPending}
+                  style={[
+                    s.packCard,
+                    { borderColor: pack.badge ? "#a855f766" : colors.border, backgroundColor: pack.badge ? "#a855f710" : colors.card },
+                    coinPending && !isLoading && { opacity: 0.5 },
+                  ]}
+                  testID={`btn-coin-pack-${pack.id}`}
+                >
+                  {pack.badge && (
+                    <View style={s.packBadge}>
+                      <Text style={s.packBadgeText}>{pack.badge}</Text>
+                    </View>
+                  )}
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="#a855f7" style={{ marginVertical: 8 }} />
+                  ) : (
+                    <>
+                      <Text style={[s.packCoins, { color: "#f59e0b" }]}>{pack.coins.toLocaleString()}</Text>
+                      <Text style={[s.packCoinsLabel, { color: colors.mutedForeground }]}>coins</Text>
+                      <View style={[s.packPricePill, { backgroundColor: "#a855f7", marginTop: 8 }]}>
+                        <Text style={s.packPriceText}>${dollars}</Text>
+                      </View>
+                    </>
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {packs.length === 0 && (
+            <View style={s.loadingRow}>
+              <ActivityIndicator size="small" color="#a855f7" />
+              <Text style={[s.loadingText, { color: colors.mutedForeground }]}>Loading packs…</Text>
+            </View>
+          )}
+        </View>
+
+        {/* ── Spend Coins ────────────────────────────────────────────── */}
+        <Text style={[s.groupLabel, { color: colors.mutedForeground }]}>SPEND COINS</Text>
+
+        {/* Streak Shield */}
+        <View style={[s.section, { backgroundColor: "#22d3ee0a", borderColor: "#22d3ee33" }]}>
           <View style={s.sectionHead}>
             <View style={[s.iconWrap, { backgroundColor: "#22d3ee18" }]}>
               <Feather name="shield" size={18} color="#22d3ee" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[s.sectionTitle, { color: "#a5f3fc" }]}>Streak Protection</Text>
-              <Text style={[s.sectionSubtitle, { color: colors.mutedForeground }]}>
-                A Shield auto-saves your streak if you miss a day — no reset.
+              <Text style={[s.sectionTitle, { color: "#a5f3fc" }]}>Streak Shield</Text>
+              <Text style={[s.sectionSub, { color: colors.mutedForeground }]}>
+                Auto-saves your streak if you miss a day
               </Text>
             </View>
             {shieldCount > 0 && (
               <View style={[s.countBadge, { backgroundColor: "#22d3ee18", borderColor: "#22d3ee44" }]}>
                 <Text style={s.countValue}>{shieldCount}</Text>
-                <Text style={s.countLabel}>{shieldCount === 1 ? "shield" : "shields"}</Text>
+                <Text style={s.countLabel}>{shieldCount === 1 ? "owned" : "owned"}</Text>
               </View>
             )}
           </View>
 
-          {/* Coin balance */}
-          <View style={[s.balanceRow, { backgroundColor: canAfford ? "#f59e0b14" : "#ef444414", borderColor: canAfford ? "#f59e0b33" : "#ef444433" }]}>
-            <Feather name="dollar-sign" size={13} color={canAfford ? "#f59e0b" : "#ef4444"} />
-            <Text style={[s.balanceLabel, { color: colors.mutedForeground }]}>Your balance:</Text>
-            <Text style={[s.balanceValue, { color: canAfford ? "#f59e0b" : "#ef4444" }]}>
-              {coins.toLocaleString()} coins
-            </Text>
-            {!canAfford && (
-              <Text style={[s.balanceHint, { color: "#ef4444" }]}>
-                · need {(SHIELD_COST - coins).toLocaleString()} more
-              </Text>
-            )}
-          </View>
-
-          {message && (
-            <View style={[s.message, { backgroundColor: message.ok ? "#22d3ee18" : "#ef444418", borderColor: message.ok ? "#22d3ee44" : "#ef444444" }]}>
-              <Text style={[s.messageText, { color: message.ok ? "#22d3ee" : "#ef4444" }]}>{message.text}</Text>
+          {shieldMsg && (
+            <View style={[s.msgRow, { backgroundColor: shieldMsg.ok ? "#22d3ee18" : "#ef444418", borderColor: shieldMsg.ok ? "#22d3ee44" : "#ef444444" }]}>
+              <Text style={[s.msgText, { color: shieldMsg.ok ? "#22d3ee" : "#ef4444" }]}>{shieldMsg.text}</Text>
             </View>
           )}
 
-          {/* Coin buy button */}
           <Pressable
-            onPress={handleCoinBuy}
-            disabled={buyShield.isPending || !canAfford}
-            style={[s.buyBtn, { opacity: (buyShield.isPending || !canAfford) ? 0.5 : 1 }]}
-            testID="button-buy-shield"
+            onPress={handleBuyShield}
+            disabled={buyShield.isPending || coins < SHIELD_COST}
+            style={[s.spendBtn, { backgroundColor: "#22d3ee", opacity: (buyShield.isPending || coins < SHIELD_COST) ? 0.45 : 1 }]}
+            testID="btn-buy-shield-coins"
           >
-            {buyShield.isPending ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Feather name="shopping-cart" size={14} color="#fff" />
-                <Text style={s.buyBtnText}>Buy Shield · {SHIELD_COST} coins</Text>
-              </>
-            )}
+            {buyShield.isPending
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <><Text style={s.coinIcon}>🪙</Text><Text style={s.spendBtnText}>Buy · {SHIELD_COST} coins</Text></>}
           </Pressable>
 
-          {/* Divider */}
-          <View style={s.dividerRow}>
-            <View style={[s.dividerLine, { backgroundColor: "#22d3ee22" }]} />
-            <Text style={[s.dividerText, { color: colors.mutedForeground }]}>or pay with card</Text>
-            <View style={[s.dividerLine, { backgroundColor: "#22d3ee22" }]} />
-          </View>
-
-          {/* USD buttons */}
-          <View style={s.usdRow}>
-            <Pressable
-              onPress={() => handleUsdBuy("single")}
-              disabled={usdPending}
-              style={[s.usdBtn, { opacity: usdPending ? 0.5 : 1, borderColor: "#22c55e55", backgroundColor: "#22c55e14" }]}
-              testID="button-buy-shield-usd-single"
-            >
-              <Feather name="shield" size={13} color="#22c55e" />
-              <Text style={[s.usdBtnText, { color: "#22c55e" }]}>$3.00 · 1 Shield</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => handleUsdBuy("bundle")}
-              disabled={usdPending}
-              style={[s.usdBtn, { opacity: usdPending ? 0.5 : 1, borderColor: "#a855f755", backgroundColor: "#a855f714" }]}
-              testID="button-buy-shield-usd-bundle"
-            >
-              <Feather name="star" size={13} color="#a855f7" />
-              <Text style={[s.usdBtnText, { color: "#a855f7" }]}>$20 · 10 Shields</Text>
-            </Pressable>
-          </View>
+          {coins < SHIELD_COST && (
+            <Text style={[s.needMoreHint, { color: "#ef4444" }]}>
+              Need {(SHIELD_COST - coins).toLocaleString()} more coins
+            </Text>
+          )}
         </View>
 
-        {/* Auto-replenish */}
+        {/* Extra Egg Slot */}
+        <View style={[s.section, { backgroundColor: "#f59e0b0a", borderColor: "#f59e0b33" }]}>
+          <View style={s.sectionHead}>
+            <View style={[s.iconWrap, { backgroundColor: "#f59e0b18" }]}>
+              <Text style={{ fontSize: 18 }}>🥚</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.sectionTitle, { color: "#fde68a" }]}>Extra Egg Slot</Text>
+              <Text style={[s.sectionSub, { color: colors.mutedForeground }]}>
+                Hatch one more egg at a time (max 8 total)
+              </Text>
+            </View>
+            {extraSlots > 0 && (
+              <View style={[s.countBadge, { backgroundColor: "#f59e0b18", borderColor: "#f59e0b44" }]}>
+                <Text style={[s.countValue, { color: "#f59e0b" }]}>{extraSlots}</Text>
+                <Text style={[s.countLabel, { color: "#f59e0b99" }]}>extra</Text>
+              </View>
+            )}
+          </View>
+
+          {slotMsg && (
+            <View style={[s.msgRow, { backgroundColor: slotMsg.ok ? "#22c55e18" : "#ef444418", borderColor: slotMsg.ok ? "#22c55e44" : "#ef444444" }]}>
+              <Text style={[s.msgText, { color: slotMsg.ok ? "#22c55e" : "#ef4444" }]}>{slotMsg.text}</Text>
+            </View>
+          )}
+
+          <Pressable
+            onPress={handleBuySlot}
+            disabled={buySlot.isPending || coins < SLOT_COST || extraSlots >= 5}
+            style={[s.spendBtn, { backgroundColor: "#f59e0b", opacity: (buySlot.isPending || coins < SLOT_COST || extraSlots >= 5) ? 0.45 : 1 }]}
+            testID="btn-buy-incubator-slot"
+          >
+            {buySlot.isPending
+              ? <ActivityIndicator size="small" color="#fff" />
+              : extraSlots >= 5
+                ? <Text style={s.spendBtnText}>Max slots reached</Text>
+                : <><Text style={s.coinIcon}>🪙</Text><Text style={s.spendBtnText}>Buy · {SLOT_COST} coins</Text></>}
+          </Pressable>
+
+          {coins < SLOT_COST && extraSlots < 5 && (
+            <Text style={[s.needMoreHint, { color: "#ef4444" }]}>
+              Need {(SLOT_COST - coins).toLocaleString()} more coins
+            </Text>
+          )}
+        </View>
+
+        {/* ── Auto-replenish ─────────────────────────────────────────── */}
         <View style={[s.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={s.toggleRow}>
             <View style={[s.iconWrap, { backgroundColor: "#22d3ee18" }]}>
@@ -223,8 +334,8 @@ export default function ShopScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[s.toggleLabel, { color: colors.foreground }]}>Auto-replenish shields</Text>
-              <Text style={[s.toggleSub, { color: colors.mutedForeground }]}>
-                Buy a shield with coins when you run low
+              <Text style={[s.sectionSub, { color: colors.mutedForeground }]}>
+                Auto-buy a shield with coins when you run low
               </Text>
             </View>
             <Pressable
@@ -242,7 +353,7 @@ export default function ShopScreen() {
             <View style={[s.thresholdRow, { borderTopColor: colors.border }]}>
               <View style={{ flex: 1 }}>
                 <Text style={[s.toggleLabel, { color: colors.foreground }]}>Keep at least</Text>
-                <Text style={[s.toggleSub, { color: colors.mutedForeground }]}>Auto-buy when shields drop below this</Text>
+                <Text style={[s.sectionSub, { color: colors.mutedForeground }]}>Auto-buy when shields drop below this</Text>
               </View>
               <View style={s.stepper}>
                 <Pressable
@@ -267,55 +378,52 @@ export default function ShopScreen() {
           )}
         </View>
 
-        {/* Coming soon */}
-        <View style={[s.comingSoon, { borderColor: colors.border }]}>
-          <Feather name="shopping-bag" size={20} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
-          <Text style={[s.comingSoonText, { color: colors.mutedForeground }]}>More items coming soon</Text>
-        </View>
-
       </View>
     </ScrollView>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1 },
-  header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingBottom: 16, borderBottomWidth: 1 },
-  backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flexDirection: "row", alignItems: "center", gap: 8 },
-  title: { fontSize: 20, fontWeight: "800" },
-  content: { padding: 16, gap: 12 },
-  section: { borderRadius: 14, borderWidth: 1, padding: 14, gap: 12 },
-  sectionHead: { flexDirection: "row", alignItems: "center", gap: 10 },
-  iconWrap: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  sectionTitle: { fontSize: 14, fontWeight: "700" },
-  sectionSubtitle: { fontSize: 12, marginTop: 2 },
-  countBadge: { alignItems: "center", borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
-  countValue: { fontSize: 18, fontWeight: "800", color: "#22d3ee" },
-  countLabel: { fontSize: 9, fontWeight: "700", color: "#22d3ee99", textTransform: "uppercase", letterSpacing: 0.5 },
-  balanceRow: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
-  balanceLabel: { fontSize: 12 },
-  balanceValue: { fontSize: 12, fontWeight: "700" },
-  balanceHint: { fontSize: 11, fontWeight: "600" },
-  message: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
-  messageText: { fontSize: 12, fontWeight: "600" },
-  buyBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#22d3ee", borderRadius: 10, paddingVertical: 12 },
-  buyBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
-  dividerRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  dividerLine: { flex: 1, height: 1 },
-  dividerText: { fontSize: 11 },
-  usdRow: { flexDirection: "row", gap: 8 },
-  usdBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 10, borderWidth: 1, paddingVertical: 10 },
-  usdBtnText: { fontSize: 13, fontWeight: "700" },
-  toggleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  toggleLabel: { fontSize: 14, fontWeight: "700" },
-  toggleSub: { fontSize: 11, marginTop: 2 },
-  toggle: { width: 44, height: 24, borderRadius: 12, justifyContent: "center" },
-  toggleThumb: { width: 20, height: 20, borderRadius: 10, backgroundColor: "#fff", position: "absolute" },
-  thresholdRow: { flexDirection: "row", alignItems: "center", gap: 10, borderTopWidth: 1, paddingTop: 12 },
-  stepper: { flexDirection: "row", alignItems: "center", gap: 8 },
-  stepBtn: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  stepValue: { fontSize: 14, fontWeight: "800", width: 24, textAlign: "center" },
-  comingSoon: { alignItems: "center", gap: 8, borderRadius: 14, borderWidth: 1, paddingVertical: 24 },
-  comingSoonText: { fontSize: 13, fontWeight: "500" },
+  root:          { flex: 1 },
+  header:        { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1 },
+  backBtn:       { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  headerTitle:   { flexDirection: "row", alignItems: "center", gap: 8, flex: 1 },
+  title:         { fontSize: 20, fontWeight: "800" },
+  coinPill:      { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 20, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
+  coinPillIcon:  { fontSize: 13 },
+  coinPillText:  { fontSize: 13, fontWeight: "800" },
+  content:       { padding: 16, gap: 12 },
+  groupLabel:    { fontSize: 11, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase", marginTop: 4, marginBottom: -4 },
+  section:       { borderRadius: 14, borderWidth: 1, padding: 14, gap: 12 },
+  sectionHead:   { flexDirection: "row", alignItems: "center", gap: 10 },
+  iconWrap:      { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  sectionTitle:  { fontSize: 14, fontWeight: "700" },
+  sectionSub:    { fontSize: 12, marginTop: 2 },
+  countBadge:    { alignItems: "center", borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
+  countValue:    { fontSize: 18, fontWeight: "800", color: "#22d3ee" },
+  countLabel:    { fontSize: 9, fontWeight: "700", color: "#22d3ee99", textTransform: "uppercase", letterSpacing: 0.5 },
+  packGrid:      { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  packCard:      { flex: 1, minWidth: "42%", borderRadius: 12, borderWidth: 1, padding: 12, alignItems: "center", gap: 2, position: "relative" },
+  packBadge:     { position: "absolute", top: -8, right: 8, backgroundColor: "#a855f7", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
+  packBadgeText: { fontSize: 9, fontWeight: "800", color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 },
+  packCoins:     { fontSize: 22, fontWeight: "900" },
+  packCoinsLabel: { fontSize: 11, fontWeight: "600" },
+  packPricePill: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 5 },
+  packPriceText: { fontSize: 14, fontWeight: "800", color: "#fff" },
+  loadingRow:    { flexDirection: "row", alignItems: "center", gap: 8, justifyContent: "center", paddingVertical: 12 },
+  loadingText:   { fontSize: 13 },
+  msgRow:        { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
+  msgText:       { fontSize: 12, fontWeight: "600" },
+  spendBtn:      { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 10, paddingVertical: 12 },
+  coinIcon:      { fontSize: 14 },
+  spendBtnText:  { color: "#fff", fontSize: 14, fontWeight: "700" },
+  needMoreHint:  { fontSize: 11, fontWeight: "600", textAlign: "center" },
+  toggleRow:     { flexDirection: "row", alignItems: "center", gap: 10 },
+  toggleLabel:   { fontSize: 14, fontWeight: "600" },
+  toggle:        { width: 44, height: 26, borderRadius: 13, justifyContent: "center" },
+  toggleThumb:   { width: 20, height: 20, borderRadius: 10, backgroundColor: "#fff" },
+  thresholdRow:  { flexDirection: "row", alignItems: "center", gap: 10, borderTopWidth: 1, paddingTop: 12 },
+  stepper:       { flexDirection: "row", alignItems: "center", gap: 8 },
+  stepBtn:       { width: 32, height: 32, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  stepValue:     { fontSize: 16, fontWeight: "700", minWidth: 24, textAlign: "center" },
 });

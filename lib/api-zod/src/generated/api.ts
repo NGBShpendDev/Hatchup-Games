@@ -2094,11 +2094,49 @@ export const PlaceEggInIncubatorResponse = zod.object({
 
 
 /**
- * @summary Purchase one extra incubator slot for $3 (max 5 active at a time)
+ * @summary List available coin packs and in-game shop items
  */
-export const BuyExtraIncubatorSlotResponse = zod.object({
+export const GetCoinPacksResponse = zod.object({
+  "packs": zod.array(zod.object({
+  "id": zod.string(),
+  "coins": zod.number(),
+  "price": zod.number().describe('Price in cents (USD)'),
+  "label": zod.string(),
+  "description": zod.string(),
+  "badge": zod.string().nullish()
+})),
+  "items": zod.record(zod.string(), zod.object({
+  "cost": zod.number().describe('Cost in coins'),
+  "label": zod.string(),
+  "description": zod.string()
+})),
+  "stripePublishableKey": zod.string().nullish(),
+  "stripeConfigured": zod.boolean()
+})
+
+
+/**
+ * @summary Create a Stripe Checkout session to purchase a coin pack (Apple Pay / Google Pay / card)
+ */
+export const BuyCoinPackBody = zod.object({
+  "packId": zod.enum(['starter', 'explorer', 'mega', 'legendary'])
+})
+
+export const BuyCoinPackResponse = zod.object({
   "url": zod.string(),
   "sessionId": zod.string()
+})
+
+
+/**
+ * @summary Spend 300 coins for one extra incubator slot (max 5 extra total)
+ */
+export const BuyIncubatorSlotWithCoinsResponse = zod.object({
+  "ok": zod.boolean(),
+  "totalSlots": zod.number(),
+  "extraIncubatorSlots": zod.number(),
+  "coinsSpent": zod.number(),
+  "coinsRemaining": zod.number()
 })
 
 

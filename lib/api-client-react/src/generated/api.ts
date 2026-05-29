@@ -50,7 +50,11 @@ import type {
   BattleWsClientMessage,
   BattleWsServerMessage,
   BattleWsTokenResponse,
-  BuyExtraIncubatorSlot200,
+  BuyCoinPack200,
+  BuyCoinPackBody,
+  BuyExtraIncubatorSlot410,
+  BuyIncubatorSlotResult,
+  BuyIncubatorSlotWithCoins400,
   BuyStreakShield400,
   BuyStreakShieldResult,
   Challenge,
@@ -66,6 +70,7 @@ import type {
   ClubInvite,
   ClubMember,
   CoachChatBody,
+  CoinPackCatalog,
   CollectDailyEggsBody,
   CommentLikeInput,
   CommentLikeResult,
@@ -5922,11 +5927,11 @@ export const getBuyExtraIncubatorSlotUrl = () => {
 }
 
 /**
- * @summary Purchase one extra incubator slot for $3 (max 5 active at a time)
+ * @summary Deprecated: use POST /shop/buy-incubator-slot instead (coins)
  */
-export const buyExtraIncubatorSlot = async ( options?: RequestInit): Promise<BuyExtraIncubatorSlot200> => {
+export const buyExtraIncubatorSlot = async ( options?: RequestInit): Promise<unknown> => {
 
-  return customFetch<BuyExtraIncubatorSlot200>(getBuyExtraIncubatorSlotUrl(),
+  return customFetch<unknown>(getBuyExtraIncubatorSlotUrl(),
   {
     ...options,
     method: 'POST'
@@ -5938,7 +5943,7 @@ export const buyExtraIncubatorSlot = async ( options?: RequestInit): Promise<Buy
 
 
 
-export const getBuyExtraIncubatorSlotMutationOptions = <TError = ErrorType<void>,
+export const getBuyExtraIncubatorSlotMutationOptions = <TError = ErrorType<BuyExtraIncubatorSlot410>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof buyExtraIncubatorSlot>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof buyExtraIncubatorSlot>>, TError,void, TContext> => {
 
@@ -5967,12 +5972,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type BuyExtraIncubatorSlotMutationResult = NonNullable<Awaited<ReturnType<typeof buyExtraIncubatorSlot>>>
 
-    export type BuyExtraIncubatorSlotMutationError = ErrorType<void>
+    export type BuyExtraIncubatorSlotMutationError = ErrorType<BuyExtraIncubatorSlot410>
 
     /**
- * @summary Purchase one extra incubator slot for $3 (max 5 active at a time)
+ * @summary Deprecated: use POST /shop/buy-incubator-slot instead (coins)
  */
-export const useBuyExtraIncubatorSlot = <TError = ErrorType<void>,
+export const useBuyExtraIncubatorSlot = <TError = ErrorType<BuyExtraIncubatorSlot410>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof buyExtraIncubatorSlot>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof buyExtraIncubatorSlot>>,
@@ -5981,6 +5986,224 @@ export const useBuyExtraIncubatorSlot = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getBuyExtraIncubatorSlotMutationOptions(options));
+    }
+
+export const getGetCoinPacksUrl = () => {
+
+
+
+
+  return `/api/shop/coin-packs`
+}
+
+/**
+ * @summary List available coin packs and in-game shop items
+ */
+export const getCoinPacks = async ( options?: RequestInit): Promise<CoinPackCatalog> => {
+
+  return customFetch<CoinPackCatalog>(getGetCoinPacksUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCoinPacksQueryKey = () => {
+    return [
+    `/api/shop/coin-packs`
+    ] as const;
+    }
+
+
+export const getGetCoinPacksQueryOptions = <TData = Awaited<ReturnType<typeof getCoinPacks>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCoinPacks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCoinPacksQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCoinPacks>>> = ({ signal }) => getCoinPacks({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCoinPacks>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCoinPacksQueryResult = NonNullable<Awaited<ReturnType<typeof getCoinPacks>>>
+export type GetCoinPacksQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List available coin packs and in-game shop items
+ */
+
+export function useGetCoinPacks<TData = Awaited<ReturnType<typeof getCoinPacks>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCoinPacks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCoinPacksQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getBuyCoinPackUrl = () => {
+
+
+
+
+  return `/api/shop/coin-packs/checkout`
+}
+
+/**
+ * @summary Create a Stripe Checkout session to purchase a coin pack (Apple Pay / Google Pay / card)
+ */
+export const buyCoinPack = async (buyCoinPackBody: BuyCoinPackBody, options?: RequestInit): Promise<BuyCoinPack200> => {
+
+  return customFetch<BuyCoinPack200>(getBuyCoinPackUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      buyCoinPackBody,)
+  }
+);}
+
+
+
+
+export const getBuyCoinPackMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof buyCoinPack>>, TError,{data: BodyType<BuyCoinPackBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof buyCoinPack>>, TError,{data: BodyType<BuyCoinPackBody>}, TContext> => {
+
+const mutationKey = ['buyCoinPack'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof buyCoinPack>>, {data: BodyType<BuyCoinPackBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  buyCoinPack(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BuyCoinPackMutationResult = NonNullable<Awaited<ReturnType<typeof buyCoinPack>>>
+    export type BuyCoinPackMutationBody = BodyType<BuyCoinPackBody>
+    export type BuyCoinPackMutationError = ErrorType<void>
+
+    /**
+ * @summary Create a Stripe Checkout session to purchase a coin pack (Apple Pay / Google Pay / card)
+ */
+export const useBuyCoinPack = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof buyCoinPack>>, TError,{data: BodyType<BuyCoinPackBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof buyCoinPack>>,
+        TError,
+        {data: BodyType<BuyCoinPackBody>},
+        TContext
+      > => {
+      return useMutation(getBuyCoinPackMutationOptions(options));
+    }
+
+export const getBuyIncubatorSlotWithCoinsUrl = () => {
+
+
+
+
+  return `/api/shop/buy-incubator-slot`
+}
+
+/**
+ * @summary Spend 300 coins for one extra incubator slot (max 5 extra total)
+ */
+export const buyIncubatorSlotWithCoins = async ( options?: RequestInit): Promise<BuyIncubatorSlotResult> => {
+
+  return customFetch<BuyIncubatorSlotResult>(getBuyIncubatorSlotWithCoinsUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getBuyIncubatorSlotWithCoinsMutationOptions = <TError = ErrorType<BuyIncubatorSlotWithCoins400>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof buyIncubatorSlotWithCoins>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof buyIncubatorSlotWithCoins>>, TError,void, TContext> => {
+
+const mutationKey = ['buyIncubatorSlotWithCoins'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof buyIncubatorSlotWithCoins>>, void> = () => {
+
+
+          return  buyIncubatorSlotWithCoins(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BuyIncubatorSlotWithCoinsMutationResult = NonNullable<Awaited<ReturnType<typeof buyIncubatorSlotWithCoins>>>
+
+    export type BuyIncubatorSlotWithCoinsMutationError = ErrorType<BuyIncubatorSlotWithCoins400>
+
+    /**
+ * @summary Spend 300 coins for one extra incubator slot (max 5 extra total)
+ */
+export const useBuyIncubatorSlotWithCoins = <TError = ErrorType<BuyIncubatorSlotWithCoins400>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof buyIncubatorSlotWithCoins>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof buyIncubatorSlotWithCoins>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getBuyIncubatorSlotWithCoinsMutationOptions(options));
     }
 
 export const getGetFitnessStatsUrl = (playerId: number,) => {

@@ -54,6 +54,8 @@ tags:
     description: Account suspension appeals (player-facing and admin moderation)
   - name: analytics
     description: Lightweight product analytics events
+  - name: shop
+    description: Coin shop — buy coins with real money, spend coins on in-game items
 
 paths:
   /storage/uploads/request-url:
@@ -1717,24 +1719,89 @@ paths:
     post:
       operationId: buyExtraIncubatorSlot
       tags: [eggs]
-      summary: Purchase one extra incubator slot for $3 (max 5 active at a time)
+      summary: "Deprecated: use POST /shop/buy-incubator-slot instead (coins)"
+      responses:
+        "410":
+          description: Use coin shop route instead
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error, message]
+                properties:
+                  error: { type: string }
+                  message: { type: string }
+
+  # ── Shop ──────────────────────────────────────────────────────────────────
+  /shop/coin-packs:
+    get:
+      operationId: getCoinPacks
+      tags: [shop]
+      summary: List available coin packs and in-game shop items
       responses:
         "200":
-          description: Stripe Checkout session URL
+          description: Coin packs and shop item catalog
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoinPackCatalog"
+
+  /shop/coin-packs/checkout:
+    post:
+      operationId: buyCoinPack
+      tags: [shop]
+      summary: Create a Stripe Checkout session to purchase a coin pack (Apple Pay / Google Pay / card)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [packId]
+              properties:
+                packId:
+                  type: string
+                  enum: [starter, explorer, mega, legendary]
+      responses:
+        "200":
+          description: Checkout session URL
           content:
             application/json:
               schema:
                 type: object
                 required: [url, sessionId]
                 properties:
-                  url:
-                    type: string
-                  sessionId:
-                    type: string
+                  url: { type: string }
+                  sessionId: { type: string }
         "400":
-          description: Max extra slots already reached
+          description: Invalid pack ID
         "503":
           description: Stripe not configured
+
+  /shop/buy-incubator-slot:
+    post:
+      operationId: buyIncubatorSlotWithCoins
+      tags: [shop]
+      summary: Spend 300 coins for one extra incubator slot (max 5 extra total)
+      responses:
+        "200":
+          description: Slot purchased
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuyIncubatorSlotResult"
+        "400":
+          description: Insufficient coins or max slots already reached
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error, message]
+                properties:
+                  error: { type: string }
+                  message: { type: string }
+                  coinsNeeded: { type: integer }
+                  coinsAvailable: { type: integer }
 
   # ── Fitness ──────────────────────────────────────────────────────────────
   /fitness/stats/{playerId}:
@@ -6353,6 +6420,49 @@ components:
         streakShields:   { type: integer, description: "Updated shield count" }
         coinsSpent:      { type: integer }
         coinsRemaining:  { type: integer }
+
+    CoinPack:
+      type: object
+      required: [id, coins, price, label, description]
+      properties:
+        id:          { type: string }
+        coins:       { type: integer }
+        price:       { type: integer, description: "Price in cents (USD)" }
+        label:       { type: string }
+        description: { type: string }
+        badge:       { type: string, nullable: true }
+
+    ShopItem:
+      type: object
+      required: [cost, label, description]
+      properties:
+        cost:        { type: integer, description: "Cost in coins" }
+        label:       { type: string }
+        description: { type: string }
+
+    CoinPackCatalog:
+      type: object
+      required: [packs, items, stripeConfigured]
+      properties:
+        packs:
+          type: array
+          items: { $ref: "#/components/schemas/CoinPack" }
+        items:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/ShopItem"
+        stripePublishableKey: { type: string, nullable: true }
+        stripeConfigured: { type: boolean }
+
+    BuyIncubatorSlotResult:
+      type: object
+      required: [ok, totalSlots, extraIncubatorSlots, coinsSpent, coinsRemaining]
+      properties:
+        ok:                   { type: boolean }
+        totalSlots:           { type: integer }
+        extraIncubatorSlots:  { type: integer }
+        coinsSpent:           { type: integer }
+        coinsRemaining:       { type: integer }
 
     ShieldAutoReplenishBody:
       type: object

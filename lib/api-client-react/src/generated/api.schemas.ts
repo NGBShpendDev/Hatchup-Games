@@ -1215,6 +1215,40 @@ export interface BuyStreakShieldResult {
   coinsRemaining: number;
 }
 
+export interface CoinPack {
+  id: string;
+  coins: number;
+  /** Price in cents (USD) */
+  price: number;
+  label: string;
+  description: string;
+  badge?: string | null;
+}
+
+export interface ShopItem {
+  /** Cost in coins */
+  cost: number;
+  label: string;
+  description: string;
+}
+
+export type CoinPackCatalogItems = {[key: string]: ShopItem};
+
+export interface CoinPackCatalog {
+  packs: CoinPack[];
+  items: CoinPackCatalogItems;
+  stripePublishableKey?: string | null;
+  stripeConfigured: boolean;
+}
+
+export interface BuyIncubatorSlotResult {
+  ok: boolean;
+  totalSlots: number;
+  extraIncubatorSlots: number;
+  coinsSpent: number;
+  coinsRemaining: number;
+}
+
 export interface ShieldAutoReplenishBody {
   autoReplenishShields?: boolean;
   /**
@@ -3864,9 +3898,35 @@ export type CollectDailyEggsBody = {
   playerId: number;
 };
 
-export type BuyExtraIncubatorSlot200 = {
+export type BuyExtraIncubatorSlot410 = {
+  error: string;
+  message: string;
+};
+
+export type BuyCoinPackBodyPackId = typeof BuyCoinPackBodyPackId[keyof typeof BuyCoinPackBodyPackId];
+
+
+export const BuyCoinPackBodyPackId = {
+  starter: 'starter',
+  explorer: 'explorer',
+  mega: 'mega',
+  legendary: 'legendary',
+} as const;
+
+export type BuyCoinPackBody = {
+  packId: BuyCoinPackBodyPackId;
+};
+
+export type BuyCoinPack200 = {
   url: string;
   sessionId: string;
+};
+
+export type BuyIncubatorSlotWithCoins400 = {
+  error: string;
+  message: string;
+  coinsNeeded?: number;
+  coinsAvailable?: number;
 };
 
 export type ListFitnessActivitiesParams = {

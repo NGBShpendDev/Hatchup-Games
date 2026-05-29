@@ -9,8 +9,8 @@
  */
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient.ts";
 import { db } from "@workspace/db";
-import { playersTable, stripeShieldFulfillmentsTable, stripeIncubatorFulfillmentsTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { playersTable, stripeShieldFulfillmentsTable, stripeIncubatorFulfillmentsTable, coinTransactionsTable } from "@workspace/db";
+import { eq, sql, and } from "drizzle-orm";
 import { logger } from "./lib/logger.ts";
 
 export const WebhookHandlers = {
@@ -29,6 +29,7 @@ export const WebhookHandlers = {
       await projectSubscriptionState(event);
       await projectShieldGrant(event);
       await projectIncubatorGrant(event);
+      await projectCoinPackGrant(event);
     } catch (err) {
       logger.warn({ err }, "stripe_event_projection_failed");
     }
@@ -144,4 +145,48 @@ async function projectIncubatorGrant(event: import("stripe").default.Event): Pro
   });
 
   logger.info({ playerId: id, sessionId: session.id, eventId: event.id }, "stripe_incubator_granted");
+}
+
+async function projectCoinPackGrant(event: import("stripe").default.Event): Promise<void> {
+  if (event.type !== "checkout.session.completed") return;
+  const session = event.data.object as import("stripe").default.Checkout.Session;
+  const { kind, playerId, coinsAmount } = session.metadata ?? {};
+  if (kind !== "coin_pack" || !playerId || !coinsAmount) return;
+
+  if (session.payment_status !== "paid") {
+    logger.warn({ sessionId: session.id, paymentStatus: session.payment_status }, "coin_pack_skipped_unconfirmed_payment");
+    return;
+  }
+
+  const coins = parseInt(coinsAmount, 10);
+  const id = parseInt(playerId, 10);
+  if (!coins || !id) return;
+
+  // Idempotency guard via coin_transactions stripe_session_id
+  const existing = await db.query.coinTransactionsTable.findFirst({
+    where: and(
+      eq(coinTransactionsTable.stripeSessionId, session.id),
+      eq(coinTransactionsTable.type, "purchase")
+    ),
+  });
+  if (existing) {
+    logger.warn({ sessionId: session.id, eventId: event.id }, "coin_pack_duplicate_skipped");
+    return;
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.insert(coinTransactionsTable).values({
+      playerId: id,
+      type: "purchase",
+      amount: coins,
+      description: `Coin pack purchase — ${coins.toLocaleString()} coins`,
+      stripeSessionId: session.id,
+    });
+    await tx
+      .update(playersTable)
+      .set({ coins: sql`${playersTable.coins} + ${coins}` })
+      .where(eq(playersTable.id, id));
+  });
+
+  logger.info({ playerId: id, coins, sessionId: session.id, eventId: event.id }, "coin_pack_granted");
 }

@@ -26,3 +26,4 @@ export * from "./admin.ts";
 export * from "./analytics.ts";
 export * from "./shield-fulfillments.ts";
 export * from "./incubator-fulfillments.ts";
+export * from "./coin-transactions.ts";
