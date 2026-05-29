@@ -13,6 +13,10 @@ export const fitnessActivitiesTable = pgTable("fitness_activities", {
   note: text("note"),
   externalId: text("external_id"),
   distanceMiles: doublePrecision("distance_miles"),
+  // Trust level of the data source. "unverified" = client-pushed without attestation
+  // (Apple Health sync, etc.) — these rows must NOT count toward competitive state.
+  // Defaults to "bronze" (manual entry) for backward-compatibility with existing rows.
+  verificationLevel: text("verification_level").notNull().default("bronze"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   // Unique constraint so that concurrent Apple Health / Garmin / Fitbit syncs

@@ -20,7 +20,7 @@ import {
   GetGroupParams,
   ListMyGroupsQueryParams,
 } from "@workspace/api-zod";
-import { logFitnessActivity } from "../services/fitnessLog.ts";
+import { logFitnessActivity, ACTIVITY_CONFIG } from "../services/fitnessLog.ts";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { blockMinorSocialWrite } from "../middlewares/minorGuard.ts";
 import { blockSuspendedSocialWrite } from "../middlewares/suspendedGuard.ts";
@@ -359,14 +359,66 @@ router.post("/groups/:id/workout", requireAuth, attachPlayer, async (req, res) =
   const xpBonusPct = Math.round(xpBonus * 100);
 
   const workoutType = body.data.workoutType ?? "active_minutes";
-  const activityValue = body.data.steps ?? body.data.baseXp ?? 30;
-  const fitnessResult = await logFitnessActivity({
-    playerId: body.data.playerId,
-    type: workoutType,
-    value: activityValue,
-    note: `Group workout – ${group.name}`,
-    isPassiveSync: false,
-  });
+
+  // Guard: only allow known activity types so unknown custom strings cannot
+  // exploit the permissive fallback in logFitnessActivity.
+  if (!ACTIVITY_CONFIG[workoutType]) {
+    res.status(400).json({ error: "fitness_anti_cheat_reject", reason: "unknown_activity_type" }); return;
+  }
+
+  // Guard: cap submitted values to prevent a malicious group member from
+  // inflating their own progression and the group's teamEnergy / raid state.
+  const MAX_GROUP_WORKOUT_STEPS = 50000;
+  const MAX_GROUP_WORKOUT_BASE_XP = 300;
+
+  const rawSteps = body.data.steps;
+  const rawBaseXp = body.data.baseXp;
+
+  // Enforce strict lower bounds to prevent negative/zero values from bypassing
+  // the daily rolling cap in logFitnessActivity (a large negative followed by
+  // capped positives could drive the sum below the daily ceiling repeatedly).
+  if (rawSteps !== undefined && rawSteps <= 0) {
+    res.status(400).json({ error: "fitness_anti_cheat_reject", reason: "steps_must_be_positive" }); return;
+  }
+  if (rawBaseXp <= 0) {
+    res.status(400).json({ error: "fitness_anti_cheat_reject", reason: "baseXp_must_be_positive" }); return;
+  }
+
+  if (rawSteps !== undefined && rawSteps > MAX_GROUP_WORKOUT_STEPS) {
+    res.status(400).json({ error: "fitness_anti_cheat_reject", reason: "steps_exceeds_per_submission_cap" }); return;
+  }
+  if (rawBaseXp > MAX_GROUP_WORKOUT_BASE_XP) {
+    res.status(400).json({ error: "fitness_anti_cheat_reject", reason: "baseXp_exceeds_per_submission_cap" }); return;
+  }
+
+  const activityValue = rawSteps ?? rawBaseXp ?? 30;
+
+  let fitnessResult: Awaited<ReturnType<typeof logFitnessActivity>>;
+  try {
+    fitnessResult = await logFitnessActivity({
+      playerId: body.data.playerId,
+      type: workoutType,
+      value: activityValue,
+      note: `Group workout – ${group.name}`,
+      isPassiveSync: false,
+    });
+  } catch (err: unknown) {
+    const e = err as { code?: string; alreadyLogged?: number; dailyCap?: number };
+    if (e?.code === "fitness_daily_cap_exceeded") {
+      res.status(400).json({
+        error: "fitness_anti_cheat_reject",
+        reason: "daily_cap_exceeded",
+        alreadyLogged: e.alreadyLogged,
+        dailyCap: e.dailyCap,
+      });
+      return;
+    }
+    if (e?.code === "fitness_value_not_positive") {
+      res.status(400).json({ error: "fitness_anti_cheat_reject", reason: "value_must_be_positive" });
+      return;
+    }
+    throw err;
+  }
 
   const baseXp = fitnessResult.fitnessXpEarned;
   const bonusXp = Math.round(baseXp * xpBonus);

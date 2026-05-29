@@ -209,8 +209,52 @@ router.post("/fitness/log", requireAuth, attachPlayer, fitnessLogLimiter, requir
     res.status(400).json({ error: "Duration (value) must be positive" });
     return;
   }
-  if (body.data.distanceMiles != null && body.data.distanceMiles <= 0) {
-    res.status(400).json({ error: "Distance must be positive when provided" });
+
+  // ── Anti-cheat: reject unknown activity types ─────────────────────────────
+  // Unknown types previously fell back to a permissive rep-based default,
+  // allowing any string to earn XP. Reject anything not in the known config.
+  const cfg = ACTIVITY_CONFIG[body.data.type];
+  if (!cfg) {
+    res.status(400).json({ error: "fitness_anti_cheat_reject", reason: "unknown_activity_type" });
+    return;
+  }
+
+  // ── Anti-cheat: distanceMiles restricted to distance-capable types ─────────
+  // Accepting distanceMiles on rep-based types (e.g. pushups) would let an
+  // attacker submit type:"pushups", distanceMiles:1000000 and inflate the miles
+  // challenge leaderboard, since miles are summed from distanceMiles column
+  // without filtering by type. Only permit it for known distance activities.
+  const DISTANCE_CAPABLE_TYPES = new Set(["running", "walking", "cycling", "swimming"]);
+  if (body.data.distanceMiles != null) {
+    if (!DISTANCE_CAPABLE_TYPES.has(body.data.type)) {
+      res.status(400).json({ error: "fitness_anti_cheat_reject", reason: "distance_not_valid_for_activity_type" });
+      return;
+    }
+    if (body.data.distanceMiles <= 0) {
+      res.status(400).json({ error: "Distance must be positive when provided" });
+      return;
+    }
+    // Hard upper bound: 200 miles in a single session is physiologically impossible.
+    if (body.data.distanceMiles > 200) {
+      res.status(400).json({ error: "fitness_anti_cheat_reject", reason: "distance_exceeds_per_submission_cap" });
+      return;
+    }
+  }
+
+  // ── Anti-cheat: per-unit submission caps ──────────────────────────────────
+  // Guards against absurdly large single-session values for each unit type.
+  const UNIT_CAPS: Record<string, number> = {
+    minutes: 1440,  // already enforced below for cardio; apply universally here
+    steps:   50000, // ~25 miles of steps in one log
+    reps:    1000,  // generous single-session rep ceiling
+    hours:   24,    // full day of sleep/recovery
+    cups:    50,    // hydration
+    kcal:    5000,  // calorie burn
+  };
+  const unitCap = UNIT_CAPS[cfg.unit];
+  if (unitCap !== undefined && body.data.value > unitCap) {
+    req.log?.warn?.({ playerId: body.data.playerId, type: body.data.type, value: body.data.value, cap: unitCap }, "Fitness log rejected: per-unit cap exceeded");
+    res.status(400).json({ error: "fitness_anti_cheat_reject", reason: "value_exceeds_per_submission_cap" });
     return;
   }
 
@@ -218,8 +262,7 @@ router.post("/fitness/log", requireAuth, attachPlayer, fitnessLogLimiter, requir
   // `value` is polymorphic across activity types (minutes / steps / reps / cups / hours / kcal),
   // so duration/pace checks only apply to duration-based cardio activities where the unit is
   // minutes (running, walking, cycling, etc.). Distance-based activities additionally get a pace check.
-  const cfg = ACTIVITY_CONFIG[body.data.type];
-  const isDurationMinutes = cfg?.unit === "minutes";
+  const isDurationMinutes = cfg.unit === "minutes";
 
   // World-record marathon pace is ~4:30/mile. Anything sub-3:00/mile is clearly spoofed.
   if (isDurationMinutes && body.data.distanceMiles != null && body.data.value > 0) {
@@ -262,15 +305,34 @@ router.post("/fitness/log", requireAuth, attachPlayer, fitnessLogLimiter, requir
     }
   }
 
-  const result = await logFitnessActivity({
-    playerId: body.data.playerId,
-    type: body.data.type,
-    value: body.data.value,
-    note: body.data.note ?? null,
-    isPassiveSync: false,
-    distanceMiles: body.data.distanceMiles ?? null,
-    verificationLevel: "bronze",
-  });
+  let result: Awaited<ReturnType<typeof logFitnessActivity>>;
+  try {
+    result = await logFitnessActivity({
+      playerId: body.data.playerId,
+      type: body.data.type,
+      value: body.data.value,
+      note: body.data.note ?? null,
+      isPassiveSync: false,
+      distanceMiles: body.data.distanceMiles ?? null,
+      verificationLevel: "bronze",
+    });
+  } catch (err: unknown) {
+    const e = err as { code?: string; alreadyLogged?: number; dailyCap?: number };
+    if (e?.code === "fitness_daily_cap_exceeded") {
+      res.status(400).json({
+        error: "fitness_anti_cheat_reject",
+        reason: "daily_cap_exceeded",
+        alreadyLogged: e.alreadyLogged,
+        dailyCap: e.dailyCap,
+      });
+      return;
+    }
+    if (e?.code === "fitness_value_not_positive") {
+      res.status(400).json({ error: "fitness_anti_cheat_reject", reason: "value_must_be_positive" });
+      return;
+    }
+    throw err;
+  }
 
   if (!result.updatedPlayer) {
     res.status(404).json({ error: "Player not found" });
@@ -476,6 +538,14 @@ router.post("/fitness/quests/:id/complete", requireAuth, attachPlayer, async (re
   if (!quest) { res.status(404).json({ error: "Quest not found" }); return; }
   if (quest.playerId !== req.playerId) { res.status(403).json({ error: "Forbidden" }); return; }
   if (quest.isCompleted) { res.status(400).json({ error: "Quest already completed" }); return; }
+
+  // Guard: the player must have actually reached the quest target before rewards are granted.
+  // Without this check, calling the endpoint immediately after quest generation awards full
+  // XP/coins with zero real activity completed.
+  if (quest.currentValue < quest.targetValue) {
+    res.status(403).json({ error: "Quest not yet completed", currentValue: quest.currentValue, targetValue: quest.targetValue });
+    return;
+  }
 
   const updated = await db.update(fitnessQuestsTable)
     .set({ isCompleted: true, currentValue: quest.targetValue })

@@ -8,8 +8,9 @@ import {
   userReportsTable,
   notificationsTable,
   playerLocationTable,
+  fitnessActivitiesTable,
 } from "@workspace/db";
-import { eq, desc, and, or, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, or, sql, inArray, sum, count, notInArray, gte, ne } from "drizzle-orm";
 import { sendPushToPlayer } from "../services/pushNotifications.ts";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { isLocationEstablished } from "./locations.ts";
@@ -440,10 +441,105 @@ router.post("/challenges/:id/join", requireAuth, attachPlayer, async (req, res) 
 });
 
 // ── Submit progress ────────────────────────────────────────────────────────
+// Non-workout activity types that do not count toward the "workouts" metric.
+const NON_WORKOUT_TYPES = ["steps", "hydration", "sleep", "calories", "active_minutes"];
+
+/**
+ * Compute a player's challenge progress server-side from their actual fitness
+ * records since they joined the challenge. The client does NOT submit a value —
+ * the server derives it independently from `fitnessActivitiesTable` so no
+ * client-controlled input can directly inflate leaderboard state.
+ */
+async function computeChallengeProgress(
+  playerId: number,
+  metric: string,
+  sinceDate: Date,
+): Promise<number> {
+  // All queries exclude "unverified" rows (Apple Health syncs and any other
+  // client-pushed unattested sources) so those payloads cannot inflate challenge
+  // leaderboard state. The verificationLevel column defaults to "bronze" for
+  // all manually logged activities and is persisted on insert.
+  const TRUSTED = ne(fitnessActivitiesTable.verificationLevel, "unverified");
+
+  if (metric === "steps") {
+    const [row] = await db.select({ total: sum(fitnessActivitiesTable.value) })
+      .from(fitnessActivitiesTable)
+      .where(and(
+        eq(fitnessActivitiesTable.playerId, playerId),
+        eq(fitnessActivitiesTable.type, "steps"),
+        gte(fitnessActivitiesTable.createdAt, sinceDate),
+        TRUSTED,
+      ));
+    return Number(row?.total ?? 0);
+  }
+
+  if (metric === "pushups" || metric === "pullups" || metric === "squats" ||
+      metric === "burpees" || metric === "planks" || metric === "situps") {
+    const [row] = await db.select({ total: sum(fitnessActivitiesTable.value) })
+      .from(fitnessActivitiesTable)
+      .where(and(
+        eq(fitnessActivitiesTable.playerId, playerId),
+        eq(fitnessActivitiesTable.type, metric),
+        gte(fitnessActivitiesTable.createdAt, sinceDate),
+        TRUSTED,
+      ));
+    return Number(row?.total ?? 0);
+  }
+
+  if (metric === "calories") {
+    const [row] = await db.select({ total: sum(fitnessActivitiesTable.value) })
+      .from(fitnessActivitiesTable)
+      .where(and(
+        eq(fitnessActivitiesTable.playerId, playerId),
+        eq(fitnessActivitiesTable.type, "calories"),
+        gte(fitnessActivitiesTable.createdAt, sinceDate),
+        TRUSTED,
+      ));
+    return Number(row?.total ?? 0);
+  }
+
+  if (metric === "miles") {
+    // Only sum distanceMiles from activities that are genuinely distance-based.
+    // This prevents poisoned rows (e.g. type:"pushups" with a large distanceMiles)
+    // from inflating the miles leaderboard.
+    const DISTANCE_CAPABLE_TYPES = ["running", "walking", "cycling", "swimming"];
+    const [row] = await db.select({ total: sum(fitnessActivitiesTable.distanceMiles) })
+      .from(fitnessActivitiesTable)
+      .where(and(
+        eq(fitnessActivitiesTable.playerId, playerId),
+        gte(fitnessActivitiesTable.createdAt, sinceDate),
+        inArray(fitnessActivitiesTable.type, DISTANCE_CAPABLE_TYPES),
+        TRUSTED,
+      ));
+    return Number(row?.total ?? 0);
+  }
+
+  if (metric === "workouts") {
+    const [row] = await db.select({ total: count() })
+      .from(fitnessActivitiesTable)
+      .where(and(
+        eq(fitnessActivitiesTable.playerId, playerId),
+        gte(fitnessActivitiesTable.createdAt, sinceDate),
+        notInArray(fitnessActivitiesTable.type, NON_WORKOUT_TYPES),
+        TRUSTED,
+      ));
+    return Number(row?.total ?? 0);
+  }
+
+  if (metric === "streak_days") {
+    // Streak is derived from the player's server-tracked daily activity record,
+    // not from raw fitness rows — no unverified-data filter needed here.
+    const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
+    return player?.currentStreak ?? 0;
+  }
+
+  // Unknown metric — return 0 (safe default: no leaderboard inflation).
+  return 0;
+}
+
 router.post("/challenges/:id/progress", requireAuth, attachPlayer, async (req, res) => {
   const id = Number(req.params.id);
-  const { value } = req.body as { value: number };
-  if (!id || value === undefined) { res.status(400).json({ error: "id and value required" }); return; }
+  if (!id) { res.status(400).json({ error: "id required" }); return; }
 
   const challenge = await db.query.challengesTable.findFirst({ where: eq(challengesTable.id, id) });
   if (!challenge) { res.status(404).json({ error: "Challenge not found" }); return; }
@@ -457,7 +553,10 @@ router.post("/challenges/:id/progress", requireAuth, attachPlayer, async (req, r
     res.status(403).json({ error: "You have been eliminated from this tournament" }); return;
   }
 
-  const newValue = Math.max(0, (participant.currentValue ?? 0) + value);
+  // Progress is derived exclusively from server-observed fitness records since
+  // the player joined. No client-supplied value is accepted or used.
+  const newValue = await computeChallengeProgress(req.playerId!, challenge.metric, participant.joinedAt);
+
   const [updated] = await db.update(challengeParticipantsTable)
     .set({ currentValue: newValue })
     .where(eq(challengeParticipantsTable.id, participant.id))

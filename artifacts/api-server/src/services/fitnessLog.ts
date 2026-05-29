@@ -7,7 +7,7 @@ import {
   eggsTable,
   personalRecordsTable,
 } from "@workspace/db";
-import { eq, and, gte } from "drizzle-orm";
+import { eq, and, gte, sum } from "drizzle-orm";
 import { checkAndAwardBadges, type BadgeDefinition } from "./badgeService.ts";
 import { awardFitnessBarXp, checkAndAwardArtifacts } from "./artifactService.ts";
 import { applyHatchlingXp, getActivePalId, type HatchlingXpResult } from "./hatchlingXp.ts";
@@ -192,7 +192,58 @@ export async function logFitnessActivity(
     }
   }
 
-  const config = ACTIVITY_CONFIG[type] ?? { unit: "reps", xpPer: 1, realm: "strength", stepsEquiv: 0 };
+  // Unknown activity types must never fall back to a permissive default — doing
+  // so would let any caller earn XP by submitting an arbitrary custom type.
+  // All callers (route handlers) are expected to reject unknown types before
+  // reaching this service, but we enforce it here as a defence-in-depth guard.
+  const config = ACTIVITY_CONFIG[type];
+  if (!config) {
+    throw new Error(`Unknown activity type: ${type}`);
+  }
+
+  // Defence-in-depth: reject non-positive values at the service layer.
+  // Negative values would corrupt the daily rolling-window sum, allowing cap
+  // bypass by alternating between negative and capped-positive submissions.
+  // Zero-value activities produce no real XP and are meaningless to log.
+  if (!Number.isFinite(value) || value <= 0) {
+    throw Object.assign(new Error("fitness_value_not_positive"), { code: "fitness_value_not_positive" });
+  }
+
+  // ── Daily rolling-window cap ──────────────────────────────────────────────
+  // Even when individual submissions are bounded, repeated calls within a day
+  // could still farm arbitrary progression. We sum all activities of this type
+  // logged today and reject the submission if the daily ceiling would be breached.
+  // Unverified syncs (Apple Health, etc.) bypass competitive mutations entirely
+  // and are therefore exempt from the competitive-state rolling cap.
+  if (verificationLevel !== "unverified") {
+    const DAILY_UNIT_CAPS: Record<string, number> = {
+      minutes: 600,   // 10 hours of activity per day
+      steps:   100000, // ~50 miles of steps
+      reps:    2000,  // generous per-type daily rep ceiling
+      hours:   24,    // full day of tracked sleep
+      cups:    50,    // hydration
+      kcal:    10000,  // calorie burn
+    };
+    const dailyCap = DAILY_UNIT_CAPS[config.unit];
+    if (dailyCap !== undefined) {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const [row] = await db
+        .select({ total: sum(fitnessActivitiesTable.value) })
+        .from(fitnessActivitiesTable)
+        .where(and(
+          eq(fitnessActivitiesTable.playerId, playerId),
+          eq(fitnessActivitiesTable.type, type),
+          gte(fitnessActivitiesTable.createdAt, todayStart),
+        ));
+      const alreadyLogged = Number(row?.total ?? 0);
+      if (alreadyLogged + value > dailyCap) {
+        logger.warn({ playerId, type, value, alreadyLogged, dailyCap }, "Fitness log rejected: daily rolling cap exceeded");
+        throw Object.assign(new Error("fitness_daily_cap_exceeded"), { code: "fitness_daily_cap_exceeded", alreadyLogged, dailyCap });
+      }
+    }
+  }
+
   const xpMultiplier = VERIFICATION_MULTIPLIER[verificationLevel ?? ""] ?? 1.0;
   const fitnessXpEarned = Math.round(value * config.xpPer * xpMultiplier);
   const stepsEquiv = Math.round(value * config.stepsEquiv * xpMultiplier);
@@ -213,6 +264,7 @@ export async function logFitnessActivity(
       note: note ?? null,
       externalId: externalId ?? null,
       distanceMiles: distanceMiles ?? null,
+      verificationLevel: verificationLevel ?? "bronze",
     })
     .onConflictDoNothing()
     .returning();
