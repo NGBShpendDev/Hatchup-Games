@@ -63,5 +63,10 @@
     "typescript": "~5.9.2",
     "zod": "catalog:",
     "zod-validation-error": "^3.4.0"
+  },
+  "dependencies": {
+    "expo-background-fetch": "^56.0.15",
+    "expo-sensors": "^56.0.5",
+    "expo-task-manager": "^56.0.15"
   }
 }

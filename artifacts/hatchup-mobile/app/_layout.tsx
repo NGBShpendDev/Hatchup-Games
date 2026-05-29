@@ -10,13 +10,19 @@ import { setBaseUrl, setAuthTokenGetter, type AuthTokenGetter } from "@workspace
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
-import { ActivityIndicator, View } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { ActivityIndicator, AppState, AppStateStatus, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import {
+  registerBackgroundSync,
+  unregisterBackgroundSync,
+  persistAuthTokenForBackground,
+  syncHealthNow,
+} from "@/services/backgroundSync";
 
 setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
 
@@ -53,6 +59,8 @@ function AuthedStack() {
   const router = useRouter();
   const qc = useQueryClient();
 
+  const appState = useRef<AppStateStatus>(AppState.currentState);
+
   // Set the token getter synchronously before the Stack renders any screen,
   // so the first React Query fetch already has auth.
   if (isLoaded && isSignedIn) {
@@ -64,6 +72,37 @@ function AuthedStack() {
   // Clear cached data when sign-in status changes.
   useEffect(() => {
     qc.clear();
+  }, [isSignedIn]);
+
+  // Register background sync once user is signed in; unregister on sign-out.
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (isSignedIn) {
+      registerBackgroundSync();
+      // Persist a fresh token so the background task can authenticate
+      getToken().then(token => persistAuthTokenForBackground(token ?? null));
+    } else {
+      unregisterBackgroundSync();
+      persistAuthTokenForBackground(null);
+    }
+  }, [isLoaded, isSignedIn]);
+
+  // Refresh token & trigger foreground health sync whenever the app returns
+  // to the foreground (user switches back from another app).
+  useEffect(() => {
+    if (!isSignedIn) return;
+    const sub = AppState.addEventListener("change", async (nextState: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && nextState === "active") {
+        const token = await getToken();
+        if (token) {
+          await persistAuthTokenForBackground(token);
+          // Fire-and-forget foreground step sync
+          syncHealthNow(token);
+        }
+      }
+      appState.current = nextState;
+    });
+    return () => sub.remove();
   }, [isSignedIn]);
 
   // Redirect after auth state settles.

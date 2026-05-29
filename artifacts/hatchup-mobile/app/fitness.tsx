@@ -1,9 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import { useGetFitnessStats, useGetActiveQuests, useGetTodayGoals } from "@workspace/api-client-react";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -13,6 +14,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+
+function apiUrl(path: string): string {
+  const domain = process.env.EXPO_PUBLIC_DOMAIN;
+  return domain ? `https://${domain}${path}` : path;
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function GoalBar({ label, current, target, color, icon }: {
   label: string; current: number; target: number; color: string; icon: string;
@@ -39,6 +47,148 @@ function GoalBar({ label, current, target, color, icon }: {
     </View>
   );
 }
+
+type HealthConn = { platform: string; isConnected: boolean; lastSyncedAt: string | null };
+
+const PLATFORM_INFO: Record<string, { label: string; color: string; icon: string; desc: string }> = {
+  google_fit:   { label: "Google Fit",   color: "#3b82f6", icon: "activity",  desc: "Steps, workouts, sleep" },
+  fitbit:       { label: "Fitbit",       color: "#14b8a6", icon: "watch",     desc: "Steps, workouts, sleep, HR" },
+  garmin:       { label: "Garmin",       color: "#22c55e", icon: "map-pin",   desc: "GPS, steps, training load" },
+  oura:         { label: "Oura Ring",    color: "#a855f7", icon: "moon",      desc: "Sleep, HRV, readiness" },
+  apple_health: { label: "Apple Health", color: "#ef4444", icon: "heart",     desc: "Apple Watch, steps, workouts" },
+};
+
+function ConnectedDevicesSection() {
+  const colors = useColors();
+  const [connections, setConnections] = useState<HealthConn[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+
+  const fetchConnections = useCallback(async () => {
+    try {
+      const res = await fetch(apiUrl("/api/health/connections"), { credentials: "include" });
+      if (res.ok) setConnections(await res.json());
+    } catch { /* silent */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchConnections(); }, [fetchConnections]);
+
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      const res = await fetch(getApiUrl("/api/health/sync"), {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        Alert.alert(
+          data.activitiesImported > 0 ? `Synced! +${data.xpEarned} XP` : "Already up to date",
+          data.activitiesImported > 0
+            ? `${data.activitiesImported} activities imported from your trackers.`
+            : "All trackers are current.",
+        );
+        fetchConnections();
+      } else {
+        Alert.alert("Sync failed", data.error ?? "Please try again.");
+      }
+    } catch {
+      Alert.alert("Sync failed", "Network error. Please try again.");
+    }
+    setSyncing(false);
+  }
+
+  // Push Apple Health data (iOS only) — reads from HealthKit in a native build
+  async function handleConnectAppleHealth() {
+    if (Platform.OS !== "ios") {
+      Alert.alert("iOS only", "Apple Health is available on iPhone only.");
+      return;
+    }
+    Alert.alert(
+      "Apple Health",
+      "To connect Apple Watch and Apple Health, the full HatchUp app (not Expo Go) is required. " +
+        "It will sync steps, workouts, sleep, and heart rate automatically once installed.",
+      [{ text: "Got it", style: "default" }],
+    );
+  }
+
+  const connected = connections.filter(c => c.isConnected);
+  const isIos = Platform.OS === "ios";
+  const hasAppleHealth = connected.some(c => c.platform === "apple_health");
+
+  if (loading) {
+    return (
+      <View style={[styles.deviceCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <ActivityIndicator color={colors.primary} size="small" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.deviceCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={styles.deviceHeader}>
+        <View style={styles.deviceTitleRow}>
+          <Feather name="watch" size={15} color={colors.mutedForeground} />
+          <Text style={[styles.deviceTitle, { color: colors.foreground }]}>Connected Trackers</Text>
+        </View>
+        {connected.length > 0 && (
+          <Pressable
+            onPress={handleSync}
+            disabled={syncing}
+            style={[styles.syncBtn, { borderColor: colors.border }]}
+          >
+            <Feather name="refresh-cw" size={12} color={syncing ? colors.mutedForeground : colors.primary} />
+            <Text style={[styles.syncBtnText, { color: syncing ? colors.mutedForeground : colors.primary }]}>
+              {syncing ? "Syncing…" : "Sync All"}
+            </Text>
+          </Pressable>
+        )}
+      </View>
+
+      {connected.length === 0 ? (
+        <Text style={[styles.noTrackers, { color: colors.mutedForeground }]}>
+          No trackers connected. Visit Wearable Sync in settings to connect Google Fit, Fitbit, Garmin, or Oura.
+        </Text>
+      ) : (
+        <View style={styles.trackerList}>
+          {connected.map(c => {
+            const info = PLATFORM_INFO[c.platform] ?? { label: c.platform, color: "#888", icon: "activity", desc: "" };
+            return (
+              <View key={c.platform} style={[styles.trackerRow, { borderColor: colors.border }]}>
+                <View style={[styles.trackerIcon, { backgroundColor: info.color + "22" }]}>
+                  <Feather name={info.icon as any} size={14} color={info.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.trackerName, { color: colors.foreground }]}>{info.label}</Text>
+                  <Text style={[styles.trackerDesc, { color: colors.mutedForeground }]}>{info.desc}</Text>
+                </View>
+                <View style={[styles.connectedBadge, { backgroundColor: "#22c55e22" }]}>
+                  <Feather name="check-circle" size={11} color="#22c55e" />
+                  <Text style={styles.connectedText}>Live</Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Apple Health connect prompt on iOS */}
+      {isIos && !hasAppleHealth && (
+        <Pressable
+          onPress={handleConnectAppleHealth}
+          style={[styles.appleHealthBtn, { borderColor: "#ef444440", backgroundColor: "#ef444410" }]}
+        >
+          <Feather name="heart" size={14} color="#ef4444" />
+          <Text style={[styles.appleHealthText, { color: "#ef4444" }]}>Connect Apple Watch & Apple Health</Text>
+          <Feather name="chevron-right" size={14} color="#ef4444" />
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function FitnessScreen() {
   const colors = useColors();
@@ -69,6 +219,10 @@ export default function FitnessScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: bottomPad + 40 }}
           showsVerticalScrollIndicator={false}
         >
+          {/* Connected Devices */}
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Wearables</Text>
+          <ConnectedDevicesSection />
+
           {/* Today's Goals */}
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Today's Goals</Text>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -179,4 +333,21 @@ const styles = StyleSheet.create({
   questProgress: { fontSize: 11 },
   emptyCard: { borderRadius: 12, borderWidth: 1, padding: 24, alignItems: "center", gap: 8 },
   emptyText: { fontSize: 13 },
+  // Connected devices
+  deviceCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 14 },
+  deviceHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  deviceTitleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  deviceTitle: { fontSize: 13, fontWeight: "700" },
+  syncBtn: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  syncBtnText: { fontSize: 11, fontWeight: "600" },
+  noTrackers: { fontSize: 12, lineHeight: 18 },
+  trackerList: { gap: 8 },
+  trackerRow: { flexDirection: "row", alignItems: "center", gap: 10, borderBottomWidth: 1, paddingBottom: 8 },
+  trackerIcon: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  trackerName: { fontSize: 13, fontWeight: "600" },
+  trackerDesc: { fontSize: 11, marginTop: 1 },
+  connectedBadge: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 10 },
+  connectedText: { fontSize: 10, fontWeight: "700", color: "#22c55e" },
+  appleHealthBtn: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
+  appleHealthText: { flex: 1, fontSize: 13, fontWeight: "600" },
 });

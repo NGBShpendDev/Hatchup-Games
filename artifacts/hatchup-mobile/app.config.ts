@@ -20,6 +20,15 @@ const config: ExpoConfig = {
     supportsTablet: false,
     infoPlist: {
       CFBundleDisplayName: "HatchUp",
+      // Background fetch — lets iOS wake the app to sync steps every ~15 min
+      UIBackgroundModes: ["fetch", "processing"],
+      // HealthKit / Pedometer permission strings
+      NSHealthShareUsageDescription:
+        "HatchUp reads your steps, workouts, and sleep so your Pals grow — even when the app is closed.",
+      NSHealthUpdateUsageDescription:
+        "HatchUp does not write health data.",
+      NSMotionUsageDescription:
+        "HatchUp counts your steps with the motion sensor to earn XP for your Pals.",
     },
     ...(domain
       ? {
@@ -28,6 +37,10 @@ const config: ExpoConfig = {
       : {}),
   },
   android: {
+    permissions: [
+      "android.permission.ACTIVITY_RECOGNITION",
+      "android.permission.RECEIVE_BOOT_COMPLETED",
+    ],
     ...(domain
       ? {
           intentFilters: [
@@ -59,6 +72,16 @@ const config: ExpoConfig = {
     ],
     "expo-font",
     "expo-web-browser",
+    // Enables background fetch capability on iOS (UIBackgroundModes: fetch)
+    "expo-background-fetch",
+    // Motion/pedometer permissions
+    [
+      "expo-sensors",
+      {
+        motionPermission:
+          "HatchUp counts your steps to earn XP for your Pals.",
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,

@@ -474,6 +474,16 @@ importers:
         version: 3.25.76
 
   artifacts/hatchup-mobile:
+    dependencies:
+      expo-background-fetch:
+        specifier: ^56.0.15
+        version: 56.0.15(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
+      expo-sensors:
+        specifier: ^56.0.5
+        version: 56.0.5(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
+      expo-task-manager:
+        specifier: ^56.0.15
+        version: 56.0.15(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
     devDependencies:
       '@babel/core':
         specifier: ^7.25.2
@@ -4778,6 +4788,11 @@ packages:
       react: '*'
       react-native: '*'
 
+  expo-background-fetch@56.0.15:
+    resolution: {integrity: sha512-TCAxgfCbo5chtL7FJTRj40ni1wTWZqJJW24TeR6Deh2QIH/2OlPKmeJTzANdDsn/VzqBONeO4Da36eDqPQ9w8A==}
+    peerDependencies:
+      expo: '*'
+
   expo-blur@15.0.8:
     resolution: {integrity: sha512-rWyE1NBRZEu9WD+X+5l7gyPRszw7n12cW3IRNAb5i6KFzaBp8cxqT5oeaphJapqURvcqhkOZn2k5EtBSbsuU7w==}
     peerDependencies:
@@ -4921,6 +4936,12 @@ packages:
       react-server-dom-webpack:
         optional: true
 
+  expo-sensors@56.0.5:
+    resolution: {integrity: sha512-7U9rFWCzh16OG28KvxD+KCNsBJhYEld4V3CT7oZykOPoo8G9+EmOGNFu68cXR7Ctj+uJA4LnHy7OwIOKJoxvLA==}
+    peerDependencies:
+      expo: '*'
+      react-native: '*'
+
   expo-server@1.0.6:
     resolution: {integrity: sha512-vb5TBtskvEdzYuW79lATXutOEBfW5m6U4EFpNjCVZTnI7S//SAsLQkYEpn+EDfn84m6VQfzSGkIVR6YPaScKFA==}
     engines: {node: '>=20.16.0'}
@@ -4951,6 +4972,12 @@ packages:
     peerDependenciesMeta:
       react-native-web:
         optional: true
+
+  expo-task-manager@56.0.15:
+    resolution: {integrity: sha512-8vbKYocXJHv27++9AubVaEvVujTdt5Z10XddaxHAhWO60uw1Zom6yRjSAayRbZ5hNFA1c72KfA2vOETXZR9IGg==}
+    peerDependencies:
+      expo: '*'
+      react-native: '*'
 
   expo-web-browser@15.0.11:
     resolution: {integrity: sha512-r2LS4Ro6DgUPZkcaEfgt8mp9eJuoA93x11Jh7S6utFe0FEzvUNn2yFhxg8XVwESaaHGt2k5V8LuK36rsp0BeIw==}
@@ -7569,6 +7596,9 @@ packages:
   unicorn-magic@0.4.0:
     resolution: {integrity: sha512-wH590V9VNgYH9g3lH9wWjTrUoKsjLF6sGLjhR4sH1LWpLmCOH0Zf7PukhDA8BiS7KHe4oPNkcTHqYkj7SOGUOw==}
     engines: {node: '>=20'}
+
+  unimodules-app-loader@56.0.1:
+    resolution: {integrity: sha512-Z801jeBOQMUF/ExklxT1BqhEV/oF2/Bii7PFYAj/8Sauxl7oKvZbf70peRzzAU0mG7UQ3yU/UO/EpD1JyJ2WcA==}
 
   universalify@0.2.0:
     resolution: {integrity: sha512-CJ1QgKmNg3CwvAv/kOFmtnEN05f0D/cn9QntgNOQlQF9dgvVTHj3t+8JPdjqawCHk7V/KA+fbUqzZ9XWhcqPUg==}
@@ -12580,6 +12610,13 @@ snapshots:
       - expo
       - supports-color
 
+  expo-background-fetch@56.0.15(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)):
+    dependencies:
+      expo: 54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@6.1.2)(expo-router@6.0.23)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3)
+      expo-task-manager: 56.0.15(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
+    transitivePeerDependencies:
+      - react-native
+
   expo-blur@15.0.8(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0):
     dependencies:
       expo: 54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@6.1.2)(expo-router@6.0.23)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3)
@@ -12739,6 +12776,12 @@ snapshots:
       - '@types/react-dom'
       - supports-color
 
+  expo-sensors@56.0.5(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)):
+    dependencies:
+      expo: 54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@6.1.2)(expo-router@6.0.23)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3)
+      invariant: 2.2.4
+      react-native: 0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
+
   expo-server@1.0.6: {}
 
   expo-splash-screen@31.0.13(expo@54.0.34)(typescript@5.9.3):
@@ -12771,6 +12814,12 @@ snapshots:
       react-native-web: 0.21.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
     transitivePeerDependencies:
       - supports-color
+
+  expo-task-manager@56.0.15(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)):
+    dependencies:
+      expo: 54.0.34(@babel/core@7.29.0)(@expo/metro-runtime@6.1.2)(expo-router@6.0.23)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)(typescript@5.9.3)
+      react-native: 0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
+      unimodules-app-loader: 56.0.1
 
   expo-web-browser@15.0.11(expo@54.0.34)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)):
     dependencies:
@@ -15938,6 +15987,8 @@ snapshots:
   unicorn-magic@0.3.0: {}
 
   unicorn-magic@0.4.0: {}
+
+  unimodules-app-loader@56.0.1: {}
 
   universalify@0.2.0: {}
 

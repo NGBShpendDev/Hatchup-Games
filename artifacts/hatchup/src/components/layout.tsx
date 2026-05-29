@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 import { BottomNav } from "./bottom-nav";
 import { TopBar } from "./top-bar";
 import { UniversePalette } from "./universe-palette";
@@ -7,9 +7,40 @@ import { useChallengeNotifications } from "@/hooks/use-challenge-notifications";
 import { useNotificationsToast } from "@/hooks/use-notifications-toast";
 import { TournamentChampionGate } from "./tournament-champion-gate";
 
+/**
+ * Fire a background health sync whenever the user returns to this tab.
+ * This ensures steps/workouts from connected trackers (Google Fit, Fitbit,
+ * Garmin, Oura) are up-to-date even if the server's 30-min passive sync
+ * job hasn't run yet since the user was last active.
+ */
+function useHealthSyncOnFocus() {
+  const lastSyncRef = useRef<number>(0);
+  const MIN_INTERVAL_MS = 5 * 60 * 1000; // at most once every 5 min
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.hidden) return;
+      const now = Date.now();
+      if (now - lastSyncRef.current < MIN_INTERVAL_MS) return;
+      lastSyncRef.current = now;
+
+      // Fire-and-forget — don't block the UI
+      fetch("/api/health/sync", {
+        method: "POST",
+        credentials: "include",
+      }).catch(() => { /* silent — user may not have any connected trackers */ });
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+}
+
 export function Layout({ children }: { children: ReactNode }) {
   useChallengeNotifications();
   useNotificationsToast();
+  useHealthSyncOnFocus();
+
   return (
     <div className="min-h-[100dvh] bg-background text-foreground overflow-hidden font-sans flex flex-col relative pb-20 md:pb-24">
       {/* Cinematic noise and gradient backdrop */}
