@@ -27,9 +27,9 @@ HatchUp is a publicly deployed social creature-hatching and fitness game with a 
 ## Scan Anchors
 
 - **Production entry points:** `artifacts/api-server/src/app.ts`, `artifacts/api-server/src/routes/*.ts`, `artifacts/api-server/src/middlewares/*.ts`
-- **Highest-risk code areas:** auth/admin gates, social/privacy routes, location + family/group features, club/challenge membership gates, storage/object ACL flows, OG/share-card rendering routes that fetch remote media, health-sync OAuth callbacks plus Apple Health client-push ingestion, Stripe/webhook + entitlement logic
+- **Highest-risk code areas:** auth/admin gates, social/privacy routes, nutrition social feeds/comments, location + family/group features, club/challenge membership gates, storage/object ACL flows, OG/share-card rendering routes that fetch remote media, health-sync OAuth callbacks plus Apple Health client-push ingestion, Stripe/webhook + entitlement logic
 - **Public surfaces:** social post detail/view endpoints, event/club/leaderboard public reads, OG routes, selected webhook/callback endpoints, and any unauthenticated image-rendering path that dereferences stored remote URLs
-- **Authenticated surfaces:** most `/api` gameplay, profile, social, storage, location, family/club/challenge, subscription, and health-sync routes
+- **Authenticated surfaces:** most `/api` gameplay, profile, social, nutrition, storage, location, family/club/challenge, subscription, and health-sync routes
 - **Admin surfaces:** `/api/admin/*`, moderation/report handling, admin session and allowlist management
 - **Usually ignore unless proven reachable:** test files, workflow tooling, mockup-only artifacts, local scripts
 
