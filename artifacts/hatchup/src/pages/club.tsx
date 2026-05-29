@@ -17,7 +17,7 @@ export default function ClubHub() {
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto space-y-8 pb-12">
+      <div className="max-w-6xl mx-auto space-y-8 pb-28">
         <GlassCard glow="primary" className="flex flex-col md:flex-row justify-between items-center gap-6 p-8">
           <div className="relative z-10">
             <h1 className="text-4xl font-black tracking-tight flex items-center gap-3 mb-2">

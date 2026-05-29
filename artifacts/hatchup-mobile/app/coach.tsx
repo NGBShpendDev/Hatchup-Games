@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   backBtn: { padding: 6 },
   headerCenter: { flexDirection: "row", alignItems: "center", gap: 8 },
   coachIcon: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  title: { fontSize: 18, fontWeight: "800" },
+  title: { fontSize: 20, fontWeight: "800" },
   starters: { gap: 8, marginBottom: 16 },
   starterBtn: { borderRadius: 12, borderWidth: 1, padding: 12 },
   starterText: { fontSize: 13 },

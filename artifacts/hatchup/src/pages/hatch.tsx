@@ -296,7 +296,7 @@ export default function Hatch() {
 
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto space-y-12 pb-12">
+      <div className="max-w-5xl mx-auto space-y-12 pb-28">
         {/* Header */}
         <div className="text-center max-w-2xl mx-auto py-8 relative">
           <motion.div

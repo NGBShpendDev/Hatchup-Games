@@ -153,7 +153,7 @@ export default function Artifacts() {
 
   return (
     <Layout>
-      <div className="max-w-lg mx-auto space-y-6 pb-12">
+      <div className="max-w-lg mx-auto space-y-6 pb-28">
         {/* Header */}
         <div className="text-center py-6 space-y-2">
           <div className="flex items-center justify-center gap-3 mb-2">

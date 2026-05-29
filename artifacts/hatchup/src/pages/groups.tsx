@@ -703,7 +703,7 @@ export default function Groups() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto space-y-6 pb-12">
+      <div className="max-w-2xl mx-auto space-y-6 pb-28">
         {/* Header */}
         <div className="bg-gradient-to-br from-primary/20 to-purple-800/20 border border-primary/20 p-6 rounded-3xl">
           <h1 className="text-3xl font-black tracking-tight flex items-center gap-3 mb-1">

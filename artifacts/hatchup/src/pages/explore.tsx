@@ -171,7 +171,7 @@ export default function Explore() {
 
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto space-y-8 pb-12">
+      <div className="max-w-5xl mx-auto space-y-8 pb-28">
         <div className="text-center max-w-2xl mx-auto py-8">
           <h1 className="text-5xl font-black tracking-tight text-primary mb-4 flex items-center justify-center gap-3">
             <Map className="w-10 h-10" /> Fitness Realms

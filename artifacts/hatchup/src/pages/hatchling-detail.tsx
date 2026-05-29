@@ -362,7 +362,7 @@ export default function HatchlingDetail() {
   return (
     <Layout>
       <HatchlingReaction reaction={reaction} onDismiss={() => setReaction(null)} />
-      <div className="max-w-5xl mx-auto pb-12">
+      <div className="max-w-5xl mx-auto pb-28">
         <Button variant="ghost" className="mb-6 font-bold" onClick={() => setLocation("/hatch")}>
           <ArrowLeft className="w-4 h-4 mr-2" /> Back
         </Button>

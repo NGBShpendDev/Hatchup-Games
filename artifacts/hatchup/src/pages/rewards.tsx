@@ -173,7 +173,7 @@ export default function Rewards() {
 
   return (
     <Layout>
-      <div className="max-w-lg mx-auto space-y-6 pb-12">
+      <div className="max-w-lg mx-auto space-y-6 pb-28">
         <header className="pt-2">
           <h1 className="text-3xl font-black flex items-center gap-2">
             <Trophy className="w-8 h-8 text-yellow-500" /> Rewards

@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
 });
 
 const shieldStyles = StyleSheet.create({
-  card: { borderRadius: 16, borderWidth: 1, padding: 14, gap: 10 },
+  card: { borderRadius: 14, borderWidth: 1, padding: 14, gap: 10 },
   header: { flexDirection: "row", alignItems: "center", gap: 10 },
   iconWrap: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   title: { fontSize: 14, fontWeight: "700" },

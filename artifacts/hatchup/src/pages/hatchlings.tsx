@@ -19,7 +19,7 @@ export default function Hatchlings() {
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto space-y-8 pb-12">
+      <div className="max-w-6xl mx-auto space-y-8 pb-28">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-4xl font-black tracking-tight text-primary">My Pals</h1>

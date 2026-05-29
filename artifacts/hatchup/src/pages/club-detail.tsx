@@ -305,7 +305,7 @@ export default function ClubDetail() {
 
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto space-y-8 pb-12">
+      <div className="max-w-5xl mx-auto space-y-8 pb-28">
         <Link href="/club">
           <a className="inline-flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-4 h-4" /> Back to Club Hub

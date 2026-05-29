@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 8 },
   backBtn: { padding: 6 },
-  title: { fontSize: 18, fontWeight: "800" },
+  title: { fontSize: 20, fontWeight: "800" },
   sectionTitle: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8, marginTop: 12, paddingHorizontal: 2 },
   card: { borderRadius: 14, borderWidth: 1, overflow: "hidden", marginBottom: 4 },
   optionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14, borderBottomWidth: 1 },

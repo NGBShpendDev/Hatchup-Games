@@ -216,7 +216,7 @@ export default function PlayerProfilePage() {
 
   return (
     <Layout>
-      <div className="max-w-lg mx-auto space-y-6 pb-12">
+      <div className="max-w-lg mx-auto space-y-6 pb-28">
         <div className="flex items-center justify-between">
           <Link href="/">
             <button className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-white transition-colors" data-testid="link-back">

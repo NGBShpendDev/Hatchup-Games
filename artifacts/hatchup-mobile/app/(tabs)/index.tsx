@@ -600,7 +600,7 @@ const rewardModalStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  title: { fontSize: 18, fontWeight: "800" },
+  title: { fontSize: 20, fontWeight: "800" },
   sub: { fontSize: 13, marginTop: 2 },
   divider: { height: 1, marginBottom: 16 },
   rows: { gap: 10, marginBottom: 20 },

@@ -471,7 +471,7 @@ export default function MyPalPage() {
   if (isLoading) {
     return (
       <Layout>
-        <div className="max-w-2xl mx-auto space-y-6 pb-12">
+        <div className="max-w-2xl mx-auto space-y-6 pb-28">
           <Skeleton className="h-8 w-40" />
           <Skeleton className="h-64 w-full rounded-3xl" />
           <div className="grid grid-cols-3 gap-3">

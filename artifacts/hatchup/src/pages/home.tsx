@@ -501,7 +501,7 @@ export default function Home() {
         </AnimatePresence>
       </div>
 
-      <div className="max-w-5xl mx-auto space-y-5 pb-12">
+      <div className="max-w-5xl mx-auto space-y-5 pb-28">
         {/* Top Bar */}
         <header className="flex justify-between items-center py-2">
           <div className="flex items-center gap-3">
