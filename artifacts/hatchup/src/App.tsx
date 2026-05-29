@@ -47,6 +47,7 @@ import ChallengeCreate from "@/pages/challenge-create";
 import Onboarding from "@/pages/onboarding";
 import FamilyPage from "@/pages/family";
 import SubscriptionPage from "@/pages/subscription";
+import ShopPage from "@/pages/shop";
 import PlayerProfile from "@/pages/player-profile";
 import FindPlayers from "@/pages/find-players";
 import ClubDetail from "@/pages/club-detail";
@@ -309,6 +310,7 @@ function AppRoutes() {
         <Route path="/challenges" component={Challenges} />
         <Route path="/family" component={FamilyPage} />
         <Route path="/subscription" component={SubscriptionPage} />
+        <Route path="/shop" component={ShopPage} />
         <Route path="/events" component={Events} />
         <Route path="/notifications" component={NotificationsPage} />
         <Route path="/my-pal" component={MyPalPage} />

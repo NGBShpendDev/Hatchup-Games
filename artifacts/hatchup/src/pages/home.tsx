@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot, Dumbbell, Minus, Plus, Users, MessageCircle, ChevronDown, ChevronUp, Send, Heart, RefreshCw, ShieldCheck } from "lucide-react";
+import { Zap, Flame, Trophy, Footprints, ChevronRight, PlusCircle, Star, Sparkles, Gift, Bot, Dumbbell, Minus, Plus, Users, MessageCircle, ChevronDown, ChevronUp, Send, Heart, RefreshCw, ShieldCheck, ShoppingBag } from "lucide-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { XpBar } from "@/components/xp-bar";
@@ -536,6 +536,11 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-2">
+            <Link href="/shop">
+              <button className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-colors" aria-label="Shop">
+                <ShoppingBag className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </Link>
             <SubscriptionChip />
             {streakFreezes > 0 && (
               <div className="flex items-center gap-1 bg-blue-500/20 border border-blue-500/40 px-2 py-1 rounded-full">

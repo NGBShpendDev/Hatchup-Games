@@ -2,11 +2,11 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useGetDailyStreak, useClaimDailyReward, getGetDailyStreakQueryKey, useBuyStreakShield } from "@workspace/api-client-react";
+import { useGetDailyStreak, useClaimDailyReward, getGetDailyStreakQueryKey } from "@workspace/api-client-react";
 import type { DailyRewardDay, DailyClaimResult } from "@workspace/api-client-react";
-import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { getGetPlayerDashboardQueryKey } from "@workspace/api-client-react";
-import { CheckCircle2, Lock, Gift, Flame, ShieldCheck, ShoppingCart, Sparkles, Info, X } from "lucide-react";
+import { CheckCircle2, Lock, Gift, Flame, ShieldCheck, Sparkles, Info, X, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const KIND_BG: Record<string, string> = {
@@ -66,32 +66,6 @@ export function StreakCalendarModal({ open, onClose, playerId, onClaimed }: Prop
         onClaimed?.(result);
       },
     },
-  });
-
-  const buyShield = useBuyStreakShield({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetDailyStreakQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetPlayerDashboardQueryKey(playerId) });
-        triggerShieldCelebration();
-      },
-    },
-  });
-
-  const shieldCheckout = useMutation({
-    mutationFn: async (pack: "single" | "bundle") => {
-      const res = await fetch("/api/shields/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pack }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { message?: string };
-        throw new Error(err.message ?? "Checkout failed");
-      }
-      return res.json() as Promise<{ url: string }>;
-    },
-    onSuccess: ({ url }) => { window.location.href = url; },
   });
 
   // Scroll the current day tile into view when modal opens
@@ -187,7 +161,7 @@ export function StreakCalendarModal({ open, onClose, playerId, onClaimed }: Prop
                 </p>
                 <div className="flex flex-col gap-1 pt-1 border-t border-cyan-500/20">
                   <p className="text-[11px] font-bold text-cyan-400/70 uppercase tracking-wide">How to earn shields</p>
-                  <p className="text-xs text-muted-foreground">Reach <span className="text-cyan-300 font-bold">Day 3</span> or <span className="text-cyan-300 font-bold">Day 20</span> on the login calendar, or buy one below for 200 coins.</p>
+                  <p className="text-xs text-muted-foreground">Reach <span className="text-cyan-300 font-bold">Day 3</span> or <span className="text-cyan-300 font-bold">Day 20</span> on the login calendar, or buy one in the Shop for 200 coins.</p>
                 </div>
               </div>
             </motion.div>
@@ -349,55 +323,13 @@ export function StreakCalendarModal({ open, onClose, playerId, onClaimed }: Prop
             </div>
           )}
 
-          {/* Streak Shield purchase row */}
-          <div className="bg-cyan-950/30 border border-cyan-500/20 rounded-xl px-4 py-2.5 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-cyan-400 flex-shrink-0" />
-                <div>
-                  <p className="text-xs font-black text-cyan-300">Streak Shield</p>
-                  <p className="text-[10px] text-muted-foreground">Auto-protects your streak if you miss a day</p>
-                </div>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10 flex items-center gap-1 text-xs h-7 px-2.5 flex-shrink-0"
-                disabled={buyShield.isPending}
-                onClick={() => buyShield.mutate()}
-              >
-                <ShoppingCart className="w-3 h-3" />
-                {SHIELD_COST}¢
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <hr className="flex-1 border-cyan-500/15" />
-              <span className="text-[10px] text-cyan-400/40 font-medium">or pay with card</span>
-              <hr className="flex-1 border-cyan-500/15" />
-            </div>
-            <div className="flex gap-1.5">
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 text-xs h-7"
-                disabled={shieldCheckout.isPending}
-                onClick={() => shieldCheckout.mutate("single")}
-              >
-                <ShieldCheck className="w-3 h-3 mr-1" />
-                $3 · 1 Shield
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1 border-violet-500/40 text-violet-300 hover:bg-violet-500/10 text-xs h-7"
-                disabled={shieldCheckout.isPending}
-                onClick={() => shieldCheckout.mutate("bundle")}
-              >
-                <Sparkles className="w-3 h-3 mr-1" />
-                $20 · 10 Shields
-              </Button>
-            </div>
-          </div>
+          <a
+            href="/shop"
+            className="flex items-center justify-center gap-1.5 text-xs text-cyan-400/60 hover:text-cyan-400 transition-colors py-1"
+          >
+            <ShoppingBag className="w-3.5 h-3.5" />
+            Get Streak Shields in the Shop
+          </a>
 
           {streak?.alreadyClaimed ? (
             <Button variant="outline" className="w-full" onClick={onClose}>

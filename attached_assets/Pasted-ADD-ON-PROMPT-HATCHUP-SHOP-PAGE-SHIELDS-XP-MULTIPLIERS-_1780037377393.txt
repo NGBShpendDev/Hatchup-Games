@@ -1,0 +1,81 @@
+ADD-ON PROMPT: HATCHUP SHOP PAGE + SHIELDS + XP MULTIPLIERS
+
+Create a premium in-app Shop Page for HatchUp that feels futuristic, clean, fun, and easy to use. The shop should flow seamlessly with the full HatchUp app design, using the same colors, animations, creature style, egg system, battle arena, nutrition tab, leaderboards, and subscription system.
+
+SHOP PAGE SECTIONS:
+1. Shields
+2. Power Packs
+3. Wearables
+4. Artifacts
+5. Coins
+6. Limited-Time Deals
+7. Subscription Upgrade
+
+SHIELD SYSTEM:
+Create 5 tiers of purchasable Shields. Shields are protection items players can use during competitions, streak challenges, battles, leaderboard races, and egg-hatching events.
+
+Shield Tiers:
+
+1. Bronze Shield — $5
+- Basic protection
+- Protects one small streak loss
+- Good for beginners
+
+2. Silver Shield — $10
+- Protects one missed daily check-in
+- Protects one 5,000-step goal miss
+- Slight XP bonus when used
+
+3. Gold Shield — $25
+- Protects streaks, step goals, and battle losses
+- Includes small coin bonus
+- Better value badge
+
+4. Platinum Shield — $50
+- Protects multiple missed goals
+- Adds temporary XP multiplier
+- Includes premium visual shield animation
+
+5. Legendary Shield — $100
+- Best protection pack
+- Protects major streaks, leaderboard runs, battles, and egg incubation progress
+- Includes exclusive shield aura, coins, and a strong XP boost
+- Should feel rare, powerful, and collectible
+
+XP MULTIPLIER SYSTEM:
+Add an XP multiplier system that rewards consistency and real fitness activity.
+
+Players can earn XP multipliers by:
+- Logging in daily
+- Keeping a login streak
+- Checking in on the calendar
+- Hitting daily step goals
+- Completing at least 5,000 steps minimum
+- Completing workouts
+- Hitting nutrition goals
+- Participating in battles or challenges
+
+Example XP Rewards:
+- Daily login: small XP bonus
+- 3-day streak: 1.1x XP
+- 7-day streak: 1.25x XP
+- 14-day streak: 1.5x XP
+- 30-day streak: 2x XP
+- 5,000 steps + calendar check-in: bonus XP
+- 10,000 steps: bigger bonus XP
+- 15,000 steps: premium bonus XP
+
+Make sure players clearly see:
+- Their current XP multiplier
+- Their streak count
+- Today’s goals
+- What they need to do to increase the multiplier
+- How long the multiplier lasts
+- What rewards they unlocked
+
+DESIGN REQUIREMENTS:
+The shop should look like a top-tier mobile game store made by a major studio. Use smooth animations, glowing shield cards, rarity colors, clean pricing, “best value” badges, and simple purchase buttons.
+
+Make the system feel exciting but fair. Free users should still be able to earn XP multipliers through activity, while paid users can buy Shields for protection and faster progress.
+
+Add security, anti-cheat, purchase verification, refund protection, server-side validation, and clean error handling so purchases, streaks, XP, goals, and shields always work correctly.

@@ -44,6 +44,7 @@ const MENU_ITEMS = [
   { label: "Leaderboard", icon: "award", color: "#f59e0b", route: "/leaderboard" },
   { label: "Events", icon: "calendar", color: "#6366f1", route: "/events" },
   { label: "Notifications", icon: "bell", color: "#ee2b8c", route: "/notifications" },
+  { label: "Shop", icon: "shopping-bag", color: "#22d3ee", route: "/shop" },
   { label: "Subscription", icon: "star", color: "#f59e0b", route: "/subscription" },
   { label: "Privacy & Settings", icon: "shield", color: "#9ca3af", route: "/settings" },
 ];
@@ -321,11 +322,6 @@ export default function ProfileScreen() {
             <Text style={[styles.shareBtnText, { color: colors.primary }]}>Share Profile</Text>
           </Pressable>
         )}
-      </View>
-
-      {/* Streak Protection */}
-      <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-        <StreakProtectionCard coins={player?.coins ?? 0} />
       </View>
 
       {/* Menu */}
