@@ -64,9 +64,11 @@ export type LogActivityParams = {
 };
 
 /** XP and egg-progress multiplier per verification level.
+ *  unverified = client-pushed data with no server-side proof (0×, no competitive state),
  *  bronze = manual tracking (1×), silver = voice (1.5×),
  *  gold = smartwatch (2×), diamond = AI camera (3×). */
 export const VERIFICATION_MULTIPLIER: Record<string, number> = {
+  unverified: 0,   // client-supplied without attestation — no competitive XP
   bronze: 1.0,
   silver: 1.5,
   gold:   2.0,
@@ -196,6 +198,9 @@ export async function logFitnessActivity(
   const stepsEquiv = Math.round(value * config.stepsEquiv * xpMultiplier);
   const isStrength = STRENGTH_TYPES.has(type);
 
+  // Use onConflictDoNothing so that concurrent requests hitting the same
+  // externalId (e.g. two Apple Health syncs racing) are atomically deduplicated
+  // by the DB unique constraint rather than relying on a read-then-write check.
   const insertedRows = await db
     .insert(fitnessActivitiesTable)
     .values({
@@ -209,7 +214,36 @@ export async function logFitnessActivity(
       externalId: externalId ?? null,
       distanceMiles: distanceMiles ?? null,
     })
+    .onConflictDoNothing()
     .returning();
+
+  // If onConflictDoNothing suppressed the insert, this externalId was already
+  // recorded — return as a duplicate without mutating any state.
+  if (insertedRows.length === 0) {
+    const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
+    return { fitnessXpEarned: 0, eggsUpdated: 0, isNew: false, updatedPlayer: player!, activity: null };
+  }
+
+  // ── Unverified data guard ────────────────────────────────────────────────────
+  // Apple Health (and any future client-pushed source) uses verificationLevel
+  // "unverified" because there is no server-side proof, attestation, or signed
+  // payload backing the values. We persist the activity row for health-insights
+  // purposes but do NOT mutate any competitive state: no XP, no streak advance,
+  // no totalWorkouts/totalSteps increment, no hatchling XP, no badge checks,
+  // no egg progress, no quest progress, no artifact awards.
+  if (verificationLevel === "unverified") {
+    const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
+    if (!player) throw new Error(`Player ${playerId} not found`);
+    return {
+      fitnessXpEarned: 0,
+      eggsUpdated: 0,
+      isNew: true,
+      updatedPlayer: player,
+      activity: insertedRows[0]!,
+      verificationLevel,
+      xpMultiplier: 0,
+    };
+  }
 
   const player = await db.query.playersTable.findFirst({
     where: eq(playersTable.id, playerId),

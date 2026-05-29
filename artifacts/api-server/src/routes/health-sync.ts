@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { healthConnectionsTable, playersTable, fitnessActivitiesTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gte, like, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.ts";
 import {
   encryptToken,
@@ -494,18 +494,47 @@ router.get("/health/oura/callback", async (req, res) => {
 // APPLE HEALTH (mobile push — HealthKit data sent from the iOS app)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Maximum lookback window for Apple Health payloads (7 days).
+// Data older than this cannot be submitted — it may represent replayed or
+// fabricated historical entries designed to bypass deduplication.
+const APPLE_HEALTH_MAX_LOOKBACK_DAYS = 7;
+
+// Per-player, per-calendar-day hard caps on Apple Health workout data.
+// These are enforced across all requests (not just per-payload) by querying
+// what is already in the DB before accepting new workouts. This closes the
+// repeated-request abuse where an attacker submits many payloads with distinct
+// synthetic timestamps to keep minting unique externalIds.
+//
+// 600 minutes = 10 hours of workouts in a day (generous for ultra-endurance events)
+// 20 sessions  = more than enough for any real day of interval or circuit training
+const DAILY_APPLE_WORKOUT_MINUTES_CAP = 600;
+const DAILY_APPLE_WORKOUT_COUNT_CAP = 20;
+
+function isDateInRange(dateStr: string): boolean {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return false;
+  const now = Date.now();
+  const minMs = now - APPLE_HEALTH_MAX_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+  return d.getTime() <= now && d.getTime() >= minMs;
+}
+
 const AppleHealthPayloadSchema = z.object({
-  steps: z.number().int().min(0).optional(),
-  activeMinutes: z.number().int().min(0).optional(),
-  caloriesBurned: z.number().min(0).optional(),
+  // Hard caps: even elite-level athletes cannot legitimately exceed these in a
+  // single day. Values above the caps indicate fabricated / replayed data.
+  steps: z.number().int().min(0).max(100_000).optional(),
+  activeMinutes: z.number().int().min(0).max(480).optional(),
+  caloriesBurned: z.number().min(0).max(10_000).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   workouts: z.array(z.object({
-    type: z.string(),
-    durationMin: z.number().int().min(1),
-    calories: z.number().min(0).optional(),
-    distanceMiles: z.number().min(0).optional(),
+    type: z.string().max(64),
+    // Cap per-workout duration at 8 hours; anything longer is implausible and
+    // would award an outsized amount of XP for a single session.
+    durationMin: z.number().int().min(1).max(480),
+    calories: z.number().min(0).max(10_000).optional(),
+    distanceMiles: z.number().min(0).max(200).optional(),
     startedAt: z.string().optional(),
-  })).optional(),
+  // Limit to 25 workouts per sync — more than enough for any real day.
+  })).max(25).optional(),
   sleepHours: z.number().min(0).max(24).optional(),
   sleepDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   heartRateAvg: z.number().min(20).max(300).optional(),
@@ -548,7 +577,100 @@ router.post("/health/apple/sync", requireAuth, async (req, res) => {
   }
 
   const data = parsed.data;
+
+  // ── Date-range validation ────────────────────────────────────────────────────
+  // The `date` field (and each workout's `startedAt`) must fall within the last
+  // 7 days and must not be in the future. Dates outside this window are a
+  // strong signal of replayed or fabricated historical payloads.
   const today = data.date ?? new Date().toISOString().slice(0, 10);
+  if (!isDateInRange(today)) {
+    res.status(422).json({ error: "date out of range", detail: "date must be within the last 7 days and not in the future" });
+    return;
+  }
+  if (data.sleepDate && !isDateInRange(data.sleepDate)) {
+    res.status(422).json({ error: "sleepDate out of range", detail: "sleepDate must be within the last 7 days and not in the future" });
+    return;
+  }
+
+  const now = Date.now();
+  const maxLookbackMs = APPLE_HEALTH_MAX_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+
+  // Validate and normalise each workout's startedAt, and deduplicate by
+  // externalId within the same payload to prevent a single request from
+  // submitting hundreds of synthetic entries with distinct timestamps.
+  const seenExternalIds = new Set<string>();
+  const validWorkouts: Array<{ type: string; durationMin: number; calories?: number; distanceMiles?: number; startedAt: string; externalId: string; activityType: string }> = [];
+
+  for (const w of data.workouts ?? []) {
+    const activityType = APPLE_HEALTH_ACTIVITY_MAP[w.type.toLowerCase()] ?? null;
+    if (!activityType) continue;
+
+    // Default to now when startedAt is absent; if present, validate range.
+    const startedAt = w.startedAt ?? new Date().toISOString();
+    const startedAtMs = new Date(startedAt).getTime();
+    if (isNaN(startedAtMs) || startedAtMs > now || startedAtMs < now - maxLookbackMs) {
+      req.log.warn({ playerId: player.id, startedAt }, "apple_health workout startedAt out of range — skipping");
+      continue;
+    }
+
+    const externalId = `apple_workout_${w.type}_${startedAt.slice(0, 16).replace(/\D/g, "")}`;
+    if (seenExternalIds.has(externalId)) {
+      req.log.warn({ playerId: player.id, externalId }, "apple_health duplicate workout in payload — skipping");
+      continue;
+    }
+    seenExternalIds.add(externalId);
+    validWorkouts.push({ ...w, startedAt, externalId, activityType });
+  }
+
+  // ── Cross-request aggregate daily cap for workouts ───────────────────────────
+  // Query how many workout minutes and sessions have already been accepted from
+  // Apple Health for this player today. This enforces the daily cap across ALL
+  // requests, not just per-payload, closing the repeated-request abuse where an
+  // attacker sends many payloads with distinct synthetic startedAt minute slots
+  // to keep minting new externalIds and earning unbounded XP.
+  const todayStartUtc = new Date(today + "T00:00:00.000Z");
+  const [dailyWorkoutTotals] = await db
+    .select({
+      totalMinutes: sql<number>`coalesce(sum(${fitnessActivitiesTable.value}), 0)::int`,
+      totalCount:   sql<number>`count(*)::int`,
+    })
+    .from(fitnessActivitiesTable)
+    .where(
+      and(
+        eq(fitnessActivitiesTable.playerId, player.id),
+        gte(fitnessActivitiesTable.createdAt, todayStartUtc),
+        like(fitnessActivitiesTable.externalId, "apple_workout_%"),
+      ),
+    );
+
+  let remainingWorkoutMinutes = Math.max(
+    0,
+    DAILY_APPLE_WORKOUT_MINUTES_CAP - (dailyWorkoutTotals?.totalMinutes ?? 0),
+  );
+  let remainingWorkoutCount = Math.max(
+    0,
+    DAILY_APPLE_WORKOUT_COUNT_CAP - (dailyWorkoutTotals?.totalCount ?? 0),
+  );
+
+  // Further filter validWorkouts to respect the cross-request cap.
+  // Workouts that would exceed the cap are silently dropped (same as the
+  // per-payload duplicate logic above) — the attacker's excess data yields zero
+  // progression instead of partial credit that compounds across requests.
+  const cappedWorkouts: typeof validWorkouts = [];
+  for (const w of validWorkouts) {
+    if (remainingWorkoutCount <= 0 || remainingWorkoutMinutes <= 0) break;
+    const acceptedMin = Math.min(w.durationMin, remainingWorkoutMinutes);
+    cappedWorkouts.push({ ...w, durationMin: acceptedMin });
+    remainingWorkoutMinutes -= acceptedMin;
+    remainingWorkoutCount -= 1;
+  }
+
+  if (cappedWorkouts.length < validWorkouts.length) {
+    req.log.warn(
+      { playerId: player.id, submitted: validWorkouts.length, accepted: cappedWorkouts.length },
+      "apple_health daily workout cap reached — some workouts dropped",
+    );
+  }
 
   let activitiesImported = 0;
   let xpEarned = 0;
@@ -572,6 +694,15 @@ router.post("/health/apple/sync", requireAuth, async (req, res) => {
     connectionId = inserted.id;
   }
 
+  // All Apple Health activities are logged as "unverified" because the server
+  // has no Apple-issued proof, attestation, or signed payload for this data.
+  // logFitnessActivity will persist the activity row (for health-insights) but
+  // will NOT award competitive XP, advance streaks, increment totalWorkouts/
+  // totalSteps, apply hatchling XP, check badges, update eggs, or award
+  // artifacts. This isolates client-pushed health data from the competitive
+  // progression systems entirely.
+  const UNVERIFIED = "unverified" as const;
+
   // Steps
   if (data.steps && data.steps > 0) {
     const result = await logFitnessActivity({
@@ -581,6 +712,7 @@ router.post("/health/apple/sync", requireAuth, async (req, res) => {
       externalId: `apple_steps_${today}`,
       note: `Apple Health: ${data.steps.toLocaleString()} steps on ${today}`,
       isPassiveSync: true,
+      verificationLevel: UNVERIFIED,
     });
     if (result.isNew) { activitiesImported++; xpEarned += result.fitnessXpEarned; }
   }
@@ -594,6 +726,7 @@ router.post("/health/apple/sync", requireAuth, async (req, res) => {
       externalId: `apple_active_${today}`,
       note: `Apple Health: ${data.activeMinutes} active min on ${today}`,
       isPassiveSync: true,
+      verificationLevel: UNVERIFIED,
     });
     if (result.isNew) { activitiesImported++; xpEarned += result.fitnessXpEarned; }
   }
@@ -607,6 +740,7 @@ router.post("/health/apple/sync", requireAuth, async (req, res) => {
       externalId: `apple_calories_${today}`,
       note: `Apple Health: ${Math.round(data.caloriesBurned)} kcal on ${today}`,
       isPassiveSync: true,
+      verificationLevel: UNVERIFIED,
     });
     if (result.isNew) { activitiesImported++; xpEarned += result.fitnessXpEarned; }
   }
@@ -621,24 +755,22 @@ router.post("/health/apple/sync", requireAuth, async (req, res) => {
       externalId: `apple_sleep_${sleepDate}`,
       note: `Apple Health: ${data.sleepHours}h sleep on ${sleepDate}`,
       isPassiveSync: true,
+      verificationLevel: UNVERIFIED,
     });
     if (result.isNew) { activitiesImported++; xpEarned += result.fitnessXpEarned; }
   }
 
-  // Workouts
-  for (const w of data.workouts ?? []) {
-    const activityType = APPLE_HEALTH_ACTIVITY_MAP[w.type.toLowerCase()] ?? null;
-    if (!activityType) continue;
-    const startedAt = w.startedAt ?? new Date().toISOString();
-    const externalId = `apple_workout_${w.type}_${startedAt.slice(0, 16).replace(/\D/g, "")}`;
+  // Workouts — date-range checked, deduplicated, and cross-request daily cap applied
+  for (const w of cappedWorkouts) {
     const result = await logFitnessActivity({
       playerId: player.id,
-      type: activityType,
+      type: w.activityType,
       value: w.durationMin,
-      externalId,
+      externalId: w.externalId,
       note: `Apple Health: ${w.type} (${w.durationMin} min)`,
       isPassiveSync: true,
       distanceMiles: w.distanceMiles ?? null,
+      verificationLevel: UNVERIFIED,
     });
     if (result.isNew) { activitiesImported++; xpEarned += result.fitnessXpEarned; }
   }

@@ -14,7 +14,13 @@ export const fitnessActivitiesTable = pgTable("fitness_activities", {
   externalId: text("external_id"),
   distanceMiles: doublePrecision("distance_miles"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  // Unique constraint so that concurrent Apple Health / Garmin / Fitbit syncs
+  // cannot insert duplicate (player, externalId) pairs even under a race
+  // condition. NULL external_id values are excluded by Postgres unique semantics
+  // (NULL != NULL), so unkeyed manual entries are unaffected.
+  uniqPlayerExternalId: unique("fitness_activities_player_id_external_id_key").on(t.playerId, t.externalId),
+}));
 
 export const insertFitnessActivitySchema = createInsertSchema(fitnessActivitiesTable).omit({ id: true, createdAt: true });
 export type InsertFitnessActivity = z.infer<typeof insertFitnessActivitySchema>;
