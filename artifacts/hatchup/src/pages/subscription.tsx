@@ -59,13 +59,15 @@ const FREE_FEATURES = [
   "5 battle entries per day",
   "City & nearby leaderboards",
   "Manual & voice rep counting",
+  "Meal logging (+50 XP per meal)",
 ];
 
 const PREMIUM_FEATURES = [
+  "2× Meal XP & Pal XP on every meal log",
+  "AI Food Scanner — auto-fill macros from a photo",
+  "AI Body Fat Scanner",
   "Camera AI Rep Counting (3× XP boost)",
   "AI Form Analysis",
-  "AI Food Scanner",
-  "AI Body Fat Scanner",
   "Advanced AI Coach — unlimited + deep analytics",
   "State, National & Global Leaderboards",
   "Unlimited Hatchlings",
