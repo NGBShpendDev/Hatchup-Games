@@ -13,7 +13,7 @@ import {
   EvolveHatchlingBody,
 } from "@workspace/api-zod";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth.ts";
-import { attachEntitlement, enforceHatchlingCap } from "../services/subscriptionGuards.ts";
+import { attachEntitlement, atomicInsertWithHatchlingCap } from "../services/subscriptionGuards.ts";
 import { buildHatchShareSvg, buildHatchAvatarSvg } from "./og-render.ts";
 import { renderSvgToPng } from "./og-router.ts";
 import { applyHatchlingXp } from "../services/hatchlingXp.ts";
@@ -314,7 +314,7 @@ router.get("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, asy
   }));
 });
 
-router.post("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, attachEntitlement, enforceHatchlingCap, async (req, res) => {
+router.post("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, attachEntitlement, async (req, res) => {
   const body = CreateHatchlingBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
@@ -333,7 +333,7 @@ router.post("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, at
   const personality = personalities[Math.floor(Math.random() * personalities.length)];
   const rarity = Math.random() < 0.05 ? "Legendary" : Math.random() < 0.15 ? "Epic" : Math.random() < 0.35 ? "Rare" : "Common";
 
-  const hatchling = await db.insert(hatchlingsTable).values({
+  const values = {
     playerId: body.data.playerId,
     name: body.data.name,
     species: body.data.species ?? "Mystery Pal",
@@ -348,10 +348,35 @@ router.post("/hatchlings", requireAuth, attachPlayer, requirePlayerOwnership, at
     energy: 100,
     genetics,
     friendshipLevel: 0,
-  }).returning();
+  } as const;
+
+  // Premium players skip the cap; free-tier players use the atomic check+insert
+  // to prevent concurrent requests from bypassing the storage limit.
+  let hatchling: typeof hatchlingsTable.$inferSelect;
+  if (!req.playerId || !req.entitlement || req.entitlement.tier === "premium") {
+    const [row] = await db.insert(hatchlingsTable).values(values).returning();
+    hatchling = row!;
+  } else {
+    const cap = req.entitlement.features.hatchlingStorageCap;
+    const outcome = await atomicInsertWithHatchlingCap(
+      req.playerId,
+      cap,
+      (tx) => tx.insert(hatchlingsTable).values(values).returning().then(r => r[0]!),
+    );
+    if (!outcome.ok) {
+      res.status(402).json({
+        error: "hatchling_cap_reached",
+        message: `Free accounts can hold up to ${cap} Hatchlings. Upgrade to Premium for unlimited storage.`,
+        cap,
+      });
+      return;
+    }
+    hatchling = outcome.result;
+  }
+
   res.status(201).json({
-    ...hatchling[0],
-    createdAt: hatchling[0].createdAt.toISOString(),
+    ...hatchling,
+    createdAt: hatchling.createdAt.toISOString(),
     lastWorkoutAt: null,
   });
 });

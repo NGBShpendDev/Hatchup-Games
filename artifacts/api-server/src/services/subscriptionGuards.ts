@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { db } from "@workspace/db";
 import { playersTable, hatchlingsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { getEntitlement } from "./entitlement.ts";
 import { refreshTop10Status } from "./top10.ts";
 
@@ -43,7 +43,11 @@ export function requirePremium(req: Request, res: Response, next: NextFunction):
   next();
 }
 
-/** Enforce free-tier hatchling storage cap on POST /hatchlings. */
+/**
+ * Non-atomic hatchling storage cap middleware. Retained as a fast-fail
+ * pre-check and for unit-test coverage. The authoritative, race-safe
+ * enforcement is `atomicInsertWithHatchlingCap` used inside the route handler.
+ */
 export async function enforceHatchlingCap(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (!req.playerId || !req.entitlement) { next(); return; }
   if (req.entitlement.tier === "premium") { next(); return; }
@@ -61,28 +65,82 @@ export async function enforceHatchlingCap(req: Request, res: Response, next: Nex
   next();
 }
 
-/** Generic daily counter gate (used by coach + battle). */
+/**
+ * Atomically check the free-tier hatchling storage cap and insert the new row
+ * inside a single serializable transaction. Acquires a row lock on the player
+ * record so concurrent hatch requests cannot all observe the same pre-insert
+ * count and slip past the cap together.
+ *
+ * Returns the inserted hatchling row on success, or a 402 error payload when
+ * the cap is reached. Callers (the POST /hatchlings handler) should skip the
+ * separate db.insert() and use this function instead when the player is on the
+ * free tier.
+ */
+export async function atomicInsertWithHatchlingCap<T>(
+  playerId: number,
+  cap: number,
+  insertFn: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<T>,
+): Promise<{ ok: true; result: T } | { ok: false; cap: number }> {
+  return await db.transaction(async (tx) => {
+    // Lock the player row for the duration of this transaction so concurrent
+    // requests cannot simultaneously pass the cap check.
+    await tx.select({ id: playersTable.id })
+      .from(playersTable)
+      .where(eq(playersTable.id, playerId))
+      .for("update");
+
+    const [row] = await tx
+      .select({ total: count() })
+      .from(hatchlingsTable)
+      .where(eq(hatchlingsTable.playerId, playerId));
+
+    const existing = row?.total ?? 0;
+    if (existing >= cap) {
+      return { ok: false as const, cap };
+    }
+
+    const result = await insertFn(tx);
+    return { ok: true as const, result };
+  });
+}
+
+/**
+ * Atomically consume one unit of a daily quota counter.
+ *
+ * A transaction with a row-level lock (SELECT … FOR UPDATE) on the player row
+ * ensures that concurrent requests read the same pre-increment count only
+ * once: the second request will block until the first transaction commits,
+ * then re-read the already-incremented value and correctly reject (or
+ * succeed) based on the updated count.
+ */
 async function consumeDailyCounter(
   playerId: number,
   cap: number,
   field: "dailyCoachUsedCount" | "dailyBattleUsedCount",
   dateField: "dailyCoachResetDate" | "dailyBattleResetDate",
 ): Promise<{ ok: boolean; used: number; cap: number }> {
-  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) });
-  if (!player) return { ok: false, used: 0, cap };
+  return await db.transaction(async (tx) => {
+    // Lock the player row so concurrent calls queue up here rather than all
+    // reading the same pre-increment counter value.
+    const rows = await tx.select().from(playersTable)
+      .where(eq(playersTable.id, playerId))
+      .for("update");
+    const player = rows[0];
+    if (!player) return { ok: false, used: 0, cap };
 
-  const todayStr = today();
-  const lastReset = player[dateField];
-  const used = lastReset === todayStr ? player[field] : 0;
+    const todayStr = today();
+    const lastReset = player[dateField];
+    const used = lastReset === todayStr ? player[field] : 0;
 
-  if (used >= cap) return { ok: false, used, cap };
+    if (used >= cap) return { ok: false, used, cap };
 
-  await db.update(playersTable).set({
-    [field]: used + 1,
-    [dateField]: todayStr,
-  } as Partial<typeof playersTable.$inferInsert>).where(eq(playersTable.id, playerId));
+    await tx.update(playersTable).set({
+      [field]: used + 1,
+      [dateField]: todayStr,
+    } as Partial<typeof playersTable.$inferInsert>).where(eq(playersTable.id, playerId));
 
-  return { ok: true, used: used + 1, cap };
+    return { ok: true, used: used + 1, cap };
+  });
 }
 
 export async function enforceCoachDailyCap(req: Request, res: Response, next: NextFunction): Promise<void> {
