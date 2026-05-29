@@ -541,7 +541,6 @@ export default function Home() {
                 <ShoppingBag className="w-4 h-4 text-muted-foreground" />
               </button>
             </Link>
-            <SubscriptionChip />
             {streakFreezes > 0 && (
               <div className="flex items-center gap-1 bg-blue-500/20 border border-blue-500/40 px-2 py-1 rounded-full">
                 <span className="text-sm">❄️</span>
