@@ -335,8 +335,9 @@ export default function HatchScreen() {
   const buySlot = useBuyExtraIncubatorSlot({
     mutation: {
       onSuccess: (result) => {
-        if (result?.url) {
-          Linking.openURL(result.url);
+        const r = result as any;
+        if (r?.url) {
+          Linking.openURL(r.url);
         }
       },
     },

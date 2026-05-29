@@ -156,7 +156,7 @@ export default function SignInScreen() {
           const autoUsername = `${emailBase || "player"}${Math.floor(Math.random() * 9000) + 1000}`;
           try {
             await oauthSignUp.update({ username: autoUsername });
-            const completed = await oauthSignUp.create?.();
+            const completed = await oauthSignUp.create?.({});
             const sessionId = completed?.createdSessionId ?? (oauthSignUp as any).createdSessionId;
             if (sessionId) {
               await setActive!({ session: sessionId });

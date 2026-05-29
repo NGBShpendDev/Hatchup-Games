@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
-import { useGetCurrentPlayer } from "@workspace/api-client-react";
+import { useGetCurrentPlayer, getGetCurrentPlayerQueryKey } from "@workspace/api-client-react";
 
 const CurrentPlayerContext = createContext<number>(1);
 
 export function CurrentPlayerProvider({ children }: { children: React.ReactNode }) {
   const { data, isLoading } = useGetCurrentPlayer({
-    query: { retry: 1, retryDelay: 500, staleTime: 30 * 1000 },
+    query: { queryKey: getGetCurrentPlayerQueryKey(), retry: 1, retryDelay: 500, staleTime: 30 * 1000 },
   });
 
   // Safety net: never block the app for more than 3 seconds regardless of

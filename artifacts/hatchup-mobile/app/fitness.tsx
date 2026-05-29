@@ -1,3 +1,4 @@
+import { useAuth } from "@clerk/clerk-expo";
 import { Feather } from "@expo/vector-icons";
 import { useGetFitnessStats, useGetActiveQuests, useGetTodayGoals } from "@workspace/api-client-react";
 import { useRouter } from "expo-router";
@@ -59,6 +60,7 @@ const PLATFORM_INFO: Record<string, { label: string; color: string; icon: string
 };
 
 function ConnectedDevicesSection() {
+  const { getToken } = useAuth();
   const colors = useColors();
   const [connections, setConnections] = useState<HealthConn[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,20 +68,24 @@ function ConnectedDevicesSection() {
 
   const fetchConnections = useCallback(async () => {
     try {
-      const res = await fetch(apiUrl("/api/health/connections"), { credentials: "include" });
+      const token = await getToken();
+      const res = await fetch(apiUrl("/api/health/connections"), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (res.ok) setConnections(await res.json());
     } catch { /* silent */ }
     setLoading(false);
-  }, []);
+  }, [getToken]);
 
   useEffect(() => { fetchConnections(); }, [fetchConnections]);
 
   async function handleSync() {
     setSyncing(true);
     try {
-      const res = await fetch(getApiUrl("/api/health/sync"), {
+      const token = await getToken();
+      const res = await fetch(apiUrl("/api/health/sync"), {
         method: "POST",
-        credentials: "include",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const data = await res.json();
       if (res.ok) {

@@ -1,7 +1,11 @@
+import { useAuth } from "@clerk/clerk-expo";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -36,7 +40,16 @@ const PLANS = [
   { id: "yearly", label: "Yearly", price: "$80", period: "/year", badge: "Save 26%" },
 ];
 
+interface SubData {
+  tier: string;
+  source: string;
+  trialEndsAt?: string | null;
+  paidUntil?: string | null;
+  pricing?: { monthly: { unitAmount: number }; yearly: { unitAmount: number } };
+}
+
 export default function SubscriptionScreen() {
+  const { getToken } = useAuth();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -44,6 +57,62 @@ export default function SubscriptionScreen() {
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const [selectedPlan, setSelectedPlan] = React.useState("yearly");
+  const [subData, setSubData] = useState<SubData | null>(null);
+  const [loadingSub, setLoadingSub] = useState(true);
+  const [checkoutPending, setCheckoutPending] = useState(false);
+
+  const domain = process.env.EXPO_PUBLIC_DOMAIN;
+  const baseUrl = domain ? `https://${domain}` : "";
+
+  useEffect(() => {
+    async function loadSub() {
+      try {
+        const token = await getToken();
+        const res = await fetch(`${baseUrl}/api/subscription/me`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) setSubData(await res.json());
+      } catch { /* silent */ }
+      setLoadingSub(false);
+    }
+    loadSub();
+  }, [getToken, baseUrl]);
+
+  async function handleUpgrade() {
+    setCheckoutPending(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${baseUrl}/api/subscription/checkout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ plan: selectedPlan }),
+      });
+      const data = await res.json() as { url?: string; message?: string };
+      if (!res.ok || !data.url) {
+        Alert.alert("Checkout unavailable", data.message ?? "Please try again later.");
+      } else {
+        await Linking.openURL(data.url);
+      }
+    } catch {
+      Alert.alert("Checkout unavailable", "Network error. Please try again.");
+    }
+    setCheckoutPending(false);
+  }
+
+  const isPremium = subData?.tier === "premium";
+  const isTrial = subData?.source === "trial";
+  const isTop10 = subData?.source === "top10";
+  const trialDaysLeft = subData?.trialEndsAt
+    ? Math.max(0, Math.ceil((new Date(subData.trialEndsAt).getTime() - Date.now()) / 86400000))
+    : null;
+
+  const statusLabel = isPremium
+    ? isTrial ? `Trial · ${trialDaysLeft}d left` : isTop10 ? "Premium · Top-10" : "Premium"
+    : "Free";
+  const statusColor = isPremium ? colors.primary : colors.mutedForeground;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -59,6 +128,18 @@ export default function SubscriptionScreen() {
         contentContainerStyle={{ padding: 20, paddingBottom: bottomPad + 40 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Status badge */}
+        {loadingSub ? (
+          <ActivityIndicator color={colors.primary} style={{ marginBottom: 16 }} />
+        ) : (
+          <View style={[styles.statusBadge, { backgroundColor: statusColor + "18", borderColor: statusColor + "44" }]}>
+            <Feather name={isPremium ? "star" : "user"} size={14} color={statusColor} />
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              Current plan: <Text style={{ fontWeight: "800" }}>{statusLabel}</Text>
+            </Text>
+          </View>
+        )}
+
         {/* Hero */}
         <View style={[styles.heroCard, { backgroundColor: colors.primary + "14", borderColor: colors.primary + "44" }]}>
           <View style={[styles.heroIcon, { backgroundColor: colors.primary + "22" }]}>
@@ -70,44 +151,67 @@ export default function SubscriptionScreen() {
           </Text>
         </View>
 
-        {/* Plan selector */}
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Choose Your Plan</Text>
-        <View style={styles.plansRow}>
-          {PLANS.map((plan) => (
+        {!isPremium && (
+          <>
+            {/* Plan selector */}
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Choose Your Plan</Text>
+            <View style={styles.plansRow}>
+              {PLANS.map((plan) => (
+                <Pressable
+                  key={plan.id}
+                  onPress={() => setSelectedPlan(plan.id)}
+                  style={[
+                    styles.planCard,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: selectedPlan === plan.id ? colors.primary : colors.border,
+                      borderWidth: selectedPlan === plan.id ? 2 : 1,
+                    },
+                  ]}
+                >
+                  {plan.badge && (
+                    <View style={[styles.planBadge, { backgroundColor: colors.primary }]}>
+                      <Text style={styles.planBadgeText}>{plan.badge}</Text>
+                    </View>
+                  )}
+                  <Text style={[styles.planLabel, { color: colors.mutedForeground }]}>{plan.label}</Text>
+                  <Text style={[styles.planPrice, { color: colors.foreground }]}>{plan.price}</Text>
+                  <Text style={[styles.planPeriod, { color: colors.mutedForeground }]}>{plan.period}</Text>
+                  {selectedPlan === plan.id && (
+                    <Feather name="check-circle" size={18} color={colors.primary} style={styles.planCheck} />
+                  )}
+                </Pressable>
+              ))}
+            </View>
+
+            {/* CTA */}
             <Pressable
-              key={plan.id}
-              onPress={() => setSelectedPlan(plan.id)}
-              style={[
-                styles.planCard,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: selectedPlan === plan.id ? colors.primary : colors.border,
-                  borderWidth: selectedPlan === plan.id ? 2 : 1,
-                },
-              ]}
+              style={[styles.upgradeBtn, { backgroundColor: colors.primary, opacity: checkoutPending ? 0.7 : 1 }]}
+              onPress={handleUpgrade}
+              disabled={checkoutPending}
             >
-              {plan.badge && (
-                <View style={[styles.planBadge, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.planBadgeText}>{plan.badge}</Text>
-                </View>
-              )}
-              <Text style={[styles.planLabel, { color: colors.mutedForeground }]}>{plan.label}</Text>
-              <Text style={[styles.planPrice, { color: colors.foreground }]}>{plan.price}</Text>
-              <Text style={[styles.planPeriod, { color: colors.mutedForeground }]}>{plan.period}</Text>
-              {selectedPlan === plan.id && (
-                <Feather name="check-circle" size={18} color={colors.primary} style={styles.planCheck} />
+              {checkoutPending ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.upgradeBtnText}>
+                  {isTrial ? "Upgrade to Premium" : "Start 7-Day Free Trial"}
+                </Text>
               )}
             </Pressable>
-          ))}
-        </View>
+            <Text style={[styles.trialNote, { color: colors.mutedForeground }]}>
+              Cancel anytime. New players get 7 days free.
+            </Text>
+          </>
+        )}
 
-        {/* CTA */}
-        <Pressable style={[styles.upgradeBtn, { backgroundColor: colors.primary }]}>
-          <Text style={styles.upgradeBtnText}>Start 7-Day Free Trial</Text>
-        </Pressable>
-        <Text style={[styles.trialNote, { color: colors.mutedForeground }]}>
-          Cancel anytime. New players get 7 days free.
-        </Text>
+        {isPremium && !isTrial && (
+          <View style={[styles.activeCard, { backgroundColor: "#22c55e14", borderColor: "#22c55e44" }]}>
+            <Feather name="check-circle" size={18} color="#22c55e" />
+            <Text style={[styles.activeText, { color: "#22c55e" }]}>
+              You have Premium{isTop10 ? " via Top-10 City ranking" : ""}. All features unlocked.
+            </Text>
+          </View>
+        )}
 
         {/* Top-10 explainer */}
         <View style={[styles.top10Card, { backgroundColor: colors.card, borderColor: "#f59e0b44" }]}>
@@ -152,6 +256,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 8 },
   backBtn: { padding: 6 },
   title: { fontSize: 20, fontWeight: "800" },
+  statusBadge: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, borderWidth: 1, padding: 10, marginBottom: 14 },
+  statusText: { fontSize: 13 },
   heroCard: { borderRadius: 16, borderWidth: 1, padding: 20, alignItems: "center", gap: 10, marginBottom: 20 },
   heroIcon: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center" },
   heroTitle: { fontSize: 20, fontWeight: "800", textAlign: "center" },
@@ -168,6 +274,8 @@ const styles = StyleSheet.create({
   upgradeBtn: { borderRadius: 14, paddingVertical: 14, alignItems: "center", marginBottom: 8 },
   upgradeBtnText: { color: "#fff", fontSize: 16, fontWeight: "800" },
   trialNote: { fontSize: 12, textAlign: "center", marginBottom: 20 },
+  activeCard: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 20 },
+  activeText: { fontSize: 13, fontWeight: "600", flex: 1 },
   top10Card: { flexDirection: "row", gap: 10, borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 20 },
   top10Title: { fontSize: 13, fontWeight: "700" },
   top10Text: { fontSize: 12, lineHeight: 17, marginTop: 2 },

@@ -1,3 +1,4 @@
+import { useAuth } from "@clerk/clerk-expo";
 import { Feather } from "@expo/vector-icons";
 import { useGetPlayer, useGetFitnessStats, useGetPlayerSocialProfile, useGetDailyStreak, useBuyStreakShield, getGetDailyStreakQueryKey, getGetPlayerQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -52,6 +53,7 @@ const MENU_ITEMS = [
 
 function StreakProtectionCard({ coins }: { coins: number }) {
   const PLAYER_ID = useCurrentPlayerId();
+  const { getToken } = useAuth();
   const colors = useColors();
   const queryClient = useQueryClient();
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -101,9 +103,15 @@ function StreakProtectionCard({ coins }: { coins: number }) {
           onPress: async () => {
             try {
               setUsdPending(true);
-              const res = await fetch("/api/shields/checkout", {
+              const token = await getToken();
+              const domain = process.env.EXPO_PUBLIC_DOMAIN;
+              const url = domain ? `https://${domain}/api/shields/checkout` : "/api/shields/checkout";
+              const res = await fetch(url, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                  "Content-Type": "application/json",
+                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
                 body: JSON.stringify({ pack }),
               });
               const data = await res.json() as { url?: string; message?: string };
@@ -269,7 +277,7 @@ export default function ProfileScreen() {
         ) : (
           <>
             <Text style={[styles.username, { color: colors.foreground }]}>
-              {player?.username ?? "DragonMaster"}
+              {player?.username ?? ""}
             </Text>
             {player?.displayName && (
               <Text style={[styles.displayName, { color: colors.mutedForeground }]}>{player.displayName}</Text>

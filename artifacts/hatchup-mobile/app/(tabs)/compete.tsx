@@ -118,7 +118,7 @@ export default function CompeteScreen() {
           contentContainerStyle={styles.modesRow}
           scrollEnabled={!!(gameModes && gameModes.length > 0)}
           renderItem={({ item: mode }) => {
-            const isLive = mode.isLive === true;
+            const isLive = String(mode.isLive) === "true";
             return (
               <Pressable style={[styles.modeCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={[styles.modeIconBg, { backgroundColor: colors.primary + "22" }]}>

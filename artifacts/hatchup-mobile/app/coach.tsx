@@ -1,6 +1,8 @@
+import { useAuth } from "@clerk/clerk-expo";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
+import { useCurrentPlayerId } from "@/providers/CurrentPlayerProvider";
 import {
   ActivityIndicator,
   FlatList,
@@ -28,6 +30,8 @@ const STARTERS = [
 ];
 
 export default function CoachScreen() {
+  const PLAYER_ID = useCurrentPlayerId();
+  const { getToken } = useAuth();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -57,10 +61,14 @@ export default function CoachScreen() {
 
     try {
       const baseUrl = `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+      const token = await getToken();
       const resp = await fetch(`${baseUrl}/api/coach/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text.trim(), playerId: 1 }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ message: text.trim(), playerId: PLAYER_ID }),
       });
 
       const body = await resp.text();
