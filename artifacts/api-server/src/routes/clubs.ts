@@ -245,15 +245,24 @@ router.post("/club-invites/:id/respond", requireAuth, attachPlayer, async (req, 
   if (!club) { res.status(404).json({ error: "Club no longer exists" }); return; }
 
   if (status === "accepted") {
-    // Only bump memberCount + assign clubId if the player wasn't already a member.
-    if (invitee && invitee.clubId !== invite.clubId) {
-      await db.update(playersTable)
-        .set({ clubId: invite.clubId, clubRole: invitee.clubRole ?? "member" })
-        .where(eq(playersTable.id, req.playerId!));
-      await db.update(clubsTable)
-        .set({ memberCount: club.memberCount + 1 })
-        .where(eq(clubsTable.id, invite.clubId));
+    // Re-run the same membership and capacity gates as the self-join path so a
+    // stale invite cannot bypass current club state or single-club policy.
+    if (invitee?.clubId === invite.clubId) {
+      res.status(409).json({ error: "You are already a member of this club" }); return;
     }
+    if (invitee?.clubId != null) {
+      res.status(409).json({ error: "You must leave your current club before joining another" }); return;
+    }
+    if (club.memberCount >= club.maxMembers) {
+      res.status(409).json({ error: "This club is full" }); return;
+    }
+
+    await db.update(playersTable)
+      .set({ clubId: invite.clubId, clubRole: invitee?.clubRole ?? "member" })
+      .where(eq(playersTable.id, req.playerId!));
+    await db.update(clubsTable)
+      .set({ memberCount: club.memberCount + 1 })
+      .where(eq(clubsTable.id, invite.clubId));
   }
 
   // Close the loop for the inviter: notify them of the invitee's response.

@@ -523,6 +523,49 @@ router.post("/challenge-invites/:id/respond", requireAuth, attachPlayer, async (
     where: and(eq(challengeInvitesTable.id, id), eq(challengeInvitesTable.inviteeId, req.playerId!)),
   });
   if (!invite) { res.status(404).json({ error: "Invite not found" }); return; }
+  if (invite.status !== "pending") {
+    res.status(409).json({ error: "Invite already responded to" }); return;
+  }
+
+  if (status === "accepted") {
+    // Re-validate all join conditions at acceptance time so a stale invite
+    // cannot bypass current challenge state, capacity, or eligibility rules.
+    const challenge = await db.query.challengesTable.findFirst({
+      where: eq(challengesTable.id, invite.challengeId),
+    });
+    if (!challenge) { res.status(404).json({ error: "Challenge no longer exists" }); return; }
+    if (challenge.status !== "active") { res.status(409).json({ error: "Challenge is not active" }); return; }
+    if (new Date() > new Date(challenge.endAt)) { res.status(409).json({ error: "Challenge has ended" }); return; }
+
+    const playerId = req.playerId!;
+
+    if (challenge.type === "guild") {
+      const [player, creator] = await Promise.all([
+        db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) }),
+        db.query.playersTable.findFirst({ where: eq(playersTable.id, challenge.creatorId) }),
+      ]);
+      if (!player?.clubId || !creator?.clubId || player.clubId !== creator.clubId) {
+        res.status(403).json({ error: "You must be in the same club as the challenge creator to join this guild challenge." });
+        return;
+      }
+    } else if (challenge.type === "city") {
+      const [playerLocation, creatorLocation] = await Promise.all([
+        db.query.playerLocationTable.findFirst({ where: eq(playerLocationTable.playerId, playerId) }),
+        db.query.playerLocationTable.findFirst({ where: eq(playerLocationTable.playerId, challenge.creatorId) }),
+      ]);
+      if (!playerLocation?.city || !creatorLocation?.city || playerLocation.city !== creatorLocation.city) {
+        res.status(403).json({ error: "This challenge is restricted to players in the same city." });
+        return;
+      }
+    }
+
+    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` })
+      .from(challengeParticipantsTable)
+      .where(eq(challengeParticipantsTable.challengeId, invite.challengeId));
+    if ((count ?? 0) >= challenge.maxParticipants) {
+      res.status(409).json({ error: "Challenge is full" }); return;
+    }
+  }
 
   await db.update(challengeInvitesTable).set({ status }).where(eq(challengeInvitesTable.id, id));
 
