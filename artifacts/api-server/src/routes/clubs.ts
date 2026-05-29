@@ -22,7 +22,10 @@ const router = Router();
 router.get("/clubs", async (req, res) => {
   const query = ListClubsQueryParams.safeParse({ limit: req.query.limit ? Number(req.query.limit) : 20 });
   if (!query.success) { res.status(400).json({ error: "Invalid query" }); return; }
-  const results = await db.query.clubsTable.findMany({ limit: query.data.limit ?? 20 });
+  const results = await db.query.clubsTable.findMany({
+    where: eq(clubsTable.isPublic, true),
+    limit: query.data.limit ?? 20,
+  });
   res.json(results.map(c => ({ ...c, createdAt: c.createdAt.toISOString() })));
 });
 
@@ -33,19 +36,33 @@ router.post("/clubs", requireAuth as RequestHandler, async (req, res) => {
   res.status(201).json({ ...club[0], createdAt: club[0].createdAt.toISOString() });
 });
 
-router.get("/clubs/:id", async (req, res) => {
+router.get("/clubs/:id", requireAuth, attachPlayer, async (req, res) => {
   const params = GetClubParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const club = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, params.data.id) });
   if (!club) { res.status(404).json({ error: "Club not found" }); return; }
+  if (!club.isPublic) {
+    const viewer = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+    if (!viewer || viewer.clubId !== club.id) {
+      res.status(403).json({ error: "This club is private" });
+      return;
+    }
+  }
   res.json({ ...club, createdAt: club.createdAt.toISOString() });
 });
 
-router.get("/clubs/:id/members", async (req, res) => {
+router.get("/clubs/:id/members", requireAuth, attachPlayer, async (req, res) => {
   const params = GetClubParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const club = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, params.data.id) });
   if (!club) { res.status(404).json({ error: "Club not found" }); return; }
+  if (!club.isPublic) {
+    const viewer = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+    if (!viewer || viewer.clubId !== club.id) {
+      res.status(403).json({ error: "This club is private" });
+      return;
+    }
+  }
   const members = await db.query.playersTable.findMany({
     where: eq(playersTable.clubId, params.data.id),
     columns: {
@@ -72,8 +89,30 @@ router.post("/clubs/:id/join", requireAuth, attachPlayer, async (req, res) => {
   const club = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, params.data.id) });
   if (!club) { res.status(404).json({ error: "Club not found" }); return; }
 
+  if (!club.isPublic) {
+    res.status(403).json({ error: "This club is invite-only" });
+    return;
+  }
+
+  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
+
+  if (player?.clubId === params.data.id) {
+    res.status(409).json({ error: "You are already a member of this club" });
+    return;
+  }
+
+  if (player?.clubId != null) {
+    res.status(409).json({ error: "You must leave your current club before joining another" });
+    return;
+  }
+
+  if (club.memberCount >= club.maxMembers) {
+    res.status(409).json({ error: "This club is full" });
+    return;
+  }
+
   await db.update(clubsTable).set({ memberCount: club.memberCount + 1 }).where(eq(clubsTable.id, params.data.id));
-  await db.update(playersTable).set({ clubId: params.data.id }).where(eq(playersTable.id, req.playerId!));
+  await db.update(playersTable).set({ clubId: params.data.id, clubRole: "member" }).where(eq(playersTable.id, req.playerId!));
 
   const updated = await db.query.clubsTable.findFirst({ where: eq(clubsTable.id, params.data.id) });
   res.json({ ...updated!, createdAt: updated!.createdAt.toISOString() });
