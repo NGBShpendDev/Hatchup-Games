@@ -91,6 +91,31 @@ async function filterCommentsByDiscoverableAuthors<T extends { playerId: number 
   return comments.filter(c => allowedIds.has(c.playerId));
 }
 
+/**
+ * Applies the three-rule people-discovery privacy gate to a single player,
+ * returning true only when the target player is reachable by the viewer:
+ *   (1) no block in either direction between target and viewer
+ *   (2) target account is not visibility=hidden
+ *   (3) target account is not a minor
+ * viewerId=null (anonymous viewer) still enforces rules (2) and (3).
+ */
+async function isPlayerVisibleToViewer(
+  targetId: number,
+  viewerId: number | null,
+): Promise<boolean> {
+  const target = await db.query.playersTable.findFirst({
+    where: eq(playersTable.id, targetId),
+  });
+  if (!target) return false;
+  if (target.locationVisibility === "hidden") return false;
+  if (target.isMinor) return false;
+  if (viewerId != null) {
+    const hiddenIds = await getHiddenPlayerIds(viewerId);
+    if (hiddenIds.includes(targetId)) return false;
+  }
+  return true;
+}
+
 // ── Moderation ─────────────────────────────────────────────────────────────
 
 const NEGATIVE_PATTERNS = [
@@ -773,6 +798,15 @@ router.get("/social/posts/:id", async (req, res) => {
   const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, id) });
   if (!post || post.deletedAt != null) { res.status(404).json({ error: "Post not found" }); return; }
 
+  // Apply the three-rule privacy gate to the post author. This prevents a
+  // viewer from reading posts belonging to accounts that have blocked them,
+  // are set to hidden visibility, or belong to minor accounts — even when
+  // they know or guess the numeric post ID directly.
+  if (!(await isPlayerVisibleToViewer(post.playerId, viewerId))) {
+    res.status(404).json({ error: "Post not found" });
+    return;
+  }
+
   const enriched = await enrichPost(post, viewerId);
   res.json(enriched);
 });
@@ -1094,6 +1128,13 @@ router.post("/social/posts/:id/react", requireAuth, attachPlayer, socialWriteLim
   const targetPost = await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) });
   if (!targetPost || targetPost.deletedAt != null) { res.status(404).json({ error: "Post not found" }); return; }
 
+  // Privacy gate: block any interaction with posts from accounts that have
+  // blocked the caller, are hidden, or are minor accounts.
+  if (!(await isPlayerVisibleToViewer(targetPost.playerId, playerId))) {
+    res.status(404).json({ error: "Post not found" });
+    return;
+  }
+
   const existing = await db.query.postReactionsTable.findFirst({
     where: and(eq(postReactionsTable.postId, postId), eq(postReactionsTable.playerId, playerId)),
   });
@@ -1209,6 +1250,12 @@ router.post("/social/posts/:id/repost", requireAuth, attachPlayer, socialWriteLi
   const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) });
   if (!post || post.deletedAt != null) { res.status(404).json({ error: "Post not found" }); return; }
 
+  // Privacy gate: reject reposts of posts from blocked/hidden/minor accounts.
+  if (!(await isPlayerVisibleToViewer(post.playerId, playerId))) {
+    res.status(404).json({ error: "Post not found" });
+    return;
+  }
+
   const existing = await db.query.postRepostsTable.findFirst({
     where: and(eq(postRepostsTable.postId, postId), eq(postRepostsTable.playerId, playerId)),
   });
@@ -1302,6 +1349,12 @@ router.post("/social/posts/:id/comments", requireAuth, attachPlayer, socialWrite
 
   const parentPost = await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) });
   if (!parentPost || parentPost.deletedAt != null) { res.status(404).json({ error: "Post not found" }); return; }
+
+  // Privacy gate: prevent commenting on posts from blocked/hidden/minor accounts.
+  if (!(await isPlayerVisibleToViewer(parentPost.playerId, playerId))) {
+    res.status(404).json({ error: "Post not found" });
+    return;
+  }
 
   const mod = moderateContent(content);
   if (mod.flagged) {
@@ -1499,6 +1552,15 @@ router.get("/social/posts/:id/comments/:commentId/revisions", requireAuth, attac
     res.status(404).json({ error: "Comment not found" });
     return;
   }
+
+  // Privacy gate: edit history must not be reachable for posts whose author
+  // has blocked the viewer, is hidden, or is a minor account.
+  const viewerId = req.playerId ?? null;
+  if (!(await isPlayerVisibleToViewer(parent.playerId, viewerId))) {
+    res.status(404).json({ error: "Comment not found" });
+    return;
+  }
+
   const revisions = await db.query.postCommentRevisionsTable.findMany({
     where: eq(postCommentRevisionsTable.commentId, commentId),
     orderBy: [desc(postCommentRevisionsTable.editedAt)],
@@ -1707,6 +1769,13 @@ router.post("/social/follow", requireAuth, attachPlayer, socialWriteLimiter, blo
 
   const { followeeId } = body.data;
   if (followerId === followeeId) { res.status(400).json({ error: "Cannot follow yourself" }); return; }
+
+  // Privacy gate: reject follow attempts targeting accounts that have blocked
+  // the caller, are set to hidden visibility, or are minor accounts.
+  if (!(await isPlayerVisibleToViewer(followeeId, followerId))) {
+    res.status(404).json({ error: "Player not found" });
+    return;
+  }
 
   const existing = await db.query.playerFollowsTable.findFirst({
     where: and(eq(playerFollowsTable.followerId, followerId), eq(playerFollowsTable.followeeId, followeeId)),
@@ -2036,6 +2105,13 @@ router.get("/social/players/:id/mutual-followers", requireAuth, attachPlayer, as
     return;
   }
 
+  // Privacy gate: the target profile must itself be visible to the caller
+  // before we expose any part of its social graph.
+  if (!(await isPlayerVisibleToViewer(id, viewerId))) {
+    res.status(404).json({ error: "Player not found" });
+    return;
+  }
+
   // Canonical people-discovery filter (see safety.ts): drop block-list (either
   // direction), visibility=hidden, and minor accounts before surfacing ids.
   const blockedIds = await getHiddenPlayerIds(viewerId);
@@ -2121,6 +2197,13 @@ router.get("/social/players/:id/mutual-following", requireAuth, attachPlayer, as
     return;
   }
 
+  // Privacy gate: the target profile must itself be visible to the caller
+  // before we expose any part of its social graph.
+  if (!(await isPlayerVisibleToViewer(id, viewerId))) {
+    res.status(404).json({ error: "Player not found" });
+    return;
+  }
+
   // Canonical people-discovery filter (see safety.ts): drop block-list (either
   // direction), visibility=hidden, and minor accounts before surfacing ids.
   const blockedIds = await getHiddenPlayerIds(viewerId);
@@ -2200,6 +2283,14 @@ router.get("/social/players/:id/followers", requireAuth, attachPlayer, async (re
   const cursor = Math.max(0, Number(req.query.cursor) || 0);
   const limit = Math.min(Math.max(1, Number(req.query.limit) || 20), 100);
 
+  // Privacy gate: the target profile must itself be visible to the caller
+  // before we expose any part of its social graph. Viewing your own graph
+  // is always allowed.
+  if (viewerId !== id && !(await isPlayerVisibleToViewer(id, viewerId))) {
+    res.status(404).json({ error: "Player not found" });
+    return;
+  }
+
   // Canonical people-discovery filter (see safety.ts): drop block-list (either
   // direction), visibility=hidden, and minor accounts before surfacing ids.
   const hiddenIds = await getHiddenPlayerIds(viewerId);
@@ -2277,6 +2368,14 @@ router.get("/social/players/:id/following", requireAuth, attachPlayer, async (re
   const viewerId = req.playerId!;
   const cursor = Math.max(0, Number(req.query.cursor) || 0);
   const limit = Math.min(Math.max(1, Number(req.query.limit) || 20), 100);
+
+  // Privacy gate: the target profile must itself be visible to the caller
+  // before we expose any part of its social graph. Viewing your own graph
+  // is always allowed.
+  if (viewerId !== id && !(await isPlayerVisibleToViewer(id, viewerId))) {
+    res.status(404).json({ error: "Player not found" });
+    return;
+  }
 
   // Canonical people-discovery filter (see safety.ts): drop block-list (either
   // direction), visibility=hidden, and minor accounts before surfacing ids.
