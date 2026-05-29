@@ -1757,6 +1757,20 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, id) });
   if (!player) { res.status(404).json({ error: "Player not found" }); return; }
 
+  // Enforce block/hidden/minor privacy: if the target is blocked by or has
+  // blocked the viewer, is location-hidden, or is a minor, treat as not found.
+  if (viewerId !== id) {
+    const hiddenIds = await getHiddenPlayerIds(viewerId);
+    if (
+      hiddenIds.includes(id) ||
+      player.locationVisibility === "hidden" ||
+      player.isMinor === true
+    ) {
+      res.status(404).json({ error: "Player not found" });
+      return;
+    }
+  }
+
   const posts = await db.query.postsTable.findMany({
     where: and(eq(postsTable.playerId, id), isNull(postsTable.deletedAt)),
     orderBy: [desc(postsTable.createdAt)],
@@ -1982,12 +1996,12 @@ router.get("/social/players/:id/profile", requireAuth, attachPlayer, async (req,
 
 router.get("/social/players/:id/mutual-followers", requireAuth, attachPlayer, async (req, res) => {
   const id = Number(req.params.id);
-  const viewerId = Number(req.query.viewerId);
+  const viewerId = req.playerId!;
   const cursor = Math.max(0, Number(req.query.cursor) || 0);
   const limit = Math.min(Math.max(1, Number(req.query.limit) || 20), 100);
 
-  if (!Number.isFinite(id) || !Number.isFinite(viewerId)) {
-    res.status(400).json({ error: "id and viewerId are required" });
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "id is required" });
     return;
   }
 
@@ -2067,12 +2081,12 @@ router.get("/social/players/:id/mutual-followers", requireAuth, attachPlayer, as
 
 router.get("/social/players/:id/mutual-following", requireAuth, attachPlayer, async (req, res) => {
   const id = Number(req.params.id);
-  const viewerId = Number(req.query.viewerId);
+  const viewerId = req.playerId!;
   const cursor = Math.max(0, Number(req.query.cursor) || 0);
   const limit = Math.min(Math.max(1, Number(req.query.limit) || 20), 100);
 
-  if (!Number.isFinite(id) || !Number.isFinite(viewerId)) {
-    res.status(400).json({ error: "id and viewerId are required" });
+  if (!Number.isFinite(id)) {
+    res.status(400).json({ error: "id is required" });
     return;
   }
 

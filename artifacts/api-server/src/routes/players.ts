@@ -798,6 +798,20 @@ router.get("/players/:id/profile", requireAuth, attachPlayer, async (req, res) =
 
   if (!player) { res.status(404).json({ error: "Player not found" }); return; }
 
+  // Enforce block/hidden/minor privacy: if the target is blocked by or has
+  // blocked the viewer, is location-hidden, or is a minor, treat as not found.
+  if (viewerId && viewerId !== playerId) {
+    const hiddenIds = await getHiddenPlayerIds(viewerId);
+    if (
+      hiddenIds.includes(playerId) ||
+      player.locationVisibility === "hidden" ||
+      player.isMinor === true
+    ) {
+      res.status(404).json({ error: "Player not found" });
+      return;
+    }
+  }
+
   // Mutual workout partners: third players who have logged a co-workout with
   // BOTH the viewer and this profile. Mirrors the same trust signal exposed
   // by /social/players/:id/profile and the invite/search rows. The shared
