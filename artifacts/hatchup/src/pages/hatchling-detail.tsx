@@ -399,17 +399,17 @@ export default function HatchlingDetail() {
             style={{ boxShadow: `0 0 40px ${rarityTokens.shadowColor}` }}
           >
             {/* Training Focus header — tap to change */}
-            <div className="w-full flex justify-between items-center mb-4 relative z-10">
+            <div className="w-full flex justify-between items-center mb-3 relative z-10">
               <button
                 onClick={() => setShowFocusPicker(true)}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-full border font-black text-sm transition-all hover:opacity-80 active:scale-95"
-                style={{ borderColor: realmConfig.color + "60", color: realmConfig.color, background: realmConfig.color + "10" }}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full border font-semibold text-xs transition-all hover:opacity-80 active:scale-95"
+                style={{ borderColor: realmConfig.color + "50", color: realmConfig.color, background: realmConfig.color + "0d" }}
               >
-                {realmConfig.emoji} {realmConfig.label} Focus
-                <ChevronRight className="w-3.5 h-3.5 opacity-60" />
+                {realmConfig.emoji} {realmConfig.label}
+                <ChevronRight className="w-3 h-3 opacity-50" />
               </button>
               {hatchling.isShiny && (
-                <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/40 font-black">✦ SHINY</Badge>
+                <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/40 font-bold text-[10px]">✦ SHINY</Badge>
               )}
             </div>
 
@@ -434,20 +434,17 @@ export default function HatchlingDetail() {
             )}
 
             {/* Evolution stage arc */}
-            <div className="w-full mt-6 relative z-10">
-              <p className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-2 text-center">Evolution Arc</p>
-              <div className="flex gap-2 justify-center">
+            <div className="w-full mt-4 relative z-10">
+              <div className="flex gap-1.5 justify-center">
                 {[1, 2, 3].map((s) => (
-                  <div key={s} className={`flex-1 text-center px-2 py-2 rounded-xl border transition-all ${s === stage ? "border-opacity-100 font-black" : s < stage ? "opacity-60" : "opacity-25 border-white/10"}`}
+                  <div key={s} className={`flex-1 text-center px-1.5 py-1 rounded-lg border transition-all ${s === stage ? "border-opacity-100 font-black" : s < stage ? "opacity-50" : "opacity-20 border-white/10"}`}
                     style={s === stage ? { borderColor: realmConfig.color, background: realmConfig.color + "20" } : {}}>
-                    <p className="text-[10px] font-black uppercase" style={s === stage ? { color: realmConfig.color } : {}}>
+                    <p className="text-[9px] font-bold uppercase" style={s === stage ? { color: realmConfig.color } : {}}>
                       {STAGE_LABELS[s]?.name}
                     </p>
-                    {s === stage && <div className="w-1 h-1 rounded-full mx-auto mt-1" style={{ background: realmConfig.color }} />}
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-center text-muted-foreground mt-2 italic">"{stageInfo.desc}"</p>
             </div>
 
             {/* Evolve button */}

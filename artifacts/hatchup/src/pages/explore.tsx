@@ -10,13 +10,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { Map, Lock, Zap, Egg, Sparkles, Trophy, Users, Eye, EyeOff, X, MapPin, ChevronDown } from "lucide-react";
+import { Map, Lock, Zap, Egg, Sparkles, Trophy, Users, Eye, EyeOff, X, MapPin, ChevronDown, Dumbbell, Mic, Target, History, Utensils } from "lucide-react";
 import { ForYouStrip } from "@/components/for-you-strip";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Link } from "wouter";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const NEARBY_PREV_VIS_KEY = "hatchup:nearby:prevVisibility";
 const NEARBY_HIDDEN_REMINDER_DISMISSED_KEY = "hatchup:nearby:hiddenReminderDismissedAt";
@@ -171,15 +172,26 @@ export default function Explore() {
 
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto space-y-8 pb-28">
-        <div className="text-center max-w-2xl mx-auto py-8">
-          <h1 className="text-5xl font-black tracking-tight text-primary mb-4 flex items-center justify-center gap-3">
-            <Map className="w-10 h-10" /> Fitness Realms
+      <div className="max-w-5xl mx-auto pb-28">
+        <div className="pt-6 pb-2">
+          <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 mb-1">
+            <Sparkles className="w-7 h-7" /> Hatchlings
           </h1>
-          <p className="text-lg text-muted-foreground font-medium">
-            Explore diverse environments to unlock specialized Pal evolutions and powerful stat bonuses.
-          </p>
+          <p className="text-sm text-muted-foreground">Explore, train, and evolve your Pals.</p>
         </div>
+
+        <Tabs defaultValue="explore" className="w-full">
+          <TabsList className="w-full grid grid-cols-2 bg-muted/50 p-1 rounded-2xl mb-6">
+            <TabsTrigger value="explore" className="rounded-xl font-bold flex items-center gap-2">
+              <Map className="w-4 h-4" /> Explore
+            </TabsTrigger>
+            <TabsTrigger value="train" className="rounded-xl font-bold flex items-center gap-2">
+              <Dumbbell className="w-4 h-4" /> Train
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ── Explore tab ──────────────────────────────────────────────── */}
+          <TabsContent value="explore" className="space-y-8">
 
         {(nearbyLoading || nearbyEntries.length > 0 || isHidden || locationRequired) && (
           <section>
@@ -396,55 +408,46 @@ export default function Explore() {
                     }`}
                   >
                     <div 
-                      className="h-32 relative"
+                      className="h-16 relative"
                       style={{ 
-                        background: `linear-gradient(135deg, ${realm.color}40, transparent)`,
-                        borderBottom: `2px solid ${realm.color}20`
+                        background: `linear-gradient(135deg, ${realm.color}30, transparent)`,
+                        borderBottom: `1px solid ${realm.color}15`
                       }}
                     >
                       <div className="absolute inset-0 bg-background/50 backdrop-blur-[2px]" />
-                      <div className="absolute inset-0 p-6 flex justify-between items-start">
-                        <div 
-                          className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl font-black shadow-lg"
-                          style={{ backgroundColor: `${realm.color}20`, color: realm.color }}
-                        >
-                          {realm.icon}
+                      <div className="absolute inset-0 px-4 py-3 flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-8 h-8 rounded-xl flex items-center justify-center text-lg font-black shadow"
+                            style={{ backgroundColor: `${realm.color}20`, color: realm.color }}
+                          >
+                            {realm.icon}
+                          </div>
+                          <h2 className="text-base font-black" style={{ color: !isLocked ? realm.color : undefined }}>
+                            {realm.name}
+                          </h2>
                         </div>
                         {isLocked && (
-                          <Badge variant="secondary" className="font-bold flex items-center gap-1">
-                            <Lock className="w-3 h-3" /> Locked
+                          <Badge variant="secondary" className="font-bold flex items-center gap-1 text-[10px]">
+                            <Lock className="w-2.5 h-2.5" /> Locked
                           </Badge>
                         )}
                       </div>
                     </div>
                     
-                    <CardContent className="p-6">
-                      <h2 className="text-2xl font-black mb-2 flex items-center gap-2" style={{ color: !isLocked ? realm.color : undefined }}>
-                        {realm.name}
-                      </h2>
-                      <p className="text-muted-foreground font-medium mb-6 min-h-[3rem]">
+                    <CardContent className="p-3">
+                      <p className="text-muted-foreground text-xs mb-2 line-clamp-2">
                         {realm.description}
                       </p>
-                      
-                      <div className="space-y-4">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Evolution Bonus</p>
-                          <div className="bg-card-foreground/5 p-3 rounded-xl border border-border/50 flex items-center gap-3">
-                            <Zap className="w-5 h-5 text-yellow-500" />
-                            <span className="font-bold text-sm">{realm.evolutionBonus}</span>
-                          </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-1 text-xs text-yellow-500 font-semibold">
+                          <Zap className="w-3 h-3" />{realm.evolutionBonus}
                         </div>
-                        
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Activities</p>
-                          <div className="flex flex-wrap gap-2">
-                            {realm.fitnessTypes?.map((type, idx) => (
-                              <Badge key={idx} variant="outline" className="font-bold capitalize bg-background">
-                                {type.replace('_', ' ')}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
+                        {realm.fitnessTypes?.slice(0, 3).map((type, idx) => (
+                          <Badge key={idx} variant="outline" className="text-[10px] font-semibold capitalize bg-background px-1.5 py-0">
+                            {type.replace('_', ' ')}
+                          </Badge>
+                        ))}
                       </div>
                     </CardContent>
                   </GlassCard>
@@ -453,6 +456,63 @@ export default function Explore() {
             })}
           </div>
         )}
+
+          </TabsContent>
+
+          {/* ── Train tab ────────────────────────────────────────────────── */}
+          <TabsContent value="train" className="space-y-4">
+
+            {/* Rep Counter — featured card */}
+            <Link href="/workout">
+              <div className="rounded-2xl border border-pink-500/30 bg-gradient-to-r from-pink-900/30 to-purple-900/30 p-4 flex items-center gap-4 hover:border-pink-500/60 transition-colors cursor-pointer">
+                <div className="w-12 h-12 rounded-2xl bg-pink-500/20 flex items-center justify-center shrink-0">
+                  <Mic className="w-6 h-6 text-pink-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-foreground flex items-center gap-2">
+                    Rep Counter
+                    <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-semibold">NEW</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Voice &amp; camera counting · Verified reps hatch eggs faster</div>
+                </div>
+                <div className="text-yellow-400 font-bold text-xs text-right shrink-0">
+                  up to 3×<br />
+                  <span className="text-muted-foreground font-normal">XP bonus</span>
+                </div>
+              </div>
+            </Link>
+
+            {/* Training hub grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {([
+                { href: "/training", label: "AI Coach",  desc: "Personalized workout plan",  icon: <Dumbbell className="w-5 h-5 text-blue-400" />,   color: "blue" },
+                { href: "/training", label: "Quests",    desc: "Daily fitness challenges",    icon: <Target    className="w-5 h-5 text-yellow-400" />,  color: "yellow" },
+                { href: "/training", label: "History",   desc: "Your workout log",            icon: <History   className="w-5 h-5 text-zinc-400" />,    color: "zinc" },
+                { href: "/nutrition", label: "Nutrition", desc: "Meal plan & tracking",       icon: <Utensils  className="w-5 h-5 text-green-400" />,   color: "green" },
+              ] as const).map(card => (
+                <Link key={card.href + card.label} href={card.href}>
+                  <div className="rounded-xl border border-white/10 bg-card/60 backdrop-blur p-4 hover:border-white/20 hover:bg-card/80 transition-all cursor-pointer h-full">
+                    {card.icon}
+                    <div className="font-bold text-sm text-foreground mt-2">{card.label}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{card.desc}</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            {/* Grow Your Pals strip in train tab too */}
+            <ForYouStrip
+              heading="Grow Your Pals"
+              items={[
+                { id: "hatch2",   title: "Hatch a new egg",     subtitle: "Open a fresh Pal.",       href: "/hatch",          icon: <Egg      className="w-4 h-4" />, tone: "yellow",  tag: "Hatch" },
+                { id: "compete2", title: "Battle with your Pal", subtitle: "Test your strongest.",    href: "/compete/battle", icon: <Trophy   className="w-4 h-4" />, tone: "primary", tag: "Compete" },
+                { id: "zap2",     title: "Check your Pals",     subtitle: "View stats & evolutions.", href: "/hatchlings",     icon: <Sparkles className="w-4 h-4" />, tone: "violet",  tag: "Pals" },
+              ]}
+            />
+
+          </TabsContent>
+
+        </Tabs>
       </div>
     </Layout>
   );
