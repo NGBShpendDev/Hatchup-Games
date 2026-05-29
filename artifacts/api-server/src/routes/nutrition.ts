@@ -11,9 +11,10 @@ import {
   groupMembersTable,
   hatchlingsTable,
 } from "@workspace/db";
-import { eq, and, desc, sql, inArray, notInArray, or } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, notInArray, or, ne } from "drizzle-orm";
 import { z } from "zod";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth.ts";
+import { blockMinorSocialWrite } from "../middlewares/minorGuard.ts";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { awardBadge } from "../services/badgeService.ts";
 import { getHiddenPlayerIds } from "./safety.ts";
@@ -958,6 +959,21 @@ router.get("/nutrition/posts", requireAuth, attachPlayer, async (req, res) => {
   // Block filtering: drop posts from anyone the viewer blocked or who blocked viewer
   const hiddenIds = await getHiddenPlayerIds(playerId);
 
+  // Privacy filtering: also exclude posts from authors who have opted out of
+  // discovery (locationVisibility="hidden") or are flagged as minors.
+  // This enforces the same three-rule policy documented in safety.ts:1110-1181.
+  const nonDiscoverableRows = await db
+    .select({ id: playersTable.id })
+    .from(playersTable)
+    .where(or(
+      eq(playersTable.locationVisibility, "hidden"),
+      eq(playersTable.isMinor, true),
+    ));
+  const excludedAuthorIds = new Set([...hiddenIds, ...nonDiscoverableRows.map(r => r.id)]);
+  // Always allow the viewer to see their own posts regardless of their own privacy settings
+  excludedAuthorIds.delete(playerId);
+  const allExcludedIds = [...excludedAuthorIds];
+
   // Feed = posts from people the user follows (via group co-membership as the
   //   social-follow proxy in this app) + own posts. If the user has no
   //   follow connections yet, automatically fall back to the global Discover
@@ -987,8 +1003,8 @@ router.get("/nutrition/posts", requireAuth, attachPlayer, async (req, res) => {
   const effectiveMode = fellBackToDiscover ? "discover" : mode;
 
   const whereClauses = [
-    hiddenIds.length > 0 ? notInArray(mealPostsTable.playerId, hiddenIds) : undefined,
-    visiblePlayerIds      ? inArray(mealPostsTable.playerId, visiblePlayerIds) : undefined,
+    allExcludedIds.length > 0 ? notInArray(mealPostsTable.playerId, allExcludedIds) : undefined,
+    visiblePlayerIds          ? inArray(mealPostsTable.playerId, visiblePlayerIds) : undefined,
   ].filter(Boolean) as any[];
 
   const posts = await db.query.mealPostsTable.findMany({
@@ -1165,6 +1181,32 @@ router.post("/nutrition/posts/:id/like", requireAuth, attachPlayer, async (req, 
   const postId = Number(req.params.id);
   const playerId = req.playerId!; // derived server-side from auth token
 
+  // Enforce canonical discoverable-author policy before allowing interaction.
+  // Liking a post from a hidden or minor account is not permitted — return 404
+  // to avoid leaking the post's existence to an unauthorized caller.
+  const targetPost = await db.query.mealPostsTable.findFirst({
+    where: eq(mealPostsTable.id, postId),
+    columns: { playerId: true },
+  });
+  if (!targetPost) { res.status(404).json({ error: "Post not found" }); return; }
+  if (targetPost.playerId !== playerId) {
+    const [hiddenIds, authorRow] = await Promise.all([
+      getHiddenPlayerIds(playerId),
+      db.query.playersTable.findFirst({
+        where: eq(playersTable.id, targetPost.playerId),
+        columns: { locationVisibility: true, isMinor: true },
+      }),
+    ]);
+    if (
+      !authorRow ||
+      authorRow.locationVisibility === "hidden" ||
+      authorRow.isMinor === true ||
+      hiddenIds.includes(targetPost.playerId)
+    ) {
+      res.status(404).json({ error: "Post not found" }); return;
+    }
+  }
+
   const existing = await db.query.mealLikesTable.findFirst({
     where: and(eq(mealLikesTable.mealPostId, postId), eq(mealLikesTable.playerId, playerId)),
   });
@@ -1202,10 +1244,24 @@ router.post("/nutrition/posts/:id/like", requireAuth, attachPlayer, async (req, 
 router.get("/nutrition/posts/:id/comments", requireAuth, attachPlayer, async (req, res) => {
   const postId = Number(req.params.id);
   const viewerId = req.playerId!;
-  const hiddenIds = await getHiddenPlayerIds(viewerId);
 
-  const where = hiddenIds.length > 0
-    ? and(eq(mealCommentsTable.mealPostId, postId), notInArray(mealCommentsTable.playerId, hiddenIds))
+  // Apply full canonical discovery filter: blocked users + hidden-visibility + minors.
+  const [hiddenIds, nonDiscoverableRows] = await Promise.all([
+    getHiddenPlayerIds(viewerId),
+    db.select({ id: playersTable.id })
+      .from(playersTable)
+      .where(or(
+        eq(playersTable.locationVisibility, "hidden"),
+        eq(playersTable.isMinor, true),
+      )),
+  ]);
+  const excludedCommenterIds = new Set([...hiddenIds, ...nonDiscoverableRows.map(r => r.id)]);
+  // Always show the viewer's own comments
+  excludedCommenterIds.delete(viewerId);
+  const allExcludedCommenterIds = [...excludedCommenterIds];
+
+  const where = allExcludedCommenterIds.length > 0
+    ? and(eq(mealCommentsTable.mealPostId, postId), notInArray(mealCommentsTable.playerId, allExcludedCommenterIds))
     : eq(mealCommentsTable.mealPostId, postId);
 
   const comments = await db.query.mealCommentsTable.findMany({
@@ -1231,11 +1287,36 @@ router.get("/nutrition/posts/:id/comments", requireAuth, attachPlayer, async (re
 // ── POST /nutrition/posts/:id/comments ────────────────────────────────────────
 const AddCommentBody = z.object({ content: z.string().min(1).max(500) });
 
-router.post("/nutrition/posts/:id/comments", requireAuth, attachPlayer, async (req, res) => {
+router.post("/nutrition/posts/:id/comments", requireAuth, attachPlayer, blockMinorSocialWrite, async (req, res) => {
   const postId = Number(req.params.id);
   const playerId = req.playerId!; // derived server-side from auth token
   const body = AddCommentBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
+
+  // Enforce canonical discoverable-author policy: do not allow commenting on
+  // posts from hidden or minor accounts. Return 404 to avoid leaking existence.
+  const targetPost = await db.query.mealPostsTable.findFirst({
+    where: eq(mealPostsTable.id, postId),
+    columns: { playerId: true },
+  });
+  if (!targetPost) { res.status(404).json({ error: "Post not found" }); return; }
+  if (targetPost.playerId !== playerId) {
+    const [hiddenIds, authorRow] = await Promise.all([
+      getHiddenPlayerIds(playerId),
+      db.query.playersTable.findFirst({
+        where: eq(playersTable.id, targetPost.playerId),
+        columns: { locationVisibility: true, isMinor: true },
+      }),
+    ]);
+    if (
+      !authorRow ||
+      authorRow.locationVisibility === "hidden" ||
+      authorRow.isMinor === true ||
+      hiddenIds.includes(targetPost.playerId)
+    ) {
+      res.status(404).json({ error: "Post not found" }); return;
+    }
+  }
 
   const [comment] = await db.insert(mealCommentsTable).values({
     mealPostId: postId,
