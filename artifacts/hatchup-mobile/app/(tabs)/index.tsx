@@ -9,12 +9,14 @@ import {
   getGetDailyStreakQueryKey,
   getGetPlayerDashboardQueryKey,
 } from "@workspace/api-client-react";
+import type { DailyClaimResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useRef, useState, useCallback, useEffect } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -29,6 +31,112 @@ import { getRarityColor, capitalize } from "@/constants/rarity";
 
 const PLAYER_ID = 1;
 
+interface RewardSummaryModalProps {
+  result: DailyClaimResult | null;
+  onDismiss: () => void;
+}
+
+function RewardSummaryModal({ result, onDismiss }: RewardSummaryModalProps) {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const scaleAnim = useRef(new Animated.Value(0.85)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (result) {
+      scaleAnim.setValue(0.85);
+      opacityAnim.setValue(0);
+      Animated.parallel([
+        Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, stiffness: 320, damping: 24 }),
+        Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [result, scaleAnim, opacityAnim]);
+
+  if (!result) return null;
+
+  const rows: { icon: string; iconColor: string; label: string; value: string }[] = [];
+  if (result.coinsGranted > 0) {
+    rows.push({ icon: "dollar-sign", iconColor: "#f59e0b", label: "Coins earned", value: `+${result.coinsGranted}` });
+  }
+  if (result.xpGranted > 0) {
+    rows.push({ icon: "zap", iconColor: "#6366f1", label: "XP earned", value: `+${result.xpGranted} XP` });
+  }
+  if (result.eggAdded) {
+    rows.push({ icon: "package", iconColor: "#22c55e", label: "Bonus egg", value: "Added to inventory" });
+  }
+  if (result.artifactGranted) {
+    rows.push({ icon: "star", iconColor: "#a855f7", label: result.artifactGranted.artifactName, value: "Artifact unlocked" });
+  }
+  if (result.streakShieldGranted) {
+    rows.push({ icon: "shield", iconColor: "#22d3ee", label: "Streak Shield", value: "Protect a missed day" });
+  }
+
+  return (
+    <Modal visible transparent animationType="none" onRequestClose={onDismiss}>
+      <Pressable style={rewardModalStyles.backdrop} onPress={onDismiss}>
+        <Animated.View
+          style={[
+            rewardModalStyles.sheet,
+            { backgroundColor: colors.card, paddingBottom: insets.bottom + 16 },
+            { opacity: opacityAnim, transform: [{ scale: scaleAnim }] },
+          ]}
+        >
+          <Pressable>
+            {/* Header */}
+            <View style={rewardModalStyles.header}>
+              <View style={rewardModalStyles.iconWrap}>
+                <Feather name="gift" size={24} color="#f97316" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[rewardModalStyles.title, { color: colors.foreground }]}>Day {result.day} Claimed!</Text>
+                <Text style={[rewardModalStyles.sub, { color: colors.mutedForeground }]}>
+                  Here's what you earned
+                </Text>
+              </View>
+              <Pressable onPress={onDismiss} hitSlop={12}>
+                <Feather name="x" size={20} color={colors.mutedForeground} />
+              </Pressable>
+            </View>
+
+            {/* Divider */}
+            <View style={[rewardModalStyles.divider, { backgroundColor: colors.border }]} />
+
+            {/* Reward rows */}
+            <View style={rewardModalStyles.rows}>
+              {rows.length === 0 ? (
+                <Text style={[rewardModalStyles.emptyText, { color: colors.mutedForeground }]}>Streak maintained!</Text>
+              ) : (
+                rows.map((row, i) => (
+                  <View key={i} style={[rewardModalStyles.row, { borderColor: colors.border }]}>
+                    <View style={[rewardModalStyles.rowIcon, { backgroundColor: row.iconColor + "22" }]}>
+                      <Feather name={row.icon as any} size={18} color={row.iconColor} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[rewardModalStyles.rowLabel, { color: colors.foreground }]}>{row.label}</Text>
+                    </View>
+                    <Text style={[rewardModalStyles.rowValue, { color: row.iconColor }]}>{row.value}</Text>
+                  </View>
+                ))
+              )}
+            </View>
+
+            {/* Collect button */}
+            <Pressable
+              onPress={onDismiss}
+              style={rewardModalStyles.collectBtn}
+              testID="button-collect-rewards"
+            >
+              <Feather name="check-circle" size={16} color="#fff" />
+              <Text style={rewardModalStyles.collectBtnText}>Collect</Text>
+            </Pressable>
+          </Pressable>
+        </Animated.View>
+      </Pressable>
+    </Modal>
+  );
+}
+
 function StreakClaimCard() {
   const colors = useColors();
   const queryClient = useQueryClient();
@@ -38,6 +146,7 @@ function StreakClaimCard() {
   const glowAnim = useRef(new Animated.Value(0.4)).current;
   const shieldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [shieldCelebrating, setShieldCelebrating] = useState(false);
+  const [claimResult, setClaimResult] = useState<DailyClaimResult | null>(null);
 
   const { data: streak, isLoading } = useGetDailyStreak();
   const shieldCount = streak?.streakShields ?? 0;
@@ -78,6 +187,7 @@ function StreakClaimCard() {
       onSuccess: (result) => {
         queryClient.invalidateQueries({ queryKey: getGetDailyStreakQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetPlayerDashboardQueryKey(PLAYER_ID) });
+        setClaimResult(result);
         if (result.streakShieldGranted) {
           triggerShieldCelebration();
         }
@@ -88,6 +198,8 @@ function StreakClaimCard() {
   if (isLoading || !streak) return null;
 
   return (
+    <>
+    <RewardSummaryModal result={claimResult} onDismiss={() => setClaimResult(null)} />
     <View style={[claimStyles.card, { backgroundColor: colors.card, borderColor: "#f97316" + "44" }]}>
       {/* Header row */}
       <View style={claimStyles.headerRow}>
@@ -177,6 +289,7 @@ function StreakClaimCard() {
         </Pressable>
       )}
     </View>
+    </>
   );
 }
 
@@ -455,4 +568,68 @@ const claimStyles = StyleSheet.create({
   shieldInfoText: { flex: 1, fontSize: 11, color: "#67e8f9", lineHeight: 16 },
   shieldUsedRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#22d3ee14", borderRadius: 10, borderWidth: 1, borderColor: "#22d3ee44", paddingHorizontal: 10, paddingVertical: 8 },
   shieldUsedText: { flex: 1, fontSize: 12, color: "#67e8f9", fontWeight: "600" },
+});
+
+const rewardModalStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  sheet: {
+    width: "100%",
+    borderRadius: 24,
+    padding: 20,
+    gap: 0,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 16,
+  },
+  iconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#f97316" + "22",
+    borderWidth: 1,
+    borderColor: "#f97316" + "55",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  title: { fontSize: 18, fontWeight: "800" },
+  sub: { fontSize: 13, marginTop: 2 },
+  divider: { height: 1, marginBottom: 16 },
+  rows: { gap: 10, marginBottom: 20 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+  },
+  rowIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rowLabel: { fontSize: 14, fontWeight: "600" },
+  rowValue: { fontSize: 14, fontWeight: "800" },
+  emptyText: { fontSize: 14, textAlign: "center", paddingVertical: 8 },
+  collectBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#f97316",
+    borderRadius: 14,
+    paddingVertical: 13,
+  },
+  collectBtnText: { color: "#fff", fontSize: 15, fontWeight: "800" },
 });
