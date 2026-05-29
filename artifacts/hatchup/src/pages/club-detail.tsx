@@ -16,6 +16,7 @@ import {
   getListClubPendingInvitesQueryKey,
   useCancelClubInvite,
   useUpdateClubMemberRole,
+  useJoinClub,
   useLeaveClub,
   useTransferClubOwnership,
   useKickClubMember,
@@ -153,6 +154,23 @@ export default function ClubDetail() {
       queryKey: getListClubPendingInvitesQueryKey(id),
       enabled: Number.isFinite(id),
       retry: false,
+    },
+  });
+
+  const joinMutation = useJoinClub({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Joined club!", description: "You're now a member of this club." });
+        queryClient.invalidateQueries({ queryKey: getGetClubQueryKey(id) });
+        queryClient.invalidateQueries({ queryKey: getListClubMembersQueryKey(id) });
+      },
+      onError: (err: { response?: { data?: { error?: string } } }) => {
+        toast({
+          title: "Could not join club",
+          description: err?.response?.data?.error ?? "Try again",
+          variant: "destructive",
+        });
+      },
     },
   });
 
@@ -343,6 +361,19 @@ export default function ClubDetail() {
                 >
                   <Share2 className="w-4 h-4" /> Share
                 </Button>
+                {!isMember && player && (
+                  <Button
+                    onClick={() =>
+                      joinMutation.mutate({ id, data: { playerId: player.id } })
+                    }
+                    disabled={joinMutation.isPending}
+                    className="bg-primary hover:bg-primary/90 font-bold gap-2"
+                    data-testid="button-join-club"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    {joinMutation.isPending ? "Joining…" : "Join Club"}
+                  </Button>
+                )}
                 {isMember && (
                   <Button
                     variant="outline"
