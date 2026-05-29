@@ -401,7 +401,7 @@ export default function Leaderboard() {
                         Unlock {SCOPES.find(s => s.key === scope)?.label ?? "local"} rankings
                       </p>
                       <p className="text-xs text-white/70 mt-1 leading-relaxed">
-                        Local boards (nearby, city, county, state) are a Premium feature. Upgrade to see how you stack up in your area.
+                        State, National &amp; Global leaderboards are a Premium feature. Upgrade to compete with everyone — in your state, your country, and worldwide.
                       </p>
                     </div>
                   </div>

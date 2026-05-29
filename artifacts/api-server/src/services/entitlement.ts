@@ -26,7 +26,7 @@ const FREE_FEATURES: Entitlement["features"] = {
   hatchlingStorageCap: 6,
   dailyCoachPromptCap: 5,
   dailyBattleEntryCap: 5,
-  allowedScopes: ["world", "country"],
+  allowedScopes: ["county", "city", "nearby"],
   advancedAnalytics: false,
   premiumCosmetics: false,
   customizationSlots: 2,

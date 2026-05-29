@@ -57,14 +57,19 @@ const FREE_FEATURES = [
   "Up to 6 Hatchlings in your roster",
   "5 AI coach messages per day",
   "5 battle entries per day",
-  "World & country leaderboards",
+  "City & nearby leaderboards",
+  "Manual & voice rep counting",
 ];
 
 const PREMIUM_FEATURES = [
+  "Camera AI Rep Counting (3× XP boost)",
+  "AI Form Analysis",
+  "AI Food Scanner",
+  "AI Body Fat Scanner",
+  "Advanced AI Coach — unlimited + deep analytics",
+  "State, National & Global Leaderboards",
   "Unlimited Hatchlings",
-  "Unlimited AI coach + advanced analytics",
   "Unlimited battles + ranked play",
-  "Local leaderboards (nearby, city, county, state)",
   "Premium cosmetics + 12 customization slots",
   "Unlimited social posts and follows",
 ];
@@ -261,9 +266,9 @@ export default function SubscriptionPage() {
 
             <PlanCard
               title="Monthly"
-              price="$8.99"
+              price="$9.99"
               suffix="/ month"
-              cta="Start Monthly"
+              cta="Start Monthly — $9.99/mo"
               testid="button-checkout-monthly"
               onClick={() => handleCheckout("month")}
               loading={checkout.isPending}
@@ -271,10 +276,10 @@ export default function SubscriptionPage() {
 
             <PlanCard
               title="Yearly"
-              price="$80"
+              price="$100"
               suffix="/ year"
-              badge="Save 26%"
-              cta="Start Yearly"
+              badge="Save 17%"
+              cta="Start Yearly — $100/yr"
               testid="button-checkout-yearly"
               onClick={() => handleCheckout("year")}
               loading={checkout.isPending}

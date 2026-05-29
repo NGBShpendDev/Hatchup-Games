@@ -35,8 +35,8 @@ router.get("/subscription/me", requireAuth, attachPlayer, attachEntitlement, asy
   res.json({
     ...ent,
     pricing: {
-      monthly: { amount: 899, currency: "usd", interval: "month", label: "$8.99 / month" },
-      yearly:  { amount: 8000, currency: "usd", interval: "year",  label: "$80 / year (save 26%)" },
+      monthly: { amount: 999, currency: "usd", interval: "month", label: "$9.99 / month" },
+      yearly:  { amount: 10000, currency: "usd", interval: "year",  label: "$100 / year · save 17%" },
     },
     stripeConfigured: !!process.env.STRIPE_SECRET_KEY || !!(await tryGetStripe()),
   });

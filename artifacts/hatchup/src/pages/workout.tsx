@@ -13,6 +13,7 @@ import {
   ChevronLeft, CheckCircle2, Star, Play, Square, Volume2,
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useSubscription } from "@/lib/subscription";
 
 // ── Exercise catalogue ────────────────────────────────────────────────────────
 const EXERCISES = [
@@ -607,12 +608,8 @@ export default function WorkoutPage() {
 
   const logActivity = useLogActivity();
 
-  const isPremium = !!(
-    player && (
-      (player as any).subscriptionTier === "premium" ||
-      (player as any).subscriptionSource === "trial"
-    )
-  );
+  const { data: subscriptionData } = useSubscription();
+  const isPremium = subscriptionData?.tier === "premium";
 
   const modeVerif: Record<CountMode, VerifLevel> = { manual: "bronze", voice: "silver", camera: "diamond" };
 

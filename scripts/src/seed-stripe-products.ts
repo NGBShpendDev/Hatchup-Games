@@ -51,10 +51,10 @@ async function main(): Promise<void> {
   // Ensure both prices exist
   const prices = await stripe.prices.list({ product: product.id, active: true, limit: 20 });
 
-  if (!prices.data.find(p => p.recurring?.interval === "month" && p.unit_amount === 899)) {
+  if (!prices.data.find(p => p.recurring?.interval === "month" && p.unit_amount === 999)) {
     const p = await stripe.prices.create({
       product: product.id,
-      unit_amount: 899,
+      unit_amount: 999,
       currency: "usd",
       recurring: { interval: "month" },
       metadata: { app: "hatchup", tier: "monthly" },
@@ -64,10 +64,10 @@ async function main(): Promise<void> {
     console.log("Monthly price already exists");
   }
 
-  if (!prices.data.find(p => p.recurring?.interval === "year" && p.unit_amount === 8000)) {
+  if (!prices.data.find(p => p.recurring?.interval === "year" && p.unit_amount === 10000)) {
     const p = await stripe.prices.create({
       product: product.id,
-      unit_amount: 8000,
+      unit_amount: 10000,
       currency: "usd",
       recurring: { interval: "year" },
       metadata: { app: "hatchup", tier: "yearly" },

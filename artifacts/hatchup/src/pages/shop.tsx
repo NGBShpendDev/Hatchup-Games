@@ -1,13 +1,15 @@
 import { Link } from "wouter";
-import { ArrowLeft, ShoppingBag, ShieldCheck, ShoppingCart, Sparkles, Loader2, RefreshCw, Minus, Plus } from "lucide-react";
+import { ArrowLeft, ShoppingBag, ShieldCheck, ShoppingCart, Sparkles, Loader2, RefreshCw, Minus, Plus, Crown, Camera, Bot, Trophy, Check } from "lucide-react";
 import {
   useGetDailyStreak, getGetDailyStreakQueryKey,
   useBuyStreakShield,
   useUpdateShieldAutoReplenish,
   useGetCurrentPlayer, getGetCurrentPlayerQueryKey,
 } from "@workspace/api-client-react";
+import { useState } from "react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscription, useStartCheckout } from "@/lib/subscription";
 
 const SHIELD_COST = 200;
 
@@ -17,6 +19,24 @@ export default function ShopPage() {
 
   const { data: player } = useGetCurrentPlayer();
   const { data: streak } = useGetDailyStreak();
+  const { data: subscription } = useSubscription();
+  const checkout = useStartCheckout();
+  const [checkoutPending, setCheckoutPending] = useState<"month" | "year" | null>(null);
+
+  const isPremium = subscription?.tier === "premium";
+
+  const handlePremiumCheckout = async (interval: "month" | "year") => {
+    setCheckoutPending(interval);
+    try {
+      const { url } = await checkout.mutateAsync(interval);
+      window.location.href = url;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Checkout unavailable";
+      toast({ title: "Couldn't start checkout", description: msg, variant: "destructive" });
+    } finally {
+      setCheckoutPending(null);
+    }
+  };
 
   const coins = player?.coins ?? 0;
   const shieldCount = streak?.streakShields ?? 0;
@@ -80,6 +100,102 @@ export default function ShopPage() {
             <h1 className="font-black text-xl">Shop</h1>
           </div>
         </div>
+
+        {/* ── Premium Membership ─────────────────────────────────────── */}
+        <section
+          className="rounded-3xl border border-amber-400/30 bg-gradient-to-br from-amber-500/10 via-pink-500/8 to-violet-500/10 p-5 space-y-4"
+          data-testid="section-premium-membership"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-400/20 flex items-center justify-center shrink-0">
+              <Crown className="w-5 h-5 text-amber-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-black text-sm text-amber-200">HatchUp Premium</h3>
+                {isPremium && (
+                  <span className="text-[9px] font-black bg-amber-500/25 text-amber-300 border border-amber-400/30 rounded-full px-2 py-0.5 uppercase tracking-wide">
+                    {subscription?.source === "trial" ? `Trial · ${subscription.daysLeftInTrial}d left` : "Active"}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-white/60 mt-0.5 leading-relaxed">
+                AI coaching, camera rep counting, global leaderboards &amp; more.
+              </p>
+            </div>
+          </div>
+
+          {/* Premium feature highlights */}
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { icon: <Camera className="w-3.5 h-3.5 text-pink-400" />, label: "Camera Rep Counter" },
+              { icon: <Bot className="w-3.5 h-3.5 text-violet-400" />, label: "Advanced AI Coach" },
+              { icon: <Trophy className="w-3.5 h-3.5 text-amber-400" />, label: "Global Leaderboards" },
+              { icon: <Sparkles className="w-3.5 h-3.5 text-cyan-400" />, label: "AI Food & Body Scanner" },
+            ].map(({ icon, label }) => (
+              <div key={label} className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2">
+                {icon}
+                <span className="text-[11px] font-bold text-white/80">{label}</span>
+              </div>
+            ))}
+          </div>
+
+          {isPremium ? (
+            <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl px-4 py-3">
+              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+              <p className="text-sm font-bold text-emerald-300">You have Premium — enjoy all features!</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {/* Monthly plan */}
+              <button
+                onClick={() => handlePremiumCheckout("month")}
+                disabled={checkoutPending !== null}
+                data-testid="button-shop-checkout-monthly"
+                className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 border border-white/10 hover:border-amber-400/30 rounded-2xl px-4 py-3 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="text-left">
+                  <p className="text-sm font-black">Monthly</p>
+                  <p className="text-xs text-white/50 mt-0.5">Auto-renews monthly · cancel anytime</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {checkoutPending === "month" ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+                  ) : (
+                    <span className="text-base font-black text-amber-300">$9.99<span className="text-xs font-bold text-white/50">/mo</span></span>
+                  )}
+                </div>
+              </button>
+
+              {/* Yearly plan */}
+              <button
+                onClick={() => handlePremiumCheckout("year")}
+                disabled={checkoutPending !== null}
+                data-testid="button-shop-checkout-yearly"
+                className="w-full flex items-center justify-between bg-gradient-to-r from-amber-500/15 to-pink-500/10 hover:from-amber-500/25 hover:to-pink-500/20 border border-amber-400/40 rounded-2xl px-4 py-3 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="text-left">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-black">Yearly</p>
+                    <span className="text-[9px] font-black bg-amber-400/25 text-amber-300 border border-amber-400/40 rounded-full px-1.5 py-0.5 uppercase tracking-wide">Save 17%</span>
+                  </div>
+                  <p className="text-xs text-white/50 mt-0.5">Auto-renews yearly · cancel anytime</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {checkoutPending === "year" ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+                  ) : (
+                    <span className="text-base font-black text-amber-300">$100<span className="text-xs font-bold text-white/50">/yr</span></span>
+                  )}
+                </div>
+              </button>
+
+              <p className="text-center text-[10px] text-white/30 pt-1">
+                Secure checkout via Stripe · Prices in USD
+              </p>
+            </div>
+          )}
+        </section>
 
         {/* Streak Shield Section */}
         <section
