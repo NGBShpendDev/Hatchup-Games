@@ -15,10 +15,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useCurrentPlayerId } from "@/providers/CurrentPlayerProvider";
 
-const PLAYER_ID = 1;
 
 export default function FollowingScreen() {
+  const PLAYER_ID = useCurrentPlayerId();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();

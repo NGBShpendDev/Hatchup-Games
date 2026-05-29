@@ -13,8 +13,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useCurrentPlayerId } from "@/providers/CurrentPlayerProvider";
 
-const PLAYER_ID = 1;
 
 const RANK_ICONS: Record<number, { icon: string; color: string }> = {
   1: { icon: "award", color: "#f59e0b" },
@@ -23,6 +23,7 @@ const RANK_ICONS: Record<number, { icon: string; color: string }> = {
 };
 
 export default function LeaderboardScreen() {
+  const PLAYER_ID = useCurrentPlayerId();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();

@@ -14,11 +14,12 @@ import {
   useGetCurrentPlayer, getGetCurrentPlayerQueryKey,
 } from "@workspace/api-client-react";
 import { useColors } from "@/hooks/useColors";
+import { useCurrentPlayerId } from "@/providers/CurrentPlayerProvider";
 
-const PLAYER_ID = 1;
 const SHIELD_COST = 200;
 
 export default function ShopScreen() {
+  const PLAYER_ID = useCurrentPlayerId();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();

@@ -18,6 +18,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { CurrentPlayerProvider } from "@/providers/CurrentPlayerProvider";
 import {
   registerBackgroundSync,
   unregisterBackgroundSync,
@@ -139,13 +140,17 @@ function AuthedStack() {
     );
   }
 
-  return (
+  const stackEl = (
     <Stack screenOptions={{ headerShown: false, headerBackTitle: "Back" }}>
       {SCREENS.map((s) => (
         <Stack.Screen key={s.name} name={s.name} options={{ headerShown: false }} />
       ))}
     </Stack>
   );
+
+  return isSignedIn ? (
+    <CurrentPlayerProvider>{stackEl}</CurrentPlayerProvider>
+  ) : stackEl;
 }
 
 export default function RootLayout() {

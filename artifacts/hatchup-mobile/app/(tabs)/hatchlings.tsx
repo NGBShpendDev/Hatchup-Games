@@ -14,10 +14,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { useCurrentPlayerId } from "@/providers/CurrentPlayerProvider";
 import { getRarityColor, capitalize } from "@/constants/rarity";
 import { ScreenGradientBg } from "@/components/ScreenGradientBg";
 
-const PLAYER_ID = 1;
 const RARITIES = ["all", "common", "uncommon", "rare", "epic", "legendary", "mythic", "ancient", "celestial"];
 
 function buildHatchlingShareUrl(hatchlingId: number): string {
@@ -89,6 +89,7 @@ function HatchlingCard({ item, onPress }: HatchlingCardProps) {
 }
 
 export default function HatchlingsScreen() {
+  const PLAYER_ID = useCurrentPlayerId();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();

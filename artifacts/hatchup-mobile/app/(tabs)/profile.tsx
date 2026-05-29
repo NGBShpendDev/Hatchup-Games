@@ -18,11 +18,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { useCurrentPlayerId } from "@/providers/CurrentPlayerProvider";
 import { ScreenGradientBg } from "@/components/ScreenGradientBg";
 
 const SHIELD_COST = 200;
 
-const PLAYER_ID = 1;
 
 const RANK_COLORS: Record<string, string> = {
   Bronze: "#cd7f32",
@@ -51,6 +51,7 @@ const MENU_ITEMS = [
 ];
 
 function StreakProtectionCard({ coins }: { coins: number }) {
+  const PLAYER_ID = useCurrentPlayerId();
   const colors = useColors();
   const queryClient = useQueryClient();
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -226,6 +227,7 @@ function MenuItem({ item }: { item: typeof MENU_ITEMS[0] }) {
 }
 
 export default function ProfileScreen() {
+  const PLAYER_ID = useCurrentPlayerId();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();

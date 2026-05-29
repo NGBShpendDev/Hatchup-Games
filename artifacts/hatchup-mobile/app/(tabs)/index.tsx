@@ -13,6 +13,8 @@ import type { DailyClaimResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useRef, useState, useCallback, useEffect } from "react";
+import * as SecureStore from "expo-secure-store";
+import { StreakCalendarModal } from "@/components/StreakCalendarModal";
 import {
   ActivityIndicator,
   Animated,
@@ -27,11 +29,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { useCurrentPlayerId } from "@/providers/CurrentPlayerProvider";
 import { getRarityColor, capitalize } from "@/constants/rarity";
 import { GradientButton } from "@/components/GradientButton";
 import { ScreenGradientBg } from "@/components/ScreenGradientBg";
 
-const PLAYER_ID = 1;
 
 interface RewardSummaryModalProps {
   result: DailyClaimResult | null;
@@ -140,6 +142,7 @@ function RewardSummaryModal({ result, onDismiss }: RewardSummaryModalProps) {
 }
 
 function StreakClaimCard() {
+  const PLAYER_ID = useCurrentPlayerId();
   const colors = useColors();
   const queryClient = useQueryClient();
 
@@ -343,7 +346,10 @@ const QUICK_LINKS: QuickLinkProps[] = [
   { label: "Subscription", icon: "zap", color: "#ee2b8c", route: "/subscription" },
 ];
 
+const STREAK_MODAL_DATE_KEY = "streak_modal_last_date";
+
 export default function HomeScreen() {
+  const PLAYER_ID = useCurrentPlayerId();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -354,12 +360,34 @@ export default function HomeScreen() {
   const { data: hatchlings } = useListHatchlings({ playerId: PLAYER_ID, limit: 1 });
   const { data: quests } = useGetActiveQuests(PLAYER_ID);
   const { data: unread } = useGetUnreadNotificationCount();
+  const { data: dailyStreak } = useGetDailyStreak();
+
+  const [streakModalOpen, setStreakModalOpen] = useState(false);
+  const streakAutoShownRef = useRef(false);
+
+  useEffect(() => {
+    if (!dailyStreak || streakAutoShownRef.current) return;
+    if (dailyStreak.alreadyClaimed) return;
+    const today = new Date().toISOString().slice(0, 10);
+    SecureStore.getItemAsync(STREAK_MODAL_DATE_KEY).then((stored) => {
+      if (stored !== today) {
+        streakAutoShownRef.current = true;
+        SecureStore.setItemAsync(STREAK_MODAL_DATE_KEY, today).catch(() => {});
+        setStreakModalOpen(true);
+      }
+    }).catch(() => {});
+  }, [dailyStreak]);
 
   const activePal = hatchlings?.[0];
   const rarityColor = activePal ? getRarityColor(activePal.rarity) : colors.primary;
 
   return (
     <ScreenGradientBg>
+      <StreakCalendarModal
+        visible={streakModalOpen}
+        playerId={PLAYER_ID}
+        onClose={() => setStreakModalOpen(false)}
+      />
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingTop: topPad + 12, paddingBottom: bottomPad + 90 }}
@@ -374,6 +402,18 @@ export default function HomeScreen() {
           </Text>
         </View>
         <View style={styles.headerActions}>
+          {/* Streak badge — tap to open the calendar */}
+          {dailyStreak && (
+            <Pressable
+              onPress={() => setStreakModalOpen(true)}
+              style={[styles.iconBtn, { borderColor: dailyStreak.alreadyClaimed ? colors.border : "#f97316aa" }]}
+            >
+              <Feather name="zap" size={18} color={dailyStreak.alreadyClaimed ? colors.mutedForeground : "#f97316"} />
+              {!dailyStreak.alreadyClaimed && (
+                <View style={[styles.badgeDot, { backgroundColor: "#f97316" }]} />
+              )}
+            </Pressable>
+          )}
           <Pressable
             onPress={() => router.push("/shop")}
             style={[styles.iconBtn, { borderColor: colors.border }]}

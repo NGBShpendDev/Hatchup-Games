@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useCurrentPlayerId } from "@/providers/CurrentPlayerProvider";
 import { getRarityColor, capitalize } from "@/constants/rarity";
 
 // Stage thresholds mirror the web app and server logic:
@@ -46,7 +47,6 @@ function buildHatchlingShareUrl(hatchlingId: number): string {
   return `https://${domain}/hatchling/${hatchlingId}`;
 }
 
-const PLAYER_ID = 1;
 
 function buildAvatarUrl(hatchlingId: number): string {
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
@@ -55,6 +55,7 @@ function buildAvatarUrl(hatchlingId: number): string {
 }
 
 export default function HatchlingDetailScreen() {
+  const PLAYER_ID = useCurrentPlayerId();
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const insets = useSafeAreaInsets();

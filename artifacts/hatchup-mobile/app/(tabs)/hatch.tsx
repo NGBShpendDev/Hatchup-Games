@@ -24,10 +24,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
+import { useCurrentPlayerId } from "@/providers/CurrentPlayerProvider";
 import { GradientButton } from "@/components/GradientButton";
 import { ScreenGradientBg } from "@/components/ScreenGradientBg";
 
-const PLAYER_ID = 1;
 const BASE_SLOTS = 3;
 const MAX_EXTRA_SLOTS = 5;
 
@@ -253,6 +253,7 @@ const bagStyles = StyleSheet.create({
 });
 
 export default function HatchScreen() {
+  const PLAYER_ID = useCurrentPlayerId();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();

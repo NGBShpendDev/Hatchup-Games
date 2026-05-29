@@ -14,10 +14,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useCurrentPlayerId } from "@/providers/CurrentPlayerProvider";
 import { getRarityColor, capitalize } from "@/constants/rarity";
 import { ComebackStreakCelebration, ComebackStreakData } from "@/components/ComebackStreakCelebration";
 
-const PLAYER_ID = 1;
 
 function RingStat({ label, value, color, sublabel }: {
   label: string; value: number; color: string; sublabel?: string;
@@ -51,6 +51,7 @@ function VitalBar({ label, value, color }: { label: string; value: number; color
 }
 
 export default function MyPalScreen() {
+  const PLAYER_ID = useCurrentPlayerId();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
