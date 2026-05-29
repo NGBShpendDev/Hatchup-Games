@@ -7,8 +7,9 @@ import {
   playersTable,
   userReportsTable,
   notificationsTable,
+  playerLocationTable,
 } from "@workspace/db";
-import { eq, desc, and, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, or, sql, inArray } from "drizzle-orm";
 import { sendPushToPlayer } from "../services/pushNotifications.ts";
 import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import {
@@ -28,8 +29,90 @@ function containsFlaggedContent(text: string): boolean {
   return BAD_WORDS.some(w => lower.includes(w));
 }
 
-// ── Finalize / advance / push wiring lives in `services/challengeFinalize.ts`.
-// The route layer just calls `finalizeChallenge(id)` on expired challenges.
+// ── Access-control helpers ─────────────────────────────────────────────────
+
+interface AccessContext {
+  playerId: number;
+  playerClubId: number | null | undefined;
+  playerCity: string | null | undefined;
+  /** challenge IDs the player has already joined */
+  participatingIds: Set<number>;
+  /** challenge IDs the player has a pending or accepted invite for */
+  invitedIds: Set<number>;
+}
+
+/**
+ * Returns true if the player is allowed to browse / view / join this challenge.
+ * For browse we pass a pre-built context to avoid N+1 queries.
+ */
+async function canAccess(
+  challenge: { id: number; type: string; creatorId: number },
+  ctx: AccessContext,
+  creatorClubId?: number | null,
+  creatorCity?: string | null,
+): Promise<boolean> {
+  if (challenge.type === "public") return true;
+  if (challenge.creatorId === ctx.playerId) return true;
+  if (ctx.participatingIds.has(challenge.id)) return true;
+
+  if (challenge.type === "private") {
+    return ctx.invitedIds.has(challenge.id);
+  }
+
+  if (challenge.type === "guild") {
+    if (!ctx.playerClubId) return false;
+    // creatorClubId may be passed in (pre-loaded) or we need to fetch it
+    const ccId = creatorClubId !== undefined
+      ? creatorClubId
+      : (await db.query.playersTable.findFirst({ where: eq(playersTable.id, challenge.creatorId) }))?.clubId;
+    return !!ccId && ccId === ctx.playerClubId;
+  }
+
+  if (challenge.type === "city") {
+    // Default-deny: both parties must have a known city and they must match.
+    if (!ctx.playerCity) return false;
+    const cCity = creatorCity !== undefined
+      ? creatorCity
+      : (await db.query.playerLocationTable.findFirst({ where: eq(playerLocationTable.playerId, challenge.creatorId) }))?.city;
+    if (!cCity) return false; // creator city unknown → deny
+    return cCity === ctx.playerCity;
+  }
+
+  return false;
+}
+
+/**
+ * Build an AccessContext for the current player with a single batch load.
+ * challengeIds: the universe of challenge IDs being considered (for invite check).
+ */
+async function buildAccessContext(playerId: number, challengeIds: number[]): Promise<AccessContext> {
+  const [player, playerLocation, participations, invites] = await Promise.all([
+    db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) }),
+    db.query.playerLocationTable.findFirst({ where: eq(playerLocationTable.playerId, playerId) }),
+    db.query.challengeParticipantsTable.findMany({ where: eq(challengeParticipantsTable.playerId, playerId) }),
+    challengeIds.length
+      ? db.query.challengeInvitesTable.findMany({
+          where: and(
+            eq(challengeInvitesTable.inviteeId, playerId),
+            inArray(challengeInvitesTable.challengeId, challengeIds),
+            // Declined invites do NOT grant access — only pending or accepted do
+            or(
+              eq(challengeInvitesTable.status, "pending"),
+              eq(challengeInvitesTable.status, "accepted"),
+            ),
+          ),
+        })
+      : Promise.resolve([]),
+  ]);
+
+  return {
+    playerId,
+    playerClubId: player?.clubId,
+    playerCity: playerLocation?.city,
+    participatingIds: new Set(participations.map(p => p.challengeId)),
+    invitedIds: new Set(invites.map(i => i.challengeId)),
+  };
+}
 
 // ── Browse challenges ──────────────────────────────────────────────────────
 router.get("/challenges", requireAuth, attachPlayer, async (req, res) => {
@@ -61,7 +144,7 @@ router.get("/challenges", requireAuth, attachPlayer, async (req, res) => {
   if (type) rows = rows.filter(c => c.type === type);
 
   if (tab === "my") {
-    // Challenges I created or joined
+    // Challenges I created or joined — no extra access-control needed
     const myParticipations = await db.query.challengeParticipantsTable.findMany({
       where: eq(challengeParticipantsTable.playerId, playerId),
     });
@@ -71,28 +154,50 @@ router.get("/challenges", requireAuth, attachPlayer, async (req, res) => {
     ]);
     rows = rows.filter(c => myIds.has(c.id));
   } else if (tab === "trending") {
-    rows = rows.filter(c => c.status === "active").slice(0, 20);
+    // Only public active challenges appear in trending
+    rows = rows.filter(c => c.status === "active" && c.type === "public").slice(0, 20);
   } else if (tab === "nearby") {
+    // City-scoped + public. City challenges are further filtered by access control below.
     rows = rows.filter(c => c.type === "city" || c.type === "public").slice(0, 20);
   } else if (tab === "friends") {
-    rows = rows.filter(c => c.type === "public" || c.type === "private").slice(0, 20);
+    // Friends tab only surfaces public challenges
+    rows = rows.filter(c => c.type === "public").slice(0, 20);
   }
 
-  // Batch-load creators
+  // ── Access control: strip out non-public challenges the caller cannot see ──
+  const challengeIds = rows.map(c => c.id);
+  const ctx = await buildAccessContext(playerId, challengeIds);
+
+  // Batch-load creator records (needed for guild / city checks)
   const creatorIds = [...new Set(rows.map(c => c.creatorId))];
   const creators = creatorIds.length
     ? await db.query.playersTable.findMany({ where: (t, { inArray }) => inArray(t.id, creatorIds) })
     : [];
   const creatorMap = Object.fromEntries(creators.map(p => [p.id, p]));
 
+  // Batch-load creator locations for city challenges
+  const cityCreatorIds = [...new Set(rows.filter(c => c.type === "city").map(c => c.creatorId))];
+  const creatorLocations = cityCreatorIds.length
+    ? await db.query.playerLocationTable.findMany({ where: (t, { inArray }) => inArray(t.playerId, cityCreatorIds) })
+    : [];
+  const creatorLocationMap = Object.fromEntries(creatorLocations.map(l => [l.playerId, l]));
+
+  const accessChecks = await Promise.all(rows.map(c =>
+    canAccess(
+      c,
+      ctx,
+      creatorMap[c.creatorId]?.clubId,
+      creatorLocationMap[c.creatorId]?.city,
+    )
+  ));
+  rows = rows.filter((_, i) => accessChecks[i]);
+
   // Enrich with participant count
   const enriched = await Promise.all(rows.map(async (c) => {
     const [{ count }] = await db.select({ count: sql<number>`count(*)::int` })
       .from(challengeParticipantsTable)
       .where(eq(challengeParticipantsTable.challengeId, c.id));
-    const myEntry = await db.query.challengeParticipantsTable.findFirst({
-      where: and(eq(challengeParticipantsTable.challengeId, c.id), eq(challengeParticipantsTable.playerId, playerId)),
-    });
+    const myEntry = ctx.participatingIds.has(c.id);
     const creator = creatorMap[c.creatorId];
     return {
       ...c,
@@ -100,7 +205,7 @@ router.get("/challenges", requireAuth, attachPlayer, async (req, res) => {
       endAt: c.endAt.toISOString(),
       createdAt: c.createdAt.toISOString(),
       participantCount: count ?? 0,
-      isJoined: !!myEntry,
+      isJoined: myEntry,
       creator: creator
         ? { id: creator.id, username: creator.username, displayName: creator.displayName, avatarUrl: creator.avatarUrl }
         : null,
@@ -121,6 +226,29 @@ router.get("/challenges/:id", requireAuth, attachPlayer, async (req, res) => {
   // Auto-finalize if expired
   if (challenge.status === "active" && new Date(challenge.endAt) < new Date()) {
     await finalizeChallenge(id);
+  }
+
+  // ── Access control ──────────────────────────────────────────────────────
+  const playerId = req.playerId!;
+  const ctx = await buildAccessContext(playerId, [id]);
+
+  if (challenge.type !== "public") {
+    let creatorClubId: number | null | undefined;
+    let creatorCity: string | null | undefined;
+
+    if (challenge.type === "guild") {
+      const creator = await db.query.playersTable.findFirst({ where: eq(playersTable.id, challenge.creatorId) });
+      creatorClubId = creator?.clubId;
+    } else if (challenge.type === "city") {
+      const creatorLocation = await db.query.playerLocationTable.findFirst({ where: eq(playerLocationTable.playerId, challenge.creatorId) });
+      creatorCity = creatorLocation?.city;
+    }
+
+    const allowed = await canAccess(challenge, ctx, creatorClubId, creatorCity);
+    if (!allowed) {
+      res.status(403).json({ error: "You do not have access to this challenge" });
+      return;
+    }
   }
 
   const rawParticipants = await db.query.challengeParticipantsTable.findMany({
@@ -164,7 +292,7 @@ router.get("/challenges/:id", requireAuth, attachPlayer, async (req, res) => {
     leaderboard,
     participantCount: participants.length,
     creator: creator ? { id: creator.id, username: creator.username, displayName: creator.displayName, avatarUrl: creator.avatarUrl } : null,
-    isJoined: participants.some(p => p.playerId === req.playerId),
+    isJoined: ctx.participatingIds.has(id),
   });
 });
 
@@ -232,10 +360,49 @@ router.post("/challenges/:id/join", requireAuth, attachPlayer, async (req, res) 
   if (challenge.status !== "active") { res.status(400).json({ error: "Challenge is not active" }); return; }
   if (new Date() > new Date(challenge.endAt)) { res.status(400).json({ error: "Challenge has ended" }); return; }
 
+  const playerId = req.playerId!;
+
   const existing = await db.query.challengeParticipantsTable.findFirst({
-    where: and(eq(challengeParticipantsTable.challengeId, id), eq(challengeParticipantsTable.playerId, req.playerId!)),
+    where: and(eq(challengeParticipantsTable.challengeId, id), eq(challengeParticipantsTable.playerId, playerId)),
   });
   if (existing) { res.status(400).json({ error: "Already joined" }); return; }
+
+  // ── Type-specific authorization ─────────────────────────────────────────
+  if (challenge.type === "private") {
+    // Only players with a pending invite may join directly
+    const invite = await db.query.challengeInvitesTable.findFirst({
+      where: and(
+        eq(challengeInvitesTable.challengeId, id),
+        eq(challengeInvitesTable.inviteeId, playerId),
+        eq(challengeInvitesTable.status, "pending"),
+      ),
+    });
+    if (!invite) {
+      res.status(403).json({ error: "This challenge is invite-only. You need an invitation to join." });
+      return;
+    }
+  } else if (challenge.type === "guild") {
+    // Only members of the creator's club may join
+    const [player, creator] = await Promise.all([
+      db.query.playersTable.findFirst({ where: eq(playersTable.id, playerId) }),
+      db.query.playersTable.findFirst({ where: eq(playersTable.id, challenge.creatorId) }),
+    ]);
+    if (!player?.clubId || !creator?.clubId || player.clubId !== creator.clubId) {
+      res.status(403).json({ error: "This challenge is for club members only. You must be in the same club as the creator to join." });
+      return;
+    }
+  } else if (challenge.type === "city") {
+    // Only players in the same city as the creator may join
+    const [playerLocation, creatorLocation] = await Promise.all([
+      db.query.playerLocationTable.findFirst({ where: eq(playerLocationTable.playerId, playerId) }),
+      db.query.playerLocationTable.findFirst({ where: eq(playerLocationTable.playerId, challenge.creatorId) }),
+    ]);
+    // Default-deny: both parties must have a known city and they must match.
+    if (!playerLocation?.city || !creatorLocation?.city || playerLocation.city !== creatorLocation.city) {
+      res.status(403).json({ error: "This challenge is restricted to players in the same city." });
+      return;
+    }
+  }
 
   const [{ count }] = await db.select({ count: sql<number>`count(*)::int` })
     .from(challengeParticipantsTable)
@@ -246,7 +413,7 @@ router.post("/challenges/:id/join", requireAuth, attachPlayer, async (req, res) 
 
   const [participant] = await db.insert(challengeParticipantsTable).values({
     challengeId: id,
-    playerId: req.playerId!,
+    playerId,
     currentValue: 0,
   }).returning();
 
