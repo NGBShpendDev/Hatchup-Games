@@ -17,6 +17,7 @@ import { useColors } from "@/hooks/useColors";
 import { useCurrentPlayerId } from "@/providers/CurrentPlayerProvider";
 import { getRarityColor, capitalize } from "@/constants/rarity";
 import { ScreenGradientBg } from "@/components/ScreenGradientBg";
+import { GenerativeCreature } from "@/components/GenerativeCreature";
 
 const RARITIES = ["all", "common", "uncommon", "rare", "epic", "legendary", "mythic", "ancient", "celestial"];
 
@@ -35,6 +36,8 @@ interface HatchlingCardProps {
     species?: string | null;
     happiness?: number | null;
     energy?: number | null;
+    realm?: string | null;
+    isShiny?: boolean | null;
   };
   onPress: () => void;
 }
@@ -59,8 +62,11 @@ function HatchlingCard({ item, onPress }: HatchlingCardProps) {
       delayLongPress={400}
       style={[styles.card, { backgroundColor: colors.card, borderColor: rarityColor + "55" }]}
     >
-      <View style={[styles.cardAura, { backgroundColor: rarityColor + "14" }]}>
-        <Feather name="zap" size={36} color={rarityColor} />
+      <View style={styles.cardAura}>
+        <GenerativeCreature
+          creature={{ id: item.id, realm: item.realm, rarity: item.rarity, isShiny: item.isShiny }}
+          size={68}
+        />
       </View>
       <View style={[styles.rarityDot, { backgroundColor: rarityColor }]} />
       <Pressable
@@ -198,7 +204,7 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 12, fontWeight: "600" },
   row: { gap: 10, marginBottom: 10, paddingHorizontal: 4 },
   card: { flex: 1, borderRadius: 16, borderWidth: 1.5, padding: 14, gap: 6, overflow: "hidden" },
-  cardAura: { width: 60, height: 60, borderRadius: 30, alignItems: "center", justifyContent: "center", marginBottom: 4 },
+  cardAura: { width: 68, height: 68, alignItems: "center", justifyContent: "center", marginBottom: 4 },
   rarityDot: { position: "absolute", top: 12, right: 30, width: 8, height: 8, borderRadius: 4 },
   cardShareBtn: { position: "absolute", top: 8, right: 8, padding: 4 },
   cardName: { fontSize: 14, fontWeight: "700" },

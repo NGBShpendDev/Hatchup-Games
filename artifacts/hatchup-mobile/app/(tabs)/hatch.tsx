@@ -21,6 +21,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { GenerativeEgg } from "@/components/GenerativeEgg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
@@ -142,9 +143,7 @@ function IncubatorSlot({
         } as any,
       ]}
     >
-      <View style={[slotStyles.aura, { backgroundColor: rc + "18" }]}>
-        <Feather name={typeIcon(egg.type) as any} size={26} color={rc} />
-      </View>
+      <GenerativeEgg egg={{ id: egg.id, type: egg.type, rarity: egg.rarity }} size={72} />
       <View style={[slotStyles.rarityBadge, { backgroundColor: rc + "22", borderColor: rc + "55" }]}>
         <Text style={[slotStyles.rarityText, { color: rc }]}>
           {(egg.rarity ?? "common").charAt(0).toUpperCase() + (egg.rarity ?? "common").slice(1)}
@@ -220,11 +219,12 @@ function BagEggCard({
         } as any,
       ]}
     >
-      <View style={[bagStyles.aura, { backgroundColor: rc + "18" }]}>
-        {placing ? (
-          <ActivityIndicator size="small" color={rc} />
-        ) : (
-          <Feather name={typeIcon(egg.type) as any} size={24} color={rc} />
+      <View style={{ position: "relative", alignItems: "center" }}>
+        <GenerativeEgg egg={{ id: egg.id, type: egg.type, rarity: egg.rarity }} size={60} />
+        {placing && (
+          <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", borderRadius: 36, backgroundColor: "#00000055" }]}>
+            <ActivityIndicator size="small" color={rc} />
+          </View>
         )}
       </View>
       <Text style={[bagStyles.name, { color: colors.foreground }]} numberOfLines={1}>

@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useGetHatchling, useEvolveHatchling, useUpdatePlayer } from "@workspace/api-client-react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useCurrentPlayerId } from "@/providers/CurrentPlayerProvider";
 import { getRarityColor, capitalize } from "@/constants/rarity";
+import { GenerativeCreature } from "@/components/GenerativeCreature";
+import { generateAttacks } from "@/lib/generative/attackDex";
 
 // Stage thresholds mirror the web app and server logic:
 // Stage 1 → 2 at level 5, Stage 2 → 3 at level 15.
@@ -164,8 +166,11 @@ export default function HatchlingDetailScreen() {
         >
           {/* Hero */}
           <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: rarityColor + "66" }]}>
-            <View style={[styles.heroAura, { backgroundColor: rarityColor + "18" }]}>
-              <Feather name="zap" size={56} color={rarityColor} />
+            <View style={styles.heroAura}>
+              <GenerativeCreature
+                creature={{ id: pal.id, realm: pal.realm, rarity: pal.rarity, isShiny: pal.isShiny }}
+                size={90}
+              />
             </View>
             <View style={styles.heroInfo}>
               <Text style={[styles.palName, { color: colors.foreground }]}>{pal.name}</Text>
@@ -276,12 +281,58 @@ export default function HatchlingDetailScreen() {
               </View>
             </View>
           )}
+
+          {/* Battle Moves */}
+          <AttackMoves palId={pal.id} realm={pal.realm ?? "balance"} rarity={pal.rarity ?? "common"} rarityColor={rarityColor} />
         </ScrollView>
       ) : (
         <View style={styles.center}>
           <Text style={{ color: colors.mutedForeground }}>Pal not found</Text>
         </View>
       )}
+    </View>
+  );
+}
+
+const TIER_COLORS: Record<string, string> = {
+  basic:     "#6b7280",
+  special:   "#3b82f6",
+  signature: "#f59e0b",
+};
+
+function AttackMoves({ palId, realm, rarity, rarityColor }: { palId: number; realm: string; rarity: string; rarityColor: string }) {
+  const colors = useColors();
+  const attacks = useMemo(() => generateAttacks(realm, rarity, palId), [palId, realm, rarity]);
+  if (!attacks.length) return null;
+
+  return (
+    <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Battle Moves</Text>
+      {attacks.map((atk, i) => {
+        const tierColor = TIER_COLORS[atk.tier] ?? "#6b7280";
+        return (
+          <View key={i} style={[styles.attackRow, { borderColor: colors.border }]}>
+            <View style={[styles.attackTierPill, { backgroundColor: tierColor + "22", borderColor: tierColor + "66" }]}>
+              <Text style={[styles.attackTierText, { color: tierColor }]}>
+                {atk.tier.toUpperCase()}
+              </Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Text style={[styles.attackName, { color: colors.foreground }]}>{atk.name}</Text>
+                <Text style={[styles.attackMult, { color: rarityColor }]}>×{atk.damageMult.toFixed(2)}</Text>
+              </View>
+              <Text style={[styles.attackDesc, { color: colors.mutedForeground }]} numberOfLines={2}>
+                {atk.description}
+              </Text>
+            </View>
+            <View style={[styles.energyBadge, { backgroundColor: "#22c55e22" }]}>
+              <Feather name="zap" size={9} color="#22c55e" />
+              <Text style={[styles.energyText, { color: "#22c55e" }]}>{atk.energyCost}</Text>
+            </View>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -293,7 +344,7 @@ const styles = StyleSheet.create({
   shareBtn: { padding: 6 },
   headerTitle: { fontSize: 17, fontWeight: "700" },
   heroCard: { borderRadius: 18, borderWidth: 1.5, padding: 16, flexDirection: "row", gap: 14, marginBottom: 14, alignItems: "center" },
-  heroAura: { width: 84, height: 84, borderRadius: 42, alignItems: "center", justifyContent: "center" },
+  heroAura: { width: 90, height: 90, alignItems: "center", justifyContent: "center" },
   heroInfo: { flex: 1, gap: 6 },
   palName: { fontSize: 20, fontWeight: "800" },
   palBadgeRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
@@ -325,4 +376,12 @@ const styles = StyleSheet.create({
   abilityDot: { width: 8, height: 8, borderRadius: 4 },
   abilityName: { fontSize: 13 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  attackRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 8, borderTopWidth: 1 },
+  attackTierPill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, alignSelf: "flex-start", marginTop: 2 },
+  attackTierText: { fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
+  attackName: { fontSize: 13, fontWeight: "700" },
+  attackMult: { fontSize: 11, fontWeight: "700" },
+  attackDesc: { fontSize: 11, marginTop: 2 },
+  energyBadge: { flexDirection: "row", alignItems: "center", gap: 2, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8, alignSelf: "flex-start" },
+  energyText: { fontSize: 10, fontWeight: "700" },
 });
