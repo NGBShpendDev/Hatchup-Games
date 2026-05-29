@@ -351,89 +351,18 @@ function bucketFromKm(km: number): "under_1km" | "under_5km" | "under_25km" | "s
 
 router.get("/players/nearby", requireAuth, attachPlayer, async (req, res) => {
   const viewerId = req.playerId!;
-  const rawLimit = Number(req.query.limit);
-  const limit = Math.min(50, Math.max(1, Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : 12));
-
-  const viewer = await db.query.playersTable.findFirst({ where: eq(playersTable.id, viewerId) });
   const viewerLoc = await db.query.playerLocationTable.findFirst({
     where: eq(playerLocationTable.playerId, viewerId),
   });
 
-  // No city → cannot compute nearby. Tell the client to prompt for location.
-  if (!viewerLoc?.city) {
-    res.json({ entries: [], city: null, locationRequired: true });
-    return;
-  }
-
-  // Viewers with hidden visibility don't get a nearby feed either —
-  // mirrors the canAppearInScope policy from the leaderboards/local-challenges modules.
-  if ((viewer?.locationVisibility ?? viewerLoc.visibility) === "hidden") {
-    res.json({ entries: [], city: viewerLoc.city, locationRequired: false });
-    return;
-  }
-
-  // State filter is applied only when the viewer has a state — city-only entries
-  // (e.g. set via the inline Explore prompt) remain discoverable to anyone in
-  // the same city regardless of whether state was recorded.
-  const candidates = await db.query.playerLocationTable.findMany({
-    where: and(
-      eq(playerLocationTable.city, viewerLoc.city),
-      viewerLoc.state ? eq(playerLocationTable.state, viewerLoc.state) : undefined,
-      ne(playerLocationTable.playerId, viewerId),
-    ),
-  });
-
-  if (candidates.length === 0) {
-    res.json({ entries: [], city: viewerLoc.city, locationRequired: false });
-    return;
-  }
-
-  const candidateIds = candidates.map(c => c.playerId);
-
-  const candidatePlayers = await db.query.playersTable.findMany({
-    where: inArray(playersTable.id, candidateIds),
-  });
-
-  // Canonical people-discovery exclusion rule: blocked / hidden-visibility /
-  // minor accounts. Shared with /players/search and /leaderboards/scoped via
-  // filterDiscoverableCandidates in safety.ts.
-  const allowed = await filterDiscoverableCandidates(viewerId, candidatePlayers);
-
-  // Compute distance buckets — only when BOTH sides opted into "exact" visibility.
-  const key = deriveLocationKey();
-  const viewerExact =
-    (viewer?.locationVisibility === "exact" || viewerLoc.visibility === "exact") && key !== null;
-  const vLat = viewerExact ? decryptCoord(viewerLoc.latEncrypted, key!) : null;
-  const vLng = viewerExact ? decryptCoord(viewerLoc.lngEncrypted, key!) : null;
-  const locMap = new Map(candidates.map(c => [c.playerId, c]));
-
-  const sortedAllowed = [...allowed].sort((a, b) => {
-    const al = locMap.get(a.id);
-    const bl = locMap.get(b.id);
-    return (bl?.updatedAt?.getTime() ?? 0) - (al?.updatedAt?.getTime() ?? 0);
-  });
-
-  const entries = sortedAllowed.slice(0, limit).map(p => {
-    const loc = locMap.get(p.id)!;
-    let bucket: "under_1km" | "under_5km" | "under_25km" | "same_city" = "same_city";
-    if (viewerExact && vLat != null && vLng != null && p.locationVisibility === "exact" && key) {
-      const tLat = decryptCoord(loc.latEncrypted, key);
-      const tLng = decryptCoord(loc.lngEncrypted, key);
-      if (tLat != null && tLng != null) {
-        bucket = bucketFromKm(haversineKm(vLat, vLng, tLat, tLng));
-      }
-    }
-    return {
-      id: p.id,
-      username: p.username,
-      displayName: p.displayName ?? null,
-      avatarUrl: p.avatarUrl ?? null,
-      city: loc.city ?? null,
-      distanceBucket: bucket,
-    };
-  });
-
-  res.json({ entries, city: viewerLoc.city, locationRequired: false });
+  // SECURITY: /players/nearby is disabled because it creates a privacy-sensitive
+  // enumeration of users in a claimed city derived solely from client-supplied
+  // GPS coordinates. Since the server cannot cryptographically verify that a
+  // device is actually at the submitted coordinates, this endpoint would expose
+  // other users' city-level presence to any attacker who submits spoofed GPS.
+  // The feature is suppressed until a trusted location attestation mechanism
+  // (e.g., device/provider-signed proof) is available.
+  res.json({ entries: [], city: viewerLoc?.city ?? null, locationRequired: false, locationUnavailable: true });
 });
 
 function isSameDayUTC(a: Date, b: Date): boolean {

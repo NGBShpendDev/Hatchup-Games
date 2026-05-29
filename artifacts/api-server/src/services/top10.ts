@@ -1,6 +1,7 @@
 import { db } from "@workspace/db";
 import { playersTable, playerLocationTable, playerArtifactsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { isLocationEstablished } from "../routes/locations.ts";
 
 type MetricKey = "xp" | "steps" | "workouts" | "battle_wins" | "streaks" | "artifacts";
 const METRICS: MetricKey[] = ["xp", "steps", "workouts", "battle_wins", "streaks", "artifacts"];
@@ -28,11 +29,21 @@ function metricLabel(m: MetricKey): string {
 }
 
 /**
+ * Minimum age (ms) a location record must have before it can be used for a
+ * Top-10 city exemption check. Prevents instant "spoof a small city → refresh
+ * Top-10 → get Premium" attacks: an attacker must hold coordinates in the
+ * target city for at least this long before the exemption can be granted.
+ */
+const TOP10_LOCATION_MIN_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+/**
  * Check whether `playerId` is in the Top 10 of their city for ANY tracked metric.
  * Returns a small object: { exempt, rank, metric, city, label } when exempt; null otherwise.
  *
  * "City" is derived from playerLocationTable. Players without a location cannot earn
- * the city exemption.
+ * the city exemption. The location record must also be at least 24 hours old — this
+ * prevents location-spoofing attacks where an attacker sets fresh coordinates for a
+ * small city and immediately refreshes their Top-10 status to unlock Premium.
  */
 export async function checkTop10CityExemption(playerId: number): Promise<{
   exempt: boolean;
@@ -46,6 +57,12 @@ export async function checkTop10CityExemption(playerId: number): Promise<{
     where: eq(playerLocationTable.playerId, playerId),
   });
   if (!myLoc?.city) return { exempt: false };
+
+  // Defense-in-depth: require the location record to be at least 24 hours old
+  // before including it in Top-10 computations. Even though the Top-10 status
+  // no longer grants Premium (see entitlement.ts), freshly-spoofed coordinates
+  // should not affect displayed rankings or context labels either.
+  if (!isLocationEstablished(myLoc, TOP10_LOCATION_MIN_AGE_MS)) return { exempt: false };
 
   // Pull all locations sharing the same city+state
   const cityLocs = await db.query.playerLocationTable.findMany({

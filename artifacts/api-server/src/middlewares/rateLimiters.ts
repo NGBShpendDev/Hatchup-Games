@@ -230,6 +230,18 @@ export async function emailResendLimiter(
   next();
 }
 
+// Top-10 city exemption refresh: strictly rate-limited because each successful
+// call can upgrade a player to Premium tier. Keyed per authenticated player so
+// a shared egress IP doesn't affect other users. 3 refreshes per hour is more
+// than enough for any legitimate use (rankings change slowly) and makes
+// automated spoof loops impractical.
+export const top10RefreshLimiter = dbLimiter({
+  scope: "top10_refresh",
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  message: { error: "too_many_top10_refreshes", message: "You can only refresh your Top-10 status 3 times per hour." },
+});
+
 // Admin panel unlock attempts: 5 wrong codes per 15 min per admin/IP.
 // Failures share the same bucket as successes so brute-forcing a wrong code
 // still ratchets the counter even when the success path would have cleared it.

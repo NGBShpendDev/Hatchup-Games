@@ -51,14 +51,19 @@ const PREMIUM_FEATURES: Entitlement["features"] = {
  * Premium is granted when ANY of these are true (in order of precedence):
  *   1. paid_until is in the future                    → source="paid"
  *   2. trial_ends_at is in the future                 → source="trial"
- *   3. top10_last_checked_at is within 24h AND
- *      top10_context_label is set                     → source="top10"
  * Otherwise the player is free with source="expired".
+ *
+ * NOTE: The "top10" Premium exemption path has been disabled. Top-10 city
+ * rankings are derived from client-supplied GPS coordinates and cannot be made
+ * trustworthy without device/provider attestation that does not exist in this
+ * system. Treating attacker-controlled location data as an entitlement signal
+ * is a broken trust boundary — any user can spoof coordinates for a small city
+ * and self-grant Premium. `top10ContextLabel` and `top10LastCheckedAt` are
+ * preserved in the DB for display purposes only and do NOT affect tier.
  */
 export function getEntitlement(player: Player, now: Date = new Date()): Entitlement {
   const trialEndsAt = player.trialEndsAt ? new Date(player.trialEndsAt) : null;
   const paidUntil   = player.paidUntil   ? new Date(player.paidUntil)   : null;
-  const top10At     = player.top10LastCheckedAt ? new Date(player.top10LastCheckedAt) : null;
 
   let tier: Tier = "free";
   let source: Source = "expired";
@@ -69,13 +74,6 @@ export function getEntitlement(player: Player, now: Date = new Date()): Entitlem
   } else if (trialEndsAt && trialEndsAt.getTime() > now.getTime()) {
     tier = "premium";
     source = "trial";
-  } else if (
-    top10At &&
-    (now.getTime() - top10At.getTime()) < 24 * 60 * 60 * 1000 &&
-    player.top10ContextLabel
-  ) {
-    tier = "premium";
-    source = "top10";
   }
 
   const daysLeftInTrial = trialEndsAt

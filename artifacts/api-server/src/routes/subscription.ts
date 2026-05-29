@@ -6,6 +6,7 @@ import { requireAuth, attachPlayer } from "../middlewares/auth.ts";
 import { attachEntitlement } from "../services/subscriptionGuards.ts";
 import { refreshTop10Status } from "../services/top10.ts";
 import { getEntitlement } from "../services/entitlement.ts";
+import { top10RefreshLimiter } from "../middlewares/rateLimiters.ts";
 
 const router = Router();
 
@@ -43,7 +44,7 @@ router.get("/subscription/me", requireAuth, attachPlayer, attachEntitlement, asy
 });
 
 // ── POST /subscription/refresh-top10 — manual recheck (used after rank changes) ──
-router.post("/subscription/refresh-top10", requireAuth, attachPlayer, async (req, res) => {
+router.post("/subscription/refresh-top10", requireAuth, attachPlayer, top10RefreshLimiter, async (req, res) => {
   await refreshTop10Status(req.playerId!);
   const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
   if (!player) { res.status(404).json({ error: "Player not found" }); return; }

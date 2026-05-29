@@ -113,6 +113,22 @@ router.get("/leaderboards/scoped", requireAuth, attachPlayer, attachEntitlement,
     return;
   }
 
+  // SECURITY: city/state/county/nearby scopes are derived from client-supplied
+  // GPS coordinates that the server cannot cryptographically verify. Using these
+  // labels for authorization would allow any user to spoof their city and access
+  // region-scoped leaderboard data for cities they are not actually in.
+  // These scopes are disabled until a trusted location attestation mechanism
+  // (e.g., device/provider-signed proof) is available.
+  const LOCATION_TRUSTED_SCOPES = ["world", "country"];
+  if (!LOCATION_TRUSTED_SCOPES.includes(scope)) {
+    res.status(503).json({
+      error: "location_untrusted",
+      message: "City, county, state, and nearby leaderboards are temporarily unavailable pending trusted location verification.",
+      availableScopes: LOCATION_TRUSTED_SCOPES,
+    });
+    return;
+  }
+
   // Free tier can only see world/country leaderboards (no nearby/county/state/city)
   const allowedScopes = req.entitlement?.features.allowedScopes ?? ["world", "country", "state", "county", "city", "nearby"];
   if (!allowedScopes.includes(scope)) {

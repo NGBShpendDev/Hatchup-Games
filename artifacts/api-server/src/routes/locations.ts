@@ -72,6 +72,31 @@ function encryptCoordinate(value: number): string {
   return `${iv.toString("base64")}:${tag.toString("base64")}:${encrypted.toString("base64")}`;
 }
 
+// ── Location trust boundary helper ───────────────────────────────────────────
+// Client-supplied GPS coordinates cannot be cryptographically verified. To
+// mitigate location spoofing attacks (e.g. setting fake coordinates for a
+// small city to unlock regional features or Top-10 Premium), we require that
+// a location record has been stable for a minimum period before it can be used
+// to authorize access to location-gated endpoints.
+//
+// This does not guarantee the player is physically present — it raises the cost
+// of a sustained spoofing attack and is defense-in-depth alongside rate
+// limiting and anti-cheat velocity checks.
+export const LOCATION_MIN_AGE_FOR_ACCESS_MS = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Returns true when the location record is old enough to be used for
+ * location-gated access control decisions. A fresh record (e.g. just set via
+ * GPS spoof) returns false, blocking immediate access to regional features.
+ */
+export function isLocationEstablished(
+  loc: { updatedAt?: Date | string | null } | null | undefined,
+  minAgeMs: number = LOCATION_MIN_AGE_FOR_ACCESS_MS,
+): boolean {
+  if (!loc?.updatedAt) return false;
+  return Date.now() - new Date(loc.updatedAt).getTime() >= minAgeMs;
+}
+
 // ── Scope eligibility helper ──────────────────────────────────────────────────
 function isChallengeEligible(
   challenge: { scope: string; scopeValue: string },
@@ -233,36 +258,21 @@ router.get("/players/me/location", requireAuth, attachPlayer, async (req, res) =
 });
 
 // ── GET /local-challenges ─────────────────────────────────────────────────────
-// Returns only ACTIVE challenges (startAt <= now <= endAt) relevant to the player's location.
-// Scope conditions are built without undefined values to avoid drizzle broadening matches.
+// Returns only ACTIVE world-scoped challenges (startAt <= now <= endAt).
 // Hidden-visibility players are excluded from participant counts.
+//
+// SECURITY: Region-scoped challenges (city/county/state/country) are no longer
+// listed here. Filtering by city/county/state/country labels derived from
+// client-supplied GPS coordinates creates an unresolvable trust-boundary failure
+// — any player can set their GPS to any city and see challenges intended for
+// that region. Until a trusted location attestation mechanism exists, only
+// world-scoped challenges are surfaced. See task #916.
 router.get("/local-challenges", requireAuth, attachPlayer, async (req, res) => {
   const now = new Date();
 
-  const playerLoc = await db.query.playerLocationTable.findFirst({
-    where: eq(playerLocationTable.playerId, req.playerId!),
-  });
-
-  // Build scope conditions without undefined — avoids drizzle treating and(..., undefined) as a broader match
-  type WhereExpr = ReturnType<typeof eq>;
-  const scopeConditions: WhereExpr[] = [eq(localChallengesTable.scope, "world") as WhereExpr];
-
-  if (playerLoc?.country) {
-    scopeConditions.push(and(eq(localChallengesTable.scope, "country"), eq(localChallengesTable.scopeValue, playerLoc.country)) as WhereExpr);
-  }
-  if (playerLoc?.state) {
-    scopeConditions.push(and(eq(localChallengesTable.scope, "state"), eq(localChallengesTable.scopeValue, playerLoc.state)) as WhereExpr);
-  }
-  if (playerLoc?.county) {
-    scopeConditions.push(and(eq(localChallengesTable.scope, "county"), eq(localChallengesTable.scopeValue, playerLoc.county)) as WhereExpr);
-  }
-  if (playerLoc?.city) {
-    scopeConditions.push(and(eq(localChallengesTable.scope, "city"), eq(localChallengesTable.scopeValue, playerLoc.city)) as WhereExpr);
-  }
-
   const challenges = await db.query.localChallengesTable.findMany({
     where: and(
-      or(...(scopeConditions as [WhereExpr, ...WhereExpr[]])),
+      eq(localChallengesTable.scope, "world"),
       lte(localChallengesTable.startAt, now),
       gte(localChallengesTable.endAt, now),
     ),
@@ -312,16 +322,16 @@ router.post("/local-challenges/:id/join", requireAuth, attachPlayer, async (req,
   if (now > challenge.endAt)   { res.status(400).json({ error: "Challenge has ended" }); return; }
   if (now < challenge.startAt) { res.status(400).json({ error: "Challenge has not started yet" }); return; }
 
-  // Hidden-visibility players cannot join location-based challenges at all.
-  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.id, req.playerId!) });
-  if (challenge.scope !== "world" && player?.locationVisibility === "hidden") {
-    res.status(403).json({ error: "Location visibility must not be 'hidden' to join location-based challenges" });
-    return;
-  }
-
-  const playerLoc = await db.query.playerLocationTable.findFirst({ where: eq(playerLocationTable.playerId, req.playerId!) });
-  if (!isChallengeEligible(challenge, playerLoc)) {
-    res.status(403).json({ error: "This challenge is not available in your location" });
+  // SECURITY: region-scoped challenges (non-world) cannot be joined because
+  // eligibility is derived from client-supplied GPS coordinates the server
+  // cannot cryptographically verify. Any player could spoof their city and join
+  // a challenge intended for a different region. Only world-scoped challenges
+  // are joinable until a trusted location attestation mechanism is available.
+  if (challenge.scope !== "world") {
+    res.status(503).json({
+      error: "location_untrusted",
+      message: "Region-restricted challenges are temporarily unavailable pending trusted location verification.",
+    });
     return;
   }
 
@@ -345,10 +355,16 @@ router.get("/local-challenges/:id/leaderboard", requireAuth, attachPlayer, async
   const challenge = await db.query.localChallengesTable.findFirst({ where: eq(localChallengesTable.id, id) });
   if (!challenge) { res.status(404).json({ error: "Challenge not found" }); return; }
 
-  // Authorization: requester must be in-scope to see participant data
-  const viewerLoc = await db.query.playerLocationTable.findFirst({ where: eq(playerLocationTable.playerId, req.playerId!) });
-  if (!isChallengeEligible(challenge, viewerLoc)) {
-    res.status(403).json({ error: "Challenge not available in your location" });
+  // SECURITY: region-scoped challenge leaderboards are disabled for the same
+  // reason as join — eligibility is derived from client-supplied GPS coordinates
+  // that cannot be verified server-side, so access control based on city labels
+  // creates a broken trust boundary. Only world-scoped challenge leaderboards
+  // are accessible until trusted location attestation is available.
+  if (challenge.scope !== "world") {
+    res.status(503).json({
+      error: "location_untrusted",
+      message: "Region-restricted challenge leaderboards are temporarily unavailable pending trusted location verification.",
+    });
     return;
   }
 
