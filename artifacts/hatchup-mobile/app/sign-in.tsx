@@ -147,7 +147,26 @@ export default function SignInScreen() {
           await setActive!({ session: createdSessionId });
           router.replace("/" as any);
         } else if (oauthSignUp?.status === "missing_requirements") {
-          setError("Additional information required. Please sign up with email instead.");
+          // Username is required by the Clerk instance — auto-generate one
+          const emailBase = (oauthSignUp.emailAddress ?? "")
+            .split("@")[0]
+            ?.replace(/[^a-z0-9]/gi, "")
+            .toLowerCase()
+            .slice(0, 12) ?? "player";
+          const autoUsername = `${emailBase || "player"}${Math.floor(Math.random() * 9000) + 1000}`;
+          try {
+            await oauthSignUp.update({ username: autoUsername });
+            const completed = await oauthSignUp.create?.();
+            const sessionId = completed?.createdSessionId ?? (oauthSignUp as any).createdSessionId;
+            if (sessionId) {
+              await setActive!({ session: sessionId });
+              router.replace("/" as any);
+            } else {
+              setError("Could not complete sign-up. Please try again or use email.");
+            }
+          } catch (innerErr: any) {
+            setError(innerErr.errors?.[0]?.message ?? "Sign-up incomplete. Please try email instead.");
+          }
         }
       } catch (e: any) {
         setError(e.errors?.[0]?.message ?? "Social sign-in failed. Please try again.");
@@ -306,7 +325,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: BG },
   scroll: { flexGrow: 1, justifyContent: "center", padding: 20 },
   header: { alignItems: "center", marginBottom: 32 },
-  logo: { fontSize: 36, fontWeight: "900", color: "#fff", marginBottom: 8 },
+  logo: { fontSize: 36, fontWeight: "900", color: PRIMARY, marginBottom: 8 },
   tagline: { fontSize: 14, color: MUTED, textAlign: "center" },
   card: {
     backgroundColor: CARD,
