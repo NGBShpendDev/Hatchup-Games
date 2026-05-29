@@ -187,10 +187,10 @@ export function HatchlingCard({ hatchling, onClick }: HatchlingCardProps) {
         </Badge>
       </div>
 
-      {/* Realm badge */}
+      {/* Focus badge */}
       <div className="relative z-10 mb-3">
         <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${realmStyle.badge}`}>
-          {realmStyle.label} Realm
+          {realmStyle.label} Focus
         </span>
       </div>
 

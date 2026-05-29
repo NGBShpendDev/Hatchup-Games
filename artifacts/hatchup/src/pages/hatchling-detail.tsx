@@ -21,7 +21,7 @@ import { GlowBadge } from "@/components/ui/glow-badge";
 import { RarityBadge } from "@/components/rarity-badge";
 import { getRarityTokens } from "@/lib/rarityTokens";
 import { motion } from "framer-motion";
-import { ArrowLeft, Zap, Heart, Coffee, Shield, Trash2, ArrowUpCircle, Sword, Star, Share2, Camera } from "lucide-react";
+import { ArrowLeft, Zap, Heart, Coffee, Shield, Trash2, ArrowUpCircle, Sword, Star, Share2, Camera, CheckCircle, ChevronRight } from "lucide-react";
 import { ComposeSheet } from "@/components/compose-sheet";
 import { ErrorCard } from "@/components/error-card";
 import { useToast } from "@/hooks/use-toast";
@@ -35,40 +35,42 @@ import candyMonsterImg from "@/assets/images/candy-monster.png";
 import cosmicEntityImg from "@/assets/images/cosmic-entity.png";
 import crystalGuardianImg from "@/assets/images/crystal-guardian.png";
 
-// ── Realm config ───────────────────────────────────────────────────────────────
-const REALM_CONFIG: Record<string, {
+// ── Focus config ───────────────────────────────────────────────────────────────
+// Each "focus" is a training direction the player chooses for their Pal.
+// The chosen focus determines which evolution paths become available.
+const FOCUS_CONFIG: Record<string, {
   label: string; color: string; gradient: string; border: string;
   description: string; emoji: string;
 }> = {
   strength: {
-    label: "Strength Realm", emoji: "🔥", color: "#ef4444",
+    label: "Strength", emoji: "🔥", color: "#ef4444",
     gradient: "from-red-950/60 to-orange-950/30",
     border: "border-red-500/50",
     description: "Forged in iron and volcanic fire. Grows powerful through resistance training.",
   },
   cardio: {
-    label: "Cardio Realm", emoji: "⚡", color: "#06b6d4",
+    label: "Cardio", emoji: "⚡", color: "#06b6d4",
     gradient: "from-cyan-950/60 to-blue-950/30",
     border: "border-cyan-500/50",
     description: "Born from lightning and wind. Thrives on speed, endurance, and relentless movement.",
   },
   balance: {
-    label: "Balance Realm", emoji: "✨", color: "#a855f7",
+    label: "Balance", emoji: "✨", color: "#a855f7",
     gradient: "from-purple-950/60 to-fuchsia-950/30",
     border: "border-purple-500/50",
     description: "Woven from starlight. Heals, protects, and elevates those around it.",
   },
   beast: {
-    label: "Beast Realm", emoji: "🌿", color: "#22c55e",
+    label: "Beast", emoji: "🌿", color: "#22c55e",
     gradient: "from-green-950/60 to-emerald-950/30",
     border: "border-green-500/50",
     description: "Risen from primal shadow. An untameable hunter that dominates through raw aggression.",
   },
   mythic: {
-    label: "Mythic Realm", emoji: "🌌", color: "#ec4899",
+    label: "Mythic", emoji: "🌌", color: "#ec4899",
     gradient: "from-pink-950/60 to-violet-950/30",
     border: "border-pink-500/50",
-    description: "A cosmic anomaly born at the intersection of all realms. Impossibly rare.",
+    description: "A cosmic anomaly. Chosen only by those who seek the impossible.",
   },
 };
 
@@ -186,6 +188,9 @@ export default function HatchlingDetail() {
     prevStatsRef.current = next;
   }, [hatchling]);
 
+  const [showFocusPicker, setShowFocusPicker] = useState(false);
+  const [isChangingFocus, setIsChangingFocus] = useState(false);
+
   const updateMutation = useUpdateHatchling();
   const evolveMutation = useEvolveHatchling();
   const deleteMutation = useDeleteHatchling();
@@ -271,7 +276,7 @@ export default function HatchlingDetail() {
           const result = res as any;
           const newStage = result?.evolutionStage ?? preStage + 1;
           const realm = (result?.realm ?? hatchling.realm) as string | undefined;
-          const realmCfg = realm ? REALM_CONFIG[realm] : undefined;
+          const realmCfg = realm ? FOCUS_CONFIG[realm] : undefined;
           enqueueEpicMoment({
             kind: "evolution",
             hatchlingName: hatchling.name,
@@ -336,7 +341,24 @@ export default function HatchlingDetail() {
   if (!hatchling) return <Layout><div className="p-8 text-center font-bold">Pal not found</div></Layout>;
 
   const realm = (hatchling.realm as string | undefined) ?? "balance";
-  const realmConfig = REALM_CONFIG[realm] ?? REALM_CONFIG["balance"];
+  const realmConfig = FOCUS_CONFIG[realm] ?? FOCUS_CONFIG["balance"];
+
+  const handleFocusChange = async (newFocus: string) => {
+    if (newFocus === realm) { setShowFocusPicker(false); return; }
+    setIsChangingFocus(true);
+    updateMutation.mutate(
+      { id: hatchlingId, data: { realm: newFocus } as any },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetHatchlingQueryKey(hatchlingId) });
+          toast({ title: `Focus changed to ${FOCUS_CONFIG[newFocus]?.label ?? newFocus}!`, description: "New evolution paths are now unlocked for this Pal." });
+          setShowFocusPicker(false);
+        },
+        onError: () => toast({ title: "Couldn't change focus", description: "Try again in a moment.", variant: "destructive" }),
+        onSettled: () => setIsChangingFocus(false),
+      }
+    );
+  };
   const stage = hatchling.evolutionStage ?? 1;
   const stageInfo = STAGE_LABELS[stage] ?? STAGE_LABELS[1];
   const moodState = (hatchling.moodState as string | undefined) ?? "happy";
@@ -376,11 +398,16 @@ export default function HatchlingDetail() {
             className={`bg-gradient-to-br ${realmConfig.gradient} backdrop-blur border-2 ${rarityTokens.border} rounded-3xl p-8 flex flex-col items-center justify-between relative overflow-hidden shadow-2xl ${rarityTokens.aura}`}
             style={{ boxShadow: `0 0 40px ${rarityTokens.shadowColor}` }}
           >
-            {/* Realm header */}
+            {/* Training Focus header — tap to change */}
             <div className="w-full flex justify-between items-center mb-4 relative z-10">
-              <Badge variant="outline" className="font-black text-sm px-3 py-1" style={{ borderColor: realmConfig.color + "60", color: realmConfig.color }}>
-                {realmConfig.emoji} {realmConfig.label}
-              </Badge>
+              <button
+                onClick={() => setShowFocusPicker(true)}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full border font-black text-sm transition-all hover:opacity-80 active:scale-95"
+                style={{ borderColor: realmConfig.color + "60", color: realmConfig.color, background: realmConfig.color + "10" }}
+              >
+                {realmConfig.emoji} {realmConfig.label} Focus
+                <ChevronRight className="w-3.5 h-3.5 opacity-60" />
+              </button>
               {hatchling.isShiny && (
                 <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/40 font-black">✦ SHINY</Badge>
               )}
@@ -518,14 +545,28 @@ export default function HatchlingDetail() {
               </div>
             </GlassCard>
 
-            {/* Realm description */}
+            {/* Training Focus card */}
             <GlassCard glow="primary" className={`p-4 bg-gradient-to-br ${realmConfig.gradient}`}>
               <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xl">{realmConfig.emoji}</span>
-                  <p className="font-black text-sm" style={{ color: realmConfig.color }}>{realmConfig.label}</p>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{realmConfig.emoji}</span>
+                    <p className="font-black text-sm" style={{ color: realmConfig.color }}>
+                      {realmConfig.label} Focus
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowFocusPicker(true)}
+                    className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border transition-all hover:opacity-80"
+                    style={{ borderColor: realmConfig.color + "50", color: realmConfig.color, background: realmConfig.color + "10" }}
+                  >
+                    Change
+                  </button>
                 </div>
                 <p className="text-xs text-muted-foreground">{realmConfig.description}</p>
+                <p className="text-[10px] text-muted-foreground/60 mt-1.5 italic">
+                  This focus unlocks specific evolution paths for your Pal.
+                </p>
               </div>
             </GlassCard>
 
@@ -683,6 +724,62 @@ export default function HatchlingDetail() {
           initialPostType="general"
           title={`Share ${hatchling.name} ✨`}
         />
+      )}
+
+      {/* ── Focus Picker Modal ─────────────────────────────────────────── */}
+      {showFocusPicker && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end md:items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowFocusPicker(false); }}
+        >
+          <motion.div
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 40, opacity: 0 }}
+            className="w-full max-w-md bg-card border border-border/40 rounded-3xl p-6 shadow-2xl"
+          >
+            <h2 className="text-xl font-black mb-1">Choose a Focus</h2>
+            <p className="text-sm text-muted-foreground mb-5">
+              Your Pal's focus unlocks specific evolution paths. You can change it any time before evolving.
+            </p>
+
+            <div className="space-y-2.5">
+              {Object.entries(FOCUS_CONFIG).map(([key, cfg]) => {
+                const isSelected = key === realm;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => handleFocusChange(key)}
+                    disabled={isChangingFocus}
+                    className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60"
+                    style={isSelected
+                      ? { borderColor: cfg.color, background: cfg.color + "15" }
+                      : { borderColor: "rgba(255,255,255,0.08)" }
+                    }
+                  >
+                    <span className="text-3xl">{cfg.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-sm" style={isSelected ? { color: cfg.color } : {}}>
+                        {cfg.label}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{cfg.description}</p>
+                    </div>
+                    {isSelected && (
+                      <CheckCircle className="w-5 h-5 shrink-0" style={{ color: cfg.color }} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setShowFocusPicker(false)}
+              className="w-full mt-4 py-3 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Cancel
+            </button>
+          </motion.div>
+        </div>
       )}
     </Layout>
   );

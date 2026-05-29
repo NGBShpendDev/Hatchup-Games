@@ -34,7 +34,7 @@ const REALM_EGG_STYLES: Record<string, {
     border: "border-red-500",
     glow: "shadow-red-500/40",
     crackColor: "#f97316",
-    label: "Strength Realm",
+    label: "Strength",
     emoji: "🔥",
     auraClass: "from-red-500/30 to-orange-500/10",
   },
@@ -43,7 +43,7 @@ const REALM_EGG_STYLES: Record<string, {
     border: "border-cyan-400",
     glow: "shadow-cyan-500/40",
     crackColor: "#06b6d4",
-    label: "Cardio Realm",
+    label: "Cardio",
     emoji: "⚡",
     auraClass: "from-cyan-500/30 to-blue-500/10",
   },
@@ -52,7 +52,7 @@ const REALM_EGG_STYLES: Record<string, {
     border: "border-purple-400",
     glow: "shadow-purple-500/40",
     crackColor: "#a855f7",
-    label: "Balance Realm",
+    label: "Balance",
     emoji: "✨",
     auraClass: "from-purple-500/30 to-fuchsia-500/10",
   },
@@ -61,7 +61,7 @@ const REALM_EGG_STYLES: Record<string, {
     border: "border-green-500",
     glow: "shadow-green-500/40",
     crackColor: "#22c55e",
-    label: "Beast Realm",
+    label: "Beast",
     emoji: "🌿",
     auraClass: "from-green-500/30 to-emerald-500/10",
   },
@@ -70,7 +70,7 @@ const REALM_EGG_STYLES: Record<string, {
     border: "border-pink-400",
     glow: "shadow-pink-500/40",
     crackColor: "#ec4899",
-    label: "Mythic Realm",
+    label: "Mythic",
     emoji: "🌌",
     auraClass: "from-pink-500/30 to-violet-500/10",
   },
@@ -310,7 +310,7 @@ export default function Hatch() {
             <EggIcon className="w-10 h-10" /> Incubator
           </h1>
           <p className="text-lg text-muted-foreground font-medium">
-            Train across five Realms to hatch your Pals. Every step, rep, and stretch counts!
+            Choose a focus for your Pals and watch them evolve. Every step, rep, and stretch counts!
           </p>
           <NeonButton onClick={handleAddEgg} disabled={addEggMutation.isPending} variant="secondary" className="mt-6">
             <Plus className="w-4 h-4 mr-2" /> Find New Egg

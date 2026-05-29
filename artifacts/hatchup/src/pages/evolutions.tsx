@@ -253,13 +253,13 @@ export default function Evolutions() {
             <Zap className="w-10 h-10" /> Evolution Atlas
           </h1>
           <p className="text-lg text-muted-foreground font-medium">
-            Five Realms. Branching paths. One prestige destiny.
+            Pick a focus for your Pal. Branching paths. One prestige destiny.
           </p>
         </div>
 
         {/* Realm tabs */}
         {isErrorRealms && !realms ? (
-          <ErrorCard title="Couldn't load realms" onRetry={() => refetchRealms()} />
+          <ErrorCard title="Couldn't load focuses" onRetry={() => refetchRealms()} />
         ) : isLoadingRealms ? (
           <div className="flex gap-3 justify-center">
             {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-28 rounded-2xl" />)}
@@ -283,7 +283,7 @@ export default function Evolutions() {
                 >
                   <span className="text-xl block mb-1">{style.emoji}</span>
                   <span className={isActive ? "" : "text-muted-foreground"} style={isActive ? { color: style.color } : {}}>
-                    {realm.name.replace(" Realm", "")}
+                    {realm.name.replace(" Realm", "").replace(" Focus", "")}
                   </span>
                   <span className="block text-[10px] text-muted-foreground font-medium mt-0.5">
                     {realm.evolutionCount} forms
