@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { createHash } from "node:crypto";
+import dns from "node:dns";
 import { readFile } from "node:fs/promises";
+import https from "node:https";
 import { createRequire } from "node:module";
+import net from "node:net";
 import path from "node:path";
 import { Resvg } from "@resvg/resvg-js";
 import {
@@ -69,25 +72,166 @@ function getFontFiles(): Promise<string[]> {
   return fontFilesPromise;
 }
 
-// Fetch a remote avatar to a Buffer with a short timeout. Returns null on any
-// failure so rendering never hard-fails because of a slow or broken avatar.
-async function fetchAvatar(url: string): Promise<Buffer | null> {
-  if (!/^https?:\/\//i.test(url)) return null;
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2500);
-    const resp = await fetch(url, { signal: controller.signal, redirect: "follow" });
-    clearTimeout(timer);
-    if (!resp.ok) return null;
-    const contentType = resp.headers.get("content-type") || "";
-    if (!contentType.startsWith("image/")) return null;
-    const buf = Buffer.from(await resp.arrayBuffer());
-    // Cap at 2MB so a hostile/huge avatar can't blow up memory.
-    if (buf.length > 2 * 1024 * 1024) return null;
-    return buf;
-  } catch {
-    return null;
+// ── SSRF protection ──────────────────────────────────────────────────────────
+// All IP-range checks operate on the address string AFTER DNS resolution so
+// they cannot be bypassed by attacker-controlled domain names. The lookup
+// callback passed to https.get() fires right before the TCP socket is opened,
+// making validation TOCTOU-safe (no window between resolution and connection).
+
+function isBlockedIpv4(ip: string): boolean {
+  const parts = ip.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((p) => !Number.isInteger(p) || p < 0 || p > 255)) {
+    return true; // malformed → block
   }
+  const [a, b] = parts;
+  return (
+    a === 0 ||                            // 0.0.0.0/8  – this network
+    a === 10 ||                           // 10.0.0.0/8  – RFC1918
+    a === 127 ||                          // 127.0.0.0/8 – loopback
+    (a === 169 && b === 254) ||           // 169.254.0.0/16 – link-local / cloud metadata
+    (a === 172 && b >= 16 && b <= 31) ||  // 172.16.0.0/12 – RFC1918
+    (a === 192 && b === 168) ||           // 192.168.0.0/16 – RFC1918
+    (a === 100 && b >= 64 && b <= 127) || // 100.64.0.0/10 – shared address space (CGN)
+    a >= 224                              // 224+ – multicast / reserved
+  );
+}
+
+function isBlockedIpv6(ip: string): boolean {
+  const addr = ip.replace(/^\[|\]$/g, "").toLowerCase();
+  return (
+    addr === "::1" ||                // loopback
+    addr.startsWith("fc") ||         // fc00::/7 – unique local
+    addr.startsWith("fd") ||         // fd00::/8 – unique local
+    addr.startsWith("fe80") ||       // fe80::/10 – link-local
+    addr.startsWith("::ffff:") ||    // IPv4-mapped – treat as IPv4 (block all mapped private)
+    addr === "::"                    // unspecified
+  );
+}
+
+// Fast synchronous pre-flight: rejects obviously bad URLs before any I/O.
+// Does NOT do DNS resolution — that happens inside the lookup callback below.
+function isSafeAvatarUrlSyntax(raw: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return false;
+  }
+
+  // Only HTTPS — plain http:// is never acceptable for server-fetched user URLs
+  if (parsed.protocol !== "https:") return false;
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  // Block reserved/special hostnames before DNS
+  if (
+    hostname === "localhost" ||
+    hostname.endsWith(".local") ||
+    hostname.endsWith(".internal") ||
+    hostname.endsWith(".localhost") ||
+    hostname === "metadata.google.internal"
+  ) {
+    return false;
+  }
+
+  // Block non-default ports (avatars must come from standard HTTPS port 443)
+  if (parsed.port !== "" && parsed.port !== "443") return false;
+
+  // If hostname is already an IP literal, validate it immediately
+  if (net.isIPv4(hostname)) return !isBlockedIpv4(hostname);
+  const unbracketed = hostname.replace(/^\[|\]$/g, "");
+  if (net.isIPv6(unbracketed)) return !isBlockedIpv6(unbracketed);
+
+  return true;
+}
+
+// TOCTOU-safe lookup callback for https.get().
+// Node calls this right before opening the TCP socket, so the IP we validate
+// is the same IP the connection will use — no DNS-rebinding window.
+function safeLookup(
+  hostname: string,
+  _options: dns.LookupOptions,
+  callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void,
+): void {
+  // Always resolve with family:0 so we get the OS-preferred address and can
+  // check both IPv4 and IPv6 results in a single call.
+  dns.lookup(hostname, { family: 0 }, (err, address, family) => {
+    if (err) { callback(err, "", 0); return; }
+    const blocked = family === 6 ? isBlockedIpv6(address) : isBlockedIpv4(address);
+    if (blocked) {
+      const ssrfErr = Object.assign(
+        new Error(`SSRF: blocked resolved address ${address}`),
+        { code: "ECONNREFUSED" },
+      ) as NodeJS.ErrnoException;
+      callback(ssrfErr, "", family);
+      return;
+    }
+    callback(null, address, family);
+  });
+}
+
+// Fetch a remote avatar to a Buffer with a short timeout.
+// Returns null on any failure — rendering must never hard-fail due to a bad avatar.
+// SSRF protections:
+//  1. Syntax/protocol pre-check (isSafeAvatarUrlSyntax) — rejects http://, literals, reserved names, non-443 ports
+//  2. TOCTOU-safe DNS validation in the lookup callback — fires right before TCP open
+//  3. No redirects (maxRedirects: 0 / destroy on 3xx)
+//  4. Content-Type guard and 2 MB size cap
+async function fetchAvatar(url: string): Promise<Buffer | null> {
+  if (!isSafeAvatarUrlSyntax(url)) return null;
+
+  return new Promise<Buffer | null>((resolve) => {
+    let settled = false;
+    const done = (result: Buffer | null) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+
+    const timer = setTimeout(() => {
+      req.destroy(new Error("avatar fetch timeout"));
+      done(null);
+    }, 2500);
+
+    const req = https.get(url, { lookup: safeLookup as Parameters<typeof https.get>[1]["lookup"] }, (res) => {
+      clearTimeout(timer);
+
+      // Never follow redirects — abort immediately on any 3xx
+      if (res.statusCode !== undefined && (res.statusCode < 200 || res.statusCode >= 300)) {
+        res.destroy();
+        done(null);
+        return;
+      }
+
+      const ct = res.headers["content-type"] ?? "";
+      if (!ct.startsWith("image/")) {
+        res.destroy();
+        done(null);
+        return;
+      }
+
+      const chunks: Buffer[] = [];
+      let totalSize = 0;
+
+      res.on("data", (chunk: Buffer) => {
+        totalSize += chunk.length;
+        if (totalSize > 2 * 1024 * 1024) {
+          res.destroy();
+          done(null);
+        } else {
+          chunks.push(chunk);
+        }
+      });
+
+      res.on("end", () => done(Buffer.concat(chunks)));
+      res.on("error", () => done(null));
+    });
+
+    req.on("error", () => {
+      clearTimeout(timer);
+      done(null);
+    });
+  });
 }
 
 // ── GET /post/:id  + /post/:id/og.png ───────────────────────────────────────
@@ -114,7 +258,7 @@ export function createOgRouter(loader: OgPostLoader): Router {
 
       const authorName = author?.displayName || author?.username || "HatchUp Player";
       const authorHandle = author?.username || "hatchup";
-      const avatarUrl = author?.avatarUrl && /^https?:\/\//i.test(author.avatarUrl)
+      const avatarUrl = author?.avatarUrl && /^https:\/\//i.test(author.avatarUrl)
         ? author.avatarUrl
         : null;
       const label = postTypeLabel(post.postType);
@@ -264,7 +408,7 @@ export function createPlayerOgRouter(loader: OgPlayerLoader): Router {
         return;
       }
 
-      const avatarUrl = player.avatarUrl && /^https?:\/\//i.test(player.avatarUrl)
+      const avatarUrl = player.avatarUrl && /^https:\/\//i.test(player.avatarUrl)
         ? player.avatarUrl
         : null;
       const accentId = player.accentId ?? "default";
@@ -362,7 +506,7 @@ export function createClubOgRouter(loader: OgClubLoader): Router {
         return;
       }
 
-      const emblemUrl = club.emblem && /^https?:\/\//i.test(club.emblem) ? club.emblem : null;
+      const emblemUrl = club.emblem && /^https:\/\//i.test(club.emblem) ? club.emblem : null;
       const accentId = club.accentId ?? "default";
       const etag = `W/"${createHash("sha1")
         .update([
