@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { healthConnectionsTable, playersTable, fitnessActivitiesTable } from "@workspace/db";
+import { healthConnectionsTable, playersTable, fitnessActivitiesTable, eggsTable } from "@workspace/db";
 import { eq, and, gte, like, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth.ts";
 import {
@@ -909,6 +909,18 @@ router.post("/health/apple/sync", requireAuth, async (req, res) => {
 
   // Steps
   if (data.steps && data.steps > 0) {
+    // Calculate step delta so repeated syncs don't double-count progress.
+    // The externalId is unique per day so we can find the previous value.
+    const prevActivity = await db.query.fitnessActivitiesTable.findFirst({
+      where: and(
+        eq(fitnessActivitiesTable.playerId, player.id),
+        eq(fitnessActivitiesTable.externalId, `apple_steps_${today}`)
+      ),
+      columns: { value: true },
+    });
+    const prevSteps = prevActivity?.value ?? 0;
+    const stepDelta = Math.max(0, data.steps - prevSteps);
+
     const result = await logFitnessActivity({
       playerId: player.id,
       type: "steps",
@@ -919,6 +931,19 @@ router.post("/health/apple/sync", requireAuth, async (req, res) => {
       verificationLevel: UNVERIFIED,
     });
     if (result.isNew) { activitiesImported++; xpEarned += result.fitnessXpEarned; }
+
+    // Credit step delta toward all incubating eggs (capped at each egg's
+    // stepsRequired). This is safe to do with unverified Apple data because
+    // it only affects the egg-hatching game mechanic, not competitive XP.
+    if (stepDelta > 0) {
+      await db.execute(
+        sql`UPDATE ${eggsTable}
+            SET steps_progress = LEAST(steps_required, steps_progress + ${stepDelta})
+            WHERE player_id = ${player.id}
+              AND status = 'incubating'
+              AND is_hatched = false`
+      );
+    }
   }
 
   // Active minutes
