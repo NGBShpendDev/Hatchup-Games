@@ -10,7 +10,7 @@
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient.ts";
 import { db } from "@workspace/db";
 import { playersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { logger } from "./lib/logger.ts";
 
 export const WebhookHandlers = {
@@ -27,6 +27,7 @@ export const WebhookHandlers = {
         await sync.getWebhookSecret(),
       );
       await projectSubscriptionState(event);
+      await projectShieldGrant(event);
     } catch (err) {
       logger.warn({ err }, "stripe_event_projection_failed");
     }
@@ -60,4 +61,21 @@ async function projectSubscriptionState(event: import("stripe").default.Event): 
     .where(eq(playersTable.id, player.id));
 
   logger.info({ playerId: player.id, status: sub.status, paidUntil }, "stripe_sub_projected");
+}
+
+async function projectShieldGrant(event: import("stripe").default.Event): Promise<void> {
+  if (event.type !== "checkout.session.completed") return;
+  const session = event.data.object as import("stripe").default.Checkout.Session;
+  const { pack, playerId, quantity } = session.metadata ?? {};
+  if (!pack || !playerId || (pack !== "single" && pack !== "bundle")) return;
+
+  const shields = parseInt(quantity ?? (pack === "bundle" ? "10" : "1"), 10);
+  const id = parseInt(playerId, 10);
+
+  await db
+    .update(playersTable)
+    .set({ streakShields: sql`${playersTable.streakShields} + ${shields}` })
+    .where(eq(playersTable.id, id));
+
+  logger.info({ playerId: id, pack, shields }, "stripe_shield_granted");
 }

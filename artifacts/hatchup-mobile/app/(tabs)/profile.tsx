@@ -6,6 +6,7 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -72,6 +73,8 @@ function StreakProtectionCard({ coins }: { coins: number }) {
     },
   });
 
+  const [usdPending, setUsdPending] = useState(false);
+
   function handleBuy() {
     Alert.alert(
       "Buy Streak Shield",
@@ -79,6 +82,39 @@ function StreakProtectionCard({ coins }: { coins: number }) {
       [
         { text: "Cancel", style: "cancel" },
         { text: "Buy", onPress: () => buyShield.mutate() },
+      ]
+    );
+  }
+
+  async function handleUsdBuy(pack: "single" | "bundle") {
+    const label = pack === "bundle" ? "10 Streak Shields for $20" : "1 Streak Shield for $3";
+    Alert.alert(
+      "Buy with Card",
+      `Purchase ${label}? You'll be taken to a secure checkout.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Continue",
+          onPress: async () => {
+            try {
+              setUsdPending(true);
+              const res = await fetch("/api/shields/checkout", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pack }),
+              });
+              const data = await res.json() as { url?: string; message?: string };
+              if (!res.ok || !data.url) throw new Error(data.message ?? "Checkout unavailable");
+              await Linking.openURL(data.url);
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Checkout unavailable";
+              setMessage({ text: msg, ok: false });
+              setTimeout(() => setMessage(null), 3000);
+            } finally {
+              setUsdPending(false);
+            }
+          },
+        },
       ]
     );
   }
@@ -121,6 +157,7 @@ function StreakProtectionCard({ coins }: { coins: number }) {
         </View>
       )}
 
+      {/* Coin buy button */}
       <Pressable
         onPress={handleBuy}
         disabled={buyShield.isPending || !canAfford}
@@ -136,6 +173,35 @@ function StreakProtectionCard({ coins }: { coins: number }) {
           </>
         )}
       </Pressable>
+
+      {/* Divider */}
+      <View style={shieldStyles.dividerRow}>
+        <View style={shieldStyles.dividerLine} />
+        <Text style={shieldStyles.dividerText}>or pay with card</Text>
+        <View style={shieldStyles.dividerLine} />
+      </View>
+
+      {/* USD purchase buttons */}
+      <View style={shieldStyles.usdRow}>
+        <Pressable
+          onPress={() => handleUsdBuy("single")}
+          disabled={usdPending}
+          style={[shieldStyles.usdBtn, { opacity: usdPending ? 0.5 : 1, borderColor: "#22c55e55", backgroundColor: "#22c55e14" }]}
+          testID="button-buy-shield-usd-single"
+        >
+          <Feather name="shield" size={13} color="#22c55e" />
+          <Text style={[shieldStyles.usdBtnText, { color: "#22c55e" }]}>$3 · 1 Shield</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => handleUsdBuy("bundle")}
+          disabled={usdPending}
+          style={[shieldStyles.usdBtn, { opacity: usdPending ? 0.5 : 1, borderColor: "#a855f755", backgroundColor: "#a855f714" }]}
+          testID="button-buy-shield-usd-bundle"
+        >
+          <Feather name="star" size={13} color="#a855f7" />
+          <Text style={[shieldStyles.usdBtnText, { color: "#a855f7" }]}>$20 · 10 Shields</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -326,4 +392,10 @@ const shieldStyles = StyleSheet.create({
   messageText: { fontSize: 13, fontWeight: "600" },
   buyBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#22d3ee", borderRadius: 12, paddingVertical: 11 },
   buyBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  dividerRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: "#22d3ee1a" },
+  dividerText: { fontSize: 10, color: "#22d3ee55", fontWeight: "500" },
+  usdRow: { flexDirection: "row", gap: 8 },
+  usdBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderRadius: 10, paddingVertical: 9 },
+  usdBtnText: { fontSize: 13, fontWeight: "700" },
 });

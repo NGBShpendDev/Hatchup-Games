@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Crown, Check, Sparkles, Trophy, X, ExternalLink, ArrowLeft, Loader2, Palette, Egg, Bot, Swords, MapPin, ShieldCheck, ShoppingCart, RefreshCw } from "lucide-react";
 import { useSubscription, useStartCheckout, useOpenPortal } from "@/lib/subscription";
 import { useGetDailyStreak, getGetDailyStreakQueryKey, useBuyStreakShield, useUpdateShieldAutoReplenish, useGetCurrentPlayer, getGetCurrentPlayerQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 type UpsellIcon = "palette" | "crown" | "egg" | "bot" | "swords" | "map";
@@ -129,6 +129,31 @@ export default function SubscriptionPage() {
     },
   });
 
+  const shieldCheckout = useMutation({
+    mutationFn: async (pack: "single" | "bundle") => {
+      const res = await fetch("/api/shields/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pack }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { message?: string };
+        throw new Error(err.message ?? "Checkout failed");
+      }
+      return res.json() as Promise<{ url: string }>;
+    },
+  });
+
+  const handleShieldCheckout = async (pack: "single" | "bundle") => {
+    try {
+      const { url } = await shieldCheckout.mutateAsync(pack);
+      window.location.href = url;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Checkout unavailable";
+      toast({ title: "Couldn't start checkout", description: msg, variant: "destructive" });
+    }
+  };
+
   const shieldCount = streakData?.streakShields ?? 0;
   const autoReplenish = streakData?.autoReplenishShields ?? false;
   const replenishThreshold = streakData?.shieldAutoReplenishThreshold ?? 1;
@@ -146,6 +171,8 @@ export default function SubscriptionPage() {
     const status = params.get("status");
     if (status === "success") {
       toast({ title: "Welcome to Premium!", description: "Your subscription is active." });
+    } else if (status === "shield_success") {
+      toast({ title: "Shields on the way!", description: "Your streak shields will appear shortly." });
     } else if (status === "cancelled") {
       toast({ title: "Checkout cancelled", description: "No charges were made." });
     }
@@ -333,38 +360,64 @@ export default function SubscriptionPage() {
             )}
           </div>
 
-          <div className="flex items-center justify-between bg-white/5 rounded-2xl px-4 py-3">
-            <div>
-              <p className="text-sm font-black">Buy a Streak Shield</p>
-              <p className="text-xs text-white/50 mt-0.5">{SHIELD_COST} coins per shield</p>
-              <p className="text-xs mt-1" data-testid="coin-balance">
-                <span className="text-white/40">Balance: </span>
-                <span className={canAffordShield ? "text-cyan-300 font-bold" : "text-amber-400 font-bold"}>{coins} coins</span>
-              </p>
-              {!canAffordShield && (
-                <>
-                  <p className="text-xs text-amber-400 font-bold mt-0.5" data-testid="not-enough-coins">
-                    Not enough coins
-                  </p>
-                  <p className="text-xs text-white/50 mt-1 leading-relaxed" data-testid="earn-coins-tip">
-                    Earn coins by completing workouts, daily check-ins, and challenges.
-                  </p>
-                </>
-              )}
+          <div className="bg-white/5 rounded-2xl px-4 py-3 space-y-3">
+            {/* Coin purchase */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-black">Buy a Streak Shield</p>
+                <p className="text-xs text-white/50 mt-0.5">{SHIELD_COST} coins per shield</p>
+                <p className="text-xs mt-1" data-testid="coin-balance">
+                  <span className="text-white/40">Balance: </span>
+                  <span className={canAffordShield ? "text-cyan-300 font-bold" : "text-amber-400 font-bold"}>{coins} coins</span>
+                </p>
+                {!canAffordShield && (
+                  <>
+                    <p className="text-xs text-amber-400 font-bold mt-0.5" data-testid="not-enough-coins">Not enough coins</p>
+                    <p className="text-xs text-white/50 mt-1 leading-relaxed" data-testid="earn-coins-tip">
+                      Earn coins by completing workouts, daily check-ins, and challenges.
+                    </p>
+                  </>
+                )}
+              </div>
+              <button
+                onClick={() => buyShield.mutate()}
+                disabled={buyShield.isPending || !canAffordShield}
+                data-testid="button-buy-shield"
+                className="flex items-center gap-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 font-bold text-sm px-4 py-2 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+              >
+                {buyShield.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4" />}
+                {SHIELD_COST}¢
+              </button>
             </div>
-            <button
-              onClick={() => buyShield.mutate()}
-              disabled={buyShield.isPending || !canAffordShield}
-              data-testid="button-buy-shield"
-              className="flex items-center gap-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 font-bold text-sm px-4 py-2 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {buyShield.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <ShoppingCart className="w-4 h-4" />
-              )}
-              {SHIELD_COST}¢
-            </button>
+
+            {/* Divider */}
+            <div className="flex items-center gap-2">
+              <hr className="flex-1 border-white/10" />
+              <span className="text-[11px] text-white/30 font-medium">or pay with card</span>
+              <hr className="flex-1 border-white/10" />
+            </div>
+
+            {/* USD purchase options */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleShieldCheckout("single")}
+                disabled={shieldCheckout.isPending}
+                data-testid="button-buy-shield-usd-single"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 font-bold text-sm py-2.5 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {shieldCheckout.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                $3.00 · 1 Shield
+              </button>
+              <button
+                onClick={() => handleShieldCheckout("bundle")}
+                disabled={shieldCheckout.isPending}
+                data-testid="button-buy-shield-usd-bundle"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/40 text-violet-300 font-bold text-sm py-2.5 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {shieldCheckout.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                $20 · 10 Shields
+              </button>
+            </div>
           </div>
 
           {/* Auto-replenish setting */}
