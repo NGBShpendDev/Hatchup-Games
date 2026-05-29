@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Platform,
   Pressable,
   StyleSheet,
@@ -176,7 +177,11 @@ export default function FollowingScreen() {
                   },
                 ]}
               >
-                <Feather name="user" size={20} color={colors.primary} />
+                {player.avatarUrl ? (
+                  <Image source={{ uri: player.avatarUrl }} style={styles.avatarImage} />
+                ) : (
+                  <Feather name="user" size={20} color={colors.primary} />
+                )}
               </View>
               <View style={{ flex: 1 }}>
                 <Text
@@ -286,6 +291,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   displayName: { fontSize: 14, fontWeight: "700" },
   username: { fontSize: 12, marginTop: 1 },

@@ -9,6 +9,7 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Platform,
   Pressable,
   StyleSheet,
@@ -122,7 +123,14 @@ export default function SocialProfileScreen() {
                   { backgroundColor: colors.primary + "22", borderColor: colors.primary },
                 ]}
               >
-                <Feather name="user" size={36} color={colors.primary} />
+                {player.avatarUrl ? (
+                  <Image
+                    source={{ uri: player.avatarUrl }}
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <Feather name="user" size={36} color={colors.primary} />
+                )}
               </View>
 
               <Text style={[styles.displayName, { color: colors.foreground }]}>
@@ -239,6 +247,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 4,
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   displayName: { fontSize: 20, fontWeight: "800", textAlign: "center" },
   username: { fontSize: 14, marginBottom: 4 },
