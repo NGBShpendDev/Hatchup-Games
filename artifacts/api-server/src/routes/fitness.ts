@@ -269,6 +269,7 @@ router.post("/fitness/log", requireAuth, attachPlayer, fitnessLogLimiter, requir
     note: body.data.note ?? null,
     isPassiveSync: false,
     distanceMiles: body.data.distanceMiles ?? null,
+    verificationLevel: body.data.verificationLevel ?? null,
   });
 
   if (!result.updatedPlayer) {
@@ -408,6 +409,8 @@ router.post("/fitness/log", requireAuth, attachPlayer, fitnessLogLimiter, requir
     newBadges: result.newBadges ?? [],
     rewardSummary,
     palXpResult: result.palXpResult ?? null,
+    verificationLevel: result.verificationLevel ?? null,
+    xpMultiplier: result.xpMultiplier ?? 1.0,
   });
 });
 

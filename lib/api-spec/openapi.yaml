@@ -5581,21 +5581,27 @@ components:
       type: object
       required: [playerId, type, value]
       properties:
-        playerId:      { type: integer }
-        type:          { type: string }
-        value:         { type: integer }
-        note:          { type: string }
-        groupId:       { type: integer }
-        distanceMiles: { type: number, description: "Optional distance in miles (for running/cycling pace tracking)" }
+        playerId:          { type: integer }
+        type:              { type: string }
+        value:             { type: integer }
+        note:              { type: string }
+        groupId:           { type: integer }
+        distanceMiles:     { type: number, description: "Optional distance in miles (for running/cycling pace tracking)" }
+        verificationLevel:
+          type: string
+          enum: [bronze, silver, gold, diamond]
+          description: "Workout verification level — bronze (manual), silver (voice), gold (smartwatch), diamond (AI camera). Higher levels apply an XP and egg-hatching multiplier."
 
     ActivityLogResult:
       type: object
       required: [activity, fitnessXpEarned, eggsUpdated, player]
       properties:
-        activity:         { $ref: "#/components/schemas/FitnessActivity" }
-        fitnessXpEarned:  { type: integer }
-        eggsUpdated:      { type: integer }
-        player:           { $ref: "#/components/schemas/Player" }
+        activity:          { $ref: "#/components/schemas/FitnessActivity" }
+        fitnessXpEarned:   { type: integer }
+        eggsUpdated:       { type: integer }
+        player:            { $ref: "#/components/schemas/Player" }
+        verificationLevel: { type: string, description: "Verification level applied to this log" }
+        xpMultiplier:      { type: number, description: "XP multiplier applied (1.0 = no bonus)" }
         groupBonusXp:     { type: integer }
         groupXpBonusPct:  { type: integer }
         prResult:

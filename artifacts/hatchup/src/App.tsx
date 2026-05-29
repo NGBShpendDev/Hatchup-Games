@@ -55,6 +55,7 @@ import Events from "@/pages/events";
 import NotificationsPage from "@/pages/notifications";
 import PostDetail from "@/pages/post-detail";
 import MyPalPage from "@/pages/my-pal";
+import WorkoutPage from "@/pages/workout";
 import { PageTransition } from "@/components/page-transition";
 import { EpicMomentProvider } from "@/components/epic-moment-overlay";
 import { EvolutionShareProvider } from "@/components/evolution-share-provider";
@@ -279,6 +280,7 @@ function AppRoutes() {
         <Route path="/explore" component={Explore} />
         <Route path="/hatch" component={Hatch} />
         <Route path="/training" component={Training} />
+        <Route path="/workout" component={WorkoutPage} />
         <Route path="/social" component={Social} />
         <Route path="/groups" component={Groups} />
         <Route path="/health-settings" component={HealthSettings} />

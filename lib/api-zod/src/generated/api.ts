@@ -2059,7 +2059,8 @@ export const LogActivityBody = zod.object({
   "value": zod.number(),
   "note": zod.string().optional(),
   "groupId": zod.number().optional(),
-  "distanceMiles": zod.number().optional().describe('Optional distance in miles (for running\/cycling pace tracking)')
+  "distanceMiles": zod.number().optional().describe('Optional distance in miles (for running\/cycling pace tracking)'),
+  "verificationLevel": zod.enum(['bronze', 'silver', 'gold', 'diamond']).optional().describe('Workout verification level — bronze (manual), silver (voice), gold (smartwatch), diamond (AI camera). Higher levels apply an XP and egg-hatching multiplier.')
 })
 
 

@@ -20,7 +20,8 @@ import { NeonButton } from "@/components/ui/neon-button";
 import { GlowBadge } from "@/components/ui/glow-badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dumbbell, Target, Utensils, History, Zap, CheckCircle2, Trophy, Clock, TrendingUp } from "lucide-react";
+import { Dumbbell, Target, Utensils, History, Zap, CheckCircle2, Trophy, Clock, TrendingUp, Mic } from "lucide-react";
+import { useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
@@ -41,6 +42,7 @@ export default function Training() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { playerId, player } = usePlayer();
+  const [, navigate] = useLocation();
   const pid = playerId ?? 0;
   const { promptLevelMilestoneShare } = useEvolutionShare();
   const [reaction, setReaction] = useState<HatchlingReactionData | null>(null);
@@ -161,6 +163,29 @@ export default function Training() {
           </TabsList>
 
           <TabsContent value="workout" className="space-y-6">
+            {/* Rep Counter entry point */}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-2xl border border-pink-500/30 bg-gradient-to-r from-pink-900/30 to-purple-900/30 p-4 flex items-center gap-4 cursor-pointer hover:border-pink-500/60 transition-colors"
+              onClick={() => navigate("/workout")}
+            >
+              <div className="w-12 h-12 rounded-2xl bg-pink-500/20 flex items-center justify-center shrink-0">
+                <Mic className="w-6 h-6 text-pink-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-white flex items-center gap-2">
+                  Rep Counter
+                  <Badge className="bg-green-500/20 text-green-400 border-0 text-[10px]">NEW</Badge>
+                </div>
+                <div className="text-xs text-zinc-400 mt-0.5">Voice &amp; camera counting • Verified reps hatch eggs faster</div>
+              </div>
+              <div className="text-zinc-500 text-xs text-right shrink-0">
+                <div className="text-yellow-400 font-semibold">up to 3×</div>
+                <div>XP bonus</div>
+              </div>
+            </motion.div>
+
             {isLoadingWorkout || generateWorkout.isPending ? (
               <Skeleton className="h-96 w-full rounded-3xl" />
             ) : workoutError || !workoutPlan ? (

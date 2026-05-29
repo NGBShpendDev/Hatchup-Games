@@ -1,0 +1,137 @@
+ADD-ON PROMPT: REP COUNTING & WORKOUT VERIFICATION SYSTEM
+
+Implement a seamless Rep Counting System inside HatchUp that rewards users for completing workouts while keeping the experience simple, fast, and engaging.
+
+⸻
+
+FREE MEMBERS — VOICE REP COUNTING
+
+Create a Voice Rep Counter that allows users to count reps out loud during workouts.
+
+How It Works
+
+Large “Start Counting” button
+App activates microphone permissions
+User counts aloud:
+
+“1… 2… 3… 4…”
+
+AI speech recognition listens in real time
+Spoken numbers automatically increase rep count
+Live rep counter updates instantly on screen
+Large, easy-to-read display
+Audio feedback available for milestones
+
+Example:
+
+“10 reps completed!”
+“25 reps completed!”
+“50 reps completed!”
+
+End Workout
+
+User taps:
+
+“Finish Workout”
+
+Workout summary displays:
+
+Total reps completed
+Calories estimated
+XP earned
+Coins earned
+Streak progress gained
+
+Voice counting should be lightweight, battery-efficient, and work with screen minimized when possible.
+
+⸻
+
+PAID MEMBERS — AI CAMERA REP COUNTING
+
+Unlock premium AI-powered workout tracking.
+
+AI Pose Detection
+
+Use phone camera and computer vision technology to automatically recognize exercises and count reps.
+
+Supported exercises:
+
+Push-Ups
+Squats
+Burpees
+Sit-Ups
+Lunges
+Jumping Jacks
+Pull-Ups
+Mountain Climbers
+Planks
+Dips
+
+AI Automatically Tracks
+
+Rep Count
+Sets
+Workout Duration
+Calories Burned
+XP Earned
+Form Quality Score
+Exercise Type
+
+Real-Time Dashboard
+
+Display:
+
+Current Reps
+Calories Burned
+XP Earned
+Form Score
+Workout Time
+
+Form Analysis
+
+AI should detect:
+
+Full Range of Motion
+Incomplete Reps
+Poor Form
+Excellent Form
+
+Provide simple coaching tips:
+
+“Go lower on squats.”
+“Full push-up depth detected.”
+“Excellent form.”
+
+⸻
+
+VERIFIED WORKOUT BONUS SYSTEM
+
+AI camera workouts become “Verified Workouts.”
+
+Verified workouts receive:
+
+Bonus XP
+Bonus Coins
+Leaderboard Multipliers
+Increased Egg Progress
+Additional HatchUp Rewards
+
+Verification Badge Levels:
+
+Bronze
+
+Manual Tracking
+
+Silver
+
+Voice Rep Tracking
+
+Gold
+
+Smartwatch Verified
+
+Diamond
+
+AI Camera Verified
+
+Users should proudly display verification badges on profiles.

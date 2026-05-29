@@ -556,6 +556,19 @@ export interface HatchResult {
   hatchling: Hatchling;
 }
 
+/**
+ * Workout verification level — bronze (manual), silver (voice), gold (smartwatch), diamond (AI camera). Higher levels apply an XP and egg-hatching multiplier.
+ */
+export type LogActivityInputVerificationLevel = typeof LogActivityInputVerificationLevel[keyof typeof LogActivityInputVerificationLevel];
+
+
+export const LogActivityInputVerificationLevel = {
+  bronze: 'bronze',
+  silver: 'silver',
+  gold: 'gold',
+  diamond: 'diamond',
+} as const;
+
 export interface LogActivityInput {
   playerId: number;
   type: string;
@@ -564,6 +577,8 @@ export interface LogActivityInput {
   groupId?: number;
   /** Optional distance in miles (for running/cycling pace tracking) */
   distanceMiles?: number;
+  /** Workout verification level — bronze (manual), silver (voice), gold (smartwatch), diamond (AI camera). Higher levels apply an XP and egg-hatching multiplier. */
+  verificationLevel?: LogActivityInputVerificationLevel;
 }
 
 export type ActivityLogResultPrResult = {
@@ -644,6 +659,10 @@ export interface ActivityLogResult {
   fitnessXpEarned: number;
   eggsUpdated: number;
   player: Player;
+  /** Verification level applied to this log */
+  verificationLevel?: string;
+  /** XP multiplier applied (1.0 = no bonus) */
+  xpMultiplier?: number;
   groupBonusXp?: number;
   groupXpBonusPct?: number;
   prResult?: ActivityLogResultPrResult;

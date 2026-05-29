@@ -39,8 +39,12 @@ export const ACTIVITY_CONFIG: Record<
   burpees:        { unit: "reps",    xpPer: 1,    realm: "beast",    stepsEquiv: 5 },
   squats:         { unit: "reps",    xpPer: 1,    realm: "strength", stepsEquiv: 2 },
   pullups:        { unit: "reps",    xpPer: 1,    realm: "strength", stepsEquiv: 3 },
-  planks:         { unit: "reps",    xpPer: 1,    realm: "strength", stepsEquiv: 1 },
-  situps:         { unit: "reps",    xpPer: 1,    realm: "strength", stepsEquiv: 2 },
+  planks:            { unit: "reps",    xpPer: 1,    realm: "strength", stepsEquiv: 1 },
+  situps:            { unit: "reps",    xpPer: 1,    realm: "strength", stepsEquiv: 2 },
+  lunges:            { unit: "reps",    xpPer: 1,    realm: "strength", stepsEquiv: 2 },
+  jumping_jacks:     { unit: "reps",    xpPer: 0.5,  realm: "cardio",   stepsEquiv: 3 },
+  mountain_climbers: { unit: "reps",    xpPer: 1,    realm: "beast",    stepsEquiv: 4 },
+  dips:              { unit: "reps",    xpPer: 1,    realm: "strength", stepsEquiv: 2 },
 };
 
 // Approximate miles per minute for running (avg 10 min/mile pace → 0.1 mi/min)
@@ -56,6 +60,17 @@ export type LogActivityParams = {
   externalId?: string | null;
   isPassiveSync?: boolean;
   distanceMiles?: number | null;
+  verificationLevel?: string | null;
+};
+
+/** XP and egg-progress multiplier per verification level.
+ *  bronze = manual tracking (1×), silver = voice (1.5×),
+ *  gold = smartwatch (2×), diamond = AI camera (3×). */
+export const VERIFICATION_MULTIPLIER: Record<string, number> = {
+  bronze: 1.0,
+  silver: 1.5,
+  gold:   2.0,
+  diamond: 3.0,
 };
 
 export type PrResult = {
@@ -75,6 +90,8 @@ export type LogActivityResult = {
   prResult?: PrResult;
   newArtifacts?: Array<{ id: number; name: string; rarity: string; lore: string; imageSlug: string }>;
   palXpResult?: HatchlingXpResult | null;
+  verificationLevel?: string | null;
+  xpMultiplier?: number;
 };
 
 /** Upsert a personal record. Returns whether it is a new/improved PR. */
@@ -150,7 +167,7 @@ async function getMonthlyRunMiles(playerId: number): Promise<number> {
 export async function logFitnessActivity(
   params: LogActivityParams,
 ): Promise<LogActivityResult> {
-  const { playerId, type, value, note, externalId, isPassiveSync, distanceMiles } = params;
+  const { playerId, type, value, note, externalId, isPassiveSync, distanceMiles, verificationLevel } = params;
 
   if (externalId) {
     const existing = await db.query.fitnessActivitiesTable.findFirst({
@@ -174,8 +191,9 @@ export async function logFitnessActivity(
   }
 
   const config = ACTIVITY_CONFIG[type] ?? { unit: "reps", xpPer: 1, realm: "strength", stepsEquiv: 0 };
-  const fitnessXpEarned = Math.round(value * config.xpPer);
-  const stepsEquiv = Math.round(value * config.stepsEquiv);
+  const xpMultiplier = VERIFICATION_MULTIPLIER[verificationLevel ?? ""] ?? 1.0;
+  const fitnessXpEarned = Math.round(value * config.xpPer * xpMultiplier);
+  const stepsEquiv = Math.round(value * config.stepsEquiv * xpMultiplier);
   const isStrength = STRENGTH_TYPES.has(type);
 
   const insertedRows = await db
@@ -388,5 +406,7 @@ export async function logFitnessActivity(
     prResult,
     newArtifacts: newArtifacts.map(a => ({ id: a.id, name: a.name, rarity: a.rarity, lore: a.lore, imageSlug: a.imageSlug })),
     palXpResult,
+    verificationLevel: verificationLevel ?? null,
+    xpMultiplier,
   };
 }
