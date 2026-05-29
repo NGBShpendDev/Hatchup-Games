@@ -370,15 +370,23 @@ export default function HomeScreen() {
             {loadingDash ? "Loading..." : `Welcome back, ${dashboard?.player.username ?? "Trainer"}`}
           </Text>
         </View>
-        <Pressable
-          onPress={() => router.push("/notifications")}
-          style={[styles.iconBtn, { borderColor: colors.border }]}
-        >
-          <Feather name="bell" size={20} color={colors.mutedForeground} />
-          {(unread?.count ?? 0) > 0 && (
-            <View style={[styles.badgeDot, { backgroundColor: colors.primary }]} />
-          )}
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={() => router.push("/shop")}
+            style={[styles.iconBtn, { borderColor: colors.border }]}
+          >
+            <Feather name="shopping-bag" size={20} color={colors.mutedForeground} />
+          </Pressable>
+          <Pressable
+            onPress={() => router.push("/notifications")}
+            style={[styles.iconBtn, { borderColor: colors.border }]}
+          >
+            <Feather name="bell" size={20} color={colors.mutedForeground} />
+            {(unread?.count ?? 0) > 0 && (
+              <View style={[styles.badgeDot, { backgroundColor: colors.primary }]} />
+            )}
+          </Pressable>
+        </View>
       </View>
 
       {/* Player Card */}
@@ -490,6 +498,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, marginBottom: 16 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   appTitle: { fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
   welcomeSub: { fontSize: 13, marginTop: 2 },
   iconBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center" },
