@@ -26,7 +26,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "pnpm --filter @workspace/hatchup-mobile test --testPathPattern=club/__tests__"
+args = "pnpm --filter @workspace/hatchup-mobile test --testPathPattern='(club|hatchling|social)/__tests__'"
 
 [workflows.workflow.metadata]
 isValidation = true
