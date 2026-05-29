@@ -501,38 +501,6 @@ router.post("/groups/:id/workout", requireAuth, attachPlayer, async (req, res) =
   });
 });
 
-// POST /groups/:id/challenge-progress — directly contribute to challenges; membership required
-router.post("/groups/:id/challenge-progress", requireAuth, attachPlayer, async (req, res) => {
-  const params = GetGroupParams.safeParse({ id: Number(req.params.id) });
-  if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { progressValue } = req.body;
-  if (progressValue === undefined) { res.status(400).json({ error: "progressValue required" }); return; }
-
-  const group = await db.query.groupsTable.findFirst({ where: eq(groupsTable.id, params.data.id) });
-  if (!group) { res.status(404).json({ error: "Group not found" }); return; }
-
-  const isMember = await checkMembership(params.data.id, req.playerId!);
-  if (!isMember) { res.status(403).json({ error: "Not a group member" }); return; }
-
-  const { challengesAdvanced, challenges } = await advanceChallenges(params.data.id, Number(progressValue));
-  res.json({ challengesAdvanced, challenges });
-});
-
-// POST /groups/:id/raid/attack — deal raid damage directly; membership required
-router.post("/groups/:id/raid/attack", requireAuth, attachPlayer, async (req, res) => {
-  const params = GetGroupParams.safeParse({ id: Number(req.params.id) });
-  if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { damage } = req.body;
-  if (damage === undefined) { res.status(400).json({ error: "damage required" }); return; }
-
-  const isMember = await checkMembership(params.data.id, req.playerId!);
-  if (!isMember) { res.status(403).json({ error: "Not a group member" }); return; }
-
-  const { raid } = await dealRaidDamage(params.data.id, Number(damage));
-  if (!raid) { res.status(404).json({ error: "No active raid" }); return; }
-
-  res.json(raid);
-});
 
 // GET /groups/:id/messages — membership required
 router.get("/groups/:id/messages", requireAuth, attachPlayer, async (req, res) => {
