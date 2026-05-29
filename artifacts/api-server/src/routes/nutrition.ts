@@ -1079,6 +1079,19 @@ router.patch("/nutrition/posts/:id", requireAuth, attachPlayer, async (req, res)
     }
   }
 
+  // Revoke public visibility of the old image when it is being replaced or
+  // removed. Best-effort: log on failure but do not block the update.
+  if (imageChanging && typeof existing.imageUrl === "string") {
+    try {
+      await objectStorageService.trySetObjectEntityAclPolicy(existing.imageUrl, {
+        owner: req.clerkUserId!,
+        visibility: "private",
+      });
+    } catch (err) {
+      req.log.warn({ err, imageUrl: existing.imageUrl }, "Failed to revoke ACL on replaced meal image");
+    }
+  }
+
   const patch: Partial<typeof mealPostsTable.$inferInsert> = {};
   if (name        !== undefined) patch.name        = name;
   if (emoji       !== undefined) patch.emoji       = emoji;
@@ -1114,6 +1127,20 @@ router.delete("/nutrition/posts/:id", requireAuth, attachPlayer, async (req, res
   const existing = await db.query.mealPostsTable.findFirst({ where: eq(mealPostsTable.id, postId) });
   if (!existing) { res.status(404).json({ error: "Meal post not found" }); return; }
   if (existing.playerId !== playerId) { res.status(403).json({ error: "Not your meal post" }); return; }
+
+  // Revoke the public ACL on the associated image before deleting the row, so
+  // the file becomes inaccessible to other users after removal. Best-effort:
+  // failure here is logged but does not block the deletion.
+  if (typeof existing.imageUrl === "string") {
+    try {
+      await objectStorageService.trySetObjectEntityAclPolicy(existing.imageUrl, {
+        owner: req.clerkUserId!,
+        visibility: "private",
+      });
+    } catch (err) {
+      req.log.warn({ err, imageUrl: existing.imageUrl }, "Failed to revoke ACL on deleted meal image");
+    }
+  }
 
   await db.delete(mealLikesTable).where(eq(mealLikesTable.mealPostId, postId));
   await db.delete(mealCommentsTable).where(eq(mealCommentsTable.mealPostId, postId));

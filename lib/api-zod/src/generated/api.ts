@@ -2809,7 +2809,9 @@ export const createPostBodyContentMax = 500;
 export const CreatePostBody = zod.object({
   "playerId": zod.number(),
   "content": zod.string().min(1).max(createPostBodyContentMax),
-  "mediaUrl": zod.string().optional(),
+  "mediaUrl": zod.string().optional().describe('Object path (e.g. `\/objects\/...`) returned by the storage upload flow. When provided, `uploadToken` and `mediaContentType` are required to prove the poster owns this upload.'),
+  "uploadToken": zod.string().optional().describe('HMAC token issued alongside the presigned upload URL. Required when `mediaUrl` is provided.'),
+  "mediaContentType": zod.string().optional().describe('MIME type used when requesting the presigned URL. Required when `mediaUrl` is provided.'),
   "postType": zod.string().optional(),
   "creatureId": zod.number().optional(),
   "metadata": zod.record(zod.string(), zod.unknown()).nullish().describe('Structured payload that depends on `postType`. See `FeedPost.metadata`\nfor the per-type shape (e.g. `tournament_win` carries `challengeId`,\n`challengeTitle`, `bracketSize`, `boostedXp`, `boostedCoins`;\n`evolution_reveal` carries `hatchlingId`, `hatchlingName`,\n`fromStage`, `toStage`, optional stage\/realm\/image fields, and\n`statDeltas`; `artifact_unlock` carries `artifactId`,\n`artifactName`, `artifactRarity`, `artifactLore`). The server\nvalidates this object against a per-postType Zod schema at\nwrite time — payloads with missing required keys or wrong\ntypes are rejected with `400`. For `tournament_win`, the\nserver also verifies the authenticated player actually\nplaced first (rank=1) in the referenced challenge. For\n`evolution_reveal`, the server enforces creature ownership\nand that `toStage > fromStage`.\n')

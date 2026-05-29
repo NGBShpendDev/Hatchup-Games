@@ -7085,11 +7085,13 @@ components:
       type: object
       required: [playerId, content]
       properties:
-        playerId:   { type: integer }
-        content:    { type: string, minLength: 1, maxLength: 500 }
-        mediaUrl:   { type: string }
-        postType:   { type: string }
-        creatureId: { type: integer }
+        playerId:        { type: integer }
+        content:         { type: string, minLength: 1, maxLength: 500 }
+        mediaUrl:        { type: string, description: "Object path (e.g. `/objects/...`) returned by the storage upload flow. When provided, `uploadToken` and `mediaContentType` are required to prove the poster owns this upload." }
+        uploadToken:     { type: string, description: "HMAC token issued alongside the presigned upload URL. Required when `mediaUrl` is provided." }
+        mediaContentType: { type: string, description: "MIME type used when requesting the presigned URL. Required when `mediaUrl` is provided." }
+        postType:        { type: string }
+        creatureId:      { type: integer }
         metadata:
           description: |
             Structured payload that depends on `postType`. See `FeedPost.metadata`

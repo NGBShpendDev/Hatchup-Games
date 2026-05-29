@@ -44,6 +44,8 @@ import { notificationsTable } from "@workspace/db";
 import { resolveMentionedPlayers } from "../services/mentions.ts";
 import { createHmac } from "node:crypto";
 import { logger } from "../lib/logger.ts";
+import { verifyUploadToken } from "./storage.ts";
+import { ObjectStorageService } from "../lib/objectStorage.ts";
 import {
   CreatePostBody,
   ReactToPostBody,
@@ -533,12 +535,36 @@ router.get("/social/trending", requireAuth, attachPlayer, async (req, res) => {
 
 // ── POST /social/posts ──────────────────────────────────────────────────────
 
+const socialObjectStorageService = new ObjectStorageService();
+
 router.post("/social/posts", requireAuth, attachPlayer, socialWriteLimiter, blockSuspendedSocialWrite, blockMinorSocialWrite, async (req, res) => {
   const playerId = req.playerId!;
   const body = CreatePostBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
-  const { content, mediaUrl, postType = "general", creatureId, metadata } = body.data;
+  const { content, mediaUrl, uploadToken, mediaContentType, postType = "general", creatureId, metadata } = body.data;
+
+  // Verify the poster actually owns the referenced media object. The upload
+  // token is an HMAC over (clerkUserId, objectPath, contentType) issued when
+  // the presigned URL was requested — matching the pattern used in nutrition
+  // routes. Without this check any user could republish another user's image
+  // by copying the /objects/... path from a feed response.
+  if (mediaUrl) {
+    if (!uploadToken || !mediaContentType || !verifyUploadToken(mediaUrl, req.clerkUserId!, uploadToken, mediaContentType)) {
+      res.status(403).json({ error: "Invalid or missing uploadToken for mediaUrl" });
+      return;
+    }
+    try {
+      await socialObjectStorageService.trySetObjectEntityAclPolicy(mediaUrl, {
+        owner: req.clerkUserId!,
+        visibility: "public",
+      });
+    } catch (err) {
+      req.log.error({ err, mediaUrl }, "Failed to set ACL on uploaded social post media");
+      res.status(400).json({ error: "Media upload not found or expired" });
+      return;
+    }
+  }
 
   // Validate the creature belongs to this player if provided
   if (creatureId) {

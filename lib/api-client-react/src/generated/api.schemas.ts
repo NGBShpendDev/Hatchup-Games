@@ -1997,7 +1997,12 @@ export interface CreatePostInput {
      * @maxLength 500
      */
   content: string;
+  /** Object path (e.g. `/objects/...`) returned by the storage upload flow. When provided, `uploadToken` and `mediaContentType` are required to prove the poster owns this upload. */
   mediaUrl?: string;
+  /** HMAC token issued alongside the presigned upload URL. Required when `mediaUrl` is provided. */
+  uploadToken?: string;
+  /** MIME type used when requesting the presigned URL. Required when `mediaUrl` is provided. */
+  mediaContentType?: string;
   postType?: string;
   creatureId?: number;
   /** Structured payload that depends on `postType`. See `FeedPost.metadata`
