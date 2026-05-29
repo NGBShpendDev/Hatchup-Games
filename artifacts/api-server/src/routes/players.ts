@@ -20,13 +20,23 @@ import { BADGE_MAP, DAILY_REWARD_SCHEDULE, computeLevelProgress, getDailyReward,
 
 const router = Router();
 
-// GET /players/me — returns current player (JIT provision if first time)
+// GET /players/me — returns current player, JIT-provisioning on first sign-in
 router.get("/players/me", requireAuth, async (req, res) => {
   const clerkId = req.clerkUserId!;
-  const player = await db.query.playersTable.findFirst({ where: eq(playersTable.clerkId, clerkId) });
+  let player = await db.query.playersTable.findFirst({ where: eq(playersTable.clerkId, clerkId) });
   if (!player) {
-    res.status(404).json({ error: "Player not found" });
-    return;
+    const base = `player_${clerkId.slice(-8).replace(/[^a-z0-9]/gi, "")}`;
+    const username = base || `player_${Date.now()}`;
+    const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const rows = await db.insert(playersTable).values({
+      clerkId,
+      username,
+      displayName: username,
+      subscriptionTier: "premium",
+      subscriptionSource: "trial",
+      trialEndsAt: trialEnd,
+    }).returning();
+    player = rows[0]!;
   }
   res.json(player);
 });

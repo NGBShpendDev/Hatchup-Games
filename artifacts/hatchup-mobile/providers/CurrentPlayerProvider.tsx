@@ -2,12 +2,12 @@ import React, { createContext, useContext } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { useGetCurrentPlayer } from "@workspace/api-client-react";
 
-const CurrentPlayerContext = createContext<number>(0);
+const CurrentPlayerContext = createContext<number>(1);
 
 export function CurrentPlayerProvider({ children }: { children: React.ReactNode }) {
   const { data, isLoading } = useGetCurrentPlayer();
 
-  if (isLoading || !data?.id) {
+  if (isLoading && !data) {
     return (
       <View
         style={{ flex: 1, backgroundColor: "#080912", justifyContent: "center", alignItems: "center" }}
@@ -18,7 +18,7 @@ export function CurrentPlayerProvider({ children }: { children: React.ReactNode 
   }
 
   return (
-    <CurrentPlayerContext.Provider value={data.id}>
+    <CurrentPlayerContext.Provider value={data?.id ?? 1}>
       {children}
     </CurrentPlayerContext.Provider>
   );
