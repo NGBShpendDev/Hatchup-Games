@@ -179,38 +179,6 @@ export const requireAdminPanel: RequestHandler = async (req, res, next) => {
   next();
 };
 
-/** Variant that only requires admin + allowlist (no session). Used for
- * the access-code rotate escape hatch a super-admin can hit even when
- * locked out. */
-export const requireSuperAdminBasic: RequestHandler = async (req, res, next) => {
-  const playerId = req.playerId;
-  if (!playerId) {
-    res.status(401).json({ error: "not_signed_in" });
-    return;
-  }
-  const player = await db.query.playersTable.findFirst({
-    where: eq(playersTable.id, playerId),
-  });
-  if (!player?.isAdmin || !player.isSuperAdmin) {
-    res.status(403).json({ error: "not_super_admin" });
-    return;
-  }
-  const email = req.clerkUserId ? await getClerkPrimaryEmail(req.clerkUserId) : null;
-  if (!email) {
-    res.status(403).json({ error: "not_whitelisted" });
-    return;
-  }
-  const allow = await db.query.adminAllowlistTable.findFirst({
-    where: eq(adminAllowlistTable.email, email),
-  });
-  if (!allow) {
-    res.status(403).json({ error: "not_whitelisted" });
-    return;
-  }
-  req.adminPlayer = player;
-  next();
-};
-
 /** Guard that further requires `isSuperAdmin`. Runs AFTER requireAdminPanel. */
 export const requireSuperAdminPanel: RequestHandler = (req, res, next) => {
   if (!req.adminPlayer?.isSuperAdmin) {

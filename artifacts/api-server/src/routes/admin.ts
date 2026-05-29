@@ -19,7 +19,6 @@ import {
   hashToken,
   normalizeEmail,
   requireAdminPanel,
-  requireSuperAdminBasic,
   requireSuperAdminPanel,
   getClerkPrimaryEmail,
 } from "../middlewares/adminPanel.ts";
@@ -323,16 +322,18 @@ router.delete(
 );
 
 // ── Access-code rotate ───────────────────────────────────────────────────────
-// Deliberately gated by `requireSuperAdminBasic` (admin+allowlist, no
-// session). This is the escape hatch when nobody knows the code; super
-// admins are already a tightly controlled set, so allowing rotation
-// without an unlocked session keeps the panel recoverable.
+// Requires a fully unlocked admin session (requireAdminPanel) AND
+// isSuperAdmin (requireSuperAdminPanel). Rotation must not be reachable
+// without first passing the two-step admin boundary — otherwise a
+// compromised Clerk session alone would be enough to mint a new code and
+// immediately unlock the panel, defeating the second factor entirely.
 
 router.post(
   "/admin/access-code/rotate",
   requireAuth,
   attachPlayer,
-  requireSuperAdminBasic,
+  requireAdminPanel,
+  requireSuperAdminPanel,
   async (req, res) => {
     const code = randomBytes(8).toString("base64url").slice(0, 12).toUpperCase();
     await db.insert(adminAccessCodesTable).values({

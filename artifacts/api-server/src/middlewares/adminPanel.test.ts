@@ -65,7 +65,6 @@ test("AdminGateReason covers all branches the frontend knows about", async () =>
   ] as const;
   // Just assert the module exports the helpers that emit them.
   assert.ok(typeof mod.requireAdminPanel === "function");
-  assert.ok(typeof mod.requireSuperAdminBasic === "function");
   assert.ok(typeof mod.requireSuperAdminPanel === "function");
   assert.ok(expected.length === 5);
 });
