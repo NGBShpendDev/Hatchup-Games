@@ -210,7 +210,7 @@ router.post("/family-groups", requireAuth, attachPlayer, async (req, res) => {
 });
 
 // ── GET /family-groups/:id ────────────────────────────────────────────────────
-router.get("/family-groups/:id", requireAuth, async (req, res) => {
+router.get("/family-groups/:id", requireAuth, attachPlayer, async (req, res) => {
   const id = Number(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
@@ -218,6 +218,18 @@ router.get("/family-groups/:id", requireAuth, async (req, res) => {
     where: eq(familyGroupsTable.id, id),
   });
   if (!group) { res.status(404).json({ error: "Family group not found" }); return; }
+
+  const callerId = req.playerId!;
+  const callerRow = await db.query.playersTable.findFirst({
+    where: eq(playersTable.id, callerId),
+    columns: { familyGroupId: true },
+  });
+  const isMember  = callerRow?.familyGroupId === id;
+  const isCreator = group.creatorId === callerId;
+  if (!isMember && !isCreator) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
 
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
