@@ -9,7 +9,7 @@
  */
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient.ts";
 import { db } from "@workspace/db";
-import { playersTable } from "@workspace/db";
+import { playersTable, stripeShieldFulfillmentsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { logger } from "./lib/logger.ts";
 
@@ -69,13 +69,38 @@ async function projectShieldGrant(event: import("stripe").default.Event): Promis
   const { pack, playerId, quantity } = session.metadata ?? {};
   if (!pack || !playerId || (pack !== "single" && pack !== "bundle")) return;
 
+  // Only fulfill after confirmed, settled payment
+  if (session.payment_status !== "paid") {
+    logger.warn({ sessionId: session.id, paymentStatus: session.payment_status }, "stripe_shield_skipped_unconfirmed_payment");
+    return;
+  }
+
   const shields = parseInt(quantity ?? (pack === "bundle" ? "10" : "1"), 10);
   const id = parseInt(playerId, 10);
 
-  await db
-    .update(playersTable)
-    .set({ streakShields: sql`${playersTable.streakShields} + ${shields}` })
-    .where(eq(playersTable.id, id));
+  // Idempotency guard: skip if this checkout session was already fulfilled
+  const existing = await db.query.stripeShieldFulfillmentsTable.findFirst({
+    where: eq(stripeShieldFulfillmentsTable.checkoutSessionId, session.id),
+  });
+  if (existing) {
+    logger.warn({ sessionId: session.id, eventId: event.id }, "stripe_shield_duplicate_skipped");
+    return;
+  }
 
-  logger.info({ playerId: id, pack, shields }, "stripe_shield_granted");
+  // Record fulfillment and credit shields atomically
+  await db.transaction(async (tx) => {
+    await tx.insert(stripeShieldFulfillmentsTable).values({
+      checkoutSessionId: session.id,
+      stripeEventId: event.id,
+      playerId: id,
+      pack,
+      shields,
+    });
+    await tx
+      .update(playersTable)
+      .set({ streakShields: sql`${playersTable.streakShields} + ${shields}` })
+      .where(eq(playersTable.id, id));
+  });
+
+  logger.info({ playerId: id, pack, shields, sessionId: session.id, eventId: event.id }, "stripe_shield_granted");
 }

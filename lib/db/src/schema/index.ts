@@ -24,3 +24,4 @@ export * from "./push.ts";
 export * from "./rematch.ts";
 export * from "./admin.ts";
 export * from "./analytics.ts";
+export * from "./shield-fulfillments.ts";
