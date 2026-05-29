@@ -1150,6 +1150,13 @@ router.delete("/social/posts/:id", requireAuth, attachPlayer, async (req, res) =
     .set({ deletedAt: new Date() })
     .where(eq(postsTable.id, id));
 
+  // Immediately revoke access to any attached media by deleting the storage
+  // object. This prevents anyone who retained the raw mediaUrl from continuing
+  // to fetch the file after the post is gone.
+  if (post.mediaUrl) {
+    await socialObjectStorageService.tryDeleteObject(post.mediaUrl);
+  }
+
   res.status(204).send();
 });
 

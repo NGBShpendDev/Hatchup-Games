@@ -9,6 +9,9 @@ import {
 } from "@workspace/db";
 import { and, lt, isNotNull, inArray, eq } from "drizzle-orm";
 import { logger } from "../lib/logger.ts";
+import { ObjectStorageService } from "../lib/objectStorage.ts";
+
+const objectStorageService = new ObjectStorageService();
 
 const RETENTION_DAYS = 30;
 const TICK_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -23,6 +26,15 @@ export { RETENTION_DAYS };
  */
 export async function hardDeletePosts(ids: number[]): Promise<void> {
   if (ids.length === 0) return;
+
+  // Collect media URLs before deleting rows so we can purge storage objects.
+  // Any post whose soft-delete path already removed the object will simply
+  // encounter a not-found error inside tryDeleteObject, which is swallowed.
+  const postRows = await db
+    .select({ id: postsTable.id, mediaUrl: postsTable.mediaUrl })
+    .from(postsTable)
+    .where(inArray(postsTable.id, ids));
+  const mediaUrls = postRows.map(r => r.mediaUrl).filter((u): u is string => !!u);
 
   const comments = await db
     .select({ id: postCommentsTable.id })
@@ -43,6 +55,10 @@ export async function hardDeletePosts(ids: number[]): Promise<void> {
   for (const id of ids) {
     await db.delete(postsTable).where(eq(postsTable.id, id));
   }
+
+  // Delete storage objects after the DB rows are gone. Errors are swallowed
+  // by tryDeleteObject so a missing or already-deleted object won't fail the job.
+  await Promise.all(mediaUrls.map(url => objectStorageService.tryDeleteObject(url)));
 }
 
 export async function purgeSoftDeletedPosts(now: Date = new Date()): Promise<{ purged: number }> {

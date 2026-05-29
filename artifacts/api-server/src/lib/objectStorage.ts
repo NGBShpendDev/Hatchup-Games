@@ -236,6 +236,21 @@ export class ObjectStorageService {
     }
   }
 
+  /**
+   * Unconditionally delete a storage object regardless of its ACL visibility.
+   * Used when the owning record (e.g. a social post) is deleted and the media
+   * must become immediately inaccessible. Any error is silently swallowed
+   * because the object may already be gone or storage may be unavailable.
+   */
+  async tryDeleteObject(normalizedPath: string): Promise<void> {
+    try {
+      const objectFile = await this.getObjectEntityFile(normalizedPath);
+      await objectFile.delete();
+    } catch {
+      // Object already gone or unreachable — no action needed.
+    }
+  }
+
   async canAccessObjectEntity({
     userId,
     objectFile,
