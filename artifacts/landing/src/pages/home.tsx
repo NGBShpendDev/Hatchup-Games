@@ -253,6 +253,7 @@ export default function Home() {
           <a href="#features" className="hover:text-white">Features</a>
           <a href="#how-it-works" className="hover:text-white">How it works</a>
           <a href="#safety" className="hover:text-white">Safety</a>
+          <a href="/landing/support" className="hover:text-white">Support</a>
         </nav>
         <a
           href="#download"
@@ -507,7 +508,7 @@ export default function Home() {
           <div className="flex items-center gap-6">
             <a href="#" className="hover:text-white">Privacy</a>
             <a href="#" className="hover:text-white">Terms</a>
-            <a href="#" className="hover:text-white">Support</a>
+            <a href="/landing/support" className="hover:text-white">Support</a>
           </div>
         </div>
       </footer>
