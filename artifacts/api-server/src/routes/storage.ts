@@ -17,6 +17,13 @@ const ALLOWED_CONTENT_TYPES = new Set([
   "image/gif",
 ]);
 
+/**
+ * Safe content types we allow to be reflected in the Content-Type response
+ * header when serving user-uploaded objects. Anything not in this set is
+ * clamped to application/octet-stream to prevent active-content rendering.
+ */
+const SAFE_SERVE_CONTENT_TYPES = ALLOWED_CONTENT_TYPES;
+
 const UploadRequestBody = z.object({
   name: z.string().min(1).max(255),
   size: z.number().int().min(1).max(MAX_UPLOAD_BYTES),
@@ -34,13 +41,18 @@ function getSigningSecret(): string {
 }
 
 /**
- * HMAC-sign an (objectPath, clerkUserId) pair so the server can later verify
- * that the user attaching an objectPath to a record is the same user who
- * originally requested the upload URL — without any DB lookups.
+ * HMAC-sign an (objectPath, clerkUserId, contentType) triple so the server
+ * can later verify that the user attaching an objectPath is the same user who
+ * requested the upload URL AND that the content type matches what was
+ * validated at request time — without any DB lookups.
  */
-export function signUploadToken(objectPath: string, clerkUserId: string): string {
+export function signUploadToken(
+  objectPath: string,
+  clerkUserId: string,
+  contentType: string,
+): string {
   return createHmac("sha256", getSigningSecret())
-    .update(`${clerkUserId}:${objectPath}`)
+    .update(`${clerkUserId}:${objectPath}:${contentType}`)
     .digest("hex");
 }
 
@@ -48,9 +60,10 @@ export function verifyUploadToken(
   objectPath: string,
   clerkUserId: string,
   token: string,
+  contentType: string,
 ): boolean {
   try {
-    const expected = signUploadToken(objectPath, clerkUserId);
+    const expected = signUploadToken(objectPath, clerkUserId, contentType);
     const a = Buffer.from(expected, "hex");
     const b = Buffer.from(token, "hex");
     if (a.length !== b.length) return false;
@@ -79,9 +92,9 @@ router.post("/storage/uploads/request-url", requireAuth, async (req: Request, re
     const { name, size, contentType } = parsed.data;
     const clerkUserId = req.clerkUserId!;
 
-    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+    const uploadURL = await objectStorageService.getObjectEntityUploadURL(contentType);
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-    const uploadToken = signUploadToken(objectPath, clerkUserId);
+    const uploadToken = signUploadToken(objectPath, clerkUserId, contentType);
 
     res.json({
       uploadURL,
@@ -157,7 +170,24 @@ router.get("/storage/objects/*path", requireAuth, async (req: Request, res: Resp
     const response = await objectStorageService.downloadObject(objectFile);
 
     res.status(response.status);
-    response.headers.forEach((value, key) => res.setHeader(key, value));
+    response.headers.forEach((value, key) => {
+      if (key.toLowerCase() === "content-type") {
+        // Clamp to the safe-image allowlist. An attacker who bypassed the
+        // upload validation and stored text/html or application/javascript
+        // would otherwise have that type reflected here, enabling XSS.
+        const safe = SAFE_SERVE_CONTENT_TYPES.has(value)
+          ? value
+          : "application/octet-stream";
+        res.setHeader("Content-Type", safe);
+      } else {
+        res.setHeader(key, value);
+      }
+    });
+
+    // Force the browser to download rather than render the response body.
+    // This is a defence-in-depth safeguard: even if a non-image content type
+    // slipped through, the browser will not execute it as a same-origin page.
+    res.setHeader("Content-Disposition", "attachment");
 
     if (response.body) {
       const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);

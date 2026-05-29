@@ -73,6 +73,8 @@ const NUTRITION_CHALLENGES = [
 ];
 
 // ── POST /nutrition/posts ─────────────────────────────────────────────────────
+const ALLOWED_IMAGE_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
+
 const CreateMealPostBody = z.object({
   playerId: z.number(),
   name: z.string().min(1).max(100),
@@ -81,6 +83,7 @@ const CreateMealPostBody = z.object({
   description: z.string().optional(),
   imageUrl: z.string().regex(/^\/objects\//, "imageUrl must be an /objects/ path").max(500).optional(),
   uploadToken: z.string().min(1).max(256).optional(),
+  imageContentType: z.enum(ALLOWED_IMAGE_CONTENT_TYPES).optional(),
   calories: z.number().optional(),
   proteinG: z.number().optional(),
   carbsG: z.number().optional(),
@@ -329,13 +332,13 @@ router.post("/nutrition/posts", requireAuth, attachPlayer, requirePlayerOwnershi
   const body = CreateMealPostBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
-  const { playerId, name, emoji, tag, description, imageUrl, uploadToken, calories, proteinG, carbsG, fatG, aiAnalyzed, qualityScore } = body.data;
+  const { playerId, name, emoji, tag, description, imageUrl, uploadToken, imageContentType, calories, proteinG, carbsG, fatG, aiAnalyzed, qualityScore } = body.data;
 
   // If an image is attached, verify the requesting user actually uploaded it
   // (HMAC token issued when the presigned URL was generated) and mark the
   // object's ACL as publicly readable so other feed viewers can fetch it.
   if (imageUrl) {
-    if (!uploadToken || !verifyUploadToken(imageUrl, req.clerkUserId!, uploadToken)) {
+    if (!uploadToken || !imageContentType || !verifyUploadToken(imageUrl, req.clerkUserId!, uploadToken, imageContentType)) {
       res.status(403).json({ error: "Invalid or missing uploadToken for imageUrl" });
       return;
     }
@@ -1026,15 +1029,16 @@ router.get("/nutrition/posts", requireAuth, attachPlayer, async (req, res) => {
 // supplied. Changing the image requires a fresh uploadToken (same HMAC check
 // used by create) so a user can't swap in someone else's uploaded object.
 const UpdateMealPostBody = z.object({
-  name:        z.string().min(1).max(100).optional(),
-  emoji:       z.string().max(16).optional(),
-  tag:         z.string().max(64).optional(),
-  description: z.string().max(2000).nullable().optional(),
-  imageUrl:    z.union([
+  name:             z.string().min(1).max(100).optional(),
+  emoji:            z.string().max(16).optional(),
+  tag:              z.string().max(64).optional(),
+  description:      z.string().max(2000).nullable().optional(),
+  imageUrl:         z.union([
     z.string().regex(/^\/objects\//, "imageUrl must be an /objects/ path").max(500),
     z.null(),
   ]).optional(),
-  uploadToken: z.string().min(1).max(256).optional(),
+  uploadToken:      z.string().min(1).max(256).optional(),
+  imageContentType: z.enum(ALLOWED_IMAGE_CONTENT_TYPES).optional(),
   calories:    z.number().nullable().optional(),
   proteinG:    z.number().nullable().optional(),
   carbsG:      z.number().nullable().optional(),
@@ -1053,13 +1057,13 @@ router.patch("/nutrition/posts/:id", requireAuth, attachPlayer, async (req, res)
   if (!existing) { res.status(404).json({ error: "Meal post not found" }); return; }
   if (existing.playerId !== playerId) { res.status(403).json({ error: "Not your meal post" }); return; }
 
-  const { name, emoji, tag, description, imageUrl, uploadToken, calories, proteinG, carbsG, fatG } = body.data;
+  const { name, emoji, tag, description, imageUrl, uploadToken, imageContentType, calories, proteinG, carbsG, fatG } = body.data;
 
   // If the imageUrl is being changed to a new object path, verify the upload
   // token and flip the ACL to public — same flow as create.
   const imageChanging = imageUrl !== undefined && imageUrl !== existing.imageUrl;
   if (imageChanging && typeof imageUrl === "string") {
-    if (!uploadToken || !verifyUploadToken(imageUrl, req.clerkUserId!, uploadToken)) {
+    if (!uploadToken || !imageContentType || !verifyUploadToken(imageUrl, req.clerkUserId!, uploadToken, imageContentType)) {
       res.status(403).json({ error: "Invalid or missing uploadToken for imageUrl" });
       return;
     }
@@ -1258,8 +1262,9 @@ router.post("/nutrition/analyze", requireAuth, attachPlayer, async (req, res) =>
 // plus the matching HMAC `uploadToken` — same trust model as POST
 // /nutrition/posts — so users can only analyze images they actually uploaded.
 const AnalyzeImageBody = z.object({
-  imageUrl: z.string().regex(/^\/objects\//, "imageUrl must be an /objects/ path").max(500),
-  uploadToken: z.string().min(1).max(256),
+  imageUrl:         z.string().regex(/^\/objects\//, "imageUrl must be an /objects/ path").max(500),
+  uploadToken:      z.string().min(1).max(256),
+  imageContentType: z.enum(ALLOWED_IMAGE_CONTENT_TYPES),
 });
 
 const FALLBACK_ANALYSIS = {
@@ -1288,10 +1293,10 @@ router.post("/nutrition/analyze-image", requireAuth, attachPlayer, scanLimiter, 
   const body = AnalyzeImageBody.safeParse(req.body);
   if (!body.success) { res.status(400).json({ error: "imageUrl and uploadToken required" }); return; }
 
-  const { imageUrl, uploadToken } = body.data;
+  const { imageUrl, uploadToken, imageContentType } = body.data;
 
   // Same gate as POST /nutrition/posts — the user must own the upload.
-  if (!verifyUploadToken(imageUrl, req.clerkUserId!, uploadToken)) {
+  if (!verifyUploadToken(imageUrl, req.clerkUserId!, uploadToken, imageContentType)) {
     res.status(403).json({ error: "Invalid uploadToken for imageUrl" });
     return;
   }
@@ -1302,7 +1307,10 @@ router.post("/nutrition/analyze-image", requireAuth, attachPlayer, scanLimiter, 
   try {
     const file = await objectStorageService.getObjectEntityFile(imageUrl);
     const [metadata] = await file.getMetadata();
-    contentType = (metadata.contentType as string) || "image/jpeg";
+    // Use the caller-declared content type (already validated against the allowlist)
+    // rather than trusting the raw stored metadata, which could differ if the
+    // client bypassed the content-type constraint on the PUT.
+    contentType = imageContentType;
     const size = Number(metadata.size ?? 0);
     if (size > 0 && size > MAX_IMAGE_BYTES_FOR_VISION) {
       res.status(400).json({ error: "Image too large for analysis" });
@@ -1367,8 +1375,9 @@ router.post("/nutrition/analyze-image", requireAuth, attachPlayer, scanLimiter, 
 // Vision-based body composition assessment from a full-body photo.
 // Premium only. Uses GPT-5.2 vision for best accuracy.
 const BodyScanBody = z.object({
-  imageUrl:    z.string().regex(/^\/objects\//, "imageUrl must be an /objects/ path").max(500),
-  uploadToken: z.string().min(1).max(256),
+  imageUrl:         z.string().regex(/^\/objects\//, "imageUrl must be an /objects/ path").max(500),
+  uploadToken:      z.string().min(1).max(256),
+  imageContentType: z.enum(ALLOWED_IMAGE_CONTENT_TYPES),
   heightCm:    z.number().min(100).max(250).optional(),
   weightKg:    z.number().min(30).max(300).optional(),
   gender:      z.enum(["male", "female", "other"]).optional(),
@@ -1396,9 +1405,9 @@ router.post("/nutrition/body-scan", requireAuth, attachPlayer, scanLimiter, asyn
     return;
   }
 
-  const { imageUrl, uploadToken, heightCm, weightKg, gender } = body.data;
+  const { imageUrl, uploadToken, imageContentType, heightCm, weightKg, gender } = body.data;
 
-  if (!verifyUploadToken(imageUrl, req.clerkUserId!, uploadToken)) {
+  if (!verifyUploadToken(imageUrl, req.clerkUserId!, uploadToken, imageContentType)) {
     res.status(403).json({ error: "Invalid uploadToken for imageUrl" });
     return;
   }
@@ -1408,7 +1417,9 @@ router.post("/nutrition/body-scan", requireAuth, attachPlayer, scanLimiter, asyn
   try {
     const file = await objectStorageService.getObjectEntityFile(imageUrl);
     const [metadata] = await file.getMetadata();
-    contentType = (metadata.contentType as string) || "image/jpeg";
+    // Use the caller-declared content type (already validated against the allowlist)
+    // rather than trusting raw stored metadata.
+    contentType = imageContentType;
     const size = Number(metadata.size ?? 0);
     if (size > MAX_IMAGE_BYTES_FOR_VISION) {
       res.status(400).json({ error: "Image too large for analysis" });
