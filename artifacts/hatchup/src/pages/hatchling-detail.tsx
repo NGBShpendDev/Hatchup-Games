@@ -21,7 +21,7 @@ import { GlowBadge } from "@/components/ui/glow-badge";
 import { RarityBadge } from "@/components/rarity-badge";
 import { getRarityTokens } from "@/lib/rarityTokens";
 import { motion } from "framer-motion";
-import { ArrowLeft, Zap, Heart, Coffee, Shield, Trash2, ArrowUpCircle, Sword, Star, Share2 } from "lucide-react";
+import { ArrowLeft, Zap, Heart, Coffee, Shield, Trash2, ArrowUpCircle, Sword, Star, Share2, Camera } from "lucide-react";
 import { ComposeSheet } from "@/components/compose-sheet";
 import { ErrorCard } from "@/components/error-card";
 import { useToast } from "@/hooks/use-toast";
@@ -192,6 +192,8 @@ export default function HatchlingDetail() {
   const updatePlayerMutation = useUpdatePlayer();
   const { player, refetch: refetchPlayer } = usePlayer();
   const isActivePartner = player?.activeHatchlingId === hatchlingId;
+  const avatarPath = `/api/hatchlings/${hatchlingId}/avatar`;
+  const isProfileAvatar = !!player?.avatarUrl?.includes(avatarPath);
 
   const handleSetActive = () => {
     if (!player || !hatchling || isActivePartner) return;
@@ -203,6 +205,21 @@ export default function HatchlingDetail() {
           toast({ title: "Active Partner Set!", description: `${hatchling.name} is now your bonded partner. Nutrition buffs go to them.` });
         },
         onError: () => toast({ title: "Couldn't set partner", description: "Try again in a moment.", variant: "destructive" }),
+      }
+    );
+  };
+
+  const handleSetAvatar = () => {
+    if (!player || !hatchling || isProfileAvatar) return;
+    const fullAvatarUrl = `${window.location.origin}${avatarPath}`;
+    updatePlayerMutation.mutate(
+      { id: player.id, data: { avatarUrl: fullAvatarUrl } },
+      {
+        onSuccess: async () => {
+          await refetchPlayer();
+          toast({ title: "Profile Picture Updated!", description: `${hatchling.name} is now your profile picture. View it on your profile page.` });
+        },
+        onError: () => toast({ title: "Couldn't set profile picture", description: "Try again in a moment.", variant: "destructive" }),
       }
     );
   };
@@ -470,6 +487,33 @@ export default function HatchlingDetail() {
                   data-testid="button-set-active-partner"
                 >
                   {isActivePartner ? "Active" : updatePlayerMutation.isPending ? "Setting…" : "Set Active"}
+                </NeonButton>
+              </div>
+            </GlassCard>
+
+            {/* Profile picture action */}
+            <GlassCard glow={isProfileAvatar ? "primary" : "none"} className="p-4">
+              <div className="relative z-10 flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-black text-sm flex items-center gap-1.5">
+                    <Camera className={`w-4 h-4 ${isProfileAvatar ? "text-pink-400" : "text-muted-foreground"}`} />
+                    {isProfileAvatar ? "Your Profile Picture" : "Profile Picture"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {isProfileAvatar
+                      ? "This Pal is your current profile avatar."
+                      : "Use this Pal as your profile picture across HatchUp."}
+                  </p>
+                </div>
+                <NeonButton
+                  size="sm"
+                  variant={isProfileAvatar ? "secondary" : "primary"}
+                  className="whitespace-nowrap"
+                  onClick={handleSetAvatar}
+                  disabled={isProfileAvatar || updatePlayerMutation.isPending}
+                  data-testid="button-set-profile-avatar"
+                >
+                  {isProfileAvatar ? "Set ✓" : updatePlayerMutation.isPending ? "Saving…" : "Set Pic"}
                 </NeonButton>
               </div>
             </GlassCard>

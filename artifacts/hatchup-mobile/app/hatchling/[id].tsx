@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useGetHatchling, useEvolveHatchling } from "@workspace/api-client-react";
+import { useGetHatchling, useEvolveHatchling, useUpdatePlayer } from "@workspace/api-client-react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback } from "react";
 import {
@@ -46,6 +46,14 @@ function buildHatchlingShareUrl(hatchlingId: number): string {
   return `https://${domain}/hatchling/${hatchlingId}`;
 }
 
+const PLAYER_ID = 1;
+
+function buildAvatarUrl(hatchlingId: number): string {
+  const domain = process.env.EXPO_PUBLIC_DOMAIN;
+  if (!domain) return "";
+  return `https://${domain}/api/hatchlings/${hatchlingId}/avatar`;
+}
+
 export default function HatchlingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
@@ -55,6 +63,7 @@ export default function HatchlingDetailScreen() {
 
   const { data: pal, isLoading, refetch } = useGetHatchling(Number(id));
   const evolveMutation = useEvolveHatchling();
+  const updatePlayerMutation = useUpdatePlayer();
 
   async function handleShare() {
     if (!pal) return;
@@ -76,6 +85,26 @@ export default function HatchlingDetailScreen() {
   const evolveThreshold = EVOLVE_LEVEL_FOR_STAGE[stage];
   const canEvolve = stage < 3 && evolveThreshold != null && level >= evolveThreshold;
   const nextStageName = STAGE_NAMES[stage + 1] ?? `Stage ${stage + 1}`;
+
+  const handleSetAvatar = useCallback(() => {
+    if (!pal) return;
+    const avatarUrl = buildAvatarUrl(Number(id));
+    if (!avatarUrl) {
+      Alert.alert("Not available", "Cannot build avatar URL — check EXPO_PUBLIC_DOMAIN.");
+      return;
+    }
+    updatePlayerMutation.mutate(
+      { id: PLAYER_ID, data: { avatarUrl } },
+      {
+        onSuccess: () => {
+          Alert.alert("Profile Picture Updated!", `${pal.name} is now your profile picture.`);
+        },
+        onError: () => {
+          Alert.alert("Couldn't set avatar", "Try again in a moment.");
+        },
+      },
+    );
+  }, [pal, id, updatePlayerMutation]);
 
   const handleEvolve = useCallback(() => {
     if (!pal) return;
@@ -185,6 +214,27 @@ export default function HatchlingDetailScreen() {
             )}
           </View>
 
+          {/* Set as Profile Picture */}
+          <Pressable
+            onPress={handleSetAvatar}
+            disabled={updatePlayerMutation.isPending}
+            style={[
+              styles.avatarBtn,
+              { backgroundColor: colors.primary + "18", borderColor: colors.primary + "66" },
+              updatePlayerMutation.isPending && styles.evolveBtnDisabled,
+            ]}
+            testID="button-set-avatar"
+          >
+            {updatePlayerMutation.isPending ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Feather name="camera" size={16} color={colors.primary} />
+            )}
+            <Text style={[styles.evolveBtnText, { color: colors.primary }]}>
+              {updatePlayerMutation.isPending ? "Saving…" : "Set as Profile Picture"}
+            </Text>
+          </Pressable>
+
           {/* Power Score */}
           <View style={[styles.powerCard, { backgroundColor: rarityColor + "14", borderColor: rarityColor + "44" }]}>
             <Feather name="award" size={20} color={rarityColor} />
@@ -263,6 +313,7 @@ const styles = StyleSheet.create({
   xpFill: { height: 8, borderRadius: 4 },
   xpLabel: { fontSize: 12 },
   evolveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 10, borderWidth: 1.5, paddingVertical: 10, marginTop: 6 },
+  avatarBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 10, borderWidth: 1.5, paddingVertical: 10, marginBottom: 12 },
   evolveBtnDisabled: { opacity: 0.6 },
   evolveBtnText: { fontSize: 13, fontWeight: "700" },
   powerCard: { borderRadius: 14, borderWidth: 1, padding: 14, flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },

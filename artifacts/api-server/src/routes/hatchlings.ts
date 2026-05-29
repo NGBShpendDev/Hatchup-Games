@@ -14,7 +14,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, attachPlayer, requirePlayerOwnership } from "../middlewares/auth.ts";
 import { attachEntitlement, enforceHatchlingCap } from "../services/subscriptionGuards.ts";
-import { buildHatchShareSvg } from "./og-render.ts";
+import { buildHatchShareSvg, buildHatchAvatarSvg } from "./og-render.ts";
 import { renderSvgToPng } from "./og-router.ts";
 import { applyHatchlingXp } from "../services/hatchlingXp.ts";
 
@@ -438,6 +438,51 @@ router.get("/hatchlings/:id/share-image", async (req, res) => {
   } catch (err) {
     req.log?.warn({ err: (err as Error).message, hatchlingId: id }, "hatchling share-image render failed");
     res.status(500).json({ error: "Failed to render share image" });
+  }
+});
+
+// ── GET /hatchlings/:id/avatar — public 400×400 square portrait PNG ────────────
+// No auth required — this is used as a profile picture URL that must load
+// from any context (mobile Image component, img tags, social crawlers, etc.)
+const REALM_COLORS_AVATAR: Record<string, string> = {
+  strength: "#ef4444",
+  cardio:   "#06b6d4",
+  balance:  "#a855f7",
+  beast:    "#22c55e",
+  mythic:   "#ec4899",
+};
+
+router.get("/hatchlings/:id/avatar", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id) || id <= 0) {
+    res.status(400).json({ error: "Invalid hatchling id" });
+    return;
+  }
+  try {
+    const hatchling = await db.query.hatchlingsTable.findFirst({
+      where: eq(hatchlingsTable.id, id),
+    });
+    if (!hatchling) {
+      res.status(404).json({ error: "Hatchling not found" });
+      return;
+    }
+    const realmEmoji = REALM_EMOJI[hatchling.realm ?? "balance"] ?? "✨";
+    const realmColor = REALM_COLORS_AVATAR[hatchling.realm ?? "balance"] ?? "#a855f7";
+    const svg = buildHatchAvatarSvg({
+      name: hatchling.name,
+      species: hatchling.species ?? "Mystery Pal",
+      rarity: hatchling.rarity ?? "Common",
+      level: hatchling.level,
+      realmEmoji,
+      realmColor,
+    });
+    const png = await renderSvgToPng(svg);
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=3600");
+    res.send(png);
+  } catch (err) {
+    req.log?.warn({ err: (err as Error).message, hatchlingId: id }, "hatchling avatar render failed");
+    res.status(500).json({ error: "Failed to render avatar" });
   }
 });
 

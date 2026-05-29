@@ -967,3 +967,82 @@ export function buildHatchShareSvg(opts: BuildHatchShareSvgArgs): string {
   <text x="${width / 2}" y="${height - padding - 22}" text-anchor="middle" font-family="Inter, sans-serif" font-weight="400" font-size="22" fill="#a1a1aa">${escapeXml(footerText)}</text>
 </svg>`;
 }
+
+// ── Square portrait avatar (400×400) ─────────────────────────────────────────
+export interface BuildHatchAvatarSvgArgs {
+  name: string;
+  species: string;
+  rarity: string;
+  level: number;
+  realmEmoji: string;
+  realmColor: string;
+}
+
+export function buildHatchAvatarSvg(opts: BuildHatchAvatarSvgArgs): string {
+  const size = 400;
+  const { name, species, rarity, level, realmEmoji, realmColor } = opts;
+
+  const displayName = name.length > 16 ? name.slice(0, 15).trimEnd() + "…" : name;
+  const displaySpecies = species.length > 20 ? species.slice(0, 19).trimEnd() + "…" : species;
+
+  const RARITY_COLORS: Record<string, string> = {
+    Common: "#6b7280",
+    Uncommon: "#22c55e",
+    Rare: "#3b82f6",
+    Epic: "#a855f7",
+    Legendary: "#f59e0b",
+    Mythic: "#ec4899",
+    Ancient: "#dc2626",
+    Celestial: "#7dd3fc",
+    Shiny: "#facc15",
+  };
+  const rarityColor = RARITY_COLORS[rarity] ?? "#6b7280";
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+  <defs>
+    <radialGradient id="realmGlow" cx="50%" cy="48%" r="65%">
+      <stop offset="0%" stop-color="${escapeAttr(realmColor)}" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#080912" stop-opacity="1"/>
+    </radialGradient>
+    <linearGradient id="rarityDiv" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="${escapeAttr(rarityColor)}" stop-opacity="0"/>
+      <stop offset="50%" stop-color="${escapeAttr(rarityColor)}" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="${escapeAttr(rarityColor)}" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="${size}" height="${size}" fill="#080912"/>
+  <rect width="${size}" height="${size}" fill="url(#realmGlow)"/>
+
+  <!-- Top accent stripe -->
+  <rect x="0" y="0" width="${size}" height="5" fill="${escapeAttr(realmColor)}" opacity="0.9"/>
+
+  <!-- Brand watermark -->
+  <text x="14" y="26" font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="11" fill="#ffffff" letter-spacing="2" opacity="0.45">HATCHUP</text>
+
+  <!-- Level badge (top-right) -->
+  <rect x="${size - 56}" y="10" width="44" height="22" rx="11" fill="${escapeAttr(realmColor)}" opacity="0.9"/>
+  <text x="${size - 34}" y="25" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="11" fill="#000000">Lv.${escapeXml(String(level))}</text>
+
+  <!-- Realm emoji (large, centred) -->
+  <text x="${size / 2}" y="208" text-anchor="middle" font-family="serif" font-size="118" dominant-baseline="central">${escapeXml(realmEmoji)}</text>
+
+  <!-- Divider line -->
+  <rect x="40" y="265" width="${size - 80}" height="1" fill="url(#rarityDiv)"/>
+
+  <!-- Creature name -->
+  <text x="${size / 2}" y="302" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="800" font-size="30" fill="#ffffff">${escapeXml(displayName)}</text>
+
+  <!-- Species -->
+  <text x="${size / 2}" y="325" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="400" font-size="13" fill="#a1a1aa">${escapeXml(displaySpecies)}</text>
+
+  <!-- Rarity pill -->
+  <rect x="${(size - 108) / 2}" y="342" width="108" height="24" rx="12" fill="${escapeAttr(rarityColor)}" opacity="0.16"/>
+  <rect x="${(size - 108) / 2}" y="342" width="108" height="24" rx="12" fill="none" stroke="${escapeAttr(rarityColor)}" stroke-width="1" stroke-opacity="0.55"/>
+  <text x="${size / 2}" y="358" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="11" fill="${escapeAttr(rarityColor)}" letter-spacing="1">${escapeXml(rarity.toUpperCase())}</text>
+
+  <!-- Bottom accent stripe -->
+  <rect x="0" y="${size - 5}" width="${size}" height="5" fill="${escapeAttr(realmColor)}" opacity="0.9"/>
+</svg>`;
+}

@@ -3,7 +3,7 @@ import { Hatchling, useUpdatePlayer } from "@workspace/api-client-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Zap, Heart, Star } from "lucide-react";
+import { Zap, Heart, Star, Camera } from "lucide-react";
 import { Link } from "wouter";
 import { usePlayer } from "@/lib/playerContext";
 import { useToast } from "@/hooks/use-toast";
@@ -98,6 +98,8 @@ export function HatchlingCard({ hatchling, onClick }: HatchlingCardProps) {
   const { toast } = useToast();
   const updatePlayer = useUpdatePlayer();
   const isActive = player?.activeHatchlingId === hatchling.id;
+  const avatarPath = `/api/hatchlings/${hatchling.id}/avatar`;
+  const isAvatar = !!player?.avatarUrl?.includes(avatarPath);
 
   const handleSetActive = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -111,6 +113,23 @@ export function HatchlingCard({ hatchling, onClick }: HatchlingCardProps) {
           toast({ title: "Active Partner Set!", description: `${hatchling.name} is now your bonded partner. Nutrition buffs go to them.` });
         },
         onError: () => toast({ title: "Couldn't set partner", description: "Try again in a moment.", variant: "destructive" }),
+      }
+    );
+  };
+
+  const handleSetAvatar = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!player || isAvatar) return;
+    const fullAvatarUrl = `${window.location.origin}${avatarPath}`;
+    updatePlayer.mutate(
+      { id: player.id, data: { avatarUrl: fullAvatarUrl } },
+      {
+        onSuccess: async () => {
+          await refetch();
+          toast({ title: "Profile Picture Updated!", description: `${hatchling.name} is now your profile picture.` });
+        },
+        onError: () => toast({ title: "Couldn't set avatar", description: "Try again in a moment.", variant: "destructive" }),
       }
     );
   };
@@ -235,7 +254,7 @@ export function HatchlingCard({ hatchling, onClick }: HatchlingCardProps) {
       )}
 
       {/* Active partner toggle */}
-      <div className="mt-3 relative z-10">
+      <div className="mt-3 relative z-10 space-y-1.5">
         <Button
           size="sm"
           variant={isActive ? "secondary" : "outline"}
@@ -246,6 +265,17 @@ export function HatchlingCard({ hatchling, onClick }: HatchlingCardProps) {
         >
           <Star className={`w-3 h-3 mr-1 ${isActive ? "fill-yellow-400 text-yellow-400" : ""}`} />
           {isActive ? "Active Partner" : "Set as Active"}
+        </Button>
+        <Button
+          size="sm"
+          variant={isAvatar ? "secondary" : "ghost"}
+          className={`w-full h-7 text-[10px] font-black uppercase tracking-wider ${isAvatar ? "text-pink-400" : "text-muted-foreground"}`}
+          onClick={handleSetAvatar}
+          disabled={isAvatar || updatePlayer.isPending}
+          data-testid={`button-set-avatar-${hatchling.id}`}
+        >
+          <Camera className={`w-3 h-3 mr-1 ${isAvatar ? "text-pink-400" : ""}`} />
+          {isAvatar ? "Profile Pic ✓" : "Set as Avatar"}
         </Button>
       </div>
     </motion.div>
