@@ -193,6 +193,22 @@ const STREAK_PLAYER_COINS = 50;
 const STREAK_HATCHLING_XP = 25;
 const STREAK_HATCHLING_BOND = 1;
 
+// ── Per-meal XP rewards ───────────────────────────────────────────────────────
+// Every logged meal earns the player base XP and their active Hatchling base XP.
+// Premium users receive a 2× multiplier on both. Meal quality also scales the
+// reward: high-quality (7-10) = 1.5×, junk food (1-4) = 0.75×, neutral = 1×.
+const MEAL_BASE_PLAYER_XP = 50;
+const MEAL_BASE_PLAYER_COINS = 10;
+const MEAL_BASE_HATCHLING_XP = 15;
+const PREMIUM_MEAL_MULTIPLIER = 2;
+
+function mealQualityMultiplier(score: number | null): number {
+  if (score == null) return 1.0;
+  if (score >= 7) return 1.5;
+  if (score <= 4) return 0.75;
+  return 1.0;
+}
+
 async function checkAndRewardDailyMacroTarget(playerId: number, player: typeof playersTable.$inferSelect) {
   // Short-circuit: already rewarded today
   const existingStreak = await db.query.nutritionDailyStreaksTable.findFirst({
@@ -407,12 +423,58 @@ router.post("/nutrition/posts", requireAuth, attachPlayer, requirePlayerOwnershi
     dailyMacroReward = await checkAndRewardDailyMacroTarget(playerId, playerRow);
   }
 
+  // ── Per-meal XP reward ────────────────────────────────────────────────────
+  // Compute player and Hatchling XP with quality + premium multipliers.
+  const premiumPlayer = playerRow ? isPremium(playerRow) : false;
+  const qualityMult = mealQualityMultiplier(effectiveScore);
+  const premiumMult = premiumPlayer ? PREMIUM_MEAL_MULTIPLIER : 1;
+  const totalMult   = qualityMult * premiumMult;
+
+  const playerXpGain      = Math.round(MEAL_BASE_PLAYER_XP      * totalMult);
+  const playerCoinsGain   = Math.round(MEAL_BASE_PLAYER_COINS    * premiumMult);
+  const hatchlingXpGain   = Math.round(MEAL_BASE_HATCHLING_XP    * totalMult);
+
+  await db.update(playersTable)
+    .set({
+      xp:    sql`xp + ${playerXpGain}`,
+      coins: sql`coins + ${playerCoinsGain}`,
+    })
+    .where(eq(playersTable.id, playerId));
+
+  let mealHatchlingXpResult: Awaited<ReturnType<typeof applyHatchlingXp>> = null;
+  const activePalId = hatchlingStatChange?.hatchlingId ?? null;
+  if (activePalId) {
+    mealHatchlingXpResult = await applyHatchlingXp(activePalId, hatchlingXpGain);
+  } else {
+    // No active partner cached from stat buff — resolve fresh
+    const freshPal = await resolveActivePartner(playerId);
+    if (freshPal) {
+      mealHatchlingXpResult = await applyHatchlingXp(freshPal.id, hatchlingXpGain);
+    }
+  }
+
+  const mealXpReward = {
+    playerXp: playerXpGain,
+    playerCoins: playerCoinsGain,
+    hatchlingXp: hatchlingXpGain,
+    hatchlingName: mealHatchlingXpResult
+      ? hatchlingStatChange?.hatchlingName ?? null
+      : null,
+    qualityMultiplier: qualityMult,
+    premiumMultiplier: premiumMult,
+    isPremium: premiumPlayer,
+    hatchlingLevelUp: mealHatchlingXpResult
+      ? mealHatchlingXpResult.newLevel > mealHatchlingXpResult.prevLevel
+      : false,
+  };
+
   res.status(201).json({
     ...post,
     createdAt: post!.createdAt.toISOString(),
     newBadges,
     hatchlingStatChange,
     dailyMacroReward,
+    mealXpReward,
   });
 });
 

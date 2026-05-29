@@ -449,6 +449,31 @@ export default function Nutrition() {
           });
         }
       }
+      // Per-meal XP reward (always present)
+      const mxp = (data as any).mealXpReward as {
+        playerXp: number; playerCoins: number; hatchlingXp: number;
+        hatchlingName: string | null; qualityMultiplier: number;
+        premiumMultiplier: number; isPremium: boolean; hatchlingLevelUp: boolean;
+      } | undefined;
+      if (mxp) {
+        const multiplierLabel = mxp.premiumMultiplier > 1
+          ? ` (${mxp.qualityMultiplier > 1 ? `${mxp.qualityMultiplier}× quality` : ""}${mxp.qualityMultiplier > 1 && mxp.isPremium ? " + " : ""}${mxp.isPremium ? "2× Premium" : ""})`
+          : mxp.qualityMultiplier !== 1 ? ` (${mxp.qualityMultiplier}× quality)` : "";
+        entries.unshift({
+          kind: "xp",
+          label: `+${mxp.playerXp} XP${multiplierLabel}`,
+          value: mxp.playerXp,
+          detail: mxp.isPremium ? "Premium 2× meal XP boost applied!" : "Log quality meals to earn more XP.",
+        });
+        if (mxp.playerCoins) entries.push({ kind: "artifact", label: "+Coins", value: mxp.playerCoins });
+        if (mxp.hatchlingXp && mxp.hatchlingName) {
+          entries.push({
+            kind: "hatchling",
+            label: `${mxp.hatchlingName} +${mxp.hatchlingXp} XP`,
+            detail: mxp.hatchlingLevelUp ? "Your Pal leveled up!" : "Pal gets stronger with every meal.",
+          });
+        }
+      }
       setRewardSummary({ open: true, entries, title: "Meal Rewards" });
       },
     },
@@ -601,6 +626,25 @@ export default function Nutrition() {
             <Plus className="w-5 h-5 text-white" />
           </button>
         </div>
+
+        {/* Premium Meal XP Banner */}
+        {!isPremiumUser ? (
+          <a href="/subscription" className="block mb-3">
+            <div className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-amber-500/15 to-yellow-500/10 border border-amber-500/40 px-3 py-2.5">
+              <span className="text-lg">⚡</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black text-amber-300">Go Premium — 2× Meal XP &amp; Pal Boost</p>
+                <p className="text-[10px] text-amber-300/70">Free: +50 XP/meal · Premium: +100 XP/meal + Pal levels up faster</p>
+              </div>
+              <span className="text-[10px] font-black text-amber-400 border border-amber-500/40 rounded-full px-2 py-0.5 shrink-0">Upgrade →</span>
+            </div>
+          </a>
+        ) : (
+          <div className="flex items-center gap-2 mb-3 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/5 border border-green-500/30 px-3 py-2">
+            <span className="text-sm">🌟</span>
+            <p className="text-[11px] font-black text-green-300">Premium Active — 2× Meal XP &amp; Pal XP on every log</p>
+          </div>
+        )}
 
         {/* Macro Target Banner */}
         {macroTargetError && !macroTarget && (
@@ -1247,6 +1291,15 @@ export default function Nutrition() {
                       />
                     </div>
                   ))}
+                </div>
+
+                {/* XP preview pill */}
+                <div className={`flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-black ${isPremiumUser ? "bg-gradient-to-r from-amber-500/20 to-yellow-500/10 border border-amber-500/30 text-amber-300" : "bg-muted/40 text-muted-foreground"}`}>
+                  {isPremiumUser ? (
+                    <>⚡ 2× PREMIUM — +{Math.round(50 * 2 * (aiResult?.quality_score != null && aiResult.quality_score >= 7 ? 1.5 : aiResult?.quality_score != null && aiResult.quality_score <= 4 ? 0.75 : 1))} XP · Pal +{Math.round(15 * 2 * (aiResult?.quality_score != null && aiResult.quality_score >= 7 ? 1.5 : aiResult?.quality_score != null && aiResult.quality_score <= 4 ? 0.75 : 1))} XP</>
+                  ) : (
+                    <>+50 XP on log · <a href="/subscription" className="text-amber-400 underline">Go Premium for 2×</a></>
+                  )}
                 </div>
 
                 <Button
