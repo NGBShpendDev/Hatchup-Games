@@ -222,7 +222,11 @@ function SignedInBody({ postId }: { postId: number }) {
   return <PostBody postId={postId} viewerId={playerId ?? null} />;
 }
 
-function SignedOutPostDetail({ postId }: { postId: number }) {
+// Post content requires authentication — the API enforces auth on the post
+// permalink so that block-list checks can always run. Unauthenticated users
+// see a sign-in wall instead of post content, preventing a blocked user from
+// bypassing the block simply by omitting credentials.
+function SignedOutPostDetail({ postId: _postId }: { postId: number }) {
   const { redirectToSignIn } = useClerk();
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
@@ -235,8 +239,21 @@ function SignedOutPostDetail({ postId }: { postId: number }) {
           Sign in
         </Button>
       </header>
-      <main className="flex-1 w-full max-w-lg mx-auto p-4">
-        <PostBody postId={postId} viewerId={null} />
+      <main className="flex-1 w-full max-w-lg mx-auto p-4 flex items-center justify-center">
+        <Card className="border border-primary/30 bg-gradient-to-r from-primary/10 to-violet-500/10 rounded-2xl w-full">
+          <CardContent className="p-6 flex flex-col items-center gap-4 text-center">
+            <Sparkles className="w-8 h-8 text-primary" />
+            <div>
+              <p className="text-base font-black">Sign in to view this post</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Join HatchUp to react, comment &amp; share.
+              </p>
+            </div>
+            <Button onClick={() => redirectToSignIn()} className="rounded-full font-black w-full" data-testid="button-signin-wall">
+              Sign in
+            </Button>
+          </CardContent>
+        </Card>
       </main>
     </div>
   );

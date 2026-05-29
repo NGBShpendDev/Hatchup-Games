@@ -42,7 +42,6 @@ import { socialChannelsForType, socialChannelsForPlayers } from "../services/soc
 import { sendSocialEmail } from "../services/socialEmail.ts";
 import { notificationsTable } from "@workspace/db";
 import { resolveMentionedPlayers } from "../services/mentions.ts";
-import { createHmac } from "node:crypto";
 import { logger } from "../lib/logger.ts";
 import { verifyUploadToken, MAX_UPLOAD_BYTES } from "./storage.ts";
 import { ObjectStorageService } from "../lib/objectStorage.ts";
@@ -790,25 +789,17 @@ router.post("/social/posts", requireAuth, attachPlayer, socialWriteLimiter, bloc
 });
 
 // ── GET /social/posts/:id ───────────────────────────────────────────────────
-// Public endpoint — permalinks must work for logged-out viewers too.
 
-router.get("/social/posts/:id", async (req, res) => {
+// Authentication is required on this endpoint so that block-list enforcement
+// is always possible. Allowing unauthenticated access would let a blocked user
+// bypass the block by omitting credentials — an anonymous viewer cannot be
+// matched against anyone's block list, so the privacy gate would silently
+// skip block enforcement and return the full post payload.
+router.get("/social/posts/:id", requireAuth, attachPlayer, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) { res.status(404).json({ error: "Post not found" }); return; }
 
-  let viewerId: number | null = null;
-  try {
-    const { getAuth } = await import("@clerk/express");
-    const auth = getAuth(req);
-    if (auth?.userId) {
-      const player = await db.query.playersTable.findFirst({
-        where: eq(playersTable.clerkId, auth.userId),
-      });
-      if (player) viewerId = player.id;
-    }
-  } catch {
-    // ignore auth lookup failures — fall back to anonymous view
-  }
+  const viewerId = req.playerId ?? null;
 
   const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, id) });
   if (!post || post.deletedAt != null) { res.status(404).json({ error: "Post not found" }); return; }
@@ -827,16 +818,18 @@ router.get("/social/posts/:id", async (req, res) => {
 });
 
 // ── POST /social/posts/:id/view ─────────────────────────────────────────────
-// Public — anyone (logged in or anonymous) opening the permalink counts as a
-// view. Dedup is per (post, viewerKey, day) so spamming refresh doesn't inflate
-// the number. viewerKey = playerId for signed-in viewers; otherwise the request
-// IP. Always returns the current viewCount so the client can render it.
+// Authentication is required so that block-list enforcement cannot be bypassed
+// by omitting credentials. A blocked user who is not authenticated would fall
+// back to viewerId=null, skipping block enforcement entirely.
 //
-// Defense in depth against bots that rotate through many post IDs from the
-// same IP: in addition to the per-day dedup and the postViewLimiter
-// (120/min/IP), we cap the number of *distinct* posts a single viewerKey can
-// count in any rolling hour. Anything above the cap returns counted=false
-// (still 200) so legitimate browsing UIs keep working.
+// Dedup is per (post, viewerKey, day) so spamming refresh doesn't inflate
+// the number. viewerKey = playerId for signed-in viewers.
+// Always returns the current viewCount so the client can render it.
+//
+// Defense in depth against bots: in addition to the per-day dedup and the
+// postViewLimiter (120/min/IP), we cap the number of *distinct* posts a single
+// viewerKey can count in any rolling hour. Anything above the cap returns
+// counted=false (still 200) so legitimate browsing UIs keep working.
 const DEFAULT_VIEW_DISTINCT_POSTS_PER_HOUR = 60;
 
 export function resolveViewDistinctPostsPerHour(
@@ -886,7 +879,7 @@ export const ABUSE_CHECK_SAMPLE_EVERY = 10;
 // Window we count "recent" views over when feeding the detector.
 export const ABUSE_CHECK_WINDOW_HOURS = 1;
 
-router.post("/social/posts/:id/view", postViewLimiter, async (req, res) => {
+router.post("/social/posts/:id/view", postViewLimiter, requireAuth, attachPlayer, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) { res.status(404).json({ error: "Post not found" }); return; }
 
@@ -896,20 +889,10 @@ router.post("/social/posts/:id/view", postViewLimiter, async (req, res) => {
   // Privacy gate: a view should not be counted (or the viewCount revealed) for
   // posts whose author has blocked the viewer, is hidden, or is a minor — the
   // same rule applied by GET /social/posts/:id for the main permalink.
+  // requireAuth + attachPlayer ensure viewerId is always resolved, preventing
+  // block bypasses via unauthenticated requests.
   {
-    let viewerId: number | null = null;
-    try {
-      const { getAuth } = await import("@clerk/express");
-      const auth = getAuth(req);
-      if (auth?.userId) {
-        const player = await db.query.playersTable.findFirst({
-          where: eq(playersTable.clerkId, auth.userId),
-        });
-        if (player) viewerId = player.id;
-      }
-    } catch {
-      // ignore — fall back to anonymous check
-    }
+    const viewerId = req.playerId ?? null;
     if (!(await isPlayerVisibleToViewer(post.playerId, viewerId))) {
       res.status(404).json({ error: "Post not found" });
       return;
@@ -924,27 +907,9 @@ router.post("/social/posts/:id/view", postViewLimiter, async (req, res) => {
     return;
   }
 
-  // For anonymous viewers, hash the IP with SESSION_SECRET so we can still
-  // dedup per-day without persisting raw IPs (privacy + a small extra cost
-  // for anyone trying to brute-force viewerKeys).
-  const sessionSecret = process.env.SESSION_SECRET ?? "";
-  const rawIp = req.ip ?? "unknown";
-  const ipHash = sessionSecret
-    ? createHmac("sha256", sessionSecret).update(rawIp).digest("hex").slice(0, 32)
-    : rawIp;
-  let viewerKey = `ip:${ipHash}`;
-  try {
-    const { getAuth } = await import("@clerk/express");
-    const auth = getAuth(req);
-    if (auth?.userId) {
-      const player = await db.query.playersTable.findFirst({
-        where: eq(playersTable.clerkId, auth.userId),
-      });
-      if (player) viewerKey = `player:${player.id}`;
-    }
-  } catch {
-    // fall back to IP-based dedup
-  }
+  // Use the authenticated player ID for dedup. Since requireAuth + attachPlayer
+  // now guarantee a resolved player, we always use the player-based key.
+  const viewerKey = `player:${req.playerId!}`;
 
   const viewDate = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
 
@@ -1606,10 +1571,17 @@ router.get("/social/posts/:id/comments/:commentId/revisions", requireAuth, attac
     return;
   }
 
-  // Privacy gate: edit history must not be reachable for posts whose author
-  // has blocked the viewer, is hidden, or is a minor account.
+  // Privacy gate: edit history must not be reachable when either the post
+  // author or the comment author has blocked the viewer, is hidden, or is a
+  // minor account. Checking only the post author is insufficient — a blocked
+  // commenter's history stays reachable to the blocker via a retained comment
+  // ID even after the block is applied.
   const viewerId = req.playerId ?? null;
   if (!(await isPlayerVisibleToViewer(parent.playerId, viewerId))) {
+    res.status(404).json({ error: "Comment not found" });
+    return;
+  }
+  if (!(await isPlayerVisibleToViewer(comment.playerId, viewerId))) {
     res.status(404).json({ error: "Comment not found" });
     return;
   }
@@ -1651,11 +1623,22 @@ router.post(
       return;
     }
 
+    // Require the path :id to match the comment's actual postId. The handler
+    // originally re-resolved the parent post from comment.postId, meaning an
+    // attacker could supply any :id value in the path and still reach the
+    // comment as long as the real parent post was visible. Enforcing the match
+    // prevents cross-post comment targeting.
+    const pathPostId = Number(req.params.id);
+    if (!Number.isFinite(pathPostId) || comment.postId !== pathPostId) {
+      res.status(404).json({ error: "Comment not found" });
+      return;
+    }
+
     // Privacy gate: reject likes that cross a block boundary or target a
-    // hidden/minor post author. Mirrors the gate on POST …/comments so
-    // attackers cannot interact with or trigger notifications for accounts
-    // that have blocked them, are hidden, or are minors — even when they
-    // already hold a comment ID obtained before the block occurred.
+    // hidden/minor account — for BOTH the parent post author AND the comment
+    // author. Checking only the post author is insufficient: a blocked commenter
+    // remains reachable via a retained comment ID even after the block, and the
+    // like would generate a notification that crosses the block boundary.
     const parentPost = await db.query.postsTable.findFirst({
       where: eq(postsTable.id, comment.postId),
     });
@@ -1664,6 +1647,10 @@ router.post(
       return;
     }
     if (!(await isPlayerVisibleToViewer(parentPost.playerId, playerId))) {
+      res.status(404).json({ error: "Comment not found" });
+      return;
+    }
+    if (!(await isPlayerVisibleToViewer(comment.playerId, playerId))) {
       res.status(404).json({ error: "Comment not found" });
       return;
     }
