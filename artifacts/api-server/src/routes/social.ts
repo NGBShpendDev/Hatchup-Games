@@ -81,11 +81,22 @@ async function filterCommentsByDiscoverableAuthors<T extends { playerId: number 
   viewerId: number | null,
   comments: T[],
 ): Promise<T[]> {
-  if (comments.length === 0 || viewerId == null) return comments;
+  if (comments.length === 0) return comments;
   const authorIds = Array.from(new Set(comments.map(c => c.playerId)));
   const authorRows = await db.query.playersTable.findMany({
     where: inArray(playersTable.id, authorIds),
   });
+  if (viewerId == null) {
+    // Anonymous viewers: still enforce rules (2) and (3) — hide accounts that
+    // have set visibility=hidden or are marked as minors. Rule (1) (block list)
+    // does not apply because there is no authenticated viewer to check against.
+    const allowedIds = new Set(
+      authorRows
+        .filter(a => a.locationVisibility !== "hidden" && !a.isMinor)
+        .map(a => a.id),
+    );
+    return comments.filter(c => allowedIds.has(c.playerId));
+  }
   const allowed = await filterDiscoverableCandidates(viewerId, authorRows);
   const allowedIds = new Set(allowed.map(a => a.id));
   return comments.filter(c => allowedIds.has(c.playerId));
@@ -882,6 +893,29 @@ router.post("/social/posts/:id/view", postViewLimiter, async (req, res) => {
   const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, id) });
   if (!post || post.deletedAt != null) { res.status(404).json({ error: "Post not found" }); return; }
 
+  // Privacy gate: a view should not be counted (or the viewCount revealed) for
+  // posts whose author has blocked the viewer, is hidden, or is a minor — the
+  // same rule applied by GET /social/posts/:id for the main permalink.
+  {
+    let viewerId: number | null = null;
+    try {
+      const { getAuth } = await import("@clerk/express");
+      const auth = getAuth(req);
+      if (auth?.userId) {
+        const player = await db.query.playersTable.findFirst({
+          where: eq(playersTable.clerkId, auth.userId),
+        });
+        if (player) viewerId = player.id;
+      }
+    } catch {
+      // ignore — fall back to anonymous check
+    }
+    if (!(await isPlayerVisibleToViewer(post.playerId, viewerId))) {
+      res.status(404).json({ error: "Post not found" });
+      return;
+    }
+  }
+
   // If the anomaly detector has previously frozen this post, stop counting
   // immediately so a botnet can't keep inflating the number while the post
   // sits in the admin moderation queue.
@@ -1304,6 +1338,14 @@ router.get("/social/posts/:id/comments", requireAuth, attachPlayer, async (req, 
   if (!parent || parent.deletedAt != null) { res.json([]); return; }
   const viewerId = req.playerId ?? null;
 
+  // Privacy gate: the comment list must not be reachable when the post author
+  // has blocked the viewer, is hidden, or is a minor — same rule as the main
+  // permalink (GET /social/posts/:id) and the write path (POST …/comments).
+  if (!(await isPlayerVisibleToViewer(parent.playerId, viewerId))) {
+    res.json([]);
+    return;
+  }
+
   const allComments = await db.query.postCommentsTable.findMany({
     where: eq(postCommentsTable.postId, postId),
     orderBy: [desc(postCommentsTable.createdAt)],
@@ -1598,6 +1640,23 @@ router.post(
       where: eq(postCommentsTable.id, commentId),
     });
     if (!comment) {
+      res.status(404).json({ error: "Comment not found" });
+      return;
+    }
+
+    // Privacy gate: reject likes that cross a block boundary or target a
+    // hidden/minor post author. Mirrors the gate on POST …/comments so
+    // attackers cannot interact with or trigger notifications for accounts
+    // that have blocked them, are hidden, or are minors — even when they
+    // already hold a comment ID obtained before the block occurred.
+    const parentPost = await db.query.postsTable.findFirst({
+      where: eq(postsTable.id, comment.postId),
+    });
+    if (!parentPost || parentPost.deletedAt != null) {
+      res.status(404).json({ error: "Comment not found" });
+      return;
+    }
+    if (!(await isPlayerVisibleToViewer(parentPost.playerId, playerId))) {
       res.status(404).json({ error: "Comment not found" });
       return;
     }
