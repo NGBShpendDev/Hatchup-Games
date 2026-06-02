@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
+import { getEggAsset } from "../assets/creatureAssets";
 import type { EggElement, EggRarity } from "../domain/models";
 import { colors } from "../theme";
 
@@ -23,6 +24,21 @@ const rarityColors: Record<EggRarity, string> = {
 };
 
 export function EggAvatar({ element, rarity, size = "large" }: Props) {
+  const asset = getEggAsset(element, rarity);
+
+  if (asset) {
+    return (
+      <View style={[styles.wrap, styles[size]]}>
+        <Image
+          accessibilityLabel={`${rarity} ${element} egg art`}
+          resizeMode="contain"
+          source={asset}
+          style={[styles.image, styles[`${size}Image`]]}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.wrap, styles[size]]}>
       <View style={[styles.egg, { backgroundColor: rarityColors[rarity] }]}>
@@ -46,6 +62,15 @@ const styles = StyleSheet.create({
   },
   small: {
     height: 82,
+  },
+  image: {
+    height: "100%",
+  },
+  largeImage: {
+    width: 144,
+  },
+  smallImage: {
+    width: 88,
   },
   egg: {
     alignItems: "center",

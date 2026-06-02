@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { ConnectHealthScreen } from "./src/screens/ConnectHealthScreen";
+import { CreatureDexScreen } from "./src/screens/CreatureDexScreen";
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { MonsterDetailScreen } from "./src/screens/MonsterDetailScreen";
 import { MonsterSetupScreen } from "./src/screens/MonsterSetupScreen";
@@ -18,6 +19,7 @@ export type ScreenName =
   | "connect"
   | "home"
   | "monster"
+  | "dex"
   | "settings";
 
 export default function App() {
@@ -73,6 +75,7 @@ export default function App() {
           latestSync={app.latestSync}
           latestSyncGains={app.latestSyncGains}
           latestEvolution={app.latestEvolution}
+          onDexPress={() => setScreen("dex")}
           onMonsterPress={() => setScreen("monster")}
           onSettingsPress={() => setScreen("settings")}
           onSync={app.syncHealth}
@@ -83,8 +86,17 @@ export default function App() {
           data={app.data}
           latestHatchling={app.latestHatchling}
           onBack={() => setScreen("home")}
+          onDexPress={() => setScreen("dex")}
           onDismissHatch={app.dismissLatestHatchling}
           onHatch={app.hatchEgg}
+          onSettingsPress={() => setScreen("settings")}
+        />
+      )}
+      {activeScreen === "dex" && (
+        <CreatureDexScreen
+          data={app.data}
+          onHomePress={() => setScreen("home")}
+          onMonsterPress={() => setScreen("monster")}
           onSettingsPress={() => setScreen("settings")}
         />
       )}
@@ -95,6 +107,7 @@ export default function App() {
           progressionProfile={app.progressionProfile}
           testLabEnabled={app.testLabEnabled}
           onBack={() => setScreen("home")}
+          onDexPress={() => setScreen("dex")}
           onMonsterPress={() => setScreen("monster")}
           onReadyTestEgg={app.readyTestEgg}
           onReset={async () => {

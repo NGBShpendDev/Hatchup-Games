@@ -12,7 +12,8 @@ leaderboards.
 3. Connect health
 4. Home dashboard
 5. Hatchery, evolution detail, and local hatchling collection
-6. Settings and privacy
+6. Creature Dex
+7. Settings and privacy
 
 ## Local-first alpha loop
 
@@ -26,6 +27,8 @@ The mobile alpha now keeps a small hatchery loop on-device:
 - Daily movement quests are derived from the current health summary.
 - The dashboard stores up to 14 daily sync summaries and shows a seven-day
   movement recap.
+- The Creature Dex tracks 16 element and rarity combinations with locked
+  silhouettes, owned counts, and completion progress.
 - Every sync reports newly awarded XP and incubator steps.
 - Hatching reveals a distinct local companion before it joins the collection.
 
@@ -117,6 +120,24 @@ Accelerated beta builds include a local-only Test Lab in Settings. Testers can
 preview Egg, Baby, Teen, and Final stages or mark the current incubator egg as
 ready. These controls change only local HatchUp state and never write data to
 Apple Health or Health Connect.
+
+## Art Prompts
+
+The app uses generated PNG art when available and falls back to code-drawn
+avatars for missing variants. Copy-paste prompts for ChatGPT image generation
+live in [`docs/art-prompts.md`](docs/art-prompts.md).
+
+Current beta asset coverage:
+
+- Mascot stages: Egg, Baby, Teen, and Final are wired in.
+- Eggs: Leaf, Ember, and Storm common art are wired in. Non-epic variants reuse
+  the common egg art for the same element when available.
+- Hatchlings: Ember, Tide, and Storm common/uncommon/rare art are wired in.
+- Pending: Leaf hatchlings, Tide egg, and all Epic variants.
+
+Several generated source files currently have the checkerboard background baked
+into the image instead of true alpha transparency. They work for beta testing,
+but final export should be transparent PNGs with no checkerboard.
 
 ## TestFlight
 

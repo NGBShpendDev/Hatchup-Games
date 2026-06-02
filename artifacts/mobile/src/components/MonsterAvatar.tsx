@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
+import { getMonsterAsset } from "../assets/creatureAssets";
 import type { MonsterStage } from "../domain/progression";
 import { colors } from "../theme";
 
@@ -15,6 +16,21 @@ const labels: Record<MonsterStage, string> = {
 };
 
 export function MonsterAvatar({ size = "large", stage }: Props) {
+  const asset = getMonsterAsset(stage);
+
+  if (asset) {
+    return (
+      <View style={[styles.wrap, styles[size]]}>
+        <Image
+          accessibilityLabel={`${labels[stage]} monster art`}
+          resizeMode="contain"
+          source={asset}
+          style={[styles.image, styles[`${size}Image`]]}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.wrap, styles[size]]}>
       <View style={[styles.body, styles[`${stage}Body`]]}>
@@ -40,6 +56,15 @@ const styles = StyleSheet.create({
   },
   small: {
     height: 116,
+  },
+  image: {
+    height: "100%",
+  },
+  largeImage: {
+    width: 210,
+  },
+  smallImage: {
+    width: 126,
   },
   body: {
     alignItems: "center",

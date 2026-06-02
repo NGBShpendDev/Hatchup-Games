@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
+import { getHatchlingAsset } from "../assets/creatureAssets";
 import type { EggElement, EggRarity } from "../domain/models";
 import { colors } from "../theme";
 
@@ -23,6 +24,24 @@ const elementLabels: Record<EggElement, string> = {
 };
 
 export function HatchlingAvatar({ element, rarity, size = "large" }: Props) {
+  const asset = getHatchlingAsset(element, rarity);
+
+  if (asset) {
+    return (
+      <View style={[styles.wrap, styles[size]]}>
+        <Image
+          accessibilityLabel={`${rarity} ${element} hatchling art`}
+          resizeMode="contain"
+          source={asset}
+          style={[styles.image, styles[`${size}Image`]]}
+        />
+        <View style={styles.rarityPill}>
+          <Text style={styles.rarity}>{rarity.toUpperCase()}</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.wrap, styles[size]]}>
       <View style={[styles.ear, styles.leftEar, { backgroundColor: elementColors[element] }]} />
@@ -52,6 +71,15 @@ const styles = StyleSheet.create({
   },
   small: {
     height: 94,
+  },
+  image: {
+    height: "100%",
+  },
+  largeImage: {
+    width: 172,
+  },
+  smallImage: {
+    width: 102,
   },
   body: {
     alignItems: "center",

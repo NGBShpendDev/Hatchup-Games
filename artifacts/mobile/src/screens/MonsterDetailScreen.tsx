@@ -16,6 +16,7 @@ interface Props {
   data: HatchUpData;
   latestHatchling: CollectedHatchling | null;
   onBack: () => void;
+  onDexPress: () => void;
   onDismissHatch: () => void;
   onHatch: () => Promise<void>;
   onSettingsPress: () => void;
@@ -25,6 +26,7 @@ export function MonsterDetailScreen({
   data,
   latestHatchling,
   onBack,
+  onDexPress,
   onDismissHatch,
   onHatch,
   onSettingsPress,
@@ -37,6 +39,7 @@ export function MonsterDetailScreen({
       footer={
         <BottomNav
           active="monster"
+          onDexPress={onDexPress}
           onHomePress={onBack}
           onMonsterPress={() => undefined}
           onSettingsPress={onSettingsPress}
@@ -56,11 +59,20 @@ export function MonsterDetailScreen({
             Your movement hatched a {latestHatchling.rarity}{" "}
             {latestHatchling.element} companion.
           </Text>
-          <AppButton
-            label="Add to collection"
-            onPress={onDismissHatch}
-            variant="secondary"
-          />
+          <View style={styles.revealActions}>
+            <AppButton
+              label="Add to collection"
+              onPress={onDismissHatch}
+              variant="secondary"
+            />
+            <AppButton
+              label="View in Creature Dex"
+              onPress={() => {
+                onDismissHatch();
+                onDexPress();
+              }}
+            />
+          </View>
         </View>
       )}
       <Text style={styles.sectionTitle}>Active companion</Text>
@@ -191,6 +203,9 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     marginTop: 5,
     textAlign: "center",
+  },
+  revealActions: {
+    gap: 8,
   },
   name: {
     color: colors.ink,

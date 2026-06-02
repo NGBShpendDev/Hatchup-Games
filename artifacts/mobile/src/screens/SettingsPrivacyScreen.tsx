@@ -17,6 +17,7 @@ interface Props {
   progressionProfile: ProgressionProfile;
   testLabEnabled: boolean;
   onBack: () => void;
+  onDexPress: () => void;
   onMonsterPress: () => void;
   onReadyTestEgg: () => Promise<void>;
   onReset: () => Promise<void>;
@@ -29,6 +30,7 @@ export function SettingsPrivacyScreen({
   progressionProfile,
   testLabEnabled,
   onBack,
+  onDexPress,
   onMonsterPress,
   onReadyTestEgg,
   onReset,
@@ -39,6 +41,7 @@ export function SettingsPrivacyScreen({
       footer={
         <BottomNav
           active="settings"
+          onDexPress={onDexPress}
           onHomePress={onBack}
           onMonsterPress={onMonsterPress}
           onSettingsPress={() => undefined}

@@ -2,7 +2,8 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "../theme";
 
 interface Props {
-  active: "home" | "monster" | "settings";
+  active: "home" | "monster" | "dex" | "settings";
+  onDexPress: () => void;
   onHomePress: () => void;
   onMonsterPress: () => void;
   onSettingsPress: () => void;
@@ -10,6 +11,7 @@ interface Props {
 
 export function BottomNav({
   active,
+  onDexPress,
   onHomePress,
   onMonsterPress,
   onSettingsPress,
@@ -22,6 +24,7 @@ export function BottomNav({
         label="Hatchery"
         onPress={onMonsterPress}
       />
+      <NavItem active={active === "dex"} label="Dex" onPress={onDexPress} />
       <NavItem
         active={active === "settings"}
         label="Settings"
@@ -61,7 +64,7 @@ const styles = StyleSheet.create({
   item: {
     alignItems: "center",
     gap: 5,
-    minWidth: 80,
+    minWidth: 68,
   },
   dot: {
     backgroundColor: colors.line,

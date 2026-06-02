@@ -26,6 +26,7 @@ interface Props {
   latestSync: DailyAward | null;
   latestSyncGains: { eggSteps: number; xp: DailyXp };
   latestEvolution: MonsterStage | null;
+  onDexPress: () => void;
   onMonsterPress: () => void;
   onSettingsPress: () => void;
   onSync: () => Promise<void>;
@@ -38,6 +39,7 @@ export function HomeScreen({
   latestSync,
   latestSyncGains,
   latestEvolution,
+  onDexPress,
   onMonsterPress,
   onSettingsPress,
   onSync,
@@ -60,6 +62,7 @@ export function HomeScreen({
       footer={
         <BottomNav
           active="home"
+          onDexPress={onDexPress}
           onHomePress={() => undefined}
           onMonsterPress={onMonsterPress}
           onSettingsPress={onSettingsPress}
