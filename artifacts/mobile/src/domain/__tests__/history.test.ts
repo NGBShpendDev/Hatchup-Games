@@ -11,7 +11,14 @@ function makeAward(date: string, steps: number, xp: number): DailyAward {
       workouts: 1,
       source: "mock",
     },
-    xp: { steps: xp, activeCalories: 0, workouts: 0, total: xp },
+    xp: {
+      steps: xp,
+      activeCalories: 0,
+      workouts: 0,
+      quests: 0,
+      firstSync: 0,
+      total: xp,
+    },
   };
 }
 
@@ -25,10 +32,7 @@ describe("activity history", () => {
 
   it("summarizes a seven-day local activity window", () => {
     const summary = getActivitySummary(
-      [
-        makeAward("2026-05-29", 4000, 16),
-        makeAward("2026-06-01", 5000, 20),
-      ],
+      [makeAward("2026-05-29", 4000, 16), makeAward("2026-06-01", 5000, 20)],
       "2026-06-01",
     );
 

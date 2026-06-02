@@ -1,3 +1,8 @@
+import {
+  ACTIVE_PROGRESSION_PROFILE,
+  type ProgressionProfile,
+} from "./progressionConfig";
+
 export type MonsterStage = "egg" | "baby" | "teen" | "final";
 
 export interface StageDefinition {
@@ -6,24 +11,37 @@ export interface StageDefinition {
   xp: number;
 }
 
-export const MONSTER_STAGES: readonly StageDefinition[] = [
-  { id: "egg", label: "Egg", xp: 0 },
-  { id: "baby", label: "Baby", xp: 200 },
-  { id: "teen", label: "Teen", xp: 700 },
-  { id: "final", label: "Final", xp: 1500 },
-] as const;
-
-export function getMonsterStage(totalXp: number): StageDefinition {
-  return [...MONSTER_STAGES].reverse().find((stage) => totalXp >= stage.xp)!;
+export function getMonsterStages(
+  profile: ProgressionProfile = ACTIVE_PROGRESSION_PROFILE,
+): readonly StageDefinition[] {
+  return [
+    { id: "egg", label: "Egg", xp: profile.stages.egg },
+    { id: "baby", label: "Baby", xp: profile.stages.baby },
+    { id: "teen", label: "Teen", xp: profile.stages.teen },
+    { id: "final", label: "Final", xp: profile.stages.final },
+  ];
 }
 
-export function getProgression(totalXp: number) {
-  const current = getMonsterStage(totalXp);
-  const currentIndex = MONSTER_STAGES.findIndex((stage) => stage.id === current.id);
-  const next = MONSTER_STAGES[currentIndex + 1] ?? null;
-  const progress = next
-    ? (totalXp - current.xp) / (next.xp - current.xp)
-    : 1;
+export const MONSTER_STAGES = getMonsterStages();
+
+export function getMonsterStage(
+  totalXp: number,
+  profile: ProgressionProfile = ACTIVE_PROGRESSION_PROFILE,
+): StageDefinition {
+  return [...getMonsterStages(profile)]
+    .reverse()
+    .find((stage) => totalXp >= stage.xp)!;
+}
+
+export function getProgression(
+  totalXp: number,
+  profile: ProgressionProfile = ACTIVE_PROGRESSION_PROFILE,
+) {
+  const stages = getMonsterStages(profile);
+  const current = getMonsterStage(totalXp, profile);
+  const currentIndex = stages.findIndex((stage) => stage.id === current.id);
+  const next = stages[currentIndex + 1] ?? null;
+  const progress = next ? (totalXp - current.xp) / (next.xp - current.xp) : 1;
 
   return {
     current,

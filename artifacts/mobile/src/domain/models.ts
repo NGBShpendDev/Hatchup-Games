@@ -1,3 +1,9 @@
+import {
+  ACTIVE_PROGRESSION_PROFILE,
+  getEggStepsRequired,
+  type ProgressionProfileId,
+} from "./progressionConfig";
+
 export type OnboardingStatus = "notStarted" | "monsterCreated" | "complete";
 
 export type HealthSource = "mock" | "appleHealth" | "healthConnect";
@@ -14,6 +20,8 @@ export interface DailyXp {
   steps: number;
   activeCalories: number;
   workouts: number;
+  quests: number;
+  firstSync: number;
   total: number;
 }
 
@@ -44,6 +52,8 @@ export interface CollectedHatchling {
 }
 
 export interface HatchUpData {
+  schemaVersion: number;
+  progressionProfile: ProgressionProfileId;
   monsterName: string;
   totalXp: number;
   currentStreak: number;
@@ -60,6 +70,8 @@ export interface HatchUpData {
 }
 
 export const initialHatchUpData: HatchUpData = {
+  schemaVersion: 2,
+  progressionProfile: ACTIVE_PROGRESSION_PROFILE.id,
   monsterName: "",
   totalXp: 0,
   currentStreak: 0,
@@ -74,7 +86,7 @@ export const initialHatchUpData: HatchUpData = {
     id: "egg-1",
     element: "leaf",
     rarity: "common",
-    stepsRequired: 5000,
+    stepsRequired: getEggStepsRequired("common"),
     stepsWalked: 0,
   },
   collection: [],

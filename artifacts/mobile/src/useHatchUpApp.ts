@@ -13,7 +13,13 @@ import {
 } from "./domain/hatchery";
 import { upsertDailyAward } from "./domain/history";
 import { updateStreak } from "./domain/streak";
-import { calculateDailyXp, mergeDailyXp } from "./domain/xp";
+import {
+  getMonsterStage,
+  getMonsterStages,
+  type MonsterStage,
+} from "./domain/progression";
+import { ACTIVE_PROGRESSION_PROFILE } from "./domain/progressionConfig";
+import { calculateDailyXp, getXpGains, mergeDailyXp } from "./domain/xp";
 import { healthService } from "./services/health";
 import {
   clearHatchUpData,
@@ -27,10 +33,22 @@ export function useHatchUpApp() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [latestSync, setLatestSync] = useState<DailyAward | null>(null);
-  const [latestSyncGains, setLatestSyncGains] = useState({ eggSteps: 0, xp: 0 });
-  const [latestHatchling, setLatestHatchling] = useState<CollectedHatchling | null>(
+  const [latestEvolution, setLatestEvolution] = useState<MonsterStage | null>(
     null,
   );
+  const [latestSyncGains, setLatestSyncGains] = useState({
+    eggSteps: 0,
+    xp: getXpGains(null, {
+      steps: 0,
+      activeCalories: 0,
+      workouts: 0,
+      quests: 0,
+      firstSync: 0,
+      total: 0,
+    }),
+  });
+  const [latestHatchling, setLatestHatchling] =
+    useState<CollectedHatchling | null>(null);
   const syncInFlight = useRef(false);
 
   useEffect(() => {
@@ -64,7 +82,9 @@ export function useHatchUpApp() {
       });
       return true;
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Health connection failed.");
+      setError(
+        caught instanceof Error ? caught.message : "Health connection failed.",
+      );
       return false;
     }
   }
@@ -77,17 +97,23 @@ export function useHatchUpApp() {
 
     try {
       const health = await healthService.getTodaySummary();
-      const calculatedXp = calculateDailyXp(health);
-      const previousDailyXp = data.dailyAward?.date === health.date
-        ? data.dailyAward.xp
-        : null;
+      const previousDailyXp =
+        data.dailyAward?.date === health.date ? data.dailyAward.xp : null;
+      const calculatedXp = calculateDailyXp(health, {
+        firstSyncOfDay: previousDailyXp === null,
+      });
       const xp = mergeDailyXp(previousDailyXp, calculatedXp);
-      const previousXp = data.dailyAward?.date === health.date
-        ? data.dailyAward.xp.total
-        : 0;
+      const previousXp =
+        data.dailyAward?.date === health.date ? data.dailyAward.xp.total : 0;
       const newXp = Math.max(xp.total - previousXp, 0);
+      const previousStage = getMonsterStage(data.totalXp);
+      const nextStage = getMonsterStage(data.totalXp + newXp);
       const streak = updateStreak(data, health.date, newXp);
-      const newSteps = getNewStepsForSync(data.dailyAward, health.date, health.steps);
+      const newSteps = getNewStepsForSync(
+        data.dailyAward,
+        health.date,
+        health.steps,
+      );
       const dailyAward = { date: health.date, health, xp };
       const next = {
         ...data,
@@ -101,9 +127,17 @@ export function useHatchUpApp() {
 
       await persist(next);
       setLatestSync(dailyAward);
-      setLatestSyncGains({ eggSteps: newSteps, xp: newXp });
+      setLatestEvolution(
+        previousStage.id === nextStage.id ? null : nextStage.id,
+      );
+      setLatestSyncGains({
+        eggSteps: newSteps,
+        xp: getXpGains(previousDailyXp, xp),
+      });
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Health sync failed.");
+      setError(
+        caught instanceof Error ? caught.message : "Health sync failed.",
+      );
     } finally {
       syncInFlight.current = false;
       setIsSyncing(false);
@@ -120,17 +154,52 @@ export function useHatchUpApp() {
     await clearHatchUpData();
     setData(initialHatchUpData);
     setLatestSync(null);
-    setLatestSyncGains({ eggSteps: 0, xp: 0 });
+    setLatestEvolution(null);
+    setLatestSyncGains({
+      eggSteps: 0,
+      xp: getXpGains(null, {
+        steps: 0,
+        activeCalories: 0,
+        workouts: 0,
+        quests: 0,
+        firstSync: 0,
+        total: 0,
+      }),
+    });
     setLatestHatchling(null);
     setError(null);
+  }
+
+  async function setTestStage(stageId: MonsterStage) {
+    const stage = getMonsterStages().find((item) => item.id === stageId);
+    if (!stage) return;
+
+    await persist({
+      ...data,
+      totalXp: stage.xp,
+    });
+    setLatestEvolution(null);
+  }
+
+  async function readyTestEgg() {
+    await persist({
+      ...data,
+      activeEgg: {
+        ...data.activeEgg,
+        stepsWalked: data.activeEgg.stepsRequired,
+      },
+    });
   }
 
   return {
     data,
     error,
     healthMode: healthService.modeLabel,
+    progressionProfile: ACTIVE_PROGRESSION_PROFILE,
+    testLabEnabled: ACTIVE_PROGRESSION_PROFILE.id === "beta",
     isSyncing,
     latestHatchling,
+    latestEvolution,
     latestSync,
     latestSyncGains,
     ready,
@@ -138,7 +207,9 @@ export function useHatchUpApp() {
     dismissLatestHatchling: () => setLatestHatchling(null),
     hatchEgg,
     resetApp,
+    readyTestEgg,
     saveMonsterName,
+    setTestStage,
     syncHealth,
     today: toDateKey(new Date()),
   };

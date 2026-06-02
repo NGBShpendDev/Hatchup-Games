@@ -5,6 +5,11 @@ import type {
   HatchUpData,
   IncubatorEgg,
 } from "./models";
+import {
+  ACTIVE_PROGRESSION_PROFILE,
+  getEggStepsRequired,
+  type ProgressionProfile,
+} from "./progressionConfig";
 
 const ELEMENTS: readonly EggElement[] = ["leaf", "ember", "tide", "storm"];
 const RARITIES: readonly EggRarity[] = [
@@ -18,21 +23,17 @@ const RARITIES: readonly EggRarity[] = [
 ];
 const NAMES = ["Sprig", "Cinder", "Ripple", "Gust", "Moss", "Sparky", "Pebble"];
 
-const STEPS_BY_RARITY: Record<EggRarity, number> = {
-  common: 5000,
-  uncommon: 7000,
-  rare: 9000,
-  epic: 12000,
-};
-
-export function createEgg(seed: number): IncubatorEgg {
+export function createEgg(
+  seed: number,
+  profile: ProgressionProfile = ACTIVE_PROGRESSION_PROFILE,
+): IncubatorEgg {
   const rarity = RARITIES[seed % RARITIES.length];
 
   return {
     id: `egg-${seed + 1}`,
     element: ELEMENTS[seed % ELEMENTS.length],
     rarity,
-    stepsRequired: STEPS_BY_RARITY[rarity],
+    stepsRequired: getEggStepsRequired(rarity, profile),
     stepsWalked: 0,
   };
 }
@@ -48,11 +49,18 @@ export function isEggReady(egg: IncubatorEgg) {
 export function addStepsToEgg(egg: IncubatorEgg, steps: number): IncubatorEgg {
   return {
     ...egg,
-    stepsWalked: Math.min(egg.stepsWalked + Math.max(steps, 0), egg.stepsRequired),
+    stepsWalked: Math.min(
+      egg.stepsWalked + Math.max(steps, 0),
+      egg.stepsRequired,
+    ),
   };
 }
 
-export function hatchActiveEgg(data: HatchUpData, hatchedAt: string): HatchUpData {
+export function hatchActiveEgg(
+  data: HatchUpData,
+  hatchedAt: string,
+  profile: ProgressionProfile = ACTIVE_PROGRESSION_PROFILE,
+): HatchUpData {
   if (!isEggReady(data.activeEgg)) return data;
 
   const hatchling: CollectedHatchling = {
@@ -66,7 +74,7 @@ export function hatchActiveEgg(data: HatchUpData, hatchedAt: string): HatchUpDat
 
   return {
     ...data,
-    activeEgg: createEgg(eggsHatched),
+    activeEgg: createEgg(eggsHatched, profile),
     collection: [hatchling, ...data.collection],
     eggsHatched,
   };
@@ -77,9 +85,8 @@ export function getNewStepsForSync(
   nextDate: string,
   nextSteps: number,
 ) {
-  const previousSteps = previousAward?.date === nextDate
-    ? previousAward.health.steps
-    : 0;
+  const previousSteps =
+    previousAward?.date === nextDate ? previousAward.health.steps : 0;
 
   return Math.max(nextSteps - previousSteps, 0);
 }

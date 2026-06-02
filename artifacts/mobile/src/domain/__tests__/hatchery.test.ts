@@ -28,7 +28,14 @@ describe("hatchery", () => {
             workouts: 1,
             source: "mock",
           },
-          xp: { steps: 17, activeCalories: 10, workouts: 20, total: 47 },
+          xp: {
+            steps: 42,
+            activeCalories: 26,
+            workouts: 30,
+            quests: 60,
+            firstSync: 15,
+            total: 173,
+          },
         },
         "2026-06-01",
         5000,
@@ -39,7 +46,7 @@ describe("hatchery", () => {
   it("moves a ready egg into the collection and starts a new egg", () => {
     const ready = {
       ...initialHatchUpData,
-      activeEgg: addStepsToEgg(initialHatchUpData.activeEgg, 5000),
+      activeEgg: addStepsToEgg(initialHatchUpData.activeEgg, 1500),
     };
     expect(isEggReady(ready.activeEgg)).toBe(true);
 

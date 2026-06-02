@@ -4,6 +4,8 @@ import { BottomNav } from "../components/BottomNav";
 import { Header } from "../components/Header";
 import { Screen } from "../components/Screen";
 import type { HatchUpData } from "../domain/models";
+import type { MonsterStage } from "../domain/progression";
+import type { ProgressionProfile } from "../domain/progressionConfig";
 import { colors } from "../theme";
 
 const privacyCopy =
@@ -12,17 +14,25 @@ const privacyCopy =
 interface Props {
   data: HatchUpData;
   healthMode: string;
+  progressionProfile: ProgressionProfile;
+  testLabEnabled: boolean;
   onBack: () => void;
   onMonsterPress: () => void;
+  onReadyTestEgg: () => Promise<void>;
   onReset: () => Promise<void>;
+  onSetTestStage: (stage: MonsterStage) => Promise<void>;
 }
 
 export function SettingsPrivacyScreen({
   data,
   healthMode,
+  progressionProfile,
+  testLabEnabled,
   onBack,
   onMonsterPress,
+  onReadyTestEgg,
   onReset,
+  onSetTestStage,
 }: Props) {
   return (
     <Screen
@@ -58,9 +68,49 @@ export function SettingsPrivacyScreen({
         <Setting
           label="Local activity history"
           value={`${data.activityHistory.length} day${data.activityHistory.length === 1 ? "" : "s"} stored`}
+        />
+        <Setting
+          label="Progression tuning"
+          value={progressionProfile.label}
           withBorder={false}
         />
       </View>
+      {testLabEnabled && (
+        <View style={styles.testLabCard}>
+          <Text style={styles.cardTitle}>Beta Test Lab</Text>
+          <Text style={styles.privacyText}>
+            Preview local progression states without changing Apple Health data.
+            These tools are included only in accelerated beta builds.
+          </Text>
+          <View style={styles.testLabButtons}>
+            <AppButton
+              label="Preview Egg"
+              onPress={() => onSetTestStage("egg")}
+              variant="secondary"
+            />
+            <AppButton
+              label="Preview Baby"
+              onPress={() => onSetTestStage("baby")}
+              variant="secondary"
+            />
+            <AppButton
+              label="Preview Teen"
+              onPress={() => onSetTestStage("teen")}
+              variant="secondary"
+            />
+            <AppButton
+              label="Preview Final"
+              onPress={() => onSetTestStage("final")}
+              variant="secondary"
+            />
+            <AppButton
+              label="Ready current egg"
+              onPress={onReadyTestEgg}
+              variant="secondary"
+            />
+          </View>
+        </View>
+      )}
       <View style={styles.privacyCard}>
         <Text style={styles.cardTitle}>Privacy promise</Text>
         <Text style={styles.privacyText}>{privacyCopy}</Text>
@@ -151,6 +201,16 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginTop: 14,
     padding: 16,
+  },
+  testLabCard: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: 18,
+    marginTop: 14,
+    padding: 16,
+  },
+  testLabButtons: {
+    gap: 8,
+    marginTop: 12,
   },
   readOnlyCard: {
     backgroundColor: colors.primarySoft,

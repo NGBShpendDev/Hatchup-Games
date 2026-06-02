@@ -8,8 +8,9 @@ import { Screen } from "../components/Screen";
 import { toDateKey } from "../domain/date";
 import { getEggProgress, isEggReady } from "../domain/hatchery";
 import { getActivitySummary, type ActivityDay } from "../domain/history";
-import type { DailyAward, HatchUpData } from "../domain/models";
-import { getProgression } from "../domain/progression";
+import type { DailyAward, DailyXp, HatchUpData } from "../domain/models";
+import { getProgression, type MonsterStage } from "../domain/progression";
+import { ACTIVE_PROGRESSION_PROFILE } from "../domain/progressionConfig";
 import {
   getDailyQuests,
   getQuestProgress,
@@ -23,7 +24,8 @@ interface Props {
   error: string | null;
   isSyncing: boolean;
   latestSync: DailyAward | null;
-  latestSyncGains: { eggSteps: number; xp: number };
+  latestSyncGains: { eggSteps: number; xp: DailyXp };
+  latestEvolution: MonsterStage | null;
   onMonsterPress: () => void;
   onSettingsPress: () => void;
   onSync: () => Promise<void>;
@@ -35,17 +37,19 @@ export function HomeScreen({
   isSyncing,
   latestSync,
   latestSyncGains,
+  latestEvolution,
   onMonsterPress,
   onSettingsPress,
   onSync,
 }: Props) {
   const todayKey = toDateKey(new Date());
   const progression = getProgression(data.totalXp);
-  const today = latestSync?.date === todayKey
-    ? latestSync
-    : data.dailyAward?.date === todayKey
-      ? data.dailyAward
-      : null;
+  const today =
+    latestSync?.date === todayKey
+      ? latestSync
+      : data.dailyAward?.date === todayKey
+        ? data.dailyAward
+        : null;
   const eggProgress = getEggProgress(data.activeEgg);
   const eggReady = isEggReady(data.activeEgg);
   const quests = getDailyQuests(today);
@@ -85,7 +89,9 @@ export function HomeScreen({
       </View>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Today's movement</Text>
-        <Text style={styles.sectionMeta}>100 XP daily max</Text>
+        <Text style={styles.sectionMeta}>
+          {ACTIVE_PROGRESSION_PROFILE.xp.dailyMax} XP daily max
+        </Text>
       </View>
       <View style={styles.metrics}>
         <Metric
@@ -112,17 +118,29 @@ export function HomeScreen({
         <View style={styles.syncReceipt}>
           <Text style={styles.syncReceiptTitle}>Movement collected</Text>
           <Text style={styles.syncReceiptText}>
-            +{latestSyncGains.xp} XP and +{latestSyncGains.eggSteps.toLocaleString()} incubator steps
+            +{latestSyncGains.xp.total} XP and +
+            {latestSyncGains.eggSteps.toLocaleString()} incubator steps
           </Text>
+          <Text style={styles.syncReceiptBreakdown}>
+            {getRewardBreakdown(latestSyncGains.xp)}
+          </Text>
+          {latestEvolution && (
+            <Text style={styles.evolutionReceipt}>
+              {capitalize(latestEvolution)} evolution unlocked!
+            </Text>
+          )}
         </View>
       )}
       {error && <Text style={styles.error}>{error}</Text>}
       <Text style={styles.syncNote}>
         {data.lastSyncedDate
-          ? `Last synced ${new Date(data.lastSyncedDate).toLocaleTimeString([], {
-              hour: "numeric",
-              minute: "2-digit",
-            })}`
+          ? `Last synced ${new Date(data.lastSyncedDate).toLocaleTimeString(
+              [],
+              {
+                hour: "numeric",
+                minute: "2-digit",
+              },
+            )}`
           : "Sync once to collect today's XP."}
       </Text>
       <View style={styles.sectionHeader}>
@@ -152,7 +170,8 @@ export function HomeScreen({
         />
         <View style={styles.incubatorBody}>
           <Text style={styles.eggTitle}>
-            {capitalize(data.activeEgg.rarity)} {capitalize(data.activeEgg.element)} egg
+            {capitalize(data.activeEgg.rarity)}{" "}
+            {capitalize(data.activeEgg.element)} egg
           </Text>
           <Text style={styles.eggCaption}>
             {eggReady
@@ -177,7 +196,15 @@ export function HomeScreen({
   );
 }
 
-function Metric({ label, value, xp }: { label: string; value: string; xp: number }) {
+function Metric({
+  label,
+  value,
+  xp,
+}: {
+  label: string;
+  value: string;
+  xp: number;
+}) {
   return (
     <View style={styles.metric}>
       <Text style={styles.metricLabel}>{label}</Text>
@@ -198,7 +225,13 @@ function ActivityStat({ label, value }: { label: string; value: string }) {
 
 function ActivityBar({ day }: { day: ActivityDay }) {
   const xp = day.award?.xp.total ?? 0;
-  const fillHeight = xp > 0 ? Math.max(12, Math.round((xp / 100) * 62)) : 6;
+  const fillHeight =
+    xp > 0
+      ? Math.max(
+          12,
+          Math.round((xp / ACTIVE_PROGRESSION_PROFILE.xp.dailyMax) * 62),
+        )
+      : 6;
 
   return (
     <View style={styles.chartDay}>
@@ -229,8 +262,13 @@ function Quest({ quest }: { quest: DailyQuest }) {
           {quest.target.toLocaleString()} {quest.unit}
         </Text>
         <ProgressBar progress={getQuestProgress(quest)} />
+        {quest.rewardXp > 0 && (
+          <Text style={styles.questReward}>Reward: +{quest.rewardXp} XP</Text>
+        )}
       </View>
-      <Text style={[styles.questStatus, complete && styles.questStatusComplete]}>
+      <Text
+        style={[styles.questStatus, complete && styles.questStatusComplete]}
+      >
         {complete ? "Done" : "Active"}
       </Text>
     </View>
@@ -239,6 +277,14 @@ function Quest({ quest }: { quest: DailyQuest }) {
 
 function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function getRewardBreakdown(xp: DailyXp) {
+  const movement = xp.steps + xp.activeCalories + xp.workouts;
+  const parts = [`Movement +${movement}`];
+  if (xp.quests > 0) parts.push(`Quests +${xp.quests}`);
+  if (xp.firstSync > 0) parts.push(`Daily sync +${xp.firstSync}`);
+  return parts.join(" | ");
 }
 
 const styles = StyleSheet.create({
@@ -370,6 +416,18 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 3,
   },
+  syncReceiptBreakdown: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 5,
+  },
+  evolutionReceipt: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: 7,
+  },
   error: {
     color: colors.danger,
     fontSize: 12,
@@ -484,6 +542,11 @@ const styles = StyleSheet.create({
   questCaption: {
     color: colors.muted,
     fontSize: 11,
+  },
+  questReward: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "800",
   },
   questStatus: {
     color: colors.muted,

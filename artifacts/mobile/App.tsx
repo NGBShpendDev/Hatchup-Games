@@ -72,6 +72,7 @@ export default function App() {
           isSyncing={app.isSyncing}
           latestSync={app.latestSync}
           latestSyncGains={app.latestSyncGains}
+          latestEvolution={app.latestEvolution}
           onMonsterPress={() => setScreen("monster")}
           onSettingsPress={() => setScreen("settings")}
           onSync={app.syncHealth}
@@ -91,12 +92,16 @@ export default function App() {
         <SettingsPrivacyScreen
           data={app.data}
           healthMode={app.healthMode}
+          progressionProfile={app.progressionProfile}
+          testLabEnabled={app.testLabEnabled}
           onBack={() => setScreen("home")}
           onMonsterPress={() => setScreen("monster")}
+          onReadyTestEgg={app.readyTestEgg}
           onReset={async () => {
             await app.resetApp();
             setScreen("welcome");
           }}
+          onSetTestStage={app.setTestStage}
         />
       )}
     </>

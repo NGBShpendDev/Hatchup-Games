@@ -87,15 +87,36 @@ Use a real iPhone for Apple Health testing. On Android 13 and lower, install
 Health Connect from Google Play before testing. Starting with Android 14,
 Health Connect is part of the framework.
 
-## XP rules
+## Accelerated beta tuning
 
-- 1 XP per 250 steps, capped at 40 XP per day
-- 1 XP per 25 active calories, capped at 20 XP per day
-- 20 XP per workout, capped at 40 XP per day
-- 100 XP total daily cap
+The TestFlight cycle uses the `beta` progression profile so testers can reach
+meaningful states during a short session:
+
+- 1 XP per 100 steps, capped at 80 XP per day
+- 1 XP per 10 active calories, capped at 40 XP per day
+- 30 XP per workout, capped at 60 XP per day
+- 20 XP per completed daily quest
+- 15 XP for the first sync of the day
+- 240 XP total daily cap
+- Baby at 60 XP, Teen at 200 XP, and Final at 500 XP
+- Eggs hatch after 1,500 to 5,000 steps depending on rarity
+
+The original MVP values remain available as the `market` profile. Switch back
+after beta data informs the launch economy:
+
+```bash
+EXPO_PUBLIC_PROGRESSION_PROFILE=market pnpm --filter @workspace/mobile ios
+```
 
 The app stores the awarded daily total in AsyncStorage so repeated syncs only
 credit newly earned XP.
+
+## Beta Test Lab
+
+Accelerated beta builds include a local-only Test Lab in Settings. Testers can
+preview Egg, Baby, Teen, and Final stages or mark the current incubator egg as
+ready. These controls change only local HatchUp state and never write data to
+Apple Health or Health Connect.
 
 ## TestFlight
 
