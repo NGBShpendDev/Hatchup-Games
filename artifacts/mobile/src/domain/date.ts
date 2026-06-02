@@ -11,7 +11,13 @@ export function isYesterday(previousDateKey: string, currentDateKey: string) {
   return toDateKey(current) === previousDateKey;
 }
 
-function dateKeyToLocalDate(dateKey: string) {
+export function shiftDateKey(dateKey: string, days: number) {
+  const date = dateKeyToLocalDate(dateKey);
+  date.setDate(date.getDate() + days);
+  return toDateKey(date);
+}
+
+export function dateKeyToLocalDate(dateKey: string) {
   const [year, month, day] = dateKey.split("-").map(Number);
   return new Date(year, month - 1, day);
 }

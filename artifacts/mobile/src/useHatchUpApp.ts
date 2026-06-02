@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { toDateKey } from "./domain/date";
 import {
   initialHatchUpData,
+  type CollectedHatchling,
   type DailyAward,
   type HatchUpData,
 } from "./domain/models";
@@ -10,6 +11,7 @@ import {
   getNewStepsForSync,
   hatchActiveEgg,
 } from "./domain/hatchery";
+import { upsertDailyAward } from "./domain/history";
 import { updateStreak } from "./domain/streak";
 import { calculateDailyXp, mergeDailyXp } from "./domain/xp";
 import { healthService } from "./services/health";
@@ -25,6 +27,10 @@ export function useHatchUpApp() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [latestSync, setLatestSync] = useState<DailyAward | null>(null);
+  const [latestSyncGains, setLatestSyncGains] = useState({ eggSteps: 0, xp: 0 });
+  const [latestHatchling, setLatestHatchling] = useState<CollectedHatchling | null>(
+    null,
+  );
   const syncInFlight = useRef(false);
 
   useEffect(() => {
@@ -87,6 +93,7 @@ export function useHatchUpApp() {
         ...data,
         ...streak,
         activeEgg: addStepsToEgg(data.activeEgg, newSteps),
+        activityHistory: upsertDailyAward(data.activityHistory, dailyAward),
         totalXp: data.totalXp + newXp,
         lastSyncedDate: new Date().toISOString(),
         dailyAward,
@@ -94,6 +101,7 @@ export function useHatchUpApp() {
 
       await persist(next);
       setLatestSync(dailyAward);
+      setLatestSyncGains({ eggSteps: newSteps, xp: newXp });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Health sync failed.");
     } finally {
@@ -103,13 +111,17 @@ export function useHatchUpApp() {
   }
 
   async function hatchEgg() {
-    await persist(hatchActiveEgg(data, new Date().toISOString()));
+    const next = hatchActiveEgg(data, new Date().toISOString());
+    await persist(next);
+    if (next !== data) setLatestHatchling(next.collection[0]);
   }
 
   async function resetApp() {
     await clearHatchUpData();
     setData(initialHatchUpData);
     setLatestSync(null);
+    setLatestSyncGains({ eggSteps: 0, xp: 0 });
+    setLatestHatchling(null);
     setError(null);
   }
 
@@ -118,9 +130,12 @@ export function useHatchUpApp() {
     error,
     healthMode: healthService.modeLabel,
     isSyncing,
+    latestHatchling,
     latestSync,
+    latestSyncGains,
     ready,
     connectHealth,
+    dismissLatestHatchling: () => setLatestHatchling(null),
     hatchEgg,
     resetApp,
     saveMonsterName,

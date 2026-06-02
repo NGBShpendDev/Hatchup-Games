@@ -5,7 +5,9 @@ import { EggAvatar } from "../components/EggAvatar";
 import { MonsterAvatar } from "../components/MonsterAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
+import { toDateKey } from "../domain/date";
 import { getEggProgress, isEggReady } from "../domain/hatchery";
+import { getActivitySummary, type ActivityDay } from "../domain/history";
 import type { DailyAward, HatchUpData } from "../domain/models";
 import { getProgression } from "../domain/progression";
 import {
@@ -21,6 +23,7 @@ interface Props {
   error: string | null;
   isSyncing: boolean;
   latestSync: DailyAward | null;
+  latestSyncGains: { eggSteps: number; xp: number };
   onMonsterPress: () => void;
   onSettingsPress: () => void;
   onSync: () => Promise<void>;
@@ -31,15 +34,22 @@ export function HomeScreen({
   error,
   isSyncing,
   latestSync,
+  latestSyncGains,
   onMonsterPress,
   onSettingsPress,
   onSync,
 }: Props) {
+  const todayKey = toDateKey(new Date());
   const progression = getProgression(data.totalXp);
-  const today = latestSync ?? data.dailyAward;
+  const today = latestSync?.date === todayKey
+    ? latestSync
+    : data.dailyAward?.date === todayKey
+      ? data.dailyAward
+      : null;
   const eggProgress = getEggProgress(data.activeEgg);
   const eggReady = isEggReady(data.activeEgg);
   const quests = getDailyQuests(today);
+  const activity = getActivitySummary(data.activityHistory, todayKey);
 
   return (
     <Screen
@@ -98,6 +108,14 @@ export function HomeScreen({
         label={isSyncing ? "Syncing movement..." : "Sync health data"}
         onPress={onSync}
       />
+      {latestSync?.date === todayKey && (
+        <View style={styles.syncReceipt}>
+          <Text style={styles.syncReceiptTitle}>Movement collected</Text>
+          <Text style={styles.syncReceiptText}>
+            +{latestSyncGains.xp} XP and +{latestSyncGains.eggSteps.toLocaleString()} incubator steps
+          </Text>
+        </View>
+      )}
       {error && <Text style={styles.error}>{error}</Text>}
       <Text style={styles.syncNote}>
         {data.lastSyncedDate
@@ -107,6 +125,21 @@ export function HomeScreen({
             })}`
           : "Sync once to collect today's XP."}
       </Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Your last 7 days</Text>
+        <Text style={styles.sectionMeta}>{activity.activeDays}/7 active</Text>
+      </View>
+      <View style={styles.activityCard}>
+        <View style={styles.activityStats}>
+          <ActivityStat label="Steps" value={activity.steps.toLocaleString()} />
+          <ActivityStat label="XP earned" value={String(activity.xp)} />
+        </View>
+        <View style={styles.chart}>
+          {activity.days.map((day) => (
+            <ActivityBar day={day} key={day.date} />
+          ))}
+        </View>
+      </View>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Incubator</Text>
         <Text style={styles.sectionMeta}>{data.eggsHatched} hatched</Text>
@@ -150,6 +183,35 @@ function Metric({ label, value, xp }: { label: string; value: string; xp: number
       <Text style={styles.metricLabel}>{label}</Text>
       <Text style={styles.metricValue}>{value}</Text>
       <Text style={styles.metricXp}>+{xp} XP</Text>
+    </View>
+  );
+}
+
+function ActivityStat({ label, value }: { label: string; value: string }) {
+  return (
+    <View>
+      <Text style={styles.activityValue}>{value}</Text>
+      <Text style={styles.activityLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function ActivityBar({ day }: { day: ActivityDay }) {
+  const xp = day.award?.xp.total ?? 0;
+  const fillHeight = xp > 0 ? Math.max(12, Math.round((xp / 100) * 62)) : 6;
+
+  return (
+    <View style={styles.chartDay}>
+      <View style={styles.chartTrack}>
+        <View
+          style={[
+            styles.chartFill,
+            { height: fillHeight },
+            xp === 0 && styles.chartFillEmpty,
+          ]}
+        />
+      </View>
+      <Text style={styles.chartLabel}>{day.dayLabel}</Text>
     </View>
   );
 }
@@ -291,6 +353,23 @@ const styles = StyleSheet.create({
     marginTop: 9,
     textAlign: "center",
   },
+  syncReceipt: {
+    backgroundColor: colors.primarySoft,
+    borderRadius: 14,
+    marginTop: 10,
+    padding: 12,
+  },
+  syncReceiptTitle: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  syncReceiptText: {
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: 3,
+  },
   error: {
     color: colors.danger,
     fontSize: 12,
@@ -306,6 +385,59 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 22,
     padding: 14,
+  },
+  activityCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    marginBottom: 22,
+    padding: 14,
+  },
+  activityStats: {
+    flexDirection: "row",
+    gap: 28,
+    marginBottom: 15,
+  },
+  activityValue: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  activityLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 3,
+  },
+  chart: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    gap: 8,
+    height: 82,
+    justifyContent: "space-between",
+  },
+  chartDay: {
+    alignItems: "center",
+    flex: 1,
+    gap: 5,
+  },
+  chartTrack: {
+    alignItems: "center",
+    height: 62,
+    justifyContent: "flex-end",
+    width: "100%",
+  },
+  chartFill: {
+    backgroundColor: colors.primary,
+    borderRadius: 5,
+    width: "70%",
+  },
+  chartFillEmpty: {
+    backgroundColor: colors.line,
+  },
+  chartLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "800",
   },
   incubatorBody: {
     flex: 1,

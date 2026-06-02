@@ -53,6 +53,7 @@ export interface HatchUpData {
   healthConnected: boolean;
   lastRewardDate: string | null;
   dailyAward: DailyAward | null;
+  activityHistory: DailyAward[];
   activeEgg: IncubatorEgg;
   collection: CollectedHatchling[];
   eggsHatched: number;
@@ -68,6 +69,7 @@ export const initialHatchUpData: HatchUpData = {
   healthConnected: false,
   lastRewardDate: null,
   dailyAward: null,
+  activityHistory: [],
   activeEgg: {
     id: "egg-1",
     element: "leaf",

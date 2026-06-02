@@ -24,6 +24,10 @@ The mobile alpha now keeps a small hatchery loop on-device:
   rarity.
 - A new egg is placed into the incubator after every hatch.
 - Daily movement quests are derived from the current health summary.
+- The dashboard stores up to 14 daily sync summaries and shows a seven-day
+  movement recap.
+- Every sync reports newly awarded XP and incubator steps.
+- Hatching reveals a distinct local companion before it joins the collection.
 
 This remains intentionally local-first. It makes the core habit loop testable
 before account recovery, cloud saves, analytics, and broader game systems are

@@ -2,25 +2,30 @@ import { StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
 import { EggAvatar } from "../components/EggAvatar";
+import { HatchlingAvatar } from "../components/HatchlingAvatar";
 import { Header } from "../components/Header";
 import { MonsterAvatar } from "../components/MonsterAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
 import { getEggProgress, isEggReady } from "../domain/hatchery";
-import type { HatchUpData } from "../domain/models";
+import type { CollectedHatchling, HatchUpData } from "../domain/models";
 import { getProgression, MONSTER_STAGES } from "../domain/progression";
 import { colors } from "../theme";
 
 interface Props {
   data: HatchUpData;
+  latestHatchling: CollectedHatchling | null;
   onBack: () => void;
+  onDismissHatch: () => void;
   onHatch: () => Promise<void>;
   onSettingsPress: () => void;
 }
 
 export function MonsterDetailScreen({
   data,
+  latestHatchling,
   onBack,
+  onDismissHatch,
   onHatch,
   onSettingsPress,
 }: Props) {
@@ -39,6 +44,25 @@ export function MonsterDetailScreen({
       }
     >
       <Header onBack={onBack} title="Hatchery" />
+      {latestHatchling && (
+        <View style={styles.revealCard}>
+          <Text style={styles.revealKicker}>NEW HATCHLING</Text>
+          <HatchlingAvatar
+            element={latestHatchling.element}
+            rarity={latestHatchling.rarity}
+          />
+          <Text style={styles.revealTitle}>Meet {latestHatchling.name}</Text>
+          <Text style={styles.revealText}>
+            Your movement hatched a {latestHatchling.rarity}{" "}
+            {latestHatchling.element} companion.
+          </Text>
+          <AppButton
+            label="Add to collection"
+            onPress={onDismissHatch}
+            variant="secondary"
+          />
+        </View>
+      )}
       <Text style={styles.sectionTitle}>Active companion</Text>
       <View style={styles.card}>
         <MonsterAvatar stage={progression.current.id} />
@@ -106,7 +130,7 @@ export function MonsterDetailScreen({
         <View style={styles.collection}>
           {data.collection.map((hatchling) => (
             <View style={styles.hatchlingCard} key={hatchling.id}>
-              <EggAvatar
+              <HatchlingAvatar
                 element={hatchling.element}
                 rarity={hatchling.rarity}
                 size="small"
@@ -141,6 +165,32 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 22,
     padding: 18,
+  },
+  revealCard: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: 22,
+    padding: 18,
+  },
+  revealKicker: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1.1,
+    textAlign: "center",
+  },
+  revealTitle: {
+    color: colors.ink,
+    fontSize: 24,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  revealText: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 14,
+    marginTop: 5,
+    textAlign: "center",
   },
   name: {
     color: colors.ink,

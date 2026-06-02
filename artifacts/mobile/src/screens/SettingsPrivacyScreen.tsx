@@ -54,6 +54,10 @@ export function SettingsPrivacyScreen({
               ? new Date(data.lastSyncedDate).toLocaleString()
               : "Not synced yet"
           }
+        />
+        <Setting
+          label="Local activity history"
+          value={`${data.activityHistory.length} day${data.activityHistory.length === 1 ? "" : "s"} stored`}
           withBorder={false}
         />
       </View>

@@ -71,6 +71,7 @@ export default function App() {
           error={app.error}
           isSyncing={app.isSyncing}
           latestSync={app.latestSync}
+          latestSyncGains={app.latestSyncGains}
           onMonsterPress={() => setScreen("monster")}
           onSettingsPress={() => setScreen("settings")}
           onSync={app.syncHealth}
@@ -79,7 +80,9 @@ export default function App() {
       {activeScreen === "monster" && (
         <MonsterDetailScreen
           data={app.data}
+          latestHatchling={app.latestHatchling}
           onBack={() => setScreen("home")}
+          onDismissHatch={app.dismissLatestHatchling}
           onHatch={app.hatchEgg}
           onSettingsPress={() => setScreen("settings")}
         />
