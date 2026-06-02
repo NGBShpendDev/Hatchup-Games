@@ -21,6 +21,7 @@ const config: ExpoConfig = {
     bundleIdentifier: "com.hatchup.games",
     infoPlist: {
       NSHealthShareUsageDescription: healthReadDescription,
+      ITSAppUsesNonExemptEncryption: false,
     },
     entitlements: {
       "com.apple.developer.healthkit": true,
