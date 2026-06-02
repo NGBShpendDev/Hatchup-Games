@@ -11,6 +11,11 @@ const config: ExpoConfig = {
   scheme: "hatchup",
   userInterfaceStyle: "light",
   newArchEnabled: true,
+  extra: {
+    eas: {
+      projectId: "a5389b94-12db-48eb-9496-fee26451e369",
+    },
+  },
   ios: {
     supportsTablet: false,
     bundleIdentifier: "com.hatchup.games",
