@@ -1,11 +1,19 @@
 import { StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
+import { EggAvatar } from "../components/EggAvatar";
 import { MonsterAvatar } from "../components/MonsterAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
+import { getEggProgress, isEggReady } from "../domain/hatchery";
 import type { DailyAward, HatchUpData } from "../domain/models";
 import { getProgression } from "../domain/progression";
+import {
+  getDailyQuests,
+  getQuestProgress,
+  isQuestComplete,
+  type DailyQuest,
+} from "../domain/quests";
 import { colors } from "../theme";
 
 interface Props {
@@ -29,6 +37,9 @@ export function HomeScreen({
 }: Props) {
   const progression = getProgression(data.totalXp);
   const today = latestSync ?? data.dailyAward;
+  const eggProgress = getEggProgress(data.activeEgg);
+  const eggReady = isEggReady(data.activeEgg);
+  const quests = getDailyQuests(today);
 
   return (
     <Screen
@@ -96,6 +107,39 @@ export function HomeScreen({
             })}`
           : "Sync once to collect today's XP."}
       </Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Incubator</Text>
+        <Text style={styles.sectionMeta}>{data.eggsHatched} hatched</Text>
+      </View>
+      <View style={styles.incubatorCard}>
+        <EggAvatar
+          element={data.activeEgg.element}
+          rarity={data.activeEgg.rarity}
+          size="small"
+        />
+        <View style={styles.incubatorBody}>
+          <Text style={styles.eggTitle}>
+            {capitalize(data.activeEgg.rarity)} {capitalize(data.activeEgg.element)} egg
+          </Text>
+          <Text style={styles.eggCaption}>
+            {eggReady
+              ? "Ready to hatch in your monster tab."
+              : `${data.activeEgg.stepsWalked.toLocaleString()} / ${data.activeEgg.stepsRequired.toLocaleString()} steps`}
+          </Text>
+          <ProgressBar progress={eggProgress} />
+        </View>
+      </View>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Daily quests</Text>
+        <Text style={styles.sectionMeta}>
+          {quests.filter(isQuestComplete).length}/{quests.length} complete
+        </Text>
+      </View>
+      <View style={styles.questList}>
+        {quests.map((quest) => (
+          <Quest key={quest.id} quest={quest} />
+        ))}
+      </View>
     </Screen>
   );
 }
@@ -108,6 +152,31 @@ function Metric({ label, value, xp }: { label: string; value: string; xp: number
       <Text style={styles.metricXp}>+{xp} XP</Text>
     </View>
   );
+}
+
+function Quest({ quest }: { quest: DailyQuest }) {
+  const complete = isQuestComplete(quest);
+
+  return (
+    <View style={styles.quest}>
+      <View style={[styles.questDot, complete && styles.questDotComplete]} />
+      <View style={styles.questBody}>
+        <Text style={styles.questLabel}>{quest.label}</Text>
+        <Text style={styles.questCaption}>
+          {Math.min(quest.current, quest.target).toLocaleString()} /{" "}
+          {quest.target.toLocaleString()} {quest.unit}
+        </Text>
+        <ProgressBar progress={getQuestProgress(quest)} />
+      </View>
+      <Text style={[styles.questStatus, complete && styles.questStatusComplete]}>
+        {complete ? "Done" : "Active"}
+      </Text>
+    </View>
+  );
+}
+
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 const styles = StyleSheet.create({
@@ -228,5 +297,68 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: 9,
     textAlign: "center",
+  },
+  incubatorCard: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 22,
+    padding: 14,
+  },
+  incubatorBody: {
+    flex: 1,
+    gap: 8,
+  },
+  eggTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  eggCaption: {
+    color: colors.muted,
+    fontSize: 12,
+  },
+  questList: {
+    gap: 8,
+  },
+  quest: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderRadius: 15,
+    flexDirection: "row",
+    gap: 10,
+    padding: 13,
+  },
+  questDot: {
+    backgroundColor: colors.line,
+    borderRadius: 7,
+    height: 14,
+    width: 14,
+  },
+  questDotComplete: {
+    backgroundColor: colors.primary,
+  },
+  questBody: {
+    flex: 1,
+    gap: 6,
+  },
+  questLabel: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  questCaption: {
+    color: colors.muted,
+    fontSize: 11,
+  },
+  questStatus: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  questStatusComplete: {
+    color: colors.primary,
   },
 });

@@ -1,5 +1,8 @@
 import type { ExpoConfig } from "expo/config";
 
+const healthReadDescription =
+  "HatchUp reads your steps, workouts, and active energy only to reward your monster with XP.";
+
 const config: ExpoConfig = {
   name: "HatchUp Games",
   slug: "hatchup-games-mobile",
@@ -12,8 +15,7 @@ const config: ExpoConfig = {
     supportsTablet: false,
     bundleIdentifier: "com.hatchup.games",
     infoPlist: {
-      NSHealthShareUsageDescription:
-        "HatchUp reads your steps, workouts, and active energy only to reward your monster with XP.",
+      NSHealthShareUsageDescription: healthReadDescription,
     },
     entitlements: {
       "com.apple.developer.healthkit": true,
@@ -32,6 +34,24 @@ const config: ExpoConfig = {
       "expo-dev-client",
       {
         launchMode: "most-recent",
+      },
+    ],
+    [
+      "@kingstinct/react-native-healthkit",
+      {
+        NSHealthShareUsageDescription: healthReadDescription,
+        NSHealthUpdateUsageDescription:
+          "HatchUp does not write data to Apple Health.",
+        background: false,
+      },
+    ],
+    "expo-health-connect",
+    [
+      "expo-build-properties",
+      {
+        android: {
+          minSdkVersion: 26,
+        },
       },
     ],
   ],

@@ -23,6 +23,26 @@ export interface DailyAward {
   health: DailyHealthSummary;
 }
 
+export type EggRarity = "common" | "uncommon" | "rare" | "epic";
+
+export type EggElement = "leaf" | "ember" | "tide" | "storm";
+
+export interface IncubatorEgg {
+  id: string;
+  element: EggElement;
+  rarity: EggRarity;
+  stepsRequired: number;
+  stepsWalked: number;
+}
+
+export interface CollectedHatchling {
+  id: string;
+  name: string;
+  element: EggElement;
+  rarity: EggRarity;
+  hatchedAt: string;
+}
+
 export interface HatchUpData {
   monsterName: string;
   totalXp: number;
@@ -33,6 +53,9 @@ export interface HatchUpData {
   healthConnected: boolean;
   lastRewardDate: string | null;
   dailyAward: DailyAward | null;
+  activeEgg: IncubatorEgg;
+  collection: CollectedHatchling[];
+  eggsHatched: number;
 }
 
 export const initialHatchUpData: HatchUpData = {
@@ -45,4 +68,13 @@ export const initialHatchUpData: HatchUpData = {
   healthConnected: false,
   lastRewardDate: null,
   dailyAward: null,
+  activeEgg: {
+    id: "egg-1",
+    element: "leaf",
+    rarity: "common",
+    stepsRequired: 5000,
+    stepsWalked: 0,
+  },
+  collection: [],
+  eggsHatched: 0,
 };

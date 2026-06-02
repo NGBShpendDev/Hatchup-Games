@@ -74,7 +74,7 @@ export function SettingsPrivacyScreen({
         onPress={() =>
           Alert.alert(
             "Reset HatchUp?",
-            "This removes your monster name, XP, streaks, and local sync history.",
+            "This removes your monster name, XP, streaks, hatchlings, and local sync history.",
             [
               { text: "Cancel", style: "cancel" },
               { text: "Reset", style: "destructive", onPress: onReset },

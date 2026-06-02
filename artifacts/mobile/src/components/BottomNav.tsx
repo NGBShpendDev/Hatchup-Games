@@ -19,7 +19,7 @@ export function BottomNav({
       <NavItem active={active === "home"} label="Home" onPress={onHomePress} />
       <NavItem
         active={active === "monster"}
-        label="Monster"
+        label="Hatchery"
         onPress={onMonsterPress}
       />
       <NavItem

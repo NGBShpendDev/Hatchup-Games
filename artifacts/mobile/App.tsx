@@ -80,6 +80,7 @@ export default function App() {
         <MonsterDetailScreen
           data={app.data}
           onBack={() => setScreen("home")}
+          onHatch={app.hatchEgg}
           onSettingsPress={() => setScreen("settings")}
         />
       )}

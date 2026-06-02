@@ -5,6 +5,11 @@ import {
   type DailyAward,
   type HatchUpData,
 } from "./domain/models";
+import {
+  addStepsToEgg,
+  getNewStepsForSync,
+  hatchActiveEgg,
+} from "./domain/hatchery";
 import { updateStreak } from "./domain/streak";
 import { calculateDailyXp, mergeDailyXp } from "./domain/xp";
 import { healthService } from "./services/health";
@@ -76,10 +81,12 @@ export function useHatchUpApp() {
         : 0;
       const newXp = Math.max(xp.total - previousXp, 0);
       const streak = updateStreak(data, health.date, newXp);
+      const newSteps = getNewStepsForSync(data.dailyAward, health.date, health.steps);
       const dailyAward = { date: health.date, health, xp };
       const next = {
         ...data,
         ...streak,
+        activeEgg: addStepsToEgg(data.activeEgg, newSteps),
         totalXp: data.totalXp + newXp,
         lastSyncedDate: new Date().toISOString(),
         dailyAward,
@@ -93,6 +100,10 @@ export function useHatchUpApp() {
       syncInFlight.current = false;
       setIsSyncing(false);
     }
+  }
+
+  async function hatchEgg() {
+    await persist(hatchActiveEgg(data, new Date().toISOString()));
   }
 
   async function resetApp() {
@@ -110,6 +121,7 @@ export function useHatchUpApp() {
     latestSync,
     ready,
     connectHealth,
+    hatchEgg,
     resetApp,
     saveMonsterName,
     syncHealth,
