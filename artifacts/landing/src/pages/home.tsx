@@ -253,13 +253,14 @@ export default function Home() {
           <a href="#features" className="hover:text-white">Features</a>
           <a href="#how-it-works" className="hover:text-white">How it works</a>
           <a href="#safety" className="hover:text-white">Safety</a>
-          <a href="/landing/support" className="hover:text-white">Support</a>
+          <a href="/demo" className="text-pink-200 hover:text-white">Live demo</a>
+          <a href="/support" className="hover:text-white">Support</a>
         </nav>
         <a
-          href="#download"
+          href="/demo"
           className="hidden md:inline-flex items-center gap-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 px-4 py-2 text-sm font-medium"
         >
-          Get the app <ChevronRight className="w-4 h-4" />
+          Test the MVP <ChevronRight className="w-4 h-4" />
         </a>
       </header>
 
@@ -310,6 +311,12 @@ export default function Home() {
               className="mt-8"
               id="download"
             >
+              <a
+                href="/demo"
+                className="mb-4 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-pink-500 to-violet-500 px-6 py-4 text-sm font-bold text-white shadow-lg shadow-pink-500/25 transition-transform hover:-translate-y-0.5"
+              >
+                Live test the MVP <ChevronRight className="h-4 w-4" />
+              </a>
               <StoreButtons />
               <p className="mt-3 text-xs text-white/50">
                 Free to play. No ads. Premium unlocks customization, never advantages.
@@ -508,7 +515,8 @@ export default function Home() {
           <div className="flex items-center gap-6">
             <a href="#" className="hover:text-white">Privacy</a>
             <a href="#" className="hover:text-white">Terms</a>
-            <a href="/landing/support" className="hover:text-white">Support</a>
+            <a href="/demo" className="hover:text-white">Live demo</a>
+            <a href="/support" className="hover:text-white">Support</a>
           </div>
         </div>
       </footer>
