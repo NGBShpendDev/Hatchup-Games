@@ -96,3 +96,22 @@ Health Connect is part of the framework.
 
 The app stores the awarded daily total in AsyncStorage so repeated syncs only
 credit newly earned XP.
+
+## TestFlight
+
+TestFlight uses the `production` EAS build and submit profiles. The iOS bundle
+identifier is `com.hatchup.games`. Before the first upload:
+
+1. Create the matching App Store Connect app record.
+2. Run `eas credentials --platform ios` privately in a local Terminal and let
+   EAS create or attach the distribution certificate and provisioning profile.
+3. Create an App Store Connect API key and store it through the private EAS
+   credential flow. Do not commit the `.p8` file.
+
+After the first-time credential setup, queue the store build and upload with:
+
+```bash
+eas build --platform ios --profile production --auto-submit
+```
+
+Apple Health access remains foreground-only and read-only in TestFlight.

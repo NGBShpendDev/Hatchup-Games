@@ -8,20 +8,26 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_HEALTH_MODE": "native"
+        "EXPO_PUBLIC_HEALTH_MODE": "native",
+        "EXPO_PUBLIC_APP_VARIANT": "development"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_HEALTH_MODE": "native"
+        "EXPO_PUBLIC_HEALTH_MODE": "native",
+        "EXPO_PUBLIC_APP_VARIANT": "preview"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_HEALTH_MODE": "native"
+        "EXPO_PUBLIC_HEALTH_MODE": "native",
+        "EXPO_PUBLIC_APP_VARIANT": "production"
       }
     }
+  },
+  "submit": {
+    "production": {}
   }
 }
