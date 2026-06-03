@@ -1,8 +1,12 @@
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
+import { HatchlingAvatar } from "../components/HatchlingAvatar";
 import { Header } from "../components/Header";
 import { Screen } from "../components/Screen";
+import { getBadges, getUnlockedBadgeCount } from "../domain/badges";
+import { toDateKey } from "../domain/date";
+import { getActiveHatchling } from "../domain/hatchlings";
 import type { HatchUpData } from "../domain/models";
 import type { MonsterStage } from "../domain/progression";
 import type { ProgressionProfile } from "../domain/progressionConfig";
@@ -50,6 +54,11 @@ export function SettingsPrivacyScreen({
   onSetLeaderboardSharing,
   onSetTestStage,
 }: Props) {
+  const today = toDateKey(new Date());
+  const badges = getBadges(data, today);
+  const activeHatchling = getActiveHatchling(data);
+  const unlockedBadgeCount = getUnlockedBadgeCount(data, today);
+
   return (
     <Screen
       footer={
@@ -63,12 +72,66 @@ export function SettingsPrivacyScreen({
         />
       }
     >
-      <Header onBack={onBack} title="Settings and privacy" />
-      <Text style={styles.title}>Your data stays simple.</Text>
+      <Header onBack={onBack} title="Profile and privacy" />
+      <Text style={styles.title}>Your HatchUp profile.</Text>
       <Text style={styles.body}>
-        This MVP stores your monster progress locally on this device with
-        AsyncStorage.
+        Track your collection, badges, and privacy controls in one beta profile
+        page.
       </Text>
+      <View style={styles.profileCard}>
+        <View>
+          <Text style={styles.profileName}>
+            {data.leaderboardAlias || data.monsterName || "HatchUp Tester"}
+          </Text>
+          <Text style={styles.profileMeta}>
+            {data.totalXp} XP | {data.eggsHatched} eggs hatched |{" "}
+            {unlockedBadgeCount}/{badges.length} badges
+          </Text>
+        </View>
+        {activeHatchling && (
+          <View style={styles.activeHatchling}>
+            <HatchlingAvatar
+              element={activeHatchling.element}
+              rarity={activeHatchling.rarity}
+              size="small"
+            />
+            <View style={styles.activeHatchlingText}>
+              <Text style={styles.activeLabel}>Training</Text>
+              <Text style={styles.activeName}>
+                {activeHatchling.name} L{activeHatchling.level}
+              </Text>
+              <Text style={styles.activeMood}>
+                {capitalize(activeHatchling.mood)} | Bond {activeHatchling.bond}
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
+      <View style={styles.badgeCard}>
+        <Text style={styles.cardTitle}>Milestones and badges</Text>
+        <Text style={styles.privacyText}>
+          Badge progress is local for this beta and can become shareable once
+          accounts are online.
+        </Text>
+        <View style={styles.badgeGrid}>
+          {badges.map((badge) => (
+            <View
+              key={badge.id}
+              style={[styles.badge, badge.unlocked && styles.badgeUnlocked]}
+            >
+              <Text style={styles.badgeStatus}>
+                {badge.unlocked ? "Unlocked" : "In progress"}
+              </Text>
+              <Text style={styles.badgeName}>{badge.label}</Text>
+              <Text style={styles.badgeText}>{badge.description}</Text>
+              <Text style={styles.badgeProgress}>
+                {Math.min(badge.value, badge.target).toLocaleString()} /{" "}
+                {badge.target.toLocaleString()}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
       <View style={styles.card}>
         <Setting label="Health source" value={healthMode} />
         <Setting
@@ -226,6 +289,10 @@ function Setting({
   );
 }
 
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 const styles = StyleSheet.create({
   title: {
     color: colors.ink,
@@ -245,6 +312,98 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginTop: 22,
     paddingHorizontal: 16,
+  },
+  profileCard: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: 22,
+    gap: 14,
+    marginTop: 22,
+    padding: 16,
+  },
+  profileName: {
+    color: colors.ink,
+    fontSize: 24,
+    fontWeight: "900",
+  },
+  profileMeta: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 4,
+  },
+  activeHatchling: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    flexDirection: "row",
+    gap: 10,
+    padding: 10,
+  },
+  activeHatchlingText: {
+    flex: 1,
+  },
+  activeLabel: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  activeName: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  activeMood: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: 3,
+  },
+  badgeCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    marginTop: 16,
+    padding: 16,
+  },
+  badgeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+  },
+  badge: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.line,
+    borderRadius: 15,
+    borderWidth: 1,
+    padding: 10,
+    width: "48%",
+  },
+  badgeUnlocked: {
+    borderColor: colors.primary,
+  },
+  badgeStatus: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  badgeName: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+    marginTop: 5,
+  },
+  badgeText: {
+    color: colors.muted,
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 4,
+    minHeight: 30,
+  },
+  badgeProgress: {
+    color: colors.ink,
+    fontSize: 11,
+    fontWeight: "900",
+    marginTop: 8,
   },
   setting: {
     paddingVertical: 15,

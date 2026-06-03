@@ -3,6 +3,8 @@ import {
   addStepsToEgg,
   addStepsToEggs,
   createEgg,
+  createStarterEgg,
+  grantMilestoneEggs,
   getNewStepsForSync,
   hatchActiveEgg,
   isEggReady,
@@ -70,8 +72,33 @@ describe("hatchery", () => {
       name: "Sprig",
       element: "leaf",
       rarity: "common",
+      level: 1,
+      xp: 0,
     });
+    expect(next.activeHatchlingId).toBe("hatchling-1");
     expect(next.activeEggs).toHaveLength(3);
     expect(next.activeEgg.id).not.toBe("egg-1");
+  });
+
+  it("creates a chosen starter egg for onboarding", () => {
+    expect(createStarterEgg("storm")).toMatchObject({
+      element: "storm",
+      id: "starter-storm",
+      rarity: "common",
+    });
+  });
+
+  it("drops random milestone eggs into open incubator slots", () => {
+    const starterOnly = {
+      ...initialHatchUpData,
+      activeEgg: initialHatchUpData.activeEggs[0],
+      activeEggs: [initialHatchUpData.activeEggs[0]],
+      milestoneEggsAwarded: [],
+    };
+
+    const next = grantMilestoneEggs(starterOnly, 0, 200);
+
+    expect(next.activeEggs).toHaveLength(3);
+    expect(next.milestoneEggsAwarded).toEqual(["xp-50", "xp-150"]);
   });
 });

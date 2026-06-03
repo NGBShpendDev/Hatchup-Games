@@ -4,18 +4,30 @@ import type { CollectedHatchling } from "../models";
 describe("creature dex", () => {
   const collection: CollectedHatchling[] = [
     {
+      bond: 5,
       id: "hatchling-1",
+      lastInteractionAt: "2026-06-01T12:00:00.000Z",
       name: "Sprig",
       element: "leaf",
+      mood: "happy",
       rarity: "common",
       hatchedAt: "2026-06-01T12:00:00.000Z",
+      level: 1,
+      stats: { heart: 9, power: 6, resilience: 8, speed: 5 },
+      xp: 0,
     },
     {
+      bond: 10,
       id: "hatchling-2",
+      lastInteractionAt: "2026-06-02T12:00:00.000Z",
       name: "Moss",
       element: "leaf",
+      mood: "happy",
       rarity: "common",
       hatchedAt: "2026-06-02T12:00:00.000Z",
+      level: 2,
+      stats: { heart: 9, power: 7, resilience: 8, speed: 5 },
+      xp: 75,
     },
   ];
 

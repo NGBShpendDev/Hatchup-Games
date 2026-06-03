@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
 import { EggAvatar } from "../components/EggAvatar";
@@ -14,9 +15,12 @@ import { getProgression, type MonsterStage } from "../domain/progression";
 import { ACTIVE_PROGRESSION_PROFILE } from "../domain/progressionConfig";
 import {
   getDailyQuests,
+  getMonthlyQuests,
   getQuestProgress,
+  getWeeklyQuests,
   isQuestComplete,
-  type DailyQuest,
+  type Quest as QuestModel,
+  type QuestCadence,
 } from "../domain/quests";
 import { getRetentionPlan } from "../domain/retention";
 import { colors } from "../theme";
@@ -48,6 +52,7 @@ export function HomeScreen({
   onSettingsPress,
   onSync,
 }: Props) {
+  const [questCadence, setQuestCadence] = useState<QuestCadence>("daily");
   const todayKey = toDateKey(new Date());
   const progression = getProgression(data.totalXp);
   const today =
@@ -57,6 +62,14 @@ export function HomeScreen({
         ? data.dailyAward
         : null;
   const quests = getDailyQuests(today);
+  const weeklyQuests = getWeeklyQuests(data, todayKey);
+  const monthlyQuests = getMonthlyQuests(data, todayKey);
+  const visibleQuests =
+    questCadence === "daily"
+      ? quests
+      : questCadence === "weekly"
+        ? weeklyQuests
+        : monthlyQuests;
   const activity = getActivitySummary(data.activityHistory, todayKey);
   const readyEggCount = data.activeEggs.filter(isEggReady).length;
   const completedQuestCount = quests.filter(isQuestComplete).length;
@@ -231,13 +244,35 @@ export function HomeScreen({
         ))}
       </View>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Daily quests</Text>
+        <Text style={styles.sectionTitle}>Quests</Text>
         <Text style={styles.sectionMeta}>
-          {quests.filter(isQuestComplete).length}/{quests.length} complete
+          {visibleQuests.filter(isQuestComplete).length}/{visibleQuests.length}{" "}
+          complete
         </Text>
       </View>
+      <View style={styles.questTabs}>
+        {(["daily", "weekly", "monthly"] as QuestCadence[]).map((cadence) => (
+          <Pressable
+            key={cadence}
+            onPress={() => setQuestCadence(cadence)}
+            style={[
+              styles.questTab,
+              questCadence === cadence && styles.questTabActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.questTabLabel,
+                questCadence === cadence && styles.questTabLabelActive,
+              ]}
+            >
+              {capitalize(cadence)}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
       <View style={styles.questList}>
-        {quests.map((quest) => (
+        {visibleQuests.map((quest) => (
           <Quest key={quest.id} quest={quest} />
         ))}
       </View>
@@ -298,7 +333,7 @@ function ActivityBar({ day }: { day: ActivityDay }) {
   );
 }
 
-function Quest({ quest }: { quest: DailyQuest }) {
+function Quest({ quest }: { quest: QuestModel }) {
   const complete = isQuestComplete(quest);
 
   return (
@@ -311,8 +346,11 @@ function Quest({ quest }: { quest: DailyQuest }) {
           {quest.target.toLocaleString()} {quest.unit}
         </Text>
         <ProgressBar progress={getQuestProgress(quest)} />
-        {quest.rewardXp > 0 && (
+        {quest.rewardXp > 0 && quest.cadence === "daily" && (
           <Text style={styles.questReward}>Reward: +{quest.rewardXp} XP</Text>
+        )}
+        {quest.rewardXp === 0 && (
+          <Text style={styles.questReward}>Milestone tracker</Text>
         )}
       </View>
       <Text
@@ -701,6 +739,29 @@ const styles = StyleSheet.create({
   },
   questList: {
     gap: 8,
+  },
+  questTabs: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 10,
+  },
+  questTab: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    flex: 1,
+    paddingVertical: 10,
+  },
+  questTabActive: {
+    backgroundColor: colors.primary,
+  },
+  questTabLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  questTabLabelActive: {
+    color: "#FFFFFF",
   },
   quest: {
     alignItems: "center",

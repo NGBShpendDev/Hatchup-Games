@@ -53,8 +53,8 @@ function AppContent() {
         <MonsterSetupScreen
           initialName={app.data.monsterName}
           onBack={() => setScreen("welcome")}
-          onContinue={async (name) => {
-            await app.saveMonsterName(name);
+          onContinue={async (name, starterEggElement) => {
+            await app.saveMonsterSetup(name, starterEggElement);
             setScreen("connect");
           }}
         />
@@ -103,7 +103,10 @@ function AppContent() {
           data={app.data}
           onHomePress={() => setScreen("home")}
           onLeaderboardPress={() => setScreen("leaderboard")}
+          onBondWithActiveHatchling={app.bondWithActiveHatchling}
           onMonsterPress={() => setScreen("monster")}
+          onRenameHatchling={app.renameCollectedHatchling}
+          onSetActiveHatchling={app.setActiveHatchling}
           onSettingsPress={() => setScreen("settings")}
         />
       )}

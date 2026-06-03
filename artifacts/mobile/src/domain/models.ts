@@ -48,13 +48,28 @@ export interface IncubatorEgg {
   stepsWalked: number;
 }
 
+export interface HatchlingStats {
+  heart: number;
+  power: number;
+  resilience: number;
+  speed: number;
+}
+
 export interface CollectedHatchling {
+  bond: number;
   id: string;
+  lastInteractionAt: string | null;
   name: string;
   element: EggElement;
+  mood: HatchlingMood;
   rarity: EggRarity;
   hatchedAt: string;
+  level: number;
+  stats: HatchlingStats;
+  xp: number;
 }
+
+export type HatchlingMood = "happy" | "excited" | "sleepy" | "lonely";
 
 export interface HatchUpData {
   schemaVersion: number;
@@ -67,6 +82,7 @@ export interface HatchUpData {
   crashReportingEnabled: boolean;
   lastCloudSyncedAt: string | null;
   privacyConsentVersion: string;
+  starterEggElement: EggElement | null;
   weeklyGoalSteps: number;
   monsterName: string;
   totalXp: number;
@@ -83,8 +99,11 @@ export interface HatchUpData {
   activityHistory: DailyAward[];
   activeEgg: IncubatorEgg;
   activeEggs: IncubatorEgg[];
+  activeHatchlingId: string | null;
   collection: CollectedHatchling[];
   eggsHatched: number;
+  eventEggsAwarded: string[];
+  milestoneEggsAwarded: string[];
 }
 
 const starterEggs: IncubatorEgg[] = [
@@ -112,7 +131,7 @@ const starterEggs: IncubatorEgg[] = [
 ];
 
 export const initialHatchUpData: HatchUpData = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   progressionProfile: ACTIVE_PROGRESSION_PROFILE.id,
   accountId: "local-beta-account",
   accountMode: "local",
@@ -122,6 +141,7 @@ export const initialHatchUpData: HatchUpData = {
   crashReportingEnabled: true,
   lastCloudSyncedAt: null,
   privacyConsentVersion: "2026-06-beta",
+  starterEggElement: null,
   weeklyGoalSteps: 35000,
   monsterName: "",
   totalXp: 0,
@@ -138,6 +158,9 @@ export const initialHatchUpData: HatchUpData = {
   activityHistory: [],
   activeEgg: starterEggs[0],
   activeEggs: starterEggs,
+  activeHatchlingId: null,
   collection: [],
   eggsHatched: 0,
+  eventEggsAwarded: [],
+  milestoneEggsAwarded: [],
 };

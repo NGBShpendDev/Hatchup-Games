@@ -8,6 +8,7 @@ import { MonsterAvatar } from "../components/MonsterAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
 import { getEggProgress, isEggReady } from "../domain/hatchery";
+import { getActiveHatchling } from "../domain/hatchlings";
 import type { CollectedHatchling, HatchUpData } from "../domain/models";
 import { getProgression, MONSTER_STAGES } from "../domain/progression";
 import { colors } from "../theme";
@@ -37,6 +38,7 @@ export function MonsterDetailScreen({
 }: Props) {
   const progression = getProgression(data.totalXp);
   const readyEggCount = data.activeEggs.filter(isEggReady).length;
+  const activeHatchling = getActiveHatchling(data);
 
   return (
     <Screen
@@ -113,6 +115,42 @@ export function MonsterDetailScreen({
         <Stat label="Active eggs" value={`${data.activeEggs.length}/3`} />
         <Stat label="Longest streak" value={`${data.longestStreak} days`} />
       </View>
+      <View style={styles.collectionHeader}>
+        <Text style={styles.sectionTitle}>Training hatchling</Text>
+        <Text style={styles.collectionCount}>
+          {activeHatchling ? `Level ${activeHatchling.level}` : "None active"}
+        </Text>
+      </View>
+      {activeHatchling ? (
+        <View style={styles.trainingCard}>
+          <HatchlingAvatar
+            element={activeHatchling.element}
+            rarity={activeHatchling.rarity}
+            size="small"
+          />
+          <View style={styles.trainingBody}>
+            <Text style={styles.trainingName}>{activeHatchling.name}</Text>
+            <Text style={styles.trainingMeta}>
+              {capitalize(activeHatchling.rarity)}{" "}
+              {capitalize(activeHatchling.element)} | {capitalize(activeHatchling.mood)} | Bond{" "}
+              {activeHatchling.bond}
+            </Text>
+          </View>
+          <AppButton
+            label="Hatchlings"
+            onPress={onDexPress}
+            style={styles.trainingButton}
+            variant="secondary"
+          />
+        </View>
+      ) : (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>No active hatchling yet.</Text>
+          <Text style={styles.emptyText}>
+            Hatch an egg to unlock companion training.
+          </Text>
+        </View>
+      )}
       <View style={styles.collectionHeader}>
         <Text style={styles.sectionTitle}>Incubator</Text>
         <Text style={styles.collectionCount}>
@@ -324,6 +362,30 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
     marginTop: 4,
+  },
+  trainingCard: {
+    alignItems: "center",
+    backgroundColor: colors.accentSoft,
+    borderRadius: 18,
+    flexDirection: "row",
+    gap: 10,
+    padding: 12,
+  },
+  trainingBody: {
+    flex: 1,
+  },
+  trainingName: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  trainingMeta: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: 3,
+  },
+  trainingButton: {
+    minWidth: 110,
   },
   incubatorCard: {
     backgroundColor: colors.surface,

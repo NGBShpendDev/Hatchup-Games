@@ -1,19 +1,30 @@
 import { useState } from "react";
-import { StyleSheet, Text, TextInput } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppButton } from "../components/AppButton";
+import { EggAvatar } from "../components/EggAvatar";
 import { Header } from "../components/Header";
 import { MonsterAvatar } from "../components/MonsterAvatar";
 import { Screen } from "../components/Screen";
+import type { EggElement } from "../domain/models";
 import { colors } from "../theme";
 
 interface Props {
   initialName: string;
   onBack: () => void;
-  onContinue: (name: string) => Promise<void>;
+  onContinue: (name: string, starterEggElement: EggElement) => Promise<void>;
 }
+
+const STARTER_EGGS: { element: EggElement; label: string; pitch: string }[] = [
+  { element: "leaf", label: "Leaf", pitch: "Steady growth" },
+  { element: "ember", label: "Ember", pitch: "High energy" },
+  { element: "tide", label: "Tide", pitch: "Balanced flow" },
+  { element: "storm", label: "Storm", pitch: "Fast sparks" },
+];
 
 export function MonsterSetupScreen({ initialName, onBack, onContinue }: Props) {
   const [name, setName] = useState(initialName);
+  const [starterEggElement, setStarterEggElement] =
+    useState<EggElement>("leaf");
   const canContinue = name.trim().length > 0;
 
   return (
@@ -21,10 +32,27 @@ export function MonsterSetupScreen({ initialName, onBack, onContinue }: Props) {
       <Header onBack={onBack} title="Meet your egg" />
       <Text style={styles.title}>Every big evolution starts small.</Text>
       <Text style={styles.body}>
-        Give your new monster a name. You can build XP by moving after health sync
-        is connected.
+        Give your new monster a name and choose your first hatchling egg. More
+        random eggs drop as you hit beta milestones.
       </Text>
       <MonsterAvatar stage="egg" />
+      <Text style={styles.label}>Starter egg</Text>
+      <View style={styles.eggGrid}>
+        {STARTER_EGGS.map((egg) => {
+          const selected = egg.element === starterEggElement;
+          return (
+            <Pressable
+              key={egg.element}
+              onPress={() => setStarterEggElement(egg.element)}
+              style={[styles.eggOption, selected && styles.eggOptionSelected]}
+            >
+              <EggAvatar element={egg.element} rarity="common" size="small" />
+              <Text style={styles.eggLabel}>{egg.label}</Text>
+              <Text style={styles.eggPitch}>{egg.pitch}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
       <Text style={styles.label}>Monster name</Text>
       <TextInput
         autoCapitalize="words"
@@ -37,8 +65,8 @@ export function MonsterSetupScreen({ initialName, onBack, onContinue }: Props) {
       />
       <AppButton
         disabled={!canContinue}
-        label="Keep this name"
-        onPress={() => onContinue(name)}
+        label="Start with this egg"
+        onPress={() => onContinue(name, starterEggElement)}
         style={!canContinue ? styles.disabled : undefined}
       />
     </Screen>
@@ -64,6 +92,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
     marginBottom: 8,
+  },
+  eggGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 9,
+    marginBottom: 18,
+  },
+  eggOption: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 10,
+    width: "48%",
+  },
+  eggOptionSelected: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
+  eggLabel: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+  eggPitch: {
+    color: colors.muted,
+    fontSize: 11,
+    marginTop: 2,
   },
   input: {
     backgroundColor: colors.surface,

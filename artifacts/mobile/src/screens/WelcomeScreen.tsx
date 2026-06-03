@@ -11,16 +11,17 @@ export function WelcomeScreen({ onContinue }: { onContinue: () => void }) {
         <Text style={styles.kicker}>HATCHUP GAMES</Text>
         <Text style={styles.title}>Raise a monster with your daily movement.</Text>
         <Text style={styles.body}>
-          Your steps, distance, active energy, and workouts turn into XP. Start
-          with an egg and watch your pocket companion grow.
+          Your steps, distance, active energy, and workouts turn into XP. Pick
+          your first egg, then train a team of hatchlings as you move.
         </Text>
       </View>
       <MonsterAvatar stage="egg" />
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Move. Hatch. Climb.</Text>
         <Text style={styles.cardBody}>
-          Fill up to three eggs at once, collect new companions, and optionally
-          compare your weekly movement in beta rankings.
+          Start with one chosen egg, earn random milestone eggs, collect
+          companions, and optionally compare your weekly movement in beta
+          rankings.
         </Text>
       </View>
       <View style={styles.spacer} />

@@ -27,7 +27,12 @@ export function BottomNav({
         label="Hatchery"
         onPress={onMonsterPress}
       />
-      <NavItem active={active === "dex"} icon="D" label="Dex" onPress={onDexPress} />
+      <NavItem
+        active={active === "dex"}
+        icon="C"
+        label="Hatchlings"
+        onPress={onDexPress}
+      />
       <NavItem
         active={active === "leaderboard"}
         icon="R"
@@ -36,8 +41,8 @@ export function BottomNav({
       />
       <NavItem
         active={active === "settings"}
-        icon="S"
-        label="Settings"
+        icon="P"
+        label="Profile"
         onPress={onSettingsPress}
       />
     </View>

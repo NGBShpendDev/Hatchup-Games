@@ -1,10 +1,10 @@
 import type {
-  CollectedHatchling,
   EggElement,
   EggRarity,
   HatchUpData,
   IncubatorEgg,
 } from "./models";
+import { createHatchlingFromEgg } from "./hatchlings";
 import {
   ACTIVE_PROGRESSION_PROFILE,
   getEggStepsRequired,
@@ -20,7 +20,7 @@ const RARITY_WEIGHTS: readonly { rarity: EggRarity; weight: number }[] = [
   { rarity: "rare", weight: 12 },
   { rarity: "epic", weight: 3 },
 ];
-const NAMES = ["Sprig", "Cinder", "Ripple", "Gust", "Moss", "Sparky", "Pebble"];
+const EGG_DROP_MILESTONES = [50, 150, 350, 700, 1200, 1800];
 
 export function createEgg(
   seed: number,
@@ -44,6 +44,19 @@ export function createRandomEgg(
   profile: ProgressionProfile = ACTIVE_PROGRESSION_PROFILE,
 ) {
   return createEgg(hashSeed(seed), profile);
+}
+
+export function createStarterEgg(
+  element: EggElement,
+  profile: ProgressionProfile = ACTIVE_PROGRESSION_PROFILE,
+): IncubatorEgg {
+  return {
+    id: `starter-${element}`,
+    element,
+    rarity: "common",
+    stepsRequired: getEggStepsRequired("common", profile),
+    stepsWalked: 0,
+  };
 }
 
 export function getEggProgress(egg: IncubatorEgg) {
@@ -84,14 +97,12 @@ export function hatchEgg(
   const egg = data.activeEggs.find((item) => item.id === eggId);
   if (!egg || !isEggReady(egg)) return data;
 
-  const hatchling: CollectedHatchling = {
-    id: `hatchling-${data.eggsHatched + 1}`,
-    name: NAMES[data.eggsHatched % NAMES.length],
-    element: egg.element,
-    rarity: egg.rarity,
-    hatchedAt,
-  };
   const eggsHatched = data.eggsHatched + 1;
+  const hatchling = createHatchlingFromEgg({
+    egg,
+    hatchedAt,
+    index: eggsHatched,
+  });
   const replacementEgg = createRandomEgg(
     Date.parse(hatchedAt) + eggsHatched + hashText(eggId),
     profile,
@@ -104,6 +115,7 @@ export function hatchEgg(
     ...data,
     activeEgg: activeEggs[0],
     activeEggs,
+    activeHatchlingId: data.activeHatchlingId ?? hatchling.id,
     collection: [hatchling, ...data.collection],
     eggsHatched,
   };
@@ -127,6 +139,35 @@ export function getNewStepsForSync(
     previousAward?.date === nextDate ? previousAward.health.steps : 0;
 
   return Math.max(nextSteps - previousSteps, 0);
+}
+
+export function grantMilestoneEggs(
+  data: HatchUpData,
+  previousXp: number,
+  nextXp: number,
+  profile: ProgressionProfile = ACTIVE_PROGRESSION_PROFILE,
+): HatchUpData {
+  let next = data;
+
+  for (const milestone of EGG_DROP_MILESTONES) {
+    const id = `xp-${milestone}`;
+    const crossed = previousXp < milestone && nextXp >= milestone;
+    const alreadyAwarded = next.milestoneEggsAwarded.includes(id);
+    const hasRoom = next.activeEggs.length < MAX_ACTIVE_EGGS;
+
+    if (!crossed || alreadyAwarded || !hasRoom) continue;
+
+    const egg = createRandomEgg(nextXp + milestone + next.activeEggs.length, profile);
+    const activeEggs = [...next.activeEggs, { ...egg, id: `${id}-${egg.id}` }];
+    next = {
+      ...next,
+      activeEgg: activeEggs[0],
+      activeEggs,
+      milestoneEggsAwarded: [...next.milestoneEggsAwarded, id],
+    };
+  }
+
+  return next;
 }
 
 function seededIndex(seed: number, salt: number, length: number) {

@@ -1,18 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import { toDateKey } from "./domain/date";
+import { grantEventEggs } from "./domain/eventEggs";
 import {
   initialHatchUpData,
   type CollectedHatchling,
   type DailyAward,
+  type EggElement,
   type HatchUpData,
 } from "./domain/models";
 import { migrateHatchUpData } from "./domain/migration";
 import {
   addStepsToEggs,
+  createStarterEgg,
+  grantMilestoneEggs,
   getNewStepsForSync,
   isEggReady,
   hatchEgg as hatchReadyEgg,
 } from "./domain/hatchery";
+import {
+  addXpToActiveHatchling,
+  bondWithHatchling,
+  renameHatchling,
+} from "./domain/hatchlings";
 import { upsertDailyAward } from "./domain/history";
 import { updateStreak } from "./domain/streak";
 import {
@@ -82,6 +91,23 @@ export function useHatchUpApp() {
     });
   }
 
+  async function saveMonsterSetup(
+    monsterName: string,
+    starterEggElement: EggElement,
+  ) {
+    const starterEgg = createStarterEgg(starterEggElement);
+    const activeEggs = [starterEgg];
+
+    await persist({
+      ...data,
+      activeEgg: activeEggs[0],
+      activeEggs,
+      monsterName: monsterName.trim(),
+      onboardingStatus: "monsterCreated",
+      starterEggElement,
+    });
+  }
+
   async function connectHealth() {
     setError(null);
 
@@ -128,16 +154,24 @@ export function useHatchUpApp() {
       );
       const dailyAward = { date: health.date, health, xp };
       const activeEggs = addStepsToEggs(data.activeEggs, newSteps);
-      const next = {
+      const previousTotalXp = data.totalXp;
+      const synced = {
         ...data,
         ...streak,
         activeEgg: activeEggs[0],
         activeEggs,
         activityHistory: upsertDailyAward(data.activityHistory, dailyAward),
-        totalXp: data.totalXp + newXp,
+        totalXp: previousTotalXp + newXp,
         lastSyncedDate: new Date().toISOString(),
         dailyAward,
       };
+      const trained = addXpToActiveHatchling(synced, newXp);
+      const withMilestoneEggs = grantMilestoneEggs(
+        trained,
+        previousTotalXp,
+        previousTotalXp + newXp,
+      );
+      const next = grantEventEggs(withMilestoneEggs, health.date);
 
       await persist(next);
       void syncLeaderboard(next);
@@ -257,6 +291,32 @@ export function useHatchUpApp() {
     });
   }
 
+  async function setActiveHatchling(hatchlingId: string) {
+    if (!data.collection.some((hatchling) => hatchling.id === hatchlingId)) {
+      return;
+    }
+
+    const next = bondWithHatchling(
+      {
+        ...data,
+        activeHatchlingId: hatchlingId,
+      },
+      hatchlingId,
+      1,
+    );
+
+    await persist(next);
+  }
+
+  async function renameCollectedHatchling(hatchlingId: string, name: string) {
+    await persist(renameHatchling(data, hatchlingId, name));
+  }
+
+  async function bondWithActiveHatchling() {
+    if (!data.activeHatchlingId) return;
+    await persist(bondWithHatchling(data, data.activeHatchlingId, 3));
+  }
+
   async function syncLeaderboard(nextData: HatchUpData) {
     try {
       const result = await syncLeaderboardEntry(nextData, toDateKey(new Date()));
@@ -346,13 +406,17 @@ export function useHatchUpApp() {
     ready,
     connectHealth,
     dismissLatestHatchling: () => setLatestHatchling(null),
+    bondWithActiveHatchling,
     hatchAllReadyEggs,
     hatchEgg,
     resetApp,
     readyTestEgg,
     reportCrash,
+    saveMonsterSetup,
     saveMonsterName,
     saveLeaderboardAlias,
+    renameCollectedHatchling,
+    setActiveHatchling,
     setAnalyticsEnabled,
     setCloudSyncEnabled,
     setCrashReportingEnabled,

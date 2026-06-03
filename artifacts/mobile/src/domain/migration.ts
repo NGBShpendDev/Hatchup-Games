@@ -6,12 +6,13 @@ import {
   type IncubatorEgg,
 } from "./models";
 import { createEgg, MAX_ACTIVE_EGGS } from "./hatchery";
+import { normalizeHatchling } from "./hatchlings";
 import {
   ACTIVE_PROGRESSION_PROFILE,
   getEggStepsRequired,
 } from "./progressionConfig";
 
-export const DATA_SCHEMA_VERSION = 4;
+export const DATA_SCHEMA_VERSION = 5;
 
 function normalizeXp(xp: Partial<DailyXp> | undefined): DailyXp {
   return {
@@ -87,15 +88,22 @@ export function migrateHatchUpData(
     lastCloudSyncedAt: stored.lastCloudSyncedAt ?? null,
     privacyConsentVersion:
       stored.privacyConsentVersion ?? initialHatchUpData.privacyConsentVersion,
+    starterEggElement: stored.starterEggElement ?? null,
     weeklyGoalSteps: stored.weeklyGoalSteps ?? initialHatchUpData.weeklyGoalSteps,
     leaderboardAlias: stored.leaderboardAlias ?? "",
     leaderboardId: stored.leaderboardId ?? createLeaderboardId(),
     leaderboardShareEnabled: stored.leaderboardShareEnabled ?? false,
     activeEgg: activeEggs[0],
     activeEggs,
+    activeHatchlingId:
+      stored.activeHatchlingId ?? stored.collection?.[0]?.id ?? null,
     dailyAward: stored.dailyAward ? normalizeAward(stored.dailyAward) : null,
     activityHistory: (stored.activityHistory ?? []).map(normalizeAward),
-    collection: stored.collection ?? [],
+    collection: (stored.collection ?? []).map((hatchling, index) =>
+      normalizeHatchling(hatchling, index + 1),
+    ),
+    eventEggsAwarded: stored.eventEggsAwarded ?? [],
+    milestoneEggsAwarded: stored.milestoneEggsAwarded ?? [],
   };
 }
 

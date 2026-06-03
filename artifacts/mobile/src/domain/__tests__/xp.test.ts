@@ -17,9 +17,9 @@ describe("calculateDailyXp", () => {
       steps: 42,
       activeCalories: 26,
       workouts: 30,
-      quests: 60,
+      quests: 100,
       firstSync: 15,
-      total: 173,
+      total: 213,
     });
   });
 
@@ -39,7 +39,7 @@ describe("calculateDailyXp", () => {
       steps: 80,
       activeCalories: 40,
       workouts: 60,
-      quests: 60,
+      quests: 100,
       firstSync: 15,
       total: 240,
     });
@@ -52,26 +52,26 @@ describe("calculateDailyXp", () => {
           steps: 42,
           activeCalories: 26,
           workouts: 30,
-          quests: 60,
+          quests: 100,
           firstSync: 15,
-          total: 173,
+          total: 213,
         },
         {
           steps: 35,
           activeCalories: 20,
           workouts: 30,
-          quests: 60,
+          quests: 100,
           firstSync: 0,
-          total: 145,
+          total: 185,
         },
       ),
     ).toEqual({
       steps: 42,
       activeCalories: 26,
       workouts: 30,
-      quests: 60,
+      quests: 100,
       firstSync: 15,
-      total: 173,
+      total: 213,
     });
   });
 
@@ -90,18 +90,18 @@ describe("calculateDailyXp", () => {
           steps: 42,
           activeCalories: 26,
           workouts: 30,
-          quests: 60,
+          quests: 100,
           firstSync: 15,
-          total: 173,
+          total: 213,
         },
       ),
     ).toEqual({
       steps: 12,
       activeCalories: 6,
       workouts: 0,
-      quests: 20,
+      quests: 60,
       firstSync: 0,
-      total: 38,
+      total: 78,
     });
   });
 });
