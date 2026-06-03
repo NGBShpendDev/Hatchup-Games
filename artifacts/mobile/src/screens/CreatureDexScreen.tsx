@@ -5,6 +5,7 @@ import { BottomNav } from "../components/BottomNav";
 import { HatchlingAvatar } from "../components/HatchlingAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
+import { SparkleBurst } from "../components/SparkleBurst";
 import {
   getCreatureDexEntries,
   getDexCompletion,
@@ -79,20 +80,25 @@ export function CreatureDexScreen({
         />
       }
     >
-      <Text style={styles.kicker}>HATCHLINGS</Text>
-      <Text style={styles.title}>Train a whole team of companions.</Text>
+      <Text style={styles.kicker}>COLLECTION</Text>
+      <Text style={styles.title}>Care for your team of Pals.</Text>
       <Text style={styles.body}>
-        Each hatchling has its own level, XP, bond, and stats. Bond grows over
-        time with your active companion; training is limited to three sessions a
+        Each Pal has its own level, XP, bond, and stats. Bond grows over
+        time with your active Pal; training is limited to three sessions a
         day.
       </Text>
       {selectedHatchling ? (
         <View style={styles.detailCard}>
           <Text style={styles.detailKicker}>
             {selectedHatchling.id === data.activeHatchlingId
-              ? "ACTIVE HATCHLING"
-              : "COLLECTED HATCHLING"}
+              ? "ACTIVE PAL"
+              : "COLLECTED PAL"}
           </Text>
+          {selectedHatchling.id === data.activeHatchlingId && (
+            <View style={styles.detailSparkles}>
+              <SparkleBurst label="ACTIVE" tone="accent" />
+            </View>
+          )}
           <HatchlingAvatar
             element={selectedHatchling.element}
             rarity={selectedHatchling.rarity}
@@ -109,7 +115,7 @@ export function CreatureDexScreen({
           <ProgressBar progress={selectedHatchling.bond / 100} />
           <ProgressBar progress={getHatchlingXpProgress(selectedHatchling.xp)} />
           <Text style={styles.detailCaption}>
-            {selectedHatchling.xp} companion XP | Power{" "}
+            {selectedHatchling.xp} Pal XP | Power{" "}
             {getHatchlingPowerScore(selectedHatchling)}
           </Text>
           <View style={styles.renameCard}>
@@ -142,7 +148,7 @@ export function CreatureDexScreen({
             <Text style={styles.trainingText}>
               {selectedHatchling.id === data.activeHatchlingId
                 ? trainingStatus?.cooldownLabel
-                : "Make this hatchling active before training."}
+                : "Make this Pal active before training."}
             </Text>
             <Text style={styles.trainingHint}>
               +{TRAINING_XP} XP per session. Passive bond grows every{" "}
@@ -155,7 +161,7 @@ export function CreatureDexScreen({
               }
               label={
                 selectedHatchling.id !== data.activeHatchlingId
-                  ? "Set active to train"
+                  ? "Set active Pal"
                   : trainingStatus?.canTrain
                     ? "Train now"
                     : "Training cooling down"
@@ -209,7 +215,7 @@ export function CreatureDexScreen({
             label={
               selectedHatchling.id === data.activeHatchlingId
                 ? "Training now"
-                : "Train this hatchling"
+                : "Train this Pal"
             }
             onPress={() => onSetActiveHatchling(selectedHatchling.id)}
             style={
@@ -221,17 +227,18 @@ export function CreatureDexScreen({
         </View>
       ) : (
         <View style={styles.emptyDetailCard}>
-          <Text style={styles.promptTitle}>No hatchlings yet</Text>
+          <Text style={styles.promptTitle}>No Pals yet</Text>
           <Text style={styles.promptText}>
-            Hatch your starter egg to unlock individual companion pages, stats,
+            Hatch your starter Egg to unlock individual Pal pages, stats,
             and training.
           </Text>
+          <Text style={styles.promptMission}>Mission: hatch your first Pal.</Text>
           <AppButton label="Go to Hatchery" onPress={onMonsterPress} />
         </View>
       )}
       <View style={styles.progressCard}>
         <View style={styles.progressHeader}>
-          <Text style={styles.progressTitle}>Dex completion</Text>
+          <Text style={styles.progressTitle}>Collection progress</Text>
           <Text style={styles.progressMeta}>
             {completion.unlocked}/{completion.total}
           </Text>
@@ -246,7 +253,7 @@ export function CreatureDexScreen({
       <View style={styles.promptCard}>
         <Text style={styles.promptTitle}>Collection loop</Text>
         <Text style={styles.promptText}>
-          Use the Hatchery for active eggs. Use Hatchlings to pick who trains
+          Use the Hatchery for active Eggs. Use Collection to pick who trains
           next and to track every element and rarity still missing.
         </Text>
         <AppButton label="Keep hatching" onPress={onMonsterPress} />
@@ -281,13 +288,14 @@ function DexCard({ entry }: { entry: CreatureDexEntry }) {
         {capitalize(entry.rarity)} | {capitalize(entry.element)}
       </Text>
       <Text style={styles.cardDescription}>
-        {unlocked ? entry.description : `Hatch a ${entry.rarity} ${entry.element} egg.`}
+        {unlocked ? entry.description : `Hatch a ${entry.rarity} ${entry.element} Egg.`}
       </Text>
       <View style={styles.cardFooter}>
         <Text style={[styles.status, unlocked && styles.unlockedStatus]}>
           {unlocked ? "Unlocked" : "Locked"}
         </Text>
         {unlocked && <Text style={styles.count}>x{entry.ownedCount}</Text>}
+        {unlocked && <SparkleBurst />}
       </View>
     </View>
   );
@@ -330,6 +338,10 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 20,
     padding: 16,
+  },
+  detailSparkles: {
+    alignItems: "center",
+    marginBottom: 4,
   },
   emptyDetailCard: {
     backgroundColor: colors.accentSoft,
@@ -561,5 +573,11 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginBottom: 14,
     marginTop: 6,
+  },
+  promptMission: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "900",
+    marginBottom: 12,
   },
 });

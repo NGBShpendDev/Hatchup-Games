@@ -5,7 +5,7 @@ import { Screen } from "../components/Screen";
 import { colors } from "../theme";
 
 const privacyCopy =
-  "HatchUp reads your steps, distance, workouts, and active energy only to reward your monster with XP and show optional rankings. We do not sell your health data or use it for ads.";
+  "HatchUp reads your steps, distance, workouts, and active energy only to reward your Pal with XP and show optional rankings. We do not sell your health data or use it for ads.";
 
 interface Props {
   error: string | null;
@@ -23,9 +23,9 @@ export function ConnectHealthScreen({
   return (
     <Screen>
       <Header onBack={onBack} title="Connect health" />
-      <Text style={styles.title}>Turn movement into monster XP.</Text>
+      <Text style={styles.title}>Turn movement into Pal progress.</Text>
       <Text style={styles.body}>
-        Connect your health source so HatchUp can calculate your daily reward.
+        Connect your health source so HatchUp can calculate your daily rewards.
       </Text>
       <View style={styles.sourceCard}>
         <View style={styles.sourceMark}>

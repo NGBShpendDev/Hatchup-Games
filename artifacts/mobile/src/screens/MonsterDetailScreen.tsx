@@ -72,7 +72,7 @@ export function MonsterDetailScreen({
           onDexPress();
         }}
       />
-      <Text style={styles.sectionTitle}>Active companion</Text>
+      <Text style={styles.sectionTitle}>Journey Pal</Text>
       <View style={styles.card}>
         <MonsterAvatar stage={progression.current.id} />
         <Text style={styles.name}>{data.monsterName}</Text>
@@ -80,11 +80,11 @@ export function MonsterDetailScreen({
         <ProgressBar progress={progression.progress} />
         <Text style={styles.caption}>
           {progression.next
-            ? `${progression.xpToNext} XP to evolve into ${progression.next.label}`
-            : "Your monster has reached its final evolution."}
+            ? `${progression.xpToNext} journey XP to reach ${progression.next.label}`
+            : "Your Pal journey has reached its final stage."}
         </Text>
       </View>
-      <Text style={styles.sectionTitle}>Evolution path</Text>
+      <Text style={styles.sectionTitle}>Journey stages</Text>
       {MONSTER_STAGES.map((stage) => {
         const unlocked = data.totalXp >= stage.xp;
         return (
@@ -92,7 +92,7 @@ export function MonsterDetailScreen({
             <View style={[styles.dot, unlocked && styles.unlockedDot]} />
             <View style={styles.stageText}>
               <Text style={styles.rowTitle}>{stage.label}</Text>
-              <Text style={styles.rowCaption}>{stage.xp} total XP</Text>
+              <Text style={styles.rowCaption}>{stage.xp} journey XP</Text>
             </View>
             <Text style={[styles.status, unlocked && styles.unlocked]}>
               {unlocked ? "Unlocked" : "Locked"}
@@ -101,12 +101,12 @@ export function MonsterDetailScreen({
         );
       })}
       <View style={styles.stats}>
-        <Stat label="Total XP" value={String(data.totalXp)} />
-        <Stat label="Active eggs" value={`${data.activeEggs.length}/3`} />
-        <Stat label="Queued eggs" value={String(data.pendingEggs.length)} />
+        <Stat label="Journey XP" value={String(data.totalXp)} />
+        <Stat label="Active Eggs" value={`${data.activeEggs.length}/3`} />
+        <Stat label="Queued Eggs" value={String(data.pendingEggs.length)} />
       </View>
       <View style={styles.collectionHeader}>
-        <Text style={styles.sectionTitle}>Training hatchling</Text>
+        <Text style={styles.sectionTitle}>Active Pal</Text>
         <Text style={styles.collectionCount}>
           {activeHatchling ? `Level ${activeHatchling.level}` : "None active"}
         </Text>
@@ -127,7 +127,7 @@ export function MonsterDetailScreen({
             </Text>
           </View>
           <AppButton
-            label="Hatchlings"
+            label="Collection"
             onPress={onDexPress}
             style={styles.trainingButton}
             variant="secondary"
@@ -135,26 +135,26 @@ export function MonsterDetailScreen({
         </View>
       ) : (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>No active hatchling yet.</Text>
+          <Text style={styles.emptyTitle}>No active Pal yet.</Text>
           <Text style={styles.emptyText}>
-            Hatch an egg to unlock companion training.
+            Hatch an Egg to unlock Pal training.
           </Text>
         </View>
       )}
       <View style={styles.collectionHeader}>
-        <Text style={styles.sectionTitle}>Incubator</Text>
+        <Text style={styles.sectionTitle}>Eggs in Hatchery</Text>
         <Text style={styles.collectionCount}>
           {readyEggCount} ready
         </Text>
       </View>
       <Text style={styles.incubatorIntro}>
-        Up to three eggs progress together from every health sync. Each new egg
-        rolls a random element and weighted rarity. Bonus eggs wait here when
-        your incubator is full.
+        Up to three Eggs progress together from every health sync. Each new Egg
+        rolls a random element and weighted rarity. Bonus Eggs wait here when
+        your Hatchery is full.
       </Text>
       {readyEggCount > 1 && (
         <AppButton
-          label={`Hatch all ${readyEggCount} ready eggs`}
+          label={`Hatch all ${readyEggCount} ready Eggs`}
           onPress={onHatchAll}
           style={styles.hatchAllButton}
         />
@@ -167,17 +167,17 @@ export function MonsterDetailScreen({
               <EggAvatar element={egg.element} rarity={egg.rarity} />
               <Text style={styles.eggName}>
                 Slot {index + 1}: {capitalize(egg.rarity)}{" "}
-                {capitalize(egg.element)} egg
+                {capitalize(egg.element)} Egg
               </Text>
               <Text style={styles.eggCaption}>
                 {eggReady
-                  ? "Your movement filled this egg. It is ready to hatch."
+                  ? "Your movement filled this Egg. It is ready to hatch."
                   : `${egg.stepsWalked.toLocaleString()} / ${egg.stepsRequired.toLocaleString()} steps walked`}
               </Text>
               <ProgressBar progress={getEggProgress(egg)} />
               <AppButton
                 disabled={!eggReady}
-                label={eggReady ? "Hatch this egg" : "Keep moving to hatch"}
+                label={eggReady ? "Hatch this Egg" : "Keep moving to hatch"}
                 onPress={() => onHatch(egg.id)}
                 style={!eggReady ? styles.disabledButton : undefined}
                 variant={eggReady ? "primary" : "secondary"}
@@ -187,14 +187,14 @@ export function MonsterDetailScreen({
         })}
       </View>
       <View style={styles.collectionHeader}>
-        <Text style={styles.sectionTitle}>Your hatchlings</Text>
+        <Text style={styles.sectionTitle}>Your Pals</Text>
         <Text style={styles.collectionCount}>{data.collection.length} collected</Text>
       </View>
       {data.collection.length === 0 ? (
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>Your collection starts with movement.</Text>
           <Text style={styles.emptyText}>
-            Hatch your first incubator egg to meet a new pocket companion.
+            Hatch your first Egg to meet a new Pal.
           </Text>
         </View>
       ) : (
@@ -313,7 +313,7 @@ function HatchRevealModal({
           </Text>
           <Text style={styles.revealStageText}>
             {stage === "shake"
-              ? "The egg is moving..."
+              ? "The Egg is moving..."
               : stage === "crack"
                 ? "Cracks of light appear."
                 : "A new Pal has arrived."}

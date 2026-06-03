@@ -3,9 +3,11 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
 import { EggAvatar } from "../components/EggAvatar";
+import { HatchlingAvatar } from "../components/HatchlingAvatar";
 import { MonsterAvatar } from "../components/MonsterAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
+import { SparkleBurst } from "../components/SparkleBurst";
 import { toDateKey } from "../domain/date";
 import { getEggProgress, isEggReady } from "../domain/hatchery";
 import {
@@ -33,7 +35,12 @@ import {
   type Quest as QuestModel,
   type QuestCadence,
 } from "../domain/quests";
-import { getRetentionPlan } from "../domain/retention";
+import {
+  getCurrentFirstWeekMission,
+  getRetentionPlan,
+  type FirstWeekMission,
+  type FirstWeekTarget,
+} from "../domain/retention";
 import { colors } from "../theme";
 import type { LatestSyncGains } from "../useHatchUpApp";
 
@@ -88,6 +95,7 @@ export function HomeScreen({
   const completedQuestCount = quests.filter(isQuestComplete).length;
   const todayDistanceMiles = getTodayDistanceMiles(today);
   const retention = getRetentionPlan(data, todayKey);
+  const firstWeekMission = getCurrentFirstWeekMission(data, todayKey);
   const activeHatchlingRaw = getActiveHatchling(data);
   const activeHatchling = activeHatchlingRaw
     ? getTimeAdjustedHatchling(activeHatchlingRaw)
@@ -119,6 +127,13 @@ export function HomeScreen({
     trainingStatus,
     today,
   });
+  const handleMissionPress = getMissionAction({
+    onDexPress,
+    onLeaderboardPress,
+    onMonsterPress,
+    onSettingsPress,
+    onSync,
+  });
 
   return (
     <Screen
@@ -135,32 +150,72 @@ export function HomeScreen({
     >
       <View style={styles.header}>
         <View>
-          <Text style={styles.kicker}>TODAY WITH</Text>
-          <Text style={styles.title}>{data.monsterName}</Text>
+          <Text style={styles.kicker}>TODAY'S JOURNEY</Text>
+          <Text style={styles.title}>
+            {activeHatchling ? activeHatchling.name : data.monsterName}
+          </Text>
         </View>
         <View style={styles.streak}>
+          {data.currentStreak > 0 && <SparkleBurst tone="accent" />}
           <Text style={styles.streakNumber}>{data.currentStreak}</Text>
           <Text style={styles.streakLabel}>day streak</Text>
         </View>
       </View>
       <View style={styles.heroCard}>
-        <MonsterAvatar stage={progression.current.id} />
-        <Text style={styles.stage}>{progression.current.label} stage</Text>
-        <Text style={styles.xp}>{data.totalXp} total XP</Text>
+        {activeHatchling ? (
+          <HatchlingAvatar
+            element={activeHatchling.element}
+            rarity={activeHatchling.rarity}
+          />
+        ) : (
+          <MonsterAvatar stage={progression.current.id} />
+        )}
+        <Text style={styles.stage}>
+          {activeHatchling
+            ? `Active Pal | ${capitalize(activeHatchling.rarity)} ${capitalize(activeHatchling.element)}`
+            : `${progression.current.label} starter Pal`}
+        </Text>
+        <Text style={styles.xp}>
+          {activeHatchling
+            ? `Level ${activeHatchling.level} | Bond ${activeHatchling.bond}/100`
+            : `${data.totalXp} journey XP`}
+        </Text>
+        {(latestEvolution || latestSyncGains.xp.total > 0 || latestSyncGains.palXp > 0) && (
+          <View style={styles.heroSparkles}>
+            <SparkleBurst
+              label={latestEvolution ? "LEVEL UP" : "XP GAIN"}
+              tone="accent"
+            />
+          </View>
+        )}
         <ProgressBar progress={progression.progress} />
         <Text style={styles.next}>
           {progression.next
-            ? `${progression.xpToNext} XP until ${progression.next.label}`
-            : "Final evolution reached"}
+            ? `${progression.xpToNext} journey XP until ${progression.next.label}`
+            : "Final journey stage reached"}
         </Text>
       </View>
       <TodayLoopCard
         activeHatchling={activeHatchling}
+        completedQuestCount={completedQuestCount}
         dailyStepGoal={ACTIVE_PROGRESSION_PROFILE.questTargets.steps}
         focusEgg={focusEgg}
         nextAction={nextAction}
+        questCount={quests.length}
+        readyEggCount={readyEggCount}
+        rewardAvailable={showRewardFeedback}
         today={today}
+        trainingStatus={trainingStatus}
       />
+      {!showRewardFeedback && !today && (
+        <EmptyMissionCard
+          actionLabel={isSyncing ? "Syncing..." : "Collect rewards"}
+          body="No rewards have been collected today. Sync movement to create the next recap."
+          disabled={isSyncing}
+          onPress={onSync}
+          title="No rewards yet"
+        />
+      )}
       {showRewardFeedback && (
         <RewardFeedbackBanner
           gains={latestSyncGains}
@@ -168,26 +223,6 @@ export function HomeScreen({
           onDismiss={() => setRewardDismissed(true)}
         />
       )}
-      <View style={styles.trainingStatusCard}>
-        <View>
-          <Text style={styles.trainingKicker}>ACTIVE HATCHLING</Text>
-          <Text style={styles.trainingTitle}>
-            {activeHatchling
-              ? `${activeHatchling.name} | ${capitalize(activeHatchling.mood)}`
-              : "Hatch a companion to train"}
-          </Text>
-          <Text style={styles.trainingText}>
-            {activeHatchling
-              ? `Bond ${activeHatchling.bond}/100. ${trainingStatus?.cooldownLabel}`
-              : "Your first hatchling unlocks timed training and passive bond."}
-          </Text>
-        </View>
-        <AppButton
-          label={activeHatchling ? "Manage" : "Hatchery"}
-          onPress={activeHatchling ? onDexPress : onMonsterPress}
-          variant="secondary"
-        />
-      </View>
       <View style={styles.goalCard}>
         <View style={styles.goalHeader}>
           <Text style={styles.goalTitle}>{retention.label}</Text>
@@ -199,6 +234,10 @@ export function HomeScreen({
         <ProgressBar progress={retention.progress} />
         <Text style={styles.goalText}>{retention.message}</Text>
       </View>
+      <FirstWeekArcCard
+        mission={firstWeekMission}
+        onPress={handleMissionPress(firstWeekMission.target)}
+      />
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Today's movement</Text>
         <Text style={styles.sectionMeta}>
@@ -210,6 +249,7 @@ export function HomeScreen({
           label="Steps"
           value={today?.health.steps.toLocaleString() ?? "0"}
           xp={today?.xp.steps ?? 0}
+          animate={Boolean(today?.xp.steps)}
         />
         <Metric
           label="Distance"
@@ -219,11 +259,13 @@ export function HomeScreen({
           label="Energy"
           value={today?.health.activeCalories.toLocaleString() ?? "0"}
           xp={today?.xp.activeCalories ?? 0}
+          animate={Boolean(today?.xp.activeCalories)}
         />
         <Metric
           label="Workouts"
           value={String(today?.health.workouts ?? 0)}
           xp={today?.xp.workouts ?? 0}
+          animate={Boolean(today?.xp.workouts)}
         />
       </View>
       <AppButton
@@ -258,7 +300,7 @@ export function HomeScreen({
         </View>
       </View>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Incubator</Text>
+        <Text style={styles.sectionTitle}>Eggs in Hatchery</Text>
         <Text style={styles.sectionMeta}>
           {readyEggCount}/{data.activeEggs.length} ready
           {data.pendingEggs.length > 0
@@ -323,26 +365,46 @@ export function HomeScreen({
 
 function TodayLoopCard({
   activeHatchling,
+  completedQuestCount,
   dailyStepGoal,
   focusEgg,
   nextAction,
+  questCount,
+  readyEggCount,
+  rewardAvailable,
   today,
+  trainingStatus,
 }: {
   activeHatchling: CollectedHatchling | null;
+  completedQuestCount: number;
   dailyStepGoal: number;
   focusEgg: HatchUpData["activeEgg"] | undefined;
   nextAction: ReturnType<typeof getNextAction>;
+  questCount: number;
+  readyEggCount: number;
+  rewardAvailable: boolean;
   today: DailyAward | null;
+  trainingStatus: ReturnType<typeof getTrainingStatus> | null;
 }) {
   const steps = today?.health.steps ?? 0;
   const stepProgress = Math.min(steps / dailyStepGoal, 1);
   const palXpProgress = activeHatchling
     ? getHatchlingXpProgress(activeHatchling.xp)
     : 0;
+  const journeySteps = getDailyJourneySteps({
+    activeHatchling,
+    completedQuestCount,
+    focusEgg,
+    questCount,
+    readyEggCount,
+    rewardAvailable,
+    today,
+    trainingStatus,
+  });
 
   return (
     <View style={styles.todayLoopCard}>
-      <Text style={styles.actionKicker}>TODAY LOOP</Text>
+      <Text style={styles.actionKicker}>DAILY JOURNEY</Text>
       <Text style={styles.actionTitle}>{nextAction.title}</Text>
       <Text style={styles.actionText}>{nextAction.body}</Text>
       <AppButton
@@ -352,10 +414,21 @@ function TodayLoopCard({
         style={nextAction.disabled ? styles.disabledAction : undefined}
         variant={nextAction.variant}
       />
+      <View style={styles.journeyList}>
+        {journeySteps.map((step, index) => (
+          <JourneyStep
+            body={step.body}
+            index={index}
+            key={step.label}
+            label={step.label}
+            state={step.state}
+          />
+        ))}
+      </View>
       <View style={styles.todayProgressHeader}>
         <View>
           <Text style={styles.todayProgressKicker}>TODAY PROGRESS</Text>
-          <Text style={styles.todayProgressTitle}>Health sync rewards</Text>
+          <Text style={styles.todayProgressTitle}>Movement to rewards</Text>
         </View>
         <Text style={styles.todayProgressMeta}>
           {today ? "Synced today" : "Waiting for sync"}
@@ -367,12 +440,12 @@ function TodayLoopCard({
         value={`${steps.toLocaleString()} / ${dailyStepGoal.toLocaleString()}`}
       />
       <ProgressRow
-        label="Active egg"
+        label="Active Egg"
         progress={focusEgg ? getEggProgress(focusEgg) : 0}
         value={
           focusEgg
             ? `${focusEgg.stepsWalked.toLocaleString()} / ${focusEgg.stepsRequired.toLocaleString()}`
-            : "No egg incubating"
+            : "No Egg incubating"
         }
       />
       <ProgressRow
@@ -392,6 +465,105 @@ function TodayLoopCard({
   );
 }
 
+function JourneyStep({
+  body,
+  index,
+  label,
+  state,
+}: {
+  body: string;
+  index: number;
+  label: string;
+  state: "active" | "done" | "pending";
+}) {
+  return (
+    <View style={styles.journeyStep}>
+      <View
+        style={[
+          styles.journeyStepMark,
+          state === "done" && styles.journeyStepDone,
+          state === "active" && styles.journeyStepActive,
+        ]}
+      >
+        <Text
+          style={[
+            styles.journeyStepNumber,
+            state !== "pending" && styles.journeyStepNumberActive,
+          ]}
+        >
+          {state === "done" ? "OK" : index + 1}
+        </Text>
+      </View>
+      <View style={styles.journeyStepText}>
+        <Text style={styles.journeyStepLabel}>{label}</Text>
+        <Text style={styles.journeyStepBody}>{body}</Text>
+      </View>
+    </View>
+  );
+}
+
+function getDailyJourneySteps({
+  activeHatchling,
+  completedQuestCount,
+  focusEgg,
+  questCount,
+  readyEggCount,
+  rewardAvailable,
+  today,
+  trainingStatus,
+}: {
+  activeHatchling: CollectedHatchling | null;
+  completedQuestCount: number;
+  focusEgg: HatchUpData["activeEgg"] | undefined;
+  questCount: number;
+  readyEggCount: number;
+  rewardAvailable: boolean;
+  today: DailyAward | null;
+  trainingStatus: ReturnType<typeof getTrainingStatus> | null;
+}): { body: string; label: string; state: "active" | "done" | "pending" }[] {
+  const synced = Boolean(today);
+  const questsComplete = questCount > 0 && completedQuestCount === questCount;
+  const trainReady = Boolean(activeHatchling && trainingStatus?.canTrain);
+
+  return [
+    {
+      body: synced
+        ? `${today?.health.steps.toLocaleString()} steps counted today.`
+        : "Sync Health to turn today's movement into rewards.",
+      label: "Sync movement",
+      state: synced ? "done" : "active",
+    },
+    {
+      body: rewardAvailable
+        ? "Review what changed from your latest sync."
+        : synced
+          ? "Rewards are recorded for today."
+          : "Rewards appear after your first sync.",
+      label: "Open rewards",
+      state: rewardAvailable ? "active" : synced ? "done" : "pending",
+    },
+    {
+      body:
+        readyEggCount > 0
+          ? `${readyEggCount} Egg${readyEggCount === 1 ? "" : "s"} ready in the Hatchery.`
+          : trainReady
+            ? `${activeHatchling?.name} has a training session ready.`
+            : focusEgg
+              ? `${focusEgg.stepsWalked.toLocaleString()} / ${focusEgg.stepsRequired.toLocaleString()} steps toward the next Egg.`
+              : "Hatch an Egg to meet your first Pal.",
+      label: "Hatch or train",
+      state: readyEggCount > 0 || trainReady ? "active" : synced ? "done" : "pending",
+    },
+    {
+      body: questsComplete
+        ? "Daily quests are complete."
+        : `${Math.max(questCount - completedQuestCount, 0)} quest${questCount - completedQuestCount === 1 ? "" : "s"} left today.`,
+      label: "Finish quests",
+      state: questsComplete ? "done" : synced ? "active" : "pending",
+    },
+  ];
+}
+
 function ProgressRow({
   label,
   progress,
@@ -404,7 +576,10 @@ function ProgressRow({
   return (
     <View style={styles.progressRow}>
       <View style={styles.progressRowHeader}>
-        <Text style={styles.progressRowLabel}>{label}</Text>
+        <View style={styles.progressRowTitle}>
+          <Text style={styles.progressRowLabel}>{label}</Text>
+          {progress > 0 && <SparkleBurst />}
+        </View>
         <Text style={styles.progressRowValue}>{value}</Text>
       </View>
       <ProgressBar progress={progress} />
@@ -427,8 +602,8 @@ function RewardFeedbackBanner({
     <View style={styles.rewardBanner}>
       <View style={styles.rewardBannerHeader}>
         <View>
-          <Text style={styles.rewardKicker}>SYNC REWARDS</Text>
-          <Text style={styles.rewardTitle}>Your movement paid off</Text>
+          <Text style={styles.rewardKicker}>WHAT CHANGED</Text>
+          <Text style={styles.rewardTitle}>Your movement became progress</Text>
         </View>
         <Pressable onPress={onDismiss} style={styles.rewardDismiss}>
           <Text style={styles.rewardDismissText}>Dismiss</Text>
@@ -442,6 +617,7 @@ function RewardFeedbackBanner({
               <Text style={styles.rewardLabel}>{reward.label}</Text>
               <Text style={styles.rewardValue}>{reward.value}</Text>
             </View>
+            <SparkleBurst tone="accent" />
           </View>
         ))}
       </View>
@@ -452,10 +628,12 @@ function RewardFeedbackBanner({
 }
 
 function Metric({
+  animate,
   label,
   value,
   xp,
 }: {
+  animate?: boolean;
   label: string;
   value: string;
   xp?: number;
@@ -464,7 +642,12 @@ function Metric({
     <View style={styles.metric}>
       <Text style={styles.metricLabel}>{label}</Text>
       <Text style={styles.metricValue}>{value}</Text>
-      {xp !== undefined && <Text style={styles.metricXp}>+{xp} XP</Text>}
+      {xp !== undefined && (
+        <View style={styles.metricXpRow}>
+          <Text style={styles.metricXp}>+{xp} XP</Text>
+          {animate && <SparkleBurst />}
+        </View>
+      )}
     </View>
   );
 }
@@ -529,6 +712,67 @@ function Quest({ quest }: { quest: QuestModel }) {
       >
         {complete ? "Done" : "Active"}
       </Text>
+      {complete && <SparkleBurst />}
+    </View>
+  );
+}
+
+function EmptyMissionCard({
+  actionLabel,
+  body,
+  disabled,
+  onPress,
+  title,
+}: {
+  actionLabel: string;
+  body: string;
+  disabled?: boolean;
+  onPress: () => void;
+  title: string;
+}) {
+  return (
+    <View style={styles.emptyMissionCard}>
+      <View style={styles.emptyMissionText}>
+        <Text style={styles.emptyMissionTitle}>{title}</Text>
+        <Text style={styles.emptyMissionBody}>{body}</Text>
+      </View>
+      <AppButton
+        disabled={disabled}
+        label={actionLabel}
+        onPress={onPress}
+        style={disabled ? styles.disabledAction : undefined}
+        variant="secondary"
+      />
+    </View>
+  );
+}
+
+function FirstWeekArcCard({
+  mission,
+  onPress,
+}: {
+  mission: FirstWeekMission;
+  onPress: () => void;
+}) {
+  return (
+    <View style={styles.arcCard}>
+      <View style={styles.arcHeader}>
+        <View>
+          <Text style={styles.arcKicker}>FIRST WEEK ARC</Text>
+          <Text style={styles.arcTitle}>Day {mission.day}: {mission.label}</Text>
+        </View>
+        {mission.complete ? (
+          <SparkleBurst label="DONE" tone="accent" />
+        ) : (
+          <Text style={styles.arcPill}>Next</Text>
+        )}
+      </View>
+      <Text style={styles.arcBody}>{mission.message}</Text>
+      <AppButton
+        label={mission.complete ? "Review progress" : mission.actionLabel}
+        onPress={onPress}
+        variant={mission.complete ? "secondary" : "primary"}
+      />
     </View>
   );
 }
@@ -547,13 +791,13 @@ function getRewardBreakdown(xp: DailyXp) {
 
 function getRewardNextStep(gains: LatestSyncGains) {
   if (gains.eggSteps > 0) {
-    return "Next: check the Hatchery for eggs that are ready or close.";
+    return "Next: check the Hatchery for Eggs that are ready or close.";
   }
   if (gains.palXp > 0) {
-    return "Next: visit Hatchlings to review your active Pal progress.";
+    return "Next: visit Collection to review your active Pal progress.";
   }
   if (gains.eggsAwarded > 0) {
-    return "Next: bonus eggs are waiting for an incubator slot.";
+    return "Next: bonus Eggs are waiting for a Hatchery slot.";
   }
   return "Next: move a little more and sync again when you are ready.";
 }
@@ -563,7 +807,7 @@ function getRewardRows(gains: LatestSyncGains, latestEvolution: MonsterStage | n
   if (gains.xp.total > 0) {
     rewards.push({
       icon: "XP",
-      label: "Monster XP",
+      label: "Journey XP",
       value: `+${gains.xp.total} XP`,
     });
   }
@@ -584,8 +828,8 @@ function getRewardRows(gains: LatestSyncGains, latestEvolution: MonsterStage | n
   if (gains.eggsAwarded > 0) {
     rewards.push({
       icon: "NEW",
-      label: "Bonus eggs",
-      value: `+${gains.eggsAwarded} egg${gains.eggsAwarded === 1 ? "" : "s"}`,
+      label: "Bonus Eggs",
+      value: `+${gains.eggsAwarded} Egg${gains.eggsAwarded === 1 ? "" : "s"}`,
     });
   }
   if (gains.coins > 0) {
@@ -605,7 +849,7 @@ function getRewardRows(gains: LatestSyncGains, latestEvolution: MonsterStage | n
   if (latestEvolution) {
     rewards.push({
       icon: "EVO",
-      label: "Evolution",
+      label: "Journey stage",
       value: `${capitalize(latestEvolution)} unlocked`,
     });
   }
@@ -663,18 +907,18 @@ function getNextAction({
 }) {
   if (readyEggCount > 0) {
     return {
-      body: "Your movement filled an incubator slot. Hatch it now, then see what rarity rolls next.",
+      body: "Your movement filled an Egg. Open the Hatchery and reveal your next Pal.",
       disabled: false,
-      label: readyEggCount > 1 ? `Hatch ${readyEggCount} eggs` : "Open Hatchery",
+      label: readyEggCount > 1 ? `Hatch ${readyEggCount} Eggs` : "Open Hatchery",
       onPress: onMonsterPress,
-      title: `${readyEggCount} egg${readyEggCount === 1 ? "" : "s"} ready`,
+      title: `${readyEggCount} Egg${readyEggCount === 1 ? "" : "s"} ready`,
       variant: "primary" as const,
     };
   }
 
   if (!today) {
     return {
-      body: "Sync once to collect XP, fill your eggs, and unlock today's quests.",
+      body: "Sync once to collect journey XP, fill your Eggs, and unlock today's quests.",
       disabled: isSyncing,
       label: isSyncing ? "Syncing..." : "Collect movement",
       onPress: onSync,
@@ -685,7 +929,7 @@ function getNextAction({
 
   if (completedQuestCount < questCount) {
     return {
-      body: "Move a little more, then sync again to push your quests and eggs forward.",
+      body: "Move a little more, then sync again to push your quests and Eggs forward.",
       disabled: isSyncing,
       label: isSyncing ? "Syncing..." : "Sync after moving",
       onPress: onSync,
@@ -698,7 +942,7 @@ function getNextAction({
     return {
       body: `${activeHatchling.name} has a training session ready. Training is capped at three sessions per day.`,
       disabled: false,
-      label: "Open Hatchlings",
+      label: "Open Collection",
       onPress: onDexPress,
       title: "Training ready",
       variant: "secondary" as const,
@@ -707,7 +951,7 @@ function getNextAction({
 
   if (!data.leaderboardShareEnabled) {
     return {
-      body: "Optional sharing lets you compare weekly steps, distance, and XP in beta rankings.",
+      body: "Optional sharing lets you compare weekly steps, distance, and journey XP in beta rankings.",
       disabled: false,
       label: "View Rankings",
       onPress: onLeaderboardPress,
@@ -723,6 +967,30 @@ function getNextAction({
     onPress: onLeaderboardPress,
     title: "Daily loop complete",
     variant: "secondary" as const,
+  };
+}
+
+function getMissionAction({
+  onDexPress,
+  onLeaderboardPress,
+  onMonsterPress,
+  onSettingsPress,
+  onSync,
+}: {
+  onDexPress: () => void;
+  onLeaderboardPress: () => void;
+  onMonsterPress: () => void;
+  onSettingsPress: () => void;
+  onSync: () => Promise<void>;
+}) {
+  return (target: FirstWeekTarget) => {
+    if (target === "collection") return onDexPress;
+    if (target === "hatchery") return onMonsterPress;
+    if (target === "leaderboard") return onLeaderboardPress;
+    if (target === "profile") return onSettingsPress;
+    return () => {
+      void onSync();
+    };
   };
 }
 
@@ -769,6 +1037,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     padding: 18,
   },
+  heroSparkles: {
+    alignItems: "center",
+    marginBottom: 8,
+  },
   todayLoopCard: {
     backgroundColor: colors.accentSoft,
     borderRadius: 22,
@@ -782,6 +1054,47 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 22,
     padding: 16,
+  },
+  arcCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 12,
+    marginBottom: 22,
+    padding: 16,
+  },
+  arcHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  arcKicker: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  arcTitle: {
+    color: colors.ink,
+    fontSize: 17,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+  arcPill: {
+    backgroundColor: colors.primarySoft,
+    borderRadius: 999,
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  arcBody: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
   },
   todayProgressHeader: {
     alignItems: "flex-start",
@@ -811,6 +1124,54 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
   },
+  journeyList: {
+    gap: 8,
+    marginTop: 2,
+  },
+  journeyStep: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderRadius: 15,
+    flexDirection: "row",
+    gap: 10,
+    padding: 11,
+  },
+  journeyStepMark: {
+    alignItems: "center",
+    backgroundColor: colors.line,
+    borderRadius: 12,
+    height: 24,
+    justifyContent: "center",
+    width: 24,
+  },
+  journeyStepActive: {
+    backgroundColor: colors.accent,
+  },
+  journeyStepDone: {
+    backgroundColor: colors.primary,
+  },
+  journeyStepNumber: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  journeyStepNumberActive: {
+    color: "#FFFFFF",
+  },
+  journeyStepText: {
+    flex: 1,
+  },
+  journeyStepLabel: {
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  journeyStepBody: {
+    color: colors.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 2,
+  },
   progressRow: {
     gap: 7,
   },
@@ -818,6 +1179,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
+  },
+  progressRowTitle: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
   },
   progressRowLabel: {
     color: colors.ink,
@@ -907,31 +1273,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
     lineHeight: 17,
-  },
-  trainingStatusCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 18,
-    gap: 12,
-    marginBottom: 22,
-    padding: 16,
-  },
-  trainingKicker: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 1,
-  },
-  trainingTitle: {
-    color: colors.ink,
-    fontSize: 17,
-    fontWeight: "900",
-    marginTop: 5,
-  },
-  trainingText: {
-    color: colors.muted,
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 4,
   },
   goalHeader: {
     alignItems: "center",
@@ -1035,6 +1376,37 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     marginTop: 4,
+  },
+  metricXpRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 5,
+    marginTop: 4,
+  },
+  emptyMissionCard: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 18,
+    padding: 14,
+  },
+  emptyMissionText: {
+    flex: 1,
+  },
+  emptyMissionTitle: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  emptyMissionBody: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 3,
   },
   syncNote: {
     color: colors.muted,

@@ -9,23 +9,23 @@ export function WelcomeScreen({ onContinue }: { onContinue: () => void }) {
     <Screen>
       <View style={styles.brand}>
         <Text style={styles.kicker}>HATCHUP GAMES</Text>
-        <Text style={styles.title}>Raise a monster with your daily movement.</Text>
+        <Text style={styles.title}>Raise a Pal with your daily movement.</Text>
         <Text style={styles.body}>
           Your steps, distance, active energy, and workouts turn into XP. Pick
-          your first egg, then train a team of hatchlings as you move.
+          your first Egg, then train a team of Pals as you move.
         </Text>
       </View>
       <MonsterAvatar stage="egg" />
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Move. Hatch. Climb.</Text>
         <Text style={styles.cardBody}>
-          Start with one chosen egg, earn random milestone eggs, collect
-          companions, and optionally compare your weekly movement in beta
+          Start with one chosen Egg, earn random milestone Eggs, collect Pals,
+          and optionally compare your weekly movement in beta
           rankings.
         </Text>
       </View>
       <View style={styles.spacer} />
-      <AppButton label="Start raising my monster" onPress={onContinue} />
+      <AppButton label="Start raising my Pal" onPress={onContinue} />
     </Screen>
   );
 }

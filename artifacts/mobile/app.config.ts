@@ -1,7 +1,7 @@
 import type { ExpoConfig } from "expo/config";
 
 const healthReadDescription =
-  "HatchUp reads your steps, distance, workouts, and active energy only to reward your monster with XP and show optional rankings.";
+  "HatchUp reads your steps, distance, workouts, and active energy only to reward your Pal with XP and show optional rankings.";
 
 const config: ExpoConfig = {
   name: "HatchUp Games",

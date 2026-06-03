@@ -124,10 +124,10 @@ export function getMonthlyQuests(data: HatchUpData, today: string): Quest[] {
       cadence: "monthly",
       current: data.collection.length,
       id: "monthlyCollection",
-      label: "Build your hatchling bench",
+      label: "Build your Pal team",
       rewardXp: 0,
       target: 6,
-      unit: "hatchlings",
+      unit: "Pals",
     },
     {
       cadence: "monthly",

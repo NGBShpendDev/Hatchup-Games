@@ -30,7 +30,7 @@ export function EggAvatar({ element, rarity, size = "large" }: Props) {
     return (
       <View style={[styles.wrap, styles[size]]}>
         <Image
-          accessibilityLabel={`${rarity} ${element} egg art`}
+          accessibilityLabel={`${rarity} ${element} Egg art`}
           resizeMode="contain"
           source={asset}
           style={[styles.image, styles[`${size}Image`]]}

@@ -37,7 +37,7 @@ export function HatchlingAvatar({ element, rarity, size = "large" }: Props) {
     return (
       <View style={[styles.wrap, styles[size]]}>
         <Image
-          accessibilityLabel={`${rarity} ${element} hatchling art`}
+          accessibilityLabel={`${rarity} ${element} Pal art`}
           resizeMode="contain"
           source={asset}
           style={[styles.image, styles[`${size}Image`]]}

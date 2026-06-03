@@ -12,6 +12,7 @@ import { BottomNav } from "../components/BottomNav";
 import { HatchlingAvatar } from "../components/HatchlingAvatar";
 import { Header } from "../components/Header";
 import { Screen } from "../components/Screen";
+import { SparkleBurst } from "../components/SparkleBurst";
 import { getBadges, getUnlockedBadgeCount } from "../domain/badges";
 import { toDateKey } from "../domain/date";
 import {
@@ -26,7 +27,7 @@ import type { ProgressionProfile } from "../domain/progressionConfig";
 import { colors } from "../theme";
 
 const privacyCopy =
-  "HatchUp reads your steps, workouts, and active energy only to reward your monster with XP. We do not sell your health data or use it for ads. Distance is used only for optional beta rankings when you choose to share.";
+  "HatchUp reads your steps, workouts, and active energy only to reward your Pal with XP. We do not sell your health data or use it for ads. Distance is used only for optional beta rankings when you choose to share.";
 
 interface Props {
   data: HatchUpData;
@@ -91,6 +92,7 @@ export function SettingsPrivacyScreen({
   const [taglineDraft, setTaglineDraft] = useState("");
   const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"profile" | "settings">("profile");
+  const [showBetaTools, setShowBetaTools] = useState(false);
   const profileName =
     data.profileUsername ||
     data.leaderboardAlias ||
@@ -216,13 +218,24 @@ export function SettingsPrivacyScreen({
               ))}
             </View>
           ) : (
-            <Text style={styles.privacyText}>
-              Hatch a Pal to unlock profile picture choices.
-            </Text>
+            <View style={styles.emptyMissionCard}>
+              <View style={styles.emptyMissionText}>
+                <Text style={styles.emptyMissionTitle}>No profile pet yet</Text>
+                <Text style={styles.privacyText}>
+                  Hatch a Pal to unlock profile picture choices.
+                </Text>
+              </View>
+              <AppButton
+                label="Open Hatchery"
+                onPress={onMonsterPress}
+                style={styles.emptyMissionButton}
+                variant="secondary"
+              />
+            </View>
           )}
         </View>
         <View style={styles.profileStatsGrid}>
-          <ProfileStat label="Total XP" value={formatCompact(data.totalXp)} />
+          <ProfileStat label="Journey XP" value={formatCompact(data.totalXp)} />
           <ProfileStat
             label="Collection"
             value={`${data.collection.length}`}
@@ -294,6 +307,11 @@ export function SettingsPrivacyScreen({
                 {Math.min(badge.value, badge.target).toLocaleString()} /{" "}
                 {badge.target.toLocaleString()}
               </Text>
+              {badge.unlocked && (
+                <View style={styles.badgeSparkles}>
+                  <SparkleBurst label="BADGE" tone="accent" />
+                </View>
+              )}
             </View>
           ))}
         </View>
@@ -334,6 +352,17 @@ export function SettingsPrivacyScreen({
         />
       </View>
       {testLabEnabled && (
+        <Pressable
+          onLongPress={() => setShowBetaTools((visible) => !visible)}
+          style={styles.betaToolsHandle}
+        >
+          <Text style={styles.betaToolsHandleTitle}>Beta Tools drawer</Text>
+          <Text style={styles.betaToolsHandleText}>
+            Press and hold to {showBetaTools ? "hide" : "reveal"} local test controls.
+          </Text>
+        </Pressable>
+      )}
+      {testLabEnabled && showBetaTools && (
         <View style={styles.testLabCard}>
           <Text style={styles.cardTitle}>Beta Test Lab</Text>
           <Text style={styles.privacyText}>
@@ -362,7 +391,7 @@ export function SettingsPrivacyScreen({
               variant="secondary"
             />
             <AppButton
-              label="Ready all eggs"
+              label="Ready all Eggs"
               onPress={onReadyTestEgg}
               variant="secondary"
             />
@@ -429,7 +458,7 @@ export function SettingsPrivacyScreen({
         onPress={() =>
           Alert.alert(
             "Reset HatchUp?",
-            "This removes your monster name, XP, streaks, hatchlings, and local sync history.",
+            "This removes your Pal name, XP, streaks, Pals, and local sync history.",
             [
               { text: "Cancel", style: "cancel" },
               { text: "Reset", style: "destructive", onPress: onReset },
@@ -799,6 +828,29 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginTop: 8,
   },
+  badgeSparkles: {
+    marginTop: 8,
+  },
+  emptyMissionCard: {
+    alignItems: "center",
+    backgroundColor: colors.primarySoft,
+    borderRadius: 15,
+    flexDirection: "row",
+    gap: 12,
+    padding: 12,
+  },
+  emptyMissionText: {
+    flex: 1,
+  },
+  emptyMissionTitle: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+    marginBottom: 4,
+  },
+  emptyMissionButton: {
+    flexShrink: 0,
+  },
   setting: {
     paddingVertical: 15,
   },
@@ -828,6 +880,26 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginTop: 14,
     padding: 16,
+  },
+  betaToolsHandle: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: 16,
+    borderStyle: "dashed",
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 14,
+  },
+  betaToolsHandleTitle: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  betaToolsHandleText: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 4,
   },
   testLabButtons: {
     gap: 8,

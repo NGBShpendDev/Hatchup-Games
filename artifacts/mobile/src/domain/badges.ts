@@ -18,13 +18,13 @@ export function getBadges(data: HatchUpData, today: string): Badge[] {
   ).length;
 
   return [
-    badge("first-hatch", "First Hatch", "Hatch your first companion.", data.eggsHatched, 1),
-    badge("egg-team", "Tiny Team", "Collect three hatchlings.", data.collection.length, 3),
-    badge("rare-find", "Rare Finder", "Hatch a rare or epic companion.", rareHatchlings, 1),
+    badge("first-hatch", "First Hatch", "Hatch your first Pal.", data.eggsHatched, 1),
+    badge("egg-team", "Tiny Team", "Collect three Pals.", data.collection.length, 3),
+    badge("rare-find", "Rare Finder", "Hatch a rare or epic Pal.", rareHatchlings, 1),
     badge("streak-3", "Three-Day Spark", "Keep a three-day sync streak.", data.longestStreak, 3),
     badge("streak-7", "Weekly Ritual", "Keep a seven-day sync streak.", data.longestStreak, 7),
-    badge("xp-500", "Monster Trainer", "Earn 500 total XP.", data.totalXp, 500),
-    badge("xp-1500", "Final Form", "Reach 1,500 total XP.", data.totalXp, 1500),
+    badge("xp-500", "Pal Trainer", "Earn 500 journey XP.", data.totalXp, 500),
+    badge("xp-1500", "Final Form", "Reach 1,500 journey XP.", data.totalXp, 1500),
     badge("weekly-goal", "Weekly Mover", "Hit your weekly step goal.", weekly.steps, data.weeklyGoalSteps),
   ];
 }

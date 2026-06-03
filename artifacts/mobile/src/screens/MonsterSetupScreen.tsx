@@ -29,14 +29,14 @@ export function MonsterSetupScreen({ initialName, onBack, onContinue }: Props) {
 
   return (
     <Screen>
-      <Header onBack={onBack} title="Meet your egg" />
+      <Header onBack={onBack} title="Choose your Egg" />
       <Text style={styles.title}>Every big evolution starts small.</Text>
       <Text style={styles.body}>
-        Give your new monster a name and choose your first hatchling egg. More
-        random eggs drop as you hit beta milestones.
+        Name your journey and choose your first starter Egg. More random Eggs
+        drop as you hit beta milestones.
       </Text>
       <MonsterAvatar stage="egg" />
-      <Text style={styles.label}>Starter egg</Text>
+      <Text style={styles.label}>Starter Egg</Text>
       <View style={styles.eggGrid}>
         {STARTER_EGGS.map((egg) => {
           const selected = egg.element === starterEggElement;
@@ -53,7 +53,7 @@ export function MonsterSetupScreen({ initialName, onBack, onContinue }: Props) {
           );
         })}
       </View>
-      <Text style={styles.label}>Monster name</Text>
+      <Text style={styles.label}>Journey name</Text>
       <TextInput
         autoCapitalize="words"
         maxLength={24}
@@ -65,7 +65,7 @@ export function MonsterSetupScreen({ initialName, onBack, onContinue }: Props) {
       />
       <AppButton
         disabled={!canContinue}
-        label="Start with this egg"
+        label="Start with this Egg"
         onPress={() => onContinue(name, starterEggElement)}
         style={!canContinue ? styles.disabled : undefined}
       />

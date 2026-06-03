@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
 import { Screen } from "../components/Screen";
+import { SparkleBurst } from "../components/SparkleBurst";
 import {
   getLeaderboardEntries,
   getMetricValue,
@@ -28,7 +29,7 @@ interface Props {
 const metricLabels: Record<LeaderboardMetric, string> = {
   distance: "Distance",
   steps: "Steps",
-  xp: "XP",
+  xp: "Journey XP",
 };
 
 export function LeaderboardScreen({
@@ -74,14 +75,14 @@ export function LeaderboardScreen({
       <Text style={styles.kicker}>BETA RANKINGS</Text>
       <Text style={styles.title}>Move, hatch, climb.</Text>
       <Text style={styles.body}>
-        Compare weekly movement and monster growth. Sharing is optional and local
+        Compare weekly movement and Pal journey growth. Sharing is optional and local
         for this beta until backend accounts are added.
       </Text>
       <Text style={styles.syncLabel}>{leaderboardSyncLabel}</Text>
       <View style={styles.statsGrid}>
         <Stat label="7-day steps" value={userStats.steps.toLocaleString()} />
         <Stat label="Distance" value={`${userStats.distanceMiles.toFixed(1)} mi`} />
-        <Stat label="Total XP" value={String(userStats.totalXp)} />
+        <Stat label="Journey XP" value={String(userStats.totalXp)} />
       </View>
       <View style={styles.shareCard}>
         <View style={styles.shareHeader}>
@@ -133,6 +134,23 @@ export function LeaderboardScreen({
           />
         </View>
       </View>
+      {!data.leaderboardShareEnabled && (
+        <View style={styles.emptyMissionCard}>
+          <View style={styles.emptyMissionText}>
+            <Text style={styles.emptyMissionTitle}>You are private right now</Text>
+            <Text style={styles.emptyMissionBody}>
+              Pick a leaderboard name and opt in when you want your weekly
+              movement to count here.
+            </Text>
+          </View>
+          <AppButton
+            label="Save & share"
+            onPress={handleShareToggle}
+            style={styles.emptyMissionButton}
+            variant="secondary"
+          />
+        </View>
+      )}
       <View style={styles.metricTabs}>
         {(Object.keys(metricLabels) as LeaderboardMetric[]).map((item) => (
           <Pressable
@@ -181,6 +199,7 @@ function RankRow({
         </Text>
       </View>
       <Text style={styles.rankScore}>{formatMetric(entry, metric)}</Text>
+      {entry.isUser && <SparkleBurst />}
     </View>
   );
 }
@@ -255,6 +274,32 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginTop: 16,
     padding: 16,
+  },
+  emptyMissionCard: {
+    alignItems: "center",
+    backgroundColor: colors.accentSoft,
+    borderRadius: 18,
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 16,
+    padding: 14,
+  },
+  emptyMissionText: {
+    flex: 1,
+  },
+  emptyMissionTitle: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  emptyMissionBody: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 3,
+  },
+  emptyMissionButton: {
+    flexShrink: 0,
   },
   shareHeader: {
     alignItems: "center",

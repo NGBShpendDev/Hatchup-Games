@@ -22,7 +22,7 @@ export function MonsterAvatar({ size = "large", stage }: Props) {
     return (
       <View style={[styles.wrap, styles[size]]}>
         <Image
-          accessibilityLabel={`${labels[stage]} monster art`}
+          accessibilityLabel={`${labels[stage]} Pal journey art`}
           resizeMode="contain"
           source={asset}
           style={[styles.image, styles[`${size}Image`]]}

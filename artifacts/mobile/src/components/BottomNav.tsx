@@ -30,7 +30,7 @@ export function BottomNav({
       <NavItem
         active={active === "dex"}
         icon="C"
-        label="Hatchlings"
+        label="Collection"
         onPress={onDexPress}
       />
       <NavItem
