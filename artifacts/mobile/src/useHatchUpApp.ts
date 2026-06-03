@@ -6,6 +6,7 @@ import {
   type DailyAward,
   type HatchUpData,
 } from "./domain/models";
+import { migrateHatchUpData } from "./domain/migration";
 import {
   addStepsToEggs,
   getNewStepsForSync,
@@ -21,8 +22,13 @@ import {
 } from "./domain/progression";
 import { ACTIVE_PROGRESSION_PROFILE } from "./domain/progressionConfig";
 import { calculateDailyXp, getXpGains, mergeDailyXp } from "./domain/xp";
+import { syncCloudSave } from "./services/account/accountService";
 import { healthService } from "./services/health";
 import { syncLeaderboardEntry } from "./services/leaderboard/leaderboardService";
+import {
+  reportCrash as reportObservedCrash,
+  trackEvent,
+} from "./services/observability/observabilityService";
 import {
   clearHatchUpData,
   loadHatchUpData,
@@ -53,6 +59,7 @@ export function useHatchUpApp() {
     useState<CollectedHatchling | null>(null);
   const [leaderboardSyncLabel, setLeaderboardSyncLabel] =
     useState("Local beta rankings");
+  const [cloudSyncLabel, setCloudSyncLabel] = useState("Local-only save");
   const syncInFlight = useRef(false);
 
   useEffect(() => {
@@ -61,9 +68,10 @@ export function useHatchUpApp() {
       .finally(() => setReady(true));
   }, []);
 
-  async function persist(next: HatchUpData) {
+  async function persist(next: HatchUpData, options = { syncCloud: true }) {
     setData(next);
     await saveHatchUpData(next);
+    if (options.syncCloud) void syncCloud(next);
   }
 
   async function saveMonsterName(monsterName: string) {
@@ -133,6 +141,10 @@ export function useHatchUpApp() {
 
       await persist(next);
       void syncLeaderboard(next);
+      void trackEvent(next, "health_sync_succeeded", {
+        eggSteps: newSteps,
+        xp: newXp,
+      });
       setLatestSync(dailyAward);
       setLatestEvolution(
         previousStage.id === nextStage.id ? null : nextStage.id,
@@ -145,6 +157,7 @@ export function useHatchUpApp() {
       setError(
         caught instanceof Error ? caught.message : "Health sync failed.",
       );
+      void trackEvent(data, "health_sync_failed");
     } finally {
       syncInFlight.current = false;
       setIsSyncing(false);
@@ -154,6 +167,10 @@ export function useHatchUpApp() {
   async function hatchEgg(eggId: string) {
     const next = hatchReadyEgg(data, eggId, new Date().toISOString());
     await persist(next);
+    void trackEvent(next, "egg_hatched", {
+      eggId,
+      eggsHatched: next.eggsHatched,
+    });
     if (next !== data) setLatestHatchling(next.collection[0]);
   }
 
@@ -177,7 +194,7 @@ export function useHatchUpApp() {
 
   async function resetApp() {
     await clearHatchUpData();
-    setData(initialHatchUpData);
+    setData(migrateHatchUpData(null));
     setLatestSync(null);
     setLatestEvolution(null);
     setLatestSyncGains({
@@ -193,6 +210,7 @@ export function useHatchUpApp() {
     });
     setLatestHatchling(null);
     setLeaderboardSyncLabel("Local beta rankings");
+    setCloudSyncLabel("Local-only save");
     setError(null);
   }
 
@@ -229,6 +247,7 @@ export function useHatchUpApp() {
 
     await persist(next);
     await syncLeaderboard(next);
+    void trackEvent(next, "leaderboard_sharing_changed", { enabled });
   }
 
   async function saveLeaderboardAlias(alias: string) {
@@ -254,10 +273,68 @@ export function useHatchUpApp() {
     }
   }
 
+  async function setCloudSyncEnabled(enabled: boolean) {
+    const next = {
+      ...data,
+      cloudSyncEnabled: enabled,
+      cloudSyncStatus: enabled ? "pending" : "localOnly",
+    } as HatchUpData;
+
+    await persist(next, { syncCloud: false });
+    await syncCloud(next);
+  }
+
+  async function setAnalyticsEnabled(enabled: boolean) {
+    await persist({
+      ...data,
+      analyticsEnabled: enabled,
+    });
+  }
+
+  async function setCrashReportingEnabled(enabled: boolean) {
+    await persist({
+      ...data,
+      crashReportingEnabled: enabled,
+    });
+  }
+
+  async function syncCloud(nextData: HatchUpData) {
+    try {
+      const result = await syncCloudSave(nextData);
+      const synced = {
+        ...nextData,
+        accountMode: result.accountMode,
+        cloudSyncStatus: result.status,
+        lastCloudSyncedAt: result.syncedAt ?? nextData.lastCloudSyncedAt,
+      };
+
+      setData(synced);
+      await saveHatchUpData(synced);
+      setCloudSyncLabel(
+        result.status === "synced" && result.syncedAt
+          ? `Cloud synced ${new Date(result.syncedAt).toLocaleTimeString([], {
+              hour: "numeric",
+              minute: "2-digit",
+            })}`
+          : result.status === "pending"
+            ? "Cloud sync pending"
+            : "Local-only save",
+      );
+    } catch {
+      setCloudSyncLabel("Cloud sync failed");
+      void trackEvent(nextData, "cloud_sync_failed");
+    }
+  }
+
+  function reportCrash(error: Error) {
+    void reportObservedCrash(error, data);
+  }
+
   return {
     data,
     error,
     healthMode: healthService.modeLabel,
+    cloudSyncLabel,
     leaderboardSyncLabel,
     progressionProfile: ACTIVE_PROGRESSION_PROFILE,
     testLabEnabled: ACTIVE_PROGRESSION_PROFILE.id === "beta",
@@ -273,8 +350,12 @@ export function useHatchUpApp() {
     hatchEgg,
     resetApp,
     readyTestEgg,
+    reportCrash,
     saveMonsterName,
     saveLeaderboardAlias,
+    setAnalyticsEnabled,
+    setCloudSyncEnabled,
+    setCrashReportingEnabled,
     setLeaderboardSharing,
     setTestStage,
     syncHealth,

@@ -99,6 +99,17 @@ Examples:
 - Consistent size across all images
 - Filename uses lowercase snake case
 
+Run the asset audit before a TestFlight build:
+
+```bash
+pnpm --filter @workspace/mobile clean:assets
+pnpm --filter @workspace/mobile audit:assets
+```
+
+The cleaner removes edge-connected white/checker backgrounds and rewrites the
+PNG as RGBA. Any remaining `WARN` result means the PNG has no alpha channel and
+should be regenerated or cleaned before public launch.
+
 ## Troubleshooting
 
 If an API or tool returns `The model 'gpt-image-2' does not exist`, switch the

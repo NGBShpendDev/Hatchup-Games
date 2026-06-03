@@ -8,6 +8,10 @@ export type OnboardingStatus = "notStarted" | "monsterCreated" | "complete";
 
 export type HealthSource = "mock" | "appleHealth" | "healthConnect";
 
+export type AccountMode = "local" | "remote";
+
+export type CloudSyncStatus = "localOnly" | "synced" | "pending" | "failed";
+
 export interface DailyHealthSummary {
   date: string;
   steps: number;
@@ -55,6 +59,15 @@ export interface CollectedHatchling {
 export interface HatchUpData {
   schemaVersion: number;
   progressionProfile: ProgressionProfileId;
+  accountId: string;
+  accountMode: AccountMode;
+  analyticsEnabled: boolean;
+  cloudSyncEnabled: boolean;
+  cloudSyncStatus: CloudSyncStatus;
+  crashReportingEnabled: boolean;
+  lastCloudSyncedAt: string | null;
+  privacyConsentVersion: string;
+  weeklyGoalSteps: number;
   monsterName: string;
   totalXp: number;
   currentStreak: number;
@@ -99,8 +112,17 @@ const starterEggs: IncubatorEgg[] = [
 ];
 
 export const initialHatchUpData: HatchUpData = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   progressionProfile: ACTIVE_PROGRESSION_PROFILE.id,
+  accountId: "local-beta-account",
+  accountMode: "local",
+  analyticsEnabled: false,
+  cloudSyncEnabled: false,
+  cloudSyncStatus: "localOnly",
+  crashReportingEnabled: true,
+  lastCloudSyncedAt: null,
+  privacyConsentVersion: "2026-06-beta",
+  weeklyGoalSteps: 35000,
   monsterName: "",
   totalXp: 0,
   currentStreak: 0,

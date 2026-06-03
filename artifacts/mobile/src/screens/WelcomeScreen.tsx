@@ -17,9 +17,10 @@ export function WelcomeScreen({ onContinue }: { onContinue: () => void }) {
       </View>
       <MonsterAvatar stage="egg" />
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Move. Earn XP. Evolve.</Text>
+        <Text style={styles.cardTitle}>Move. Hatch. Climb.</Text>
         <Text style={styles.cardBody}>
-          HatchUp is a simple daily loop built around progress you already make.
+          Fill up to three eggs at once, collect new companions, and optionally
+          compare your weekly movement in beta rankings.
         </Text>
       </View>
       <View style={styles.spacer} />

@@ -8,6 +8,7 @@ import { Screen } from "../components/Screen";
 import { toDateKey } from "../domain/date";
 import { getEggProgress, isEggReady } from "../domain/hatchery";
 import { getActivitySummary, type ActivityDay } from "../domain/history";
+import { metersToMiles, stepsToMiles } from "../domain/leaderboard";
 import type { DailyAward, DailyXp, HatchUpData } from "../domain/models";
 import { getProgression, type MonsterStage } from "../domain/progression";
 import { ACTIVE_PROGRESSION_PROFILE } from "../domain/progressionConfig";
@@ -17,6 +18,7 @@ import {
   isQuestComplete,
   type DailyQuest,
 } from "../domain/quests";
+import { getRetentionPlan } from "../domain/retention";
 import { colors } from "../theme";
 
 interface Props {
@@ -56,6 +58,21 @@ export function HomeScreen({
         : null;
   const quests = getDailyQuests(today);
   const activity = getActivitySummary(data.activityHistory, todayKey);
+  const readyEggCount = data.activeEggs.filter(isEggReady).length;
+  const completedQuestCount = quests.filter(isQuestComplete).length;
+  const todayDistanceMiles = getTodayDistanceMiles(today);
+  const retention = getRetentionPlan(data, todayKey);
+  const nextAction = getNextAction({
+    completedQuestCount,
+    data,
+    isSyncing,
+    onLeaderboardPress,
+    onMonsterPress,
+    onSync,
+    questCount: quests.length,
+    readyEggCount,
+    today,
+  });
 
   return (
     <Screen
@@ -91,6 +108,29 @@ export function HomeScreen({
             : "Final evolution reached"}
         </Text>
       </View>
+      <View style={styles.actionCard}>
+        <Text style={styles.actionKicker}>NEXT BEST ACTION</Text>
+        <Text style={styles.actionTitle}>{nextAction.title}</Text>
+        <Text style={styles.actionText}>{nextAction.body}</Text>
+        <AppButton
+          disabled={nextAction.disabled}
+          label={nextAction.label}
+          onPress={nextAction.onPress}
+          style={nextAction.disabled ? styles.disabledAction : undefined}
+          variant={nextAction.variant}
+        />
+      </View>
+      <View style={styles.goalCard}>
+        <View style={styles.goalHeader}>
+          <Text style={styles.goalTitle}>{retention.label}</Text>
+          <Text style={styles.goalMeta}>
+            {retention.weeklySteps.toLocaleString()} /{" "}
+            {retention.weeklyGoalSteps.toLocaleString()}
+          </Text>
+        </View>
+        <ProgressBar progress={retention.progress} />
+        <Text style={styles.goalText}>{retention.message}</Text>
+      </View>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Today's movement</Text>
         <Text style={styles.sectionMeta}>
@@ -104,7 +144,11 @@ export function HomeScreen({
           xp={today?.xp.steps ?? 0}
         />
         <Metric
-          label="Active cal"
+          label="Distance"
+          value={`${todayDistanceMiles.toFixed(1)} mi`}
+        />
+        <Metric
+          label="Energy"
           value={today?.health.activeCalories.toLocaleString() ?? "0"}
           xp={today?.xp.activeCalories ?? 0}
         />
@@ -165,7 +209,7 @@ export function HomeScreen({
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Incubator</Text>
         <Text style={styles.sectionMeta}>
-          {data.activeEggs.filter(isEggReady).length}/{data.activeEggs.length} ready
+          {readyEggCount}/{data.activeEggs.length} ready
         </Text>
       </View>
       <View style={styles.incubatorStack}>
@@ -208,13 +252,13 @@ function Metric({
 }: {
   label: string;
   value: string;
-  xp: number;
+  xp?: number;
 }) {
   return (
     <View style={styles.metric}>
       <Text style={styles.metricLabel}>{label}</Text>
       <Text style={styles.metricValue}>{value}</Text>
-      <Text style={styles.metricXp}>+{xp} XP</Text>
+      {xp !== undefined && <Text style={styles.metricXp}>+{xp} XP</Text>}
     </View>
   );
 }
@@ -292,6 +336,89 @@ function getRewardBreakdown(xp: DailyXp) {
   return parts.join(" | ");
 }
 
+function getTodayDistanceMiles(today: DailyAward | null) {
+  if (!today) return 0;
+  if ((today.health.distanceMeters ?? 0) > 0) {
+    return metersToMiles(today.health.distanceMeters ?? 0);
+  }
+  return stepsToMiles(today.health.steps);
+}
+
+function getNextAction({
+  completedQuestCount,
+  data,
+  isSyncing,
+  onLeaderboardPress,
+  onMonsterPress,
+  onSync,
+  questCount,
+  readyEggCount,
+  today,
+}: {
+  completedQuestCount: number;
+  data: HatchUpData;
+  isSyncing: boolean;
+  onLeaderboardPress: () => void;
+  onMonsterPress: () => void;
+  onSync: () => Promise<void>;
+  questCount: number;
+  readyEggCount: number;
+  today: DailyAward | null;
+}) {
+  if (readyEggCount > 0) {
+    return {
+      body: "Your movement filled an incubator slot. Hatch it now, then see what rarity rolls next.",
+      disabled: false,
+      label: readyEggCount > 1 ? `Hatch ${readyEggCount} eggs` : "Open Hatchery",
+      onPress: onMonsterPress,
+      title: `${readyEggCount} egg${readyEggCount === 1 ? "" : "s"} ready`,
+      variant: "primary" as const,
+    };
+  }
+
+  if (!today) {
+    return {
+      body: "Sync once to collect XP, fill your eggs, and unlock today's quests.",
+      disabled: isSyncing,
+      label: isSyncing ? "Syncing..." : "Collect movement",
+      onPress: onSync,
+      title: "Start today's loop",
+      variant: "primary" as const,
+    };
+  }
+
+  if (completedQuestCount < questCount) {
+    return {
+      body: "Move a little more, then sync again to push your quests and eggs forward.",
+      disabled: isSyncing,
+      label: isSyncing ? "Syncing..." : "Sync after moving",
+      onPress: onSync,
+      title: `${questCount - completedQuestCount} quest${questCount - completedQuestCount === 1 ? "" : "s"} left`,
+      variant: "secondary" as const,
+    };
+  }
+
+  if (!data.leaderboardShareEnabled) {
+    return {
+      body: "Optional sharing lets you compare weekly steps, distance, and XP in beta rankings.",
+      disabled: false,
+      label: "View Rankings",
+      onPress: onLeaderboardPress,
+      title: "Try the leaderboard",
+      variant: "secondary" as const,
+    };
+  }
+
+  return {
+    body: "You collected today's rewards. Keep the streak alive tomorrow or move more to climb ranks.",
+    disabled: false,
+    label: "View Rankings",
+    onPress: onLeaderboardPress,
+    title: "Daily loop complete",
+    variant: "secondary" as const,
+  };
+}
+
 const styles = StyleSheet.create({
   header: {
     alignItems: "center",
@@ -332,8 +459,61 @@ const styles = StyleSheet.create({
   heroCard: {
     backgroundColor: colors.surface,
     borderRadius: 22,
-    marginBottom: 22,
+    marginBottom: 12,
     padding: 18,
+  },
+  actionCard: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: 18,
+    gap: 10,
+    marginBottom: 22,
+    padding: 16,
+  },
+  goalCard: {
+    backgroundColor: colors.primarySoft,
+    borderRadius: 18,
+    gap: 10,
+    marginBottom: 22,
+    padding: 16,
+  },
+  goalHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  goalTitle: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  goalMeta: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  goalText: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  actionKicker: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  actionTitle: {
+    color: colors.ink,
+    fontSize: 19,
+    fontWeight: "900",
+  },
+  actionText: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  disabledAction: {
+    opacity: 0.58,
   },
   stage: {
     color: colors.primary,
@@ -372,14 +552,15 @@ const styles = StyleSheet.create({
   },
   metrics: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     marginBottom: 16,
   },
   metric: {
     backgroundColor: colors.surface,
     borderRadius: 15,
-    flex: 1,
     padding: 12,
+    width: "48%",
   },
   metricLabel: {
     color: colors.muted,

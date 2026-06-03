@@ -1,4 +1,7 @@
-import { getUserLeaderboardStats } from "../../domain/leaderboard";
+import {
+  getUserLeaderboardStats,
+  validateLeaderboardStats,
+} from "../../domain/leaderboard";
 import type { HatchUpData } from "../../domain/models";
 
 export interface LeaderboardSyncResult {
@@ -21,12 +24,14 @@ export async function syncLeaderboardEntry(
   }
 
   const stats = getUserLeaderboardStats(data, today);
+  const validation = validateLeaderboardStats(stats);
   const response = await fetch(apiUrl, {
     body: JSON.stringify({
       alias: data.leaderboardAlias || data.monsterName || "HatchUp Tester",
       leaderboardId: data.leaderboardId,
       monsterName: data.monsterName,
       stats,
+      validation,
       syncedAt,
     }),
     headers: {

@@ -11,7 +11,7 @@ import {
   getEggStepsRequired,
 } from "./progressionConfig";
 
-export const DATA_SCHEMA_VERSION = 3;
+export const DATA_SCHEMA_VERSION = 4;
 
 function normalizeXp(xp: Partial<DailyXp> | undefined): DailyXp {
   return {
@@ -67,6 +67,7 @@ export function migrateHatchUpData(
   if (!stored) {
     return {
       ...initialHatchUpData,
+      accountId: createLocalId("account"),
       leaderboardId: createLeaderboardId(),
     };
   }
@@ -77,6 +78,16 @@ export function migrateHatchUpData(
     ...stored,
     schemaVersion: DATA_SCHEMA_VERSION,
     progressionProfile: ACTIVE_PROGRESSION_PROFILE.id,
+    accountId: stored.accountId ?? createLocalId("account"),
+    accountMode: stored.accountMode ?? "local",
+    analyticsEnabled: stored.analyticsEnabled ?? false,
+    cloudSyncEnabled: stored.cloudSyncEnabled ?? false,
+    cloudSyncStatus: stored.cloudSyncStatus ?? "localOnly",
+    crashReportingEnabled: stored.crashReportingEnabled ?? true,
+    lastCloudSyncedAt: stored.lastCloudSyncedAt ?? null,
+    privacyConsentVersion:
+      stored.privacyConsentVersion ?? initialHatchUpData.privacyConsentVersion,
+    weeklyGoalSteps: stored.weeklyGoalSteps ?? initialHatchUpData.weeklyGoalSteps,
     leaderboardAlias: stored.leaderboardAlias ?? "",
     leaderboardId: stored.leaderboardId ?? createLeaderboardId(),
     leaderboardShareEnabled: stored.leaderboardShareEnabled ?? false,
@@ -89,7 +100,11 @@ export function migrateHatchUpData(
 }
 
 function createLeaderboardId() {
-  return `local-${Date.now().toString(36)}-${Math.random()
+  return createLocalId("leaderboard");
+}
+
+function createLocalId(prefix: string) {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random()
     .toString(36)
     .slice(2, 8)}`;
 }

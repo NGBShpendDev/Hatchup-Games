@@ -6,6 +6,7 @@ describe("local data migration", () => {
     const stored = {
       ...initialHatchUpData,
       schemaVersion: 2,
+      accountId: undefined,
       leaderboardId: undefined,
       totalXp: 321,
       activeEgg: {
@@ -34,7 +35,12 @@ describe("local data migration", () => {
     const migrated = migrateHatchUpData(stored);
 
     expect(migrated.totalXp).toBe(321);
+    expect(migrated.schemaVersion).toBe(4);
     expect(migrated.progressionProfile).toBe("beta");
+    expect(migrated.accountId).toEqual(expect.stringMatching(/^account-/));
+    expect(migrated.cloudSyncStatus).toBe("localOnly");
+    expect(migrated.analyticsEnabled).toBe(false);
+    expect(migrated.crashReportingEnabled).toBe(true);
     expect(migrated.activeEgg).toMatchObject({
       stepsRequired: 1500,
       stepsWalked: 1500,
@@ -44,7 +50,9 @@ describe("local data migration", () => {
       stepsRequired: 1500,
       stepsWalked: 1500,
     });
-    expect(migrated.leaderboardId).toEqual(expect.stringMatching(/^local-/));
+    expect(migrated.leaderboardId).toEqual(
+      expect.stringMatching(/^leaderboard-/),
+    );
     expect(migrated.leaderboardShareEnabled).toBe(false);
     expect(migrated.dailyAward?.xp).toEqual({
       steps: 17,

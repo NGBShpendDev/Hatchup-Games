@@ -15,6 +15,11 @@ export interface LeaderboardEntry {
   totalXp: number;
 }
 
+export interface LeaderboardValidation {
+  flags: string[];
+  isValid: boolean;
+}
+
 export const DISTANCE_MILES_PER_STEP = 0.000473;
 export const METERS_PER_MILE = 1609.344;
 
@@ -104,6 +109,24 @@ export function getMetricValue(
   if (metric === "distance") return entry.distanceMiles;
   if (metric === "xp") return entry.totalXp;
   return entry.steps;
+}
+
+export function validateLeaderboardStats(
+  entry: Pick<LeaderboardEntry, "distanceMiles" | "steps" | "totalXp">,
+): LeaderboardValidation {
+  const flags: string[] = [];
+
+  if (entry.steps > 250000) flags.push("weekly_steps_too_high");
+  if (entry.distanceMiles > 200) flags.push("weekly_distance_too_high");
+  if (entry.steps > 0 && entry.distanceMiles / entry.steps > 0.0025) {
+    flags.push("distance_step_ratio_high");
+  }
+  if (entry.totalXp > 10000) flags.push("xp_review_required");
+
+  return {
+    flags,
+    isValid: flags.length === 0,
+  };
 }
 
 export function stepsToMiles(steps: number) {

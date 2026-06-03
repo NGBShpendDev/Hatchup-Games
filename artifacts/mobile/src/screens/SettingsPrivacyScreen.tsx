@@ -9,10 +9,11 @@ import type { ProgressionProfile } from "../domain/progressionConfig";
 import { colors } from "../theme";
 
 const privacyCopy =
-  "HatchUp reads your steps, distance, workouts, and active energy only to reward your monster with XP and show optional rankings. We do not sell your health data or use it for ads.";
+  "HatchUp reads your steps, workouts, and active energy only to reward your monster with XP. We do not sell your health data or use it for ads. Distance is used only for optional beta rankings when you choose to share.";
 
 interface Props {
   data: HatchUpData;
+  cloudSyncLabel: string;
   healthMode: string;
   leaderboardSyncLabel: string;
   progressionProfile: ProgressionProfile;
@@ -23,12 +24,16 @@ interface Props {
   onMonsterPress: () => void;
   onReadyTestEgg: () => Promise<void>;
   onReset: () => Promise<void>;
+  onSetAnalyticsEnabled: (enabled: boolean) => Promise<void>;
+  onSetCloudSyncEnabled: (enabled: boolean) => Promise<void>;
+  onSetCrashReportingEnabled: (enabled: boolean) => Promise<void>;
   onSetLeaderboardSharing: (enabled: boolean) => Promise<void>;
   onSetTestStage: (stage: MonsterStage) => Promise<void>;
 }
 
 export function SettingsPrivacyScreen({
   data,
+  cloudSyncLabel,
   healthMode,
   leaderboardSyncLabel,
   progressionProfile,
@@ -39,6 +44,9 @@ export function SettingsPrivacyScreen({
   onMonsterPress,
   onReadyTestEgg,
   onReset,
+  onSetAnalyticsEnabled,
+  onSetCloudSyncEnabled,
+  onSetCrashReportingEnabled,
   onSetLeaderboardSharing,
   onSetTestStage,
 }: Props) {
@@ -79,6 +87,8 @@ export function SettingsPrivacyScreen({
           label="Local activity history"
           value={`${data.activityHistory.length} day${data.activityHistory.length === 1 ? "" : "s"} stored`}
         />
+        <Setting label="Account mode" value={data.accountMode} />
+        <Setting label="Cloud save" value={cloudSyncLabel} />
         <Setting
           label="Leaderboard sharing"
           value={data.leaderboardShareEnabled ? "Opted in" : "Private"}
@@ -129,6 +139,34 @@ export function SettingsPrivacyScreen({
       <View style={styles.privacyCard}>
         <Text style={styles.cardTitle}>Privacy promise</Text>
         <Text style={styles.privacyText}>{privacyCopy}</Text>
+      </View>
+      <View style={styles.readOnlyCard}>
+        <Text style={styles.cardTitle}>Public-ready data controls</Text>
+        <Text style={styles.privacyText}>
+          Cloud save and analytics are opt-in foundations for launch. They stay
+          local unless backend URLs are configured.
+        </Text>
+        <View style={styles.privacyActions}>
+          <AppButton
+            label={data.cloudSyncEnabled ? "Disable cloud save" : "Enable cloud save"}
+            onPress={() => onSetCloudSyncEnabled(!data.cloudSyncEnabled)}
+            variant={data.cloudSyncEnabled ? "secondary" : "primary"}
+          />
+          <AppButton
+            label={data.analyticsEnabled ? "Disable analytics" : "Enable analytics"}
+            onPress={() => onSetAnalyticsEnabled(!data.analyticsEnabled)}
+            variant="secondary"
+          />
+          <AppButton
+            label={
+              data.crashReportingEnabled
+                ? "Disable crash reports"
+                : "Enable crash reports"
+            }
+            onPress={() => onSetCrashReportingEnabled(!data.crashReportingEnabled)}
+            variant="secondary"
+          />
+        </View>
       </View>
       <View style={styles.readOnlyCard}>
         <Text style={styles.cardTitle}>Leaderboard privacy</Text>
@@ -249,6 +287,10 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   leaderboardActions: {
+    marginTop: 12,
+  },
+  privacyActions: {
+    gap: 8,
     marginTop: 12,
   },
   cardTitle: {

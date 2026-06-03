@@ -3,6 +3,7 @@ import "expo-dev-client";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { ConnectHealthScreen } from "./src/screens/ConnectHealthScreen";
 import { CreatureDexScreen } from "./src/screens/CreatureDexScreen";
 import { HomeScreen } from "./src/screens/HomeScreen";
@@ -24,7 +25,7 @@ export type ScreenName =
   | "leaderboard"
   | "settings";
 
-export default function App() {
+function AppContent() {
   const app = useHatchUpApp();
   const [screen, setScreen] = useState<ScreenName>("welcome");
 
@@ -43,7 +44,7 @@ export default function App() {
       : screen;
 
   return (
-    <>
+    <ErrorBoundary onError={app.reportCrash}>
       <StatusBar style="dark" />
       {activeScreen === "welcome" && (
         <WelcomeScreen onContinue={() => setScreen("setup")} />
@@ -122,6 +123,7 @@ export default function App() {
       {activeScreen === "settings" && (
         <SettingsPrivacyScreen
           data={app.data}
+          cloudSyncLabel={app.cloudSyncLabel}
           healthMode={app.healthMode}
           leaderboardSyncLabel={app.leaderboardSyncLabel}
           progressionProfile={app.progressionProfile}
@@ -135,11 +137,22 @@ export default function App() {
             await app.resetApp();
             setScreen("welcome");
           }}
+          onSetAnalyticsEnabled={app.setAnalyticsEnabled}
+          onSetCloudSyncEnabled={app.setCloudSyncEnabled}
+          onSetCrashReportingEnabled={app.setCrashReportingEnabled}
           onSetLeaderboardSharing={app.setLeaderboardSharing}
           onSetTestStage={app.setTestStage}
         />
       )}
-    </>
+    </ErrorBoundary>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
   );
 }
 

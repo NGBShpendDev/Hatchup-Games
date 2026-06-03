@@ -49,6 +49,14 @@ export function LeaderboardScreen({
   const userStats = getUserLeaderboardStats(data, today);
   const entries = getLeaderboardEntries(data, today, metric);
   const userRank = entries.find((entry) => entry.isUser)?.rank ?? null;
+  const aliasChanged = alias.trim() !== data.leaderboardAlias.trim();
+
+  async function handleShareToggle() {
+    if (aliasChanged) {
+      await onSaveAlias(alias);
+    }
+    await onSetSharing(!data.leaderboardShareEnabled);
+  }
 
   return (
     <Screen
@@ -113,14 +121,14 @@ export function LeaderboardScreen({
         />
         <View style={styles.shareActions}>
           <AppButton
-            label="Save name"
+            label={aliasChanged ? "Save name" : "Name saved"}
             onPress={() => onSaveAlias(alias)}
             style={styles.actionButton}
             variant="secondary"
           />
           <AppButton
-            label={data.leaderboardShareEnabled ? "Hide me" : "Share ranking"}
-            onPress={() => onSetSharing(!data.leaderboardShareEnabled)}
+            label={data.leaderboardShareEnabled ? "Hide me" : "Save & share"}
+            onPress={handleShareToggle}
             style={styles.actionButton}
           />
         </View>

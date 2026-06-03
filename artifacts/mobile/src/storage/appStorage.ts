@@ -1,17 +1,17 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { migrateHatchUpData } from "../domain/migration";
-import { initialHatchUpData, type HatchUpData } from "../domain/models";
+import type { HatchUpData } from "../domain/models";
 
 const STORAGE_KEY = "@hatchup/mvp-state-v1";
 
 export async function loadHatchUpData(): Promise<HatchUpData> {
   const stored = await AsyncStorage.getItem(STORAGE_KEY);
-  if (!stored) return initialHatchUpData;
+  if (!stored) return migrateHatchUpData(null);
 
   try {
     return migrateHatchUpData(JSON.parse(stored));
   } catch {
-    return initialHatchUpData;
+    return migrateHatchUpData(null);
   }
 }
 

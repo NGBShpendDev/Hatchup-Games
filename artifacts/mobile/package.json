@@ -7,6 +7,8 @@
     "dev": "expo start --dev-client",
     "ios": "expo run:ios",
     "android": "expo run:android",
+    "audit:assets": "node ../../scripts/mobile/audit-creature-assets.mjs",
+    "clean:assets": "node ../../scripts/mobile/clean-creature-assets.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "jest --config jest.config.js"
   },
@@ -28,6 +30,7 @@
     "expo-build-properties": "^1.0.10",
     "jest": "^29.7.0",
     "jest-expo": "~54.0.17",
+    "pngjs": "5.0.0",
     "typescript": "~5.9.2"
   }
 }

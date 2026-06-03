@@ -1,4 +1,8 @@
-import { getLeaderboardEntries, getUserLeaderboardStats } from "../leaderboard";
+import {
+  getLeaderboardEntries,
+  getUserLeaderboardStats,
+  validateLeaderboardStats,
+} from "../leaderboard";
 import { initialHatchUpData, type HatchUpData } from "../models";
 
 describe("leaderboard", () => {
@@ -68,5 +72,19 @@ describe("leaderboard", () => {
         "xp",
       ).some((entry) => entry.isUser),
     ).toBe(true);
+  });
+
+  it("flags unrealistic leaderboard submissions", () => {
+    expect(
+      validateLeaderboardStats({
+        distanceMiles: 230,
+        steps: 300000,
+        totalXp: 12000,
+      }).flags,
+    ).toEqual([
+      "weekly_steps_too_high",
+      "weekly_distance_too_high",
+      "xp_review_required",
+    ]);
   });
 });
