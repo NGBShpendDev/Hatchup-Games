@@ -7,9 +7,10 @@ import {
   type HatchUpData,
 } from "./domain/models";
 import {
-  addStepsToEgg,
+  addStepsToEggs,
   getNewStepsForSync,
-  hatchActiveEgg,
+  isEggReady,
+  hatchEgg as hatchReadyEgg,
 } from "./domain/hatchery";
 import { upsertDailyAward } from "./domain/history";
 import { updateStreak } from "./domain/streak";
@@ -21,6 +22,7 @@ import {
 import { ACTIVE_PROGRESSION_PROFILE } from "./domain/progressionConfig";
 import { calculateDailyXp, getXpGains, mergeDailyXp } from "./domain/xp";
 import { healthService } from "./services/health";
+import { syncLeaderboardEntry } from "./services/leaderboard/leaderboardService";
 import {
   clearHatchUpData,
   loadHatchUpData,
@@ -49,6 +51,8 @@ export function useHatchUpApp() {
   });
   const [latestHatchling, setLatestHatchling] =
     useState<CollectedHatchling | null>(null);
+  const [leaderboardSyncLabel, setLeaderboardSyncLabel] =
+    useState("Local beta rankings");
   const syncInFlight = useRef(false);
 
   useEffect(() => {
@@ -115,10 +119,12 @@ export function useHatchUpApp() {
         health.steps,
       );
       const dailyAward = { date: health.date, health, xp };
+      const activeEggs = addStepsToEggs(data.activeEggs, newSteps);
       const next = {
         ...data,
         ...streak,
-        activeEgg: addStepsToEgg(data.activeEgg, newSteps),
+        activeEgg: activeEggs[0],
+        activeEggs,
         activityHistory: upsertDailyAward(data.activityHistory, dailyAward),
         totalXp: data.totalXp + newXp,
         lastSyncedDate: new Date().toISOString(),
@@ -126,6 +132,7 @@ export function useHatchUpApp() {
       };
 
       await persist(next);
+      void syncLeaderboard(next);
       setLatestSync(dailyAward);
       setLatestEvolution(
         previousStage.id === nextStage.id ? null : nextStage.id,
@@ -144,8 +151,26 @@ export function useHatchUpApp() {
     }
   }
 
-  async function hatchEgg() {
-    const next = hatchActiveEgg(data, new Date().toISOString());
+  async function hatchEgg(eggId: string) {
+    const next = hatchReadyEgg(data, eggId, new Date().toISOString());
+    await persist(next);
+    if (next !== data) setLatestHatchling(next.collection[0]);
+  }
+
+  async function hatchAllReadyEggs() {
+    let next = data;
+    const readyEggIds = data.activeEggs
+      .filter(isEggReady)
+      .map((egg) => egg.id);
+
+    readyEggIds.forEach((eggId, index) => {
+      next = hatchReadyEgg(
+        next,
+        eggId,
+        new Date(Date.now() + index).toISOString(),
+      );
+    });
+
     await persist(next);
     if (next !== data) setLatestHatchling(next.collection[0]);
   }
@@ -167,6 +192,7 @@ export function useHatchUpApp() {
       }),
     });
     setLatestHatchling(null);
+    setLeaderboardSyncLabel("Local beta rankings");
     setError(null);
   }
 
@@ -182,19 +208,57 @@ export function useHatchUpApp() {
   }
 
   async function readyTestEgg() {
+    const activeEggs = data.activeEggs.map((egg) => ({
+      ...egg,
+      stepsWalked: egg.stepsRequired,
+    }));
+
     await persist({
       ...data,
-      activeEgg: {
-        ...data.activeEgg,
-        stepsWalked: data.activeEgg.stepsRequired,
-      },
+      activeEgg: activeEggs[0],
+      activeEggs,
     });
+  }
+
+  async function setLeaderboardSharing(enabled: boolean) {
+    const next = {
+      ...data,
+      leaderboardAlias: data.leaderboardAlias || data.monsterName || "HatchUp Tester",
+      leaderboardShareEnabled: enabled,
+    };
+
+    await persist(next);
+    await syncLeaderboard(next);
+  }
+
+  async function saveLeaderboardAlias(alias: string) {
+    await persist({
+      ...data,
+      leaderboardAlias: alias.trim().slice(0, 24),
+    });
+  }
+
+  async function syncLeaderboard(nextData: HatchUpData) {
+    try {
+      const result = await syncLeaderboardEntry(nextData, toDateKey(new Date()));
+      setLeaderboardSyncLabel(
+        result.mode === "remote"
+          ? `Synced ${new Date(result.syncedAt).toLocaleTimeString([], {
+              hour: "numeric",
+              minute: "2-digit",
+            })}`
+          : "Local beta rankings",
+      );
+    } catch {
+      setLeaderboardSyncLabel("Leaderboard sync pending");
+    }
   }
 
   return {
     data,
     error,
     healthMode: healthService.modeLabel,
+    leaderboardSyncLabel,
     progressionProfile: ACTIVE_PROGRESSION_PROFILE,
     testLabEnabled: ACTIVE_PROGRESSION_PROFILE.id === "beta",
     isSyncing,
@@ -205,10 +269,13 @@ export function useHatchUpApp() {
     ready,
     connectHealth,
     dismissLatestHatchling: () => setLatestHatchling(null),
+    hatchAllReadyEggs,
     hatchEgg,
     resetApp,
     readyTestEgg,
     saveMonsterName,
+    saveLeaderboardAlias,
+    setLeaderboardSharing,
     setTestStage,
     syncHealth,
     today: toDateKey(new Date()),

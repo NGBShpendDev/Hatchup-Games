@@ -5,7 +5,7 @@ import { Screen } from "../components/Screen";
 import { colors } from "../theme";
 
 const privacyCopy =
-  "HatchUp reads your steps, workouts, and active energy only to reward your monster with XP. We do not sell your health data or use it for ads.";
+  "HatchUp reads your steps, distance, workouts, and active energy only to reward your monster with XP and show optional rankings. We do not sell your health data or use it for ads.";
 
 interface Props {
   error: string | null;
@@ -39,6 +39,7 @@ export function ConnectHealthScreen({
       <View style={styles.readCard}>
         <Text style={styles.cardTitle}>HatchUp reads only</Text>
         <Text style={styles.item}>Steps</Text>
+        <Text style={styles.item}>Distance</Text>
         <Text style={styles.item}>Active calories</Text>
         <Text style={styles.item}>Workouts and exercise sessions</Text>
       </View>

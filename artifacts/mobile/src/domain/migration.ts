@@ -5,12 +5,13 @@ import {
   type HatchUpData,
   type IncubatorEgg,
 } from "./models";
+import { createEgg, MAX_ACTIVE_EGGS } from "./hatchery";
 import {
   ACTIVE_PROGRESSION_PROFILE,
   getEggStepsRequired,
 } from "./progressionConfig";
 
-export const DATA_SCHEMA_VERSION = 2;
+export const DATA_SCHEMA_VERSION = 3;
 
 function normalizeXp(xp: Partial<DailyXp> | undefined): DailyXp {
   return {
@@ -41,19 +42,54 @@ function normalizeEgg(egg: IncubatorEgg | undefined): IncubatorEgg {
   };
 }
 
+function normalizeEggs(stored: Partial<HatchUpData>): IncubatorEgg[] {
+  const isLegacySingleEggSave =
+    (stored.schemaVersion ?? 1) < 3 && stored.activeEgg !== undefined;
+  const existingEggs = isLegacySingleEggSave
+    ? [stored.activeEgg!]
+    : stored.activeEggs && stored.activeEggs.length > 0
+      ? stored.activeEggs
+      : stored.activeEgg
+        ? [stored.activeEgg]
+        : initialHatchUpData.activeEggs;
+  const normalized = existingEggs.slice(0, MAX_ACTIVE_EGGS).map(normalizeEgg);
+
+  while (normalized.length < MAX_ACTIVE_EGGS) {
+    normalized.push(createEgg((stored.eggsHatched ?? 0) + normalized.length + 1));
+  }
+
+  return normalized;
+}
+
 export function migrateHatchUpData(
   stored: Partial<HatchUpData> | null | undefined,
 ): HatchUpData {
-  if (!stored) return initialHatchUpData;
+  if (!stored) {
+    return {
+      ...initialHatchUpData,
+      leaderboardId: createLeaderboardId(),
+    };
+  }
+  const activeEggs = normalizeEggs(stored);
 
   return {
     ...initialHatchUpData,
     ...stored,
     schemaVersion: DATA_SCHEMA_VERSION,
     progressionProfile: ACTIVE_PROGRESSION_PROFILE.id,
-    activeEgg: normalizeEgg(stored.activeEgg),
+    leaderboardAlias: stored.leaderboardAlias ?? "",
+    leaderboardId: stored.leaderboardId ?? createLeaderboardId(),
+    leaderboardShareEnabled: stored.leaderboardShareEnabled ?? false,
+    activeEgg: activeEggs[0],
+    activeEggs,
     dailyAward: stored.dailyAward ? normalizeAward(stored.dailyAward) : null,
     activityHistory: (stored.activityHistory ?? []).map(normalizeAward),
     collection: stored.collection ?? [],
   };
+}
+
+function createLeaderboardId() {
+  return `local-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
 }

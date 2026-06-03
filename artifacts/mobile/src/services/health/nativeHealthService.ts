@@ -5,6 +5,7 @@ import type { HealthService } from "./HealthService";
 
 const IOS_READ_TYPES = [
   "HKQuantityTypeIdentifierStepCount",
+  "HKQuantityTypeIdentifierDistanceWalkingRunning",
   "HKQuantityTypeIdentifierActiveEnergyBurned",
   "HKWorkoutTypeIdentifier",
 ] as const;
@@ -49,11 +50,16 @@ async function getAppleHealthTodaySummary(): Promise<DailyHealthSummary> {
   const filter = {
     filter: { date: { startDate: startTime, endDate: endTime } },
   };
-  const [steps, activeCalories, workouts] = await Promise.all([
+  const [steps, distance, activeCalories, workouts] = await Promise.all([
     healthkit.queryStatisticsForQuantity(
       "HKQuantityTypeIdentifierStepCount",
       ["cumulativeSum"],
       { ...filter, unit: "count" },
+    ),
+    healthkit.queryStatisticsForQuantity(
+      "HKQuantityTypeIdentifierDistanceWalkingRunning",
+      ["cumulativeSum"],
+      { ...filter, unit: "m" },
     ),
     healthkit.queryStatisticsForQuantity(
       "HKQuantityTypeIdentifierActiveEnergyBurned",
@@ -66,6 +72,7 @@ async function getAppleHealthTodaySummary(): Promise<DailyHealthSummary> {
   return {
     date: toDateKey(startTime),
     steps: Math.round(steps.sumQuantity?.quantity ?? 0),
+    distanceMeters: Math.round(distance.sumQuantity?.quantity ?? 0),
     activeCalories: Math.round(activeCalories.sumQuantity?.quantity ?? 0),
     workouts: workouts.length,
     source: "appleHealth",
@@ -83,6 +90,7 @@ async function requestHealthConnectPermissions() {
 
   await healthConnect.requestPermission([
     { accessType: "read", recordType: "Steps" },
+    { accessType: "read", recordType: "Distance" },
     { accessType: "read", recordType: "ActiveCaloriesBurned" },
     { accessType: "read", recordType: "ExerciseSession" },
   ]);
@@ -103,8 +111,9 @@ async function getHealthConnectTodaySummary(): Promise<DailyHealthSummary> {
     startTime: startTime.toISOString(),
     endTime: endTime.toISOString(),
   };
-  const [steps, activeCalories, exerciseSessions] = await Promise.all([
+  const [steps, distance, activeCalories, exerciseSessions] = await Promise.all([
     healthConnect.aggregateRecord({ recordType: "Steps", timeRangeFilter }),
+    healthConnect.aggregateRecord({ recordType: "Distance", timeRangeFilter }),
     healthConnect.aggregateRecord({
       recordType: "ActiveCaloriesBurned",
       timeRangeFilter,
@@ -115,6 +124,7 @@ async function getHealthConnectTodaySummary(): Promise<DailyHealthSummary> {
   return {
     date: toDateKey(startTime),
     steps: Math.round(steps.COUNT_TOTAL ?? 0),
+    distanceMeters: Math.round(distance.DISTANCE?.inMeters ?? 0),
     activeCalories: Math.round(
       activeCalories.ACTIVE_CALORIES_TOTAL?.inKilocalories ?? 0,
     ),

@@ -1,7 +1,7 @@
 import type { ExpoConfig } from "expo/config";
 
 const healthReadDescription =
-  "HatchUp reads your steps, workouts, and active energy only to reward your monster with XP.";
+  "HatchUp reads your steps, distance, workouts, and active energy only to reward your monster with XP and show optional rankings.";
 
 const config: ExpoConfig = {
   name: "HatchUp Games",
@@ -31,6 +31,7 @@ const config: ExpoConfig = {
     package: "com.hatchup.games",
     permissions: [
       "android.permission.health.READ_STEPS",
+      "android.permission.health.READ_DISTANCE",
       "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
       "android.permission.health.READ_EXERCISE",
     ],

@@ -11,6 +11,7 @@ export type HealthSource = "mock" | "appleHealth" | "healthConnect";
 export interface DailyHealthSummary {
   date: string;
   steps: number;
+  distanceMeters?: number;
   activeCalories: number;
   workouts: number;
   source: HealthSource;
@@ -61,16 +62,44 @@ export interface HatchUpData {
   lastSyncedDate: string | null;
   onboardingStatus: OnboardingStatus;
   healthConnected: boolean;
+  leaderboardAlias: string;
+  leaderboardId: string;
+  leaderboardShareEnabled: boolean;
   lastRewardDate: string | null;
   dailyAward: DailyAward | null;
   activityHistory: DailyAward[];
   activeEgg: IncubatorEgg;
+  activeEggs: IncubatorEgg[];
   collection: CollectedHatchling[];
   eggsHatched: number;
 }
 
+const starterEggs: IncubatorEgg[] = [
+  {
+    id: "egg-1",
+    element: "leaf",
+    rarity: "common",
+    stepsRequired: getEggStepsRequired("common"),
+    stepsWalked: 0,
+  },
+  {
+    id: "egg-2",
+    element: "ember",
+    rarity: "common",
+    stepsRequired: getEggStepsRequired("common"),
+    stepsWalked: 0,
+  },
+  {
+    id: "egg-3",
+    element: "tide",
+    rarity: "uncommon",
+    stepsRequired: getEggStepsRequired("uncommon"),
+    stepsWalked: 0,
+  },
+];
+
 export const initialHatchUpData: HatchUpData = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   progressionProfile: ACTIVE_PROGRESSION_PROFILE.id,
   monsterName: "",
   totalXp: 0,
@@ -79,16 +108,14 @@ export const initialHatchUpData: HatchUpData = {
   lastSyncedDate: null,
   onboardingStatus: "notStarted",
   healthConnected: false,
+  leaderboardAlias: "",
+  leaderboardId: "local-beta-player",
+  leaderboardShareEnabled: false,
   lastRewardDate: null,
   dailyAward: null,
   activityHistory: [],
-  activeEgg: {
-    id: "egg-1",
-    element: "leaf",
-    rarity: "common",
-    stepsRequired: getEggStepsRequired("common"),
-    stepsWalked: 0,
-  },
+  activeEgg: starterEggs[0],
+  activeEggs: starterEggs,
   collection: [],
   eggsHatched: 0,
 };

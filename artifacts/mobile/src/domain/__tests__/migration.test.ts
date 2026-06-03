@@ -5,6 +5,8 @@ describe("local data migration", () => {
   it("keeps existing progress while moving an install onto accelerated beta tuning", () => {
     const stored = {
       ...initialHatchUpData,
+      schemaVersion: 2,
+      leaderboardId: undefined,
       totalXp: 321,
       activeEgg: {
         ...initialHatchUpData.activeEgg,
@@ -27,7 +29,7 @@ describe("local data migration", () => {
           total: 47,
         } as DailyXp,
       },
-    } as HatchUpData;
+    } as Partial<HatchUpData>;
 
     const migrated = migrateHatchUpData(stored);
 
@@ -37,6 +39,13 @@ describe("local data migration", () => {
       stepsRequired: 1500,
       stepsWalked: 1500,
     });
+    expect(migrated.activeEggs).toHaveLength(3);
+    expect(migrated.activeEggs[0]).toMatchObject({
+      stepsRequired: 1500,
+      stepsWalked: 1500,
+    });
+    expect(migrated.leaderboardId).toEqual(expect.stringMatching(/^local-/));
+    expect(migrated.leaderboardShareEnabled).toBe(false);
     expect(migrated.dailyAward?.xp).toEqual({
       steps: 17,
       activeCalories: 10,

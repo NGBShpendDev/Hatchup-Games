@@ -15,6 +15,7 @@ import { colors } from "../theme";
 interface Props {
   data: HatchUpData;
   onHomePress: () => void;
+  onLeaderboardPress: () => void;
   onMonsterPress: () => void;
   onSettingsPress: () => void;
 }
@@ -22,6 +23,7 @@ interface Props {
 export function CreatureDexScreen({
   data,
   onHomePress,
+  onLeaderboardPress,
   onMonsterPress,
   onSettingsPress,
 }: Props) {
@@ -35,6 +37,7 @@ export function CreatureDexScreen({
           active="dex"
           onDexPress={() => undefined}
           onHomePress={onHomePress}
+          onLeaderboardPress={onLeaderboardPress}
           onMonsterPress={onMonsterPress}
           onSettingsPress={onSettingsPress}
         />

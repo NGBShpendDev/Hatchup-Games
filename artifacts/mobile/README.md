@@ -2,8 +2,7 @@
 
 This artifact is the small, mock-first Expo React Native MVP for HatchUp Games.
 It intentionally excludes battles, social features, payments, subscriptions,
-nutrition, coaching, push notifications, backend authentication, and
-leaderboards.
+nutrition, coaching, push notifications, and backend authentication.
 
 ## Included flow
 
@@ -13,22 +12,27 @@ leaderboards.
 4. Home dashboard
 5. Hatchery, evolution detail, and local hatchling collection
 6. Creature Dex
-7. Settings and privacy
+7. Beta Rankings
+8. Settings and privacy
 
 ## Local-first alpha loop
 
 The mobile alpha now keeps a small hatchery loop on-device:
 
-- Health sync awards XP and adds only newly synced steps to the active egg.
-- Incubator progress is capped at the egg's step requirement.
-- Ready eggs hatch into a deterministic local collection with an element and
-  rarity.
-- A new egg is placed into the incubator after every hatch.
+- Health sync awards XP and adds only newly synced steps to up to three active
+  incubator eggs.
+- Incubator progress is capped at each egg's step requirement.
+- Ready eggs hatch into a local collection with an element and rarity.
+- A weighted-random replacement egg is placed into the incubator after every
+  hatch.
 - Daily movement quests are derived from the current health summary.
 - The dashboard stores up to 14 daily sync summaries and shows a seven-day
   movement recap.
 - The Creature Dex tracks 16 element and rarity combinations with locked
   silhouettes, owned counts, and completion progress.
+- Beta Rankings add an opt-in leaderboard experience for weekly steps, distance,
+  and total monster XP. It runs locally by default and can POST opted-in ranking
+  stats to `EXPO_PUBLIC_LEADERBOARD_API_URL` when a backend endpoint is added.
 - Every sync reports newly awarded XP and incubator steps.
 - Hatching reveals a distinct local companion before it joins the collection.
 
@@ -73,9 +77,10 @@ EXPO_PUBLIC_HEALTH_MODE=native pnpm --filter @workspace/mobile android
 
 The service contract is read-only. Keep it that way for MVP:
 
-- iOS: read HealthKit step count, active energy burned, and workouts.
+- iOS: read HealthKit step count, walking/running distance, active energy burned,
+  and workouts.
 - Android: read Health Connect `StepsRecord`, `ActiveCaloriesBurnedRecord`, and
-  `ExerciseSessionRecord`.
+  `ExerciseSessionRecord`, plus `DistanceRecord` where available.
 - Aggregate cumulative Health Connect step values instead of summing raw records
   so multiple sources do not double count movement.
 - Never request write permissions.

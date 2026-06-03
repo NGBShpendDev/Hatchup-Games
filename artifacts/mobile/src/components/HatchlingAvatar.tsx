@@ -23,6 +23,13 @@ const elementLabels: Record<EggElement, string> = {
   storm: "STORM",
 };
 
+const rarityColors: Record<EggRarity, string> = {
+  common: colors.line,
+  uncommon: colors.primary,
+  rare: colors.accent,
+  epic: colors.final,
+};
+
 export function HatchlingAvatar({ element, rarity, size = "large" }: Props) {
   const asset = getHatchlingAsset(element, rarity);
 
@@ -35,8 +42,12 @@ export function HatchlingAvatar({ element, rarity, size = "large" }: Props) {
           source={asset}
           style={[styles.image, styles[`${size}Image`]]}
         />
-        <View style={styles.rarityPill}>
-          <Text style={styles.rarity}>{rarity.toUpperCase()}</Text>
+        <View
+          style={[styles.rarityPill, { borderColor: rarityColors[rarity] }]}
+        >
+          <Text style={[styles.rarity, { color: rarityColors[rarity] }]}>
+            {rarity.toUpperCase()}
+          </Text>
         </View>
       </View>
     );
@@ -53,8 +64,10 @@ export function HatchlingAvatar({ element, rarity, size = "large" }: Props) {
         </View>
         <Text style={styles.label}>{elementLabels[element]}</Text>
       </View>
-      <View style={styles.rarityPill}>
-        <Text style={styles.rarity}>{rarity.toUpperCase()}</Text>
+      <View style={[styles.rarityPill, { borderColor: rarityColors[rarity] }]}>
+        <Text style={[styles.rarity, { color: rarityColors[rarity] }]}>
+          {rarity.toUpperCase()}
+        </Text>
       </View>
     </View>
   );

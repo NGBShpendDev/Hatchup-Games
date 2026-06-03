@@ -6,6 +6,7 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { ConnectHealthScreen } from "./src/screens/ConnectHealthScreen";
 import { CreatureDexScreen } from "./src/screens/CreatureDexScreen";
 import { HomeScreen } from "./src/screens/HomeScreen";
+import { LeaderboardScreen } from "./src/screens/LeaderboardScreen";
 import { MonsterDetailScreen } from "./src/screens/MonsterDetailScreen";
 import { MonsterSetupScreen } from "./src/screens/MonsterSetupScreen";
 import { SettingsPrivacyScreen } from "./src/screens/SettingsPrivacyScreen";
@@ -20,6 +21,7 @@ export type ScreenName =
   | "home"
   | "monster"
   | "dex"
+  | "leaderboard"
   | "settings";
 
 export default function App() {
@@ -76,6 +78,7 @@ export default function App() {
           latestSyncGains={app.latestSyncGains}
           latestEvolution={app.latestEvolution}
           onDexPress={() => setScreen("dex")}
+          onLeaderboardPress={() => setScreen("leaderboard")}
           onMonsterPress={() => setScreen("monster")}
           onSettingsPress={() => setScreen("settings")}
           onSync={app.syncHealth}
@@ -88,7 +91,9 @@ export default function App() {
           onBack={() => setScreen("home")}
           onDexPress={() => setScreen("dex")}
           onDismissHatch={app.dismissLatestHatchling}
+          onHatchAll={app.hatchAllReadyEggs}
           onHatch={app.hatchEgg}
+          onLeaderboardPress={() => setScreen("leaderboard")}
           onSettingsPress={() => setScreen("settings")}
         />
       )}
@@ -96,24 +101,41 @@ export default function App() {
         <CreatureDexScreen
           data={app.data}
           onHomePress={() => setScreen("home")}
+          onLeaderboardPress={() => setScreen("leaderboard")}
           onMonsterPress={() => setScreen("monster")}
           onSettingsPress={() => setScreen("settings")}
+        />
+      )}
+      {activeScreen === "leaderboard" && (
+        <LeaderboardScreen
+          data={app.data}
+          leaderboardSyncLabel={app.leaderboardSyncLabel}
+          today={app.today}
+          onDexPress={() => setScreen("dex")}
+          onHomePress={() => setScreen("home")}
+          onMonsterPress={() => setScreen("monster")}
+          onSaveAlias={app.saveLeaderboardAlias}
+          onSettingsPress={() => setScreen("settings")}
+          onSetSharing={app.setLeaderboardSharing}
         />
       )}
       {activeScreen === "settings" && (
         <SettingsPrivacyScreen
           data={app.data}
           healthMode={app.healthMode}
+          leaderboardSyncLabel={app.leaderboardSyncLabel}
           progressionProfile={app.progressionProfile}
           testLabEnabled={app.testLabEnabled}
           onBack={() => setScreen("home")}
           onDexPress={() => setScreen("dex")}
+          onLeaderboardPress={() => setScreen("leaderboard")}
           onMonsterPress={() => setScreen("monster")}
           onReadyTestEgg={app.readyTestEgg}
           onReset={async () => {
             await app.resetApp();
             setScreen("welcome");
           }}
+          onSetLeaderboardSharing={app.setLeaderboardSharing}
           onSetTestStage={app.setTestStage}
         />
       )}

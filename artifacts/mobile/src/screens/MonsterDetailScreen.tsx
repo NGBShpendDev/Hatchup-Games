@@ -18,7 +18,9 @@ interface Props {
   onBack: () => void;
   onDexPress: () => void;
   onDismissHatch: () => void;
-  onHatch: () => Promise<void>;
+  onHatchAll: () => Promise<void>;
+  onHatch: (eggId: string) => Promise<void>;
+  onLeaderboardPress: () => void;
   onSettingsPress: () => void;
 }
 
@@ -28,11 +30,13 @@ export function MonsterDetailScreen({
   onBack,
   onDexPress,
   onDismissHatch,
+  onHatchAll,
   onHatch,
+  onLeaderboardPress,
   onSettingsPress,
 }: Props) {
   const progression = getProgression(data.totalXp);
-  const eggReady = isEggReady(data.activeEgg);
+  const readyEggCount = data.activeEggs.filter(isEggReady).length;
 
   return (
     <Screen
@@ -41,6 +45,7 @@ export function MonsterDetailScreen({
           active="monster"
           onDexPress={onDexPress}
           onHomePress={onBack}
+          onLeaderboardPress={onLeaderboardPress}
           onMonsterPress={() => undefined}
           onSettingsPress={onSettingsPress}
         />
@@ -105,27 +110,52 @@ export function MonsterDetailScreen({
       })}
       <View style={styles.stats}>
         <Stat label="Total XP" value={String(data.totalXp)} />
+        <Stat label="Active eggs" value={`${data.activeEggs.length}/3`} />
         <Stat label="Longest streak" value={`${data.longestStreak} days`} />
       </View>
-      <Text style={styles.sectionTitle}>Incubator</Text>
-      <View style={styles.incubatorCard}>
-        <EggAvatar element={data.activeEgg.element} rarity={data.activeEgg.rarity} />
-        <Text style={styles.eggName}>
-          {capitalize(data.activeEgg.rarity)} {capitalize(data.activeEgg.element)} egg
+      <View style={styles.collectionHeader}>
+        <Text style={styles.sectionTitle}>Incubator</Text>
+        <Text style={styles.collectionCount}>
+          {readyEggCount} ready
         </Text>
-        <Text style={styles.eggCaption}>
-          {eggReady
-            ? "Your movement filled this egg. It is ready to hatch."
-            : `${data.activeEgg.stepsWalked.toLocaleString()} / ${data.activeEgg.stepsRequired.toLocaleString()} steps walked`}
-        </Text>
-        <ProgressBar progress={getEggProgress(data.activeEgg)} />
+      </View>
+      <Text style={styles.incubatorIntro}>
+        Up to three eggs progress together from every health sync. Each new egg
+        rolls a random element and weighted rarity.
+      </Text>
+      {readyEggCount > 1 && (
         <AppButton
-          disabled={!eggReady}
-          label={eggReady ? "Hatch this egg" : "Keep moving to hatch"}
-          onPress={onHatch}
-          style={!eggReady ? styles.disabledButton : undefined}
-          variant={eggReady ? "primary" : "secondary"}
+          label={`Hatch all ${readyEggCount} ready eggs`}
+          onPress={onHatchAll}
+          style={styles.hatchAllButton}
         />
+      )}
+      <View style={styles.incubatorStack}>
+        {data.activeEggs.map((egg, index) => {
+          const eggReady = isEggReady(egg);
+          return (
+            <View style={styles.incubatorCard} key={egg.id}>
+              <EggAvatar element={egg.element} rarity={egg.rarity} />
+              <Text style={styles.eggName}>
+                Slot {index + 1}: {capitalize(egg.rarity)}{" "}
+                {capitalize(egg.element)} egg
+              </Text>
+              <Text style={styles.eggCaption}>
+                {eggReady
+                  ? "Your movement filled this egg. It is ready to hatch."
+                  : `${egg.stepsWalked.toLocaleString()} / ${egg.stepsRequired.toLocaleString()} steps walked`}
+              </Text>
+              <ProgressBar progress={getEggProgress(egg)} />
+              <AppButton
+                disabled={!eggReady}
+                label={eggReady ? "Hatch this egg" : "Keep moving to hatch"}
+                onPress={() => onHatch(egg.id)}
+                style={!eggReady ? styles.disabledButton : undefined}
+                variant={eggReady ? "primary" : "secondary"}
+              />
+            </View>
+          );
+        })}
       </View>
       <View style={styles.collectionHeader}>
         <Text style={styles.sectionTitle}>Your hatchlings</Text>
@@ -299,6 +329,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 22,
     padding: 18,
+  },
+  incubatorIntro: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 10,
+    marginTop: -4,
+  },
+  incubatorStack: {
+    gap: 10,
+  },
+  hatchAllButton: {
+    marginBottom: 10,
   },
   eggName: {
     color: colors.ink,

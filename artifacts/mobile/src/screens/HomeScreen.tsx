@@ -27,6 +27,7 @@ interface Props {
   latestSyncGains: { eggSteps: number; xp: DailyXp };
   latestEvolution: MonsterStage | null;
   onDexPress: () => void;
+  onLeaderboardPress: () => void;
   onMonsterPress: () => void;
   onSettingsPress: () => void;
   onSync: () => Promise<void>;
@@ -40,6 +41,7 @@ export function HomeScreen({
   latestSyncGains,
   latestEvolution,
   onDexPress,
+  onLeaderboardPress,
   onMonsterPress,
   onSettingsPress,
   onSync,
@@ -52,8 +54,6 @@ export function HomeScreen({
       : data.dailyAward?.date === todayKey
         ? data.dailyAward
         : null;
-  const eggProgress = getEggProgress(data.activeEgg);
-  const eggReady = isEggReady(data.activeEgg);
   const quests = getDailyQuests(today);
   const activity = getActivitySummary(data.activityHistory, todayKey);
 
@@ -64,6 +64,7 @@ export function HomeScreen({
           active="home"
           onDexPress={onDexPress}
           onHomePress={() => undefined}
+          onLeaderboardPress={onLeaderboardPress}
           onMonsterPress={onMonsterPress}
           onSettingsPress={onSettingsPress}
         />
@@ -122,7 +123,7 @@ export function HomeScreen({
           <Text style={styles.syncReceiptTitle}>Movement collected</Text>
           <Text style={styles.syncReceiptText}>
             +{latestSyncGains.xp.total} XP and +
-            {latestSyncGains.eggSteps.toLocaleString()} incubator steps
+            {latestSyncGains.eggSteps.toLocaleString()} steps to each egg
           </Text>
           <Text style={styles.syncReceiptBreakdown}>
             {getRewardBreakdown(latestSyncGains.xp)}
@@ -163,26 +164,27 @@ export function HomeScreen({
       </View>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Incubator</Text>
-        <Text style={styles.sectionMeta}>{data.eggsHatched} hatched</Text>
+        <Text style={styles.sectionMeta}>
+          {data.activeEggs.filter(isEggReady).length}/{data.activeEggs.length} ready
+        </Text>
       </View>
-      <View style={styles.incubatorCard}>
-        <EggAvatar
-          element={data.activeEgg.element}
-          rarity={data.activeEgg.rarity}
-          size="small"
-        />
-        <View style={styles.incubatorBody}>
-          <Text style={styles.eggTitle}>
-            {capitalize(data.activeEgg.rarity)}{" "}
-            {capitalize(data.activeEgg.element)} egg
-          </Text>
-          <Text style={styles.eggCaption}>
-            {eggReady
-              ? "Ready to hatch in your monster tab."
-              : `${data.activeEgg.stepsWalked.toLocaleString()} / ${data.activeEgg.stepsRequired.toLocaleString()} steps`}
-          </Text>
-          <ProgressBar progress={eggProgress} />
-        </View>
+      <View style={styles.incubatorStack}>
+        {data.activeEggs.map((egg, index) => (
+          <View style={styles.incubatorCard} key={egg.id}>
+            <EggAvatar element={egg.element} rarity={egg.rarity} size="small" />
+            <View style={styles.incubatorBody}>
+              <Text style={styles.eggTitle}>
+                Slot {index + 1}: {capitalize(egg.rarity)} {capitalize(egg.element)}
+              </Text>
+              <Text style={styles.eggCaption}>
+                {isEggReady(egg)
+                  ? "Ready to hatch in your Hatchery."
+                  : `${egg.stepsWalked.toLocaleString()} / ${egg.stepsRequired.toLocaleString()} steps`}
+              </Text>
+              <ProgressBar progress={getEggProgress(egg)} />
+            </View>
+          </View>
+        ))}
       </View>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Daily quests</Text>
@@ -444,8 +446,11 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     flexDirection: "row",
     gap: 12,
-    marginBottom: 22,
     padding: 14,
+  },
+  incubatorStack: {
+    gap: 8,
+    marginBottom: 22,
   },
   activityCard: {
     backgroundColor: colors.surface,

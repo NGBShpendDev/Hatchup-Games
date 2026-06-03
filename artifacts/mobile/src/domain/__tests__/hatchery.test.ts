@@ -1,6 +1,7 @@
 import { initialHatchUpData } from "../models";
 import {
   addStepsToEgg,
+  addStepsToEggs,
   createEgg,
   getNewStepsForSync,
   hatchActiveEgg,
@@ -14,6 +15,13 @@ describe("hatchery", () => {
     expect(addStepsToEgg(egg, 10000)).toMatchObject({
       stepsWalked: egg.stepsRequired,
     });
+  });
+
+  it("advances all active eggs with the same movement", () => {
+    const eggs = addStepsToEggs(initialHatchUpData.activeEggs, 900);
+
+    expect(eggs).toHaveLength(3);
+    expect(eggs.every((egg) => egg.stepsWalked === 900)).toBe(true);
   });
 
   it("counts only newly synced steps on the same day", () => {
@@ -44,9 +52,13 @@ describe("hatchery", () => {
   });
 
   it("moves a ready egg into the collection and starts a new egg", () => {
+    const activeEggs = initialHatchUpData.activeEggs.map((egg, index) =>
+      index === 0 ? addStepsToEgg(egg, egg.stepsRequired) : egg,
+    );
     const ready = {
       ...initialHatchUpData,
-      activeEgg: addStepsToEgg(initialHatchUpData.activeEgg, 1500),
+      activeEgg: activeEggs[0],
+      activeEggs,
     };
     expect(isEggReady(ready.activeEgg)).toBe(true);
 
@@ -59,6 +71,7 @@ describe("hatchery", () => {
       element: "leaf",
       rarity: "common",
     });
-    expect(next.activeEgg.id).toBe("egg-2");
+    expect(next.activeEggs).toHaveLength(3);
+    expect(next.activeEgg.id).not.toBe("egg-1");
   });
 });

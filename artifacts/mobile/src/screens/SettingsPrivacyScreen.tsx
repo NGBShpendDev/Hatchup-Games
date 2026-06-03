@@ -9,31 +9,37 @@ import type { ProgressionProfile } from "../domain/progressionConfig";
 import { colors } from "../theme";
 
 const privacyCopy =
-  "HatchUp reads your steps, workouts, and active energy only to reward your monster with XP. We do not sell your health data or use it for ads.";
+  "HatchUp reads your steps, distance, workouts, and active energy only to reward your monster with XP and show optional rankings. We do not sell your health data or use it for ads.";
 
 interface Props {
   data: HatchUpData;
   healthMode: string;
+  leaderboardSyncLabel: string;
   progressionProfile: ProgressionProfile;
   testLabEnabled: boolean;
   onBack: () => void;
   onDexPress: () => void;
+  onLeaderboardPress: () => void;
   onMonsterPress: () => void;
   onReadyTestEgg: () => Promise<void>;
   onReset: () => Promise<void>;
+  onSetLeaderboardSharing: (enabled: boolean) => Promise<void>;
   onSetTestStage: (stage: MonsterStage) => Promise<void>;
 }
 
 export function SettingsPrivacyScreen({
   data,
   healthMode,
+  leaderboardSyncLabel,
   progressionProfile,
   testLabEnabled,
   onBack,
   onDexPress,
+  onLeaderboardPress,
   onMonsterPress,
   onReadyTestEgg,
   onReset,
+  onSetLeaderboardSharing,
   onSetTestStage,
 }: Props) {
   return (
@@ -43,6 +49,7 @@ export function SettingsPrivacyScreen({
           active="settings"
           onDexPress={onDexPress}
           onHomePress={onBack}
+          onLeaderboardPress={onLeaderboardPress}
           onMonsterPress={onMonsterPress}
           onSettingsPress={() => undefined}
         />
@@ -72,6 +79,11 @@ export function SettingsPrivacyScreen({
           label="Local activity history"
           value={`${data.activityHistory.length} day${data.activityHistory.length === 1 ? "" : "s"} stored`}
         />
+        <Setting
+          label="Leaderboard sharing"
+          value={data.leaderboardShareEnabled ? "Opted in" : "Private"}
+        />
+        <Setting label="Leaderboard sync" value={leaderboardSyncLabel} />
         <Setting
           label="Progression tuning"
           value={progressionProfile.label}
@@ -107,7 +119,7 @@ export function SettingsPrivacyScreen({
               variant="secondary"
             />
             <AppButton
-              label="Ready current egg"
+              label="Ready all eggs"
               onPress={onReadyTestEgg}
               variant="secondary"
             />
@@ -117,6 +129,21 @@ export function SettingsPrivacyScreen({
       <View style={styles.privacyCard}>
         <Text style={styles.cardTitle}>Privacy promise</Text>
         <Text style={styles.privacyText}>{privacyCopy}</Text>
+      </View>
+      <View style={styles.readOnlyCard}>
+        <Text style={styles.cardTitle}>Leaderboard privacy</Text>
+        <Text style={styles.privacyText}>
+          Rankings are optional for this beta. Turning sharing on adds your
+          leaderboard name, weekly movement, distance, and XP to the local
+          leaderboard experience.
+        </Text>
+        <View style={styles.leaderboardActions}>
+          <AppButton
+            label={data.leaderboardShareEnabled ? "Hide from rankings" : "Share ranking"}
+            onPress={() => onSetLeaderboardSharing(!data.leaderboardShareEnabled)}
+            variant={data.leaderboardShareEnabled ? "secondary" : "primary"}
+          />
+        </View>
       </View>
       <View style={styles.readOnlyCard}>
         <Text style={styles.cardTitle}>Read-only health access</Text>
@@ -220,6 +247,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginTop: 14,
     padding: 16,
+  },
+  leaderboardActions: {
+    marginTop: 12,
   },
   cardTitle: {
     color: colors.ink,

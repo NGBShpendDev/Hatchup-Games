@@ -17,6 +17,7 @@ export const mockHealthService: HealthService = {
     return {
       date: toDateKey(new Date()),
       steps: 3500 + syncCount * 750,
+      distanceMeters: Math.round((3500 + syncCount * 750) * 0.762),
       activeCalories: 210 + syncCount * 50,
       workouts: syncCount >= 2 ? 2 : 1,
       source: "mock",
