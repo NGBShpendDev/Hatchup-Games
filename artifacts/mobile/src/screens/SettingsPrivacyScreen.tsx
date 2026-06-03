@@ -1,4 +1,12 @@
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
 import { HatchlingAvatar } from "../components/HatchlingAvatar";
@@ -6,8 +14,13 @@ import { Header } from "../components/Header";
 import { Screen } from "../components/Screen";
 import { getBadges, getUnlockedBadgeCount } from "../domain/badges";
 import { toDateKey } from "../domain/date";
-import { getActiveHatchling } from "../domain/hatchlings";
-import type { HatchUpData } from "../domain/models";
+import {
+  getActiveHatchling,
+  getTimeAdjustedHatchling,
+  getTrainingStatus,
+} from "../domain/hatchlings";
+import { getActivitySummary } from "../domain/history";
+import type { CollectedHatchling, HatchUpData } from "../domain/models";
 import type { MonsterStage } from "../domain/progression";
 import type { ProgressionProfile } from "../domain/progressionConfig";
 import { colors } from "../theme";
@@ -28,6 +41,11 @@ interface Props {
   onMonsterPress: () => void;
   onReadyTestEgg: () => Promise<void>;
   onReset: () => Promise<void>;
+  onSaveProfile: (profile: {
+    profileHatchlingId: string | null;
+    profileTagline: string;
+    profileUsername: string;
+  }) => Promise<void>;
   onSetAnalyticsEnabled: (enabled: boolean) => Promise<void>;
   onSetCloudSyncEnabled: (enabled: boolean) => Promise<void>;
   onSetCrashReportingEnabled: (enabled: boolean) => Promise<void>;
@@ -48,6 +66,7 @@ export function SettingsPrivacyScreen({
   onMonsterPress,
   onReadyTestEgg,
   onReset,
+  onSaveProfile,
   onSetAnalyticsEnabled,
   onSetCloudSyncEnabled,
   onSetCrashReportingEnabled,
@@ -56,8 +75,53 @@ export function SettingsPrivacyScreen({
 }: Props) {
   const today = toDateKey(new Date());
   const badges = getBadges(data, today);
-  const activeHatchling = getActiveHatchling(data);
+  const activeHatchlingRaw = getActiveHatchling(data);
+  const activeHatchling = activeHatchlingRaw
+    ? getTimeAdjustedHatchling(activeHatchlingRaw)
+    : null;
+  const trainingStatus = activeHatchling
+    ? getTrainingStatus(activeHatchling)
+    : null;
   const unlockedBadgeCount = getUnlockedBadgeCount(data, today);
+  const weeklyActivity = useMemo(
+    () => getActivitySummary(data.activityHistory, today),
+    [data.activityHistory, today],
+  );
+  const [usernameDraft, setUsernameDraft] = useState("");
+  const [taglineDraft, setTaglineDraft] = useState("");
+  const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"profile" | "settings">("profile");
+  const profileName =
+    data.profileUsername ||
+    data.leaderboardAlias ||
+    data.monsterName ||
+    "HatchUp Tester";
+  const profilePetRaw =
+    data.collection.find((hatchling) => hatchling.id === selectedPetId) ??
+    activeHatchlingRaw ??
+    data.collection[0] ??
+    null;
+  const profilePet = profilePetRaw
+    ? getTimeAdjustedHatchling(profilePetRaw)
+    : null;
+
+  useEffect(() => {
+    setUsernameDraft(
+      data.profileUsername || data.leaderboardAlias || data.monsterName || "",
+    );
+    setTaglineDraft(data.profileTagline);
+    setSelectedPetId(
+      data.profileHatchlingId ?? data.activeHatchlingId ?? data.collection[0]?.id ?? null,
+    );
+  }, [
+    data.activeHatchlingId,
+    data.collection,
+    data.leaderboardAlias,
+    data.monsterName,
+    data.profileHatchlingId,
+    data.profileTagline,
+    data.profileUsername,
+  ]);
 
   return (
     <Screen
@@ -78,15 +142,104 @@ export function SettingsPrivacyScreen({
         Track your collection, badges, and privacy controls in one beta profile
         page.
       </Text>
+      <View style={styles.profileTabs}>
+        <ProfileTab
+          active={activeTab === "profile"}
+          label="Profile"
+          onPress={() => setActiveTab("profile")}
+        />
+        <ProfileTab
+          active={activeTab === "settings"}
+          label="Settings"
+          onPress={() => setActiveTab("settings")}
+        />
+      </View>
+      {activeTab === "profile" && (
+        <>
       <View style={styles.profileCard}>
-        <View>
-          <Text style={styles.profileName}>
-            {data.leaderboardAlias || data.monsterName || "HatchUp Tester"}
-          </Text>
-          <Text style={styles.profileMeta}>
-            {data.totalXp} XP | {data.eggsHatched} eggs hatched |{" "}
-            {unlockedBadgeCount}/{badges.length} badges
-          </Text>
+        <View style={styles.profileHero}>
+          <View style={styles.profileAvatar}>
+            {profilePet ? (
+              <HatchlingAvatar
+                element={profilePet.element}
+                rarity={profilePet.rarity}
+                size="large"
+              />
+            ) : (
+              <View style={styles.emptyAvatar}>
+                <Text style={styles.emptyAvatarText}>PAL</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.profileHeroText}>
+            <Text style={styles.profileKicker}>Beta trainer card</Text>
+            <Text style={styles.profileName}>{profileName}</Text>
+            <Text style={styles.profileMeta}>
+              {taglineDraft.trim() ||
+                "Choose a favorite Pal and make this profile yours."}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.profileForm}>
+          <Text style={styles.inputLabel}>Username</Text>
+          <TextInput
+            autoCapitalize="none"
+            maxLength={24}
+            onChangeText={setUsernameDraft}
+            placeholder="Your trainer name"
+            placeholderTextColor={colors.muted}
+            style={styles.profileInput}
+            value={usernameDraft}
+          />
+          <Text style={styles.inputLabel}>Profile note</Text>
+          <TextInput
+            maxLength={80}
+            multiline
+            onChangeText={setTaglineDraft}
+            placeholder="A short note for your beta profile"
+            placeholderTextColor={colors.muted}
+            style={[styles.profileInput, styles.taglineInput]}
+            value={taglineDraft}
+          />
+        </View>
+        <View style={styles.petPicker}>
+          <Text style={styles.cardTitle}>Profile pet picture</Text>
+          {data.collection.length > 0 ? (
+            <View style={styles.petOptions}>
+              {data.collection.map((hatchling) => (
+                <PetOption
+                  key={hatchling.id}
+                  hatchling={hatchling}
+                  selected={hatchling.id === selectedPetId}
+                  onPress={() => setSelectedPetId(hatchling.id)}
+                />
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.privacyText}>
+              Hatch a Pal to unlock profile picture choices.
+            </Text>
+          )}
+        </View>
+        <View style={styles.profileStatsGrid}>
+          <ProfileStat label="Total XP" value={formatCompact(data.totalXp)} />
+          <ProfileStat
+            label="Collection"
+            value={`${data.collection.length}`}
+          />
+          <ProfileStat label="Eggs hatched" value={`${data.eggsHatched}`} />
+          <ProfileStat
+            label="Badges"
+            value={`${unlockedBadgeCount}/${badges.length}`}
+          />
+          <ProfileStat
+            label="Current streak"
+            value={`${data.currentStreak}d`}
+          />
+          <ProfileStat
+            label="Weekly steps"
+            value={formatCompact(weeklyActivity.steps)}
+          />
         </View>
         {activeHatchling && (
           <View style={styles.activeHatchling}>
@@ -96,16 +249,29 @@ export function SettingsPrivacyScreen({
               size="small"
             />
             <View style={styles.activeHatchlingText}>
-              <Text style={styles.activeLabel}>Training</Text>
+              <Text style={styles.activeLabel}>Active Pal</Text>
               <Text style={styles.activeName}>
                 {activeHatchling.name} L{activeHatchling.level}
               </Text>
               <Text style={styles.activeMood}>
                 {capitalize(activeHatchling.mood)} | Bond {activeHatchling.bond}
               </Text>
+              <Text style={styles.activeMood}>
+                {trainingStatus?.cooldownLabel}
+              </Text>
             </View>
           </View>
         )}
+        <AppButton
+          label="Save profile"
+          onPress={() =>
+            onSaveProfile({
+              profileHatchlingId: selectedPetId,
+              profileTagline: taglineDraft,
+              profileUsername: usernameDraft,
+            })
+          }
+        />
       </View>
       <View style={styles.badgeCard}>
         <Text style={styles.cardTitle}>Milestones and badges</Text>
@@ -132,6 +298,10 @@ export function SettingsPrivacyScreen({
           ))}
         </View>
       </View>
+        </>
+      )}
+      {activeTab === "settings" && (
+        <>
       <View style={styles.card}>
         <Setting label="Health source" value={healthMode} />
         <Setting
@@ -268,6 +438,8 @@ export function SettingsPrivacyScreen({
         }
         variant="danger"
       />
+        </>
+      )}
     </Screen>
   );
 }
@@ -293,6 +465,73 @@ function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function formatCompact(value: number) {
+  return Intl.NumberFormat(undefined, { notation: "compact" }).format(value);
+}
+
+function ProfileStat({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.profileStat}>
+      <Text style={styles.profileStatValue}>{value}</Text>
+      <Text style={styles.profileStatLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function ProfileTab({
+  active,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.profileTab, active && styles.profileTabActive]}
+    >
+      <Text
+        style={[styles.profileTabText, active && styles.profileTabTextActive]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function PetOption({
+  hatchling,
+  selected,
+  onPress,
+}: {
+  hatchling: CollectedHatchling;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.petOption, selected && styles.petOptionSelected]}
+    >
+      <HatchlingAvatar
+        element={hatchling.element}
+        rarity={hatchling.rarity}
+        size="small"
+      />
+      <Text style={styles.petOptionText} numberOfLines={1}>
+        {hatchling.name}
+      </Text>
+      <Text style={styles.petOptionMeta}>
+        L{hatchling.level} {hatchling.rarity}
+      </Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   title: {
     color: colors.ink,
@@ -307,6 +546,33 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     marginTop: 10,
   },
+  profileTabs: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 18,
+    padding: 6,
+  },
+  profileTab: {
+    alignItems: "center",
+    borderRadius: 13,
+    flex: 1,
+    paddingVertical: 11,
+  },
+  profileTabActive: {
+    backgroundColor: colors.primary,
+  },
+  profileTabText: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  profileTabTextActive: {
+    color: "#FFFFFF",
+  },
   card: {
     backgroundColor: colors.surface,
     borderRadius: 18,
@@ -320,6 +586,47 @@ const styles = StyleSheet.create({
     marginTop: 22,
     padding: 16,
   },
+  profileHero: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 14,
+  },
+  profileAvatar: {
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.62)",
+    borderColor: "rgba(244, 163, 64, 0.35)",
+    borderRadius: 24,
+    borderWidth: 1,
+    height: 170,
+    justifyContent: "center",
+    overflow: "hidden",
+    width: 142,
+  },
+  emptyAvatar: {
+    alignItems: "center",
+    backgroundColor: colors.primarySoft,
+    borderRadius: 44,
+    height: 88,
+    justifyContent: "center",
+    width: 88,
+  },
+  emptyAvatarText: {
+    color: colors.primary,
+    fontSize: 18,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  profileHeroText: {
+    flex: 1,
+  },
+  profileKicker: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    marginBottom: 5,
+    textTransform: "uppercase",
+  },
   profileName: {
     color: colors.ink,
     fontSize: 24,
@@ -330,6 +637,93 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     marginTop: 4,
+  },
+  profileForm: {
+    gap: 8,
+  },
+  inputLabel: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  profileInput: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: 14,
+    borderWidth: 1,
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: "700",
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  taglineInput: {
+    minHeight: 76,
+    textAlignVertical: "top",
+  },
+  petPicker: {
+    backgroundColor: "rgba(255, 255, 255, 0.54)",
+    borderRadius: 18,
+    padding: 12,
+  },
+  petOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 8,
+  },
+  petOption: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 8,
+    width: "30.5%",
+  },
+  petOptionSelected: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
+  petOptionText: {
+    color: colors.ink,
+    fontSize: 11,
+    fontWeight: "900",
+    marginTop: 4,
+    maxWidth: "100%",
+  },
+  petOptionMeta: {
+    color: colors.muted,
+    fontSize: 10,
+    marginTop: 2,
+    textTransform: "capitalize",
+  },
+  profileStatsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  profileStat: {
+    backgroundColor: colors.surface,
+    borderColor: "rgba(37, 49, 46, 0.08)",
+    borderRadius: 15,
+    borderWidth: 1,
+    padding: 10,
+    width: "31.5%",
+  },
+  profileStatValue: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  profileStatLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "800",
+    lineHeight: 14,
+    marginTop: 3,
   },
   activeHatchling: {
     alignItems: "center",

@@ -5,6 +5,7 @@ import {
   initialHatchUpData,
   type CollectedHatchling,
   type DailyAward,
+  type DailyXp,
   type EggElement,
   type HatchUpData,
 } from "./domain/models";
@@ -19,8 +20,8 @@ import {
 } from "./domain/hatchery";
 import {
   addXpToActiveHatchling,
-  bondWithHatchling,
   renameHatchling,
+  trainHatchling,
 } from "./domain/hatchlings";
 import { upsertDailyAward } from "./domain/history";
 import { updateStreak } from "./domain/streak";
@@ -44,6 +45,33 @@ import {
   saveHatchUpData,
 } from "./storage/appStorage";
 
+export interface LatestSyncGains {
+  coins: number;
+  eggSteps: number;
+  eggsAwarded: number;
+  palXp: number;
+  streakProgressed: boolean;
+  xp: DailyXp;
+}
+
+const emptyDailyXp: DailyXp = {
+  steps: 0,
+  activeCalories: 0,
+  workouts: 0,
+  quests: 0,
+  firstSync: 0,
+  total: 0,
+};
+
+const emptySyncGains: LatestSyncGains = {
+  coins: 0,
+  eggSteps: 0,
+  eggsAwarded: 0,
+  palXp: 0,
+  streakProgressed: false,
+  xp: getXpGains(null, emptyDailyXp),
+};
+
 export function useHatchUpApp() {
   const [data, setData] = useState<HatchUpData>(initialHatchUpData);
   const [ready, setReady] = useState(false);
@@ -53,17 +81,8 @@ export function useHatchUpApp() {
   const [latestEvolution, setLatestEvolution] = useState<MonsterStage | null>(
     null,
   );
-  const [latestSyncGains, setLatestSyncGains] = useState({
-    eggSteps: 0,
-    xp: getXpGains(null, {
-      steps: 0,
-      activeCalories: 0,
-      workouts: 0,
-      quests: 0,
-      firstSync: 0,
-      total: 0,
-    }),
-  });
+  const [latestSyncGains, setLatestSyncGains] =
+    useState<LatestSyncGains>(emptySyncGains);
   const [latestHatchling, setLatestHatchling] =
     useState<CollectedHatchling | null>(null);
   const [leaderboardSyncLabel, setLeaderboardSyncLabel] =
@@ -154,7 +173,12 @@ export function useHatchUpApp() {
       );
       const dailyAward = { date: health.date, health, xp };
       const activeEggs = addStepsToEggs(data.activeEggs, newSteps);
+      const previousEggRewardCount =
+        activeEggs.length + data.pendingEggs.length;
       const previousTotalXp = data.totalXp;
+      const activeHatchlingBefore = data.activeHatchlingId
+        ? data.collection.find((item) => item.id === data.activeHatchlingId)
+        : null;
       const synced = {
         ...data,
         ...streak,
@@ -172,6 +196,10 @@ export function useHatchUpApp() {
         previousTotalXp + newXp,
       );
       const next = grantEventEggs(withMilestoneEggs, health.date);
+      const activeHatchlingAfter =
+        next.activeHatchlingId && activeHatchlingBefore
+          ? next.collection.find((item) => item.id === next.activeHatchlingId)
+          : null;
 
       await persist(next);
       void syncLeaderboard(next);
@@ -184,7 +212,17 @@ export function useHatchUpApp() {
         previousStage.id === nextStage.id ? null : nextStage.id,
       );
       setLatestSyncGains({
+        coins: 0,
         eggSteps: newSteps,
+        eggsAwarded: Math.max(
+          next.activeEggs.length + next.pendingEggs.length - previousEggRewardCount,
+          0,
+        ),
+        palXp: Math.max(
+          (activeHatchlingAfter?.xp ?? 0) - (activeHatchlingBefore?.xp ?? 0),
+          0,
+        ),
+        streakProgressed: next.lastRewardDate === health.date && data.lastRewardDate !== health.date,
         xp: getXpGains(previousDailyXp, xp),
       });
     } catch (caught) {
@@ -231,17 +269,7 @@ export function useHatchUpApp() {
     setData(migrateHatchUpData(null));
     setLatestSync(null);
     setLatestEvolution(null);
-    setLatestSyncGains({
-      eggSteps: 0,
-      xp: getXpGains(null, {
-        steps: 0,
-        activeCalories: 0,
-        workouts: 0,
-        quests: 0,
-        firstSync: 0,
-        total: 0,
-      }),
-    });
+    setLatestSyncGains(emptySyncGains);
     setLatestHatchling(null);
     setLeaderboardSyncLabel("Local beta rankings");
     setCloudSyncLabel("Local-only save");
@@ -291,30 +319,43 @@ export function useHatchUpApp() {
     });
   }
 
+  async function saveProfile({
+    profileHatchlingId,
+    profileTagline,
+    profileUsername,
+  }: {
+    profileHatchlingId: string | null;
+    profileTagline: string;
+    profileUsername: string;
+  }) {
+    const username = profileUsername.trim().slice(0, 24);
+    await persist({
+      ...data,
+      leaderboardAlias: data.leaderboardAlias || username,
+      profileHatchlingId,
+      profileTagline: profileTagline.trim().slice(0, 80),
+      profileUsername: username,
+    });
+  }
+
   async function setActiveHatchling(hatchlingId: string) {
     if (!data.collection.some((hatchling) => hatchling.id === hatchlingId)) {
       return;
     }
 
-    const next = bondWithHatchling(
-      {
-        ...data,
-        activeHatchlingId: hatchlingId,
-      },
-      hatchlingId,
-      1,
-    );
-
-    await persist(next);
+    await persist({
+      ...data,
+      activeHatchlingId: hatchlingId,
+    });
   }
 
   async function renameCollectedHatchling(hatchlingId: string, name: string) {
     await persist(renameHatchling(data, hatchlingId, name));
   }
 
-  async function bondWithActiveHatchling() {
+  async function trainActiveHatchling() {
     if (!data.activeHatchlingId) return;
-    await persist(bondWithHatchling(data, data.activeHatchlingId, 3));
+    await persist(trainHatchling(data, data.activeHatchlingId));
   }
 
   async function syncLeaderboard(nextData: HatchUpData) {
@@ -406,7 +447,6 @@ export function useHatchUpApp() {
     ready,
     connectHealth,
     dismissLatestHatchling: () => setLatestHatchling(null),
-    bondWithActiveHatchling,
     hatchAllReadyEggs,
     hatchEgg,
     resetApp,
@@ -415,6 +455,7 @@ export function useHatchUpApp() {
     saveMonsterSetup,
     saveMonsterName,
     saveLeaderboardAlias,
+    saveProfile,
     renameCollectedHatchling,
     setActiveHatchling,
     setAnalyticsEnabled,
@@ -423,6 +464,7 @@ export function useHatchUpApp() {
     setLeaderboardSharing,
     setTestStage,
     syncHealth,
+    trainActiveHatchling,
     today: toDateKey(new Date()),
   };
 }

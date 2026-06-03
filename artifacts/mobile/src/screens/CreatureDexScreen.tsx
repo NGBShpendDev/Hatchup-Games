@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
@@ -14,6 +14,10 @@ import {
   getActiveHatchling,
   getHatchlingPowerScore,
   getHatchlingXpProgress,
+  getTimeAdjustedHatchling,
+  getTrainingStatus,
+  PASSIVE_BOND_HOURS,
+  TRAINING_XP,
 } from "../domain/hatchlings";
 import type { HatchUpData } from "../domain/models";
 import { colors } from "../theme";
@@ -22,22 +26,22 @@ interface Props {
   data: HatchUpData;
   onHomePress: () => void;
   onLeaderboardPress: () => void;
-  onBondWithActiveHatchling: () => Promise<void>;
   onMonsterPress: () => void;
   onRenameHatchling: (hatchlingId: string, name: string) => Promise<void>;
   onSetActiveHatchling: (hatchlingId: string) => Promise<void>;
   onSettingsPress: () => void;
+  onTrainActiveHatchling: () => Promise<void>;
 }
 
 export function CreatureDexScreen({
   data,
   onHomePress,
   onLeaderboardPress,
-  onBondWithActiveHatchling,
   onMonsterPress,
   onRenameHatchling,
   onSetActiveHatchling,
   onSettingsPress,
+  onTrainActiveHatchling,
 }: Props) {
   const entries = getCreatureDexEntries(data.collection);
   const completion = getDexCompletion(data.collection);
@@ -50,11 +54,17 @@ export function CreatureDexScreen({
   const [draftName, setDraftName] = useState("");
   const selectedHatchling = useMemo(() => {
     if (data.collection.length === 0) return null;
-    return data.collection[
+    const hatchling = data.collection[
       Math.min(selectedIndex, data.collection.length - 1)
     ];
+    return getTimeAdjustedHatchling(hatchling);
   }, [data.collection, selectedIndex]);
-  const nameValue = draftName || selectedHatchling?.name || "";
+  useEffect(() => {
+    setDraftName(selectedHatchling?.name ?? "");
+  }, [selectedHatchling?.id, selectedHatchling?.name]);
+  const trainingStatus = selectedHatchling
+    ? getTrainingStatus(selectedHatchling)
+    : null;
 
   return (
     <Screen
@@ -72,8 +82,9 @@ export function CreatureDexScreen({
       <Text style={styles.kicker}>HATCHLINGS</Text>
       <Text style={styles.title}>Train a whole team of companions.</Text>
       <Text style={styles.body}>
-        Each hatchling has its own level, XP, and stats. Set one as active to
-        train it with future health syncs.
+        Each hatchling has its own level, XP, bond, and stats. Bond grows over
+        time with your active companion; training is limited to three sessions a
+        day.
       </Text>
       {selectedHatchling ? (
         <View style={styles.detailCard}>
@@ -110,13 +121,12 @@ export function CreatureDexScreen({
               placeholder={selectedHatchling.name}
               placeholderTextColor={colors.muted}
               style={styles.renameInput}
-              value={nameValue}
+              value={draftName}
             />
             <AppButton
               label="Save nickname"
               onPress={async () => {
-                await onRenameHatchling(selectedHatchling.id, nameValue);
-                setDraftName("");
+                await onRenameHatchling(selectedHatchling.id, draftName);
               }}
               variant="secondary"
             />
@@ -126,6 +136,51 @@ export function CreatureDexScreen({
             <Stat label="Power" value={selectedHatchling.stats.power} />
             <Stat label="Guard" value={selectedHatchling.stats.resilience} />
             <Stat label="Speed" value={selectedHatchling.stats.speed} />
+          </View>
+          <View style={styles.trainingCard}>
+            <Text style={styles.trainingTitle}>Training cooldown</Text>
+            <Text style={styles.trainingText}>
+              {selectedHatchling.id === data.activeHatchlingId
+                ? trainingStatus?.cooldownLabel
+                : "Make this hatchling active before training."}
+            </Text>
+            <Text style={styles.trainingHint}>
+              +{TRAINING_XP} XP per session. Passive bond grows every{" "}
+              {PASSIVE_BOND_HOURS} hours.
+            </Text>
+            <AppButton
+              disabled={
+                selectedHatchling.id !== data.activeHatchlingId ||
+                !trainingStatus?.canTrain
+              }
+              label={
+                selectedHatchling.id !== data.activeHatchlingId
+                  ? "Set active to train"
+                  : trainingStatus?.canTrain
+                    ? "Train now"
+                    : "Training cooling down"
+              }
+              onPress={onTrainActiveHatchling}
+              style={
+                selectedHatchling.id !== data.activeHatchlingId ||
+                !trainingStatus?.canTrain
+                  ? styles.disabledAction
+                  : undefined
+              }
+              variant="secondary"
+            />
+          </View>
+          <View style={styles.memoryCard}>
+            <Text style={styles.trainingTitle}>Memory log</Text>
+            {selectedHatchling.memories.slice(0, 4).map((memory) => (
+              <View key={memory.id} style={styles.memoryRow}>
+                <Text style={styles.memoryLabel}>{memory.label}</Text>
+                <Text style={styles.memoryText}>{memory.description}</Text>
+                <Text style={styles.memoryDate}>
+                  {new Date(memory.happenedAt).toLocaleDateString()}
+                </Text>
+              </View>
+            ))}
           </View>
           <View style={styles.carouselActions}>
             <AppButton
@@ -163,13 +218,6 @@ export function CreatureDexScreen({
                 : undefined
             }
           />
-          {selectedHatchling.id === data.activeHatchlingId && (
-            <AppButton
-              label="Bond with hatchling"
-              onPress={onBondWithActiveHatchling}
-              variant="secondary"
-            />
-          )}
         </View>
       ) : (
         <View style={styles.emptyDetailCard}>
@@ -338,6 +386,57 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 16,
     padding: 12,
+  },
+  trainingCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    gap: 8,
+    padding: 12,
+  },
+  trainingTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  trainingText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  trainingHint: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  memoryCard: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: 16,
+    gap: 8,
+    padding: 12,
+  },
+  memoryRow: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: 13,
+    borderWidth: 1,
+    padding: 10,
+  },
+  memoryLabel: {
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  memoryText: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 3,
+  },
+  memoryDate: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+    marginTop: 5,
   },
   statGrid: {
     flexDirection: "row",

@@ -2,6 +2,7 @@ import type {
   CollectedHatchling,
   EggElement,
   EggRarity,
+  HatchlingMemory,
   HatchlingMood,
   HatchlingStats,
   HatchUpData,
@@ -29,6 +30,20 @@ const ELEMENT_BASE_STATS: Record<EggElement, HatchlingStats> = {
   tide: { heart: 8, power: 6, resilience: 9, speed: 6 },
 };
 
+export const TRAINING_DAILY_LIMIT = 3;
+export const TRAINING_COOLDOWN_HOURS = 4;
+export const TRAINING_XP = 25;
+export const TRAINING_BOND = 4;
+export const PASSIVE_BOND_HOURS = 8;
+
+export interface HatchlingTrainingStatus {
+  canTrain: boolean;
+  cooldownLabel: string;
+  nextAvailableAt: string | null;
+  remainingToday: number;
+  sessionsToday: number;
+}
+
 export function createHatchlingFromEgg({
   egg,
   hatchedAt,
@@ -48,10 +63,19 @@ export function createHatchlingFromEgg({
     id: `hatchling-${index}`,
     lastInteractionAt: hatchedAt,
     level,
+    memories: [
+      {
+        description: `Hatched from a ${egg.rarity} ${egg.element} egg.`,
+        happenedAt: hatchedAt,
+        id: `memory-hatch-${index}`,
+        label: "First hatch",
+      },
+    ],
     mood: "happy",
     name: nameOptions[(index - 1) % nameOptions.length],
     rarity: egg.rarity,
     stats: getHatchlingStats(egg.element, egg.rarity, level),
+    trainingSessions: [],
     xp: 0,
   };
 }
@@ -65,21 +89,28 @@ export function normalizeHatchling(
   const xp = Math.max(hatchling.xp ?? 0, 0);
   const level = getHatchlingLevel(xp);
   const bond = clampBond(hatchling.bond ?? 5);
+  const lastInteractionAt =
+    hatchling.lastInteractionAt ?? hatchling.hatchedAt ?? null;
 
   return {
     bond,
     element,
     hatchedAt: hatchling.hatchedAt ?? new Date(0).toISOString(),
     id: hatchling.id ?? `hatchling-${index}`,
-    lastInteractionAt: hatchling.lastInteractionAt ?? hatchling.hatchedAt ?? null,
+    lastInteractionAt,
+    memories:
+      hatchling.memories && hatchling.memories.length > 0
+        ? hatchling.memories
+        : createLegacyHatchMemory(hatchling, index),
     level,
     mood: getHatchlingMood({
       bond,
-      lastInteractionAt: hatchling.lastInteractionAt ?? hatchling.hatchedAt ?? null,
+      lastInteractionAt,
     }),
     name: hatchling.name ?? ELEMENT_NAMES[element][(index - 1) % 3],
     rarity,
     stats: getHatchlingStats(element, rarity, level),
+    trainingSessions: hatchling.trainingSessions ?? [],
     xp,
   };
 }
@@ -87,22 +118,30 @@ export function normalizeHatchling(
 export function addXpToActiveHatchling(
   data: HatchUpData,
   xpGained: number,
+  interactedAt = new Date().toISOString(),
 ): HatchUpData {
   if (!data.activeHatchlingId || xpGained <= 0) return data;
 
   const collection = data.collection.map((hatchling) => {
     if (hatchling.id !== data.activeHatchlingId) return hatchling;
 
-    const xp = hatchling.xp + xpGained;
+    const current = getTimeAdjustedHatchling(hatchling, interactedAt);
+    const xp = current.xp + xpGained;
     const level = getHatchlingLevel(xp);
-    const bond = clampBond(hatchling.bond + Math.max(Math.ceil(xpGained / 25), 1));
-    const interactedAt = new Date().toISOString();
+    const leveledUp = level > current.level;
+    const bond = clampBond(current.bond + Math.max(Math.ceil(xpGained / 25), 1));
     return {
-      ...hatchling,
+      ...current,
       bond,
       lastInteractionAt: interactedAt,
       level,
       mood: getHatchlingMood({ bond, lastInteractionAt: interactedAt }),
+      memories: leveledUp
+        ? [
+            createLevelMemory(level, interactedAt, "Health sync"),
+            ...current.memories,
+          ]
+        : current.memories,
       stats: getHatchlingStats(hatchling.element, hatchling.rarity, level),
       xp,
     };
@@ -112,6 +151,87 @@ export function addXpToActiveHatchling(
     ...data,
     collection,
   };
+}
+
+export function trainHatchling(
+  data: HatchUpData,
+  hatchlingId: string,
+  trainedAt = new Date().toISOString(),
+): HatchUpData {
+  let trained = false;
+
+  const collection = data.collection.map((hatchling) => {
+    if (hatchling.id !== hatchlingId) return getTimeAdjustedHatchling(hatchling);
+
+    const current = getTimeAdjustedHatchling(hatchling, trainedAt);
+    const status = getTrainingStatus(current, trainedAt);
+    if (!status.canTrain) return current;
+
+    trained = true;
+    const xp = current.xp + TRAINING_XP;
+    const level = getHatchlingLevel(xp);
+    const leveledUp = level > current.level;
+    const bond = clampBond(current.bond + TRAINING_BOND);
+
+    return {
+      ...current,
+      bond,
+      lastInteractionAt: trainedAt,
+      level,
+      memories: leveledUp
+        ? [
+            createLevelMemory(level, trainedAt, "Training"),
+            ...current.memories,
+          ]
+        : current.memories,
+      mood: getHatchlingMood({ bond, lastInteractionAt: trainedAt }),
+      stats: getHatchlingStats(current.element, current.rarity, level),
+      trainingSessions: [...current.trainingSessions, trainedAt],
+      xp,
+    };
+  });
+
+  return trained
+    ? {
+        ...data,
+        activeHatchlingId: data.activeHatchlingId ?? hatchlingId,
+        collection,
+      }
+    : {
+        ...data,
+        collection,
+      };
+}
+
+function createLevelMemory(
+  level: number,
+  happenedAt: string,
+  source: string,
+): HatchlingMemory {
+  return {
+    description: `${source} helped this Pal reach level ${level}.`,
+    happenedAt,
+    id: `memory-level-${level}-${Date.parse(happenedAt)}`,
+    label: `Reached level ${level}`,
+  };
+}
+
+function createLegacyHatchMemory(
+  hatchling: Partial<CollectedHatchling>,
+  index: number,
+): HatchlingMemory[] {
+  const element = hatchling.element ?? "leaf";
+  const rarity = hatchling.rarity ?? "common";
+  const happenedAt = hatchling.hatchedAt ?? new Date(0).toISOString();
+
+  return [
+    {
+      description: `Hatched from a ${rarity} ${element} egg.`,
+      happenedAt,
+      id: `memory-hatch-${index}`,
+      label: "First hatch",
+    },
+  ];
 }
 
 export function renameHatchling(
@@ -165,6 +285,51 @@ export function getActiveHatchling(data: HatchUpData) {
   );
 }
 
+export function getTimeAdjustedHatchling(
+  hatchling: CollectedHatchling,
+  now = new Date().toISOString(),
+): CollectedHatchling {
+  const passiveBond = getPassiveBondGain(hatchling, now);
+  const bond = clampBond(hatchling.bond + passiveBond);
+  const lastInteractionAt =
+    passiveBond > 0 ? now : hatchling.lastInteractionAt;
+
+  return {
+    ...hatchling,
+    bond,
+    lastInteractionAt,
+    mood: getHatchlingMood({ bond, lastInteractionAt }),
+    trainingSessions: getTrainingSessionsForDay(hatchling, now),
+  };
+}
+
+export function getTrainingStatus(
+  hatchling: CollectedHatchling,
+  now = new Date().toISOString(),
+): HatchlingTrainingStatus {
+  const sessionsToday = getTrainingSessionsForDay(hatchling, now);
+  const remainingToday = Math.max(
+    TRAINING_DAILY_LIMIT - sessionsToday.length,
+    0,
+  );
+  const lastSession = sessionsToday[sessionsToday.length - 1] ?? null;
+  const nextAvailableAt = lastSession
+    ? new Date(
+        Date.parse(lastSession) + TRAINING_COOLDOWN_HOURS * 60 * 60 * 1000,
+      ).toISOString()
+    : null;
+  const cooldownDone = !nextAvailableAt || Date.parse(now) >= Date.parse(nextAvailableAt);
+  const canTrain = remainingToday > 0 && cooldownDone;
+
+  return {
+    canTrain,
+    cooldownLabel: getCooldownLabel({ nextAvailableAt, remainingToday, now }),
+    nextAvailableAt,
+    remainingToday,
+    sessionsToday: sessionsToday.length,
+  };
+}
+
 export function getHatchlingLevel(xp: number) {
   return Math.min(Math.floor(Math.max(xp, 0) / 75) + 1, 50);
 }
@@ -200,6 +365,16 @@ export function getHatchlingPowerScore(hatchling: CollectedHatchling) {
   );
 }
 
+export function getPassiveBondGain(
+  hatchling: Pick<CollectedHatchling, "bond" | "lastInteractionAt">,
+  now = new Date().toISOString(),
+) {
+  if (!hatchling.lastInteractionAt || hatchling.bond >= 100) return 0;
+
+  const elapsedMs = Math.max(Date.parse(now) - Date.parse(hatchling.lastInteractionAt), 0);
+  return Math.min(Math.floor(elapsedMs / (PASSIVE_BOND_HOURS * 60 * 60 * 1000)), 3);
+}
+
 export function getHatchlingMood({
   bond,
   lastInteractionAt,
@@ -220,4 +395,38 @@ export function getHatchlingMood({
 
 function clampBond(value: number) {
   return Math.min(Math.max(Math.round(value), 0), 100);
+}
+
+function getTrainingSessionsForDay(
+  hatchling: Pick<CollectedHatchling, "trainingSessions">,
+  now: string,
+) {
+  const day = now.slice(0, 10);
+  return hatchling.trainingSessions.filter((session) => session.slice(0, 10) === day);
+}
+
+function getCooldownLabel({
+  nextAvailableAt,
+  now,
+  remainingToday,
+}: {
+  nextAvailableAt: string | null;
+  now: string;
+  remainingToday: number;
+}) {
+  if (remainingToday <= 0) return "Training used up for today";
+  if (!nextAvailableAt || Date.parse(now) >= Date.parse(nextAvailableAt)) {
+    return `${remainingToday} training session${remainingToday === 1 ? "" : "s"} left today`;
+  }
+
+  const minutes = Math.max(
+    Math.ceil((Date.parse(nextAvailableAt) - Date.parse(now)) / 60000),
+    1,
+  );
+  if (minutes >= 60) {
+    const hours = Math.ceil(minutes / 60);
+    return `Next training in ${hours}h`;
+  }
+
+  return `Next training in ${minutes}m`;
 }

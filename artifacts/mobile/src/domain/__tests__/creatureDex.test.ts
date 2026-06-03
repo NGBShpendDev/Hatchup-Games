@@ -7,6 +7,14 @@ describe("creature dex", () => {
       bond: 5,
       id: "hatchling-1",
       lastInteractionAt: "2026-06-01T12:00:00.000Z",
+      memories: [
+        {
+          description: "Hatched from a common leaf egg.",
+          happenedAt: "2026-06-01T12:00:00.000Z",
+          id: "memory-hatch-1",
+          label: "First hatch",
+        },
+      ],
       name: "Sprig",
       element: "leaf",
       mood: "happy",
@@ -14,12 +22,21 @@ describe("creature dex", () => {
       hatchedAt: "2026-06-01T12:00:00.000Z",
       level: 1,
       stats: { heart: 9, power: 6, resilience: 8, speed: 5 },
+      trainingSessions: [],
       xp: 0,
     },
     {
       bond: 10,
       id: "hatchling-2",
       lastInteractionAt: "2026-06-02T12:00:00.000Z",
+      memories: [
+        {
+          description: "Hatched from a common leaf egg.",
+          happenedAt: "2026-06-02T12:00:00.000Z",
+          id: "memory-hatch-2",
+          label: "First hatch",
+        },
+      ],
       name: "Moss",
       element: "leaf",
       mood: "happy",
@@ -27,6 +44,7 @@ describe("creature dex", () => {
       hatchedAt: "2026-06-02T12:00:00.000Z",
       level: 2,
       stats: { heart: 9, power: 7, resilience: 8, speed: 5 },
+      trainingSessions: [],
       xp: 75,
     },
   ];

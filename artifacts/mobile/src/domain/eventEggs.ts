@@ -62,18 +62,25 @@ function maybeGrantEgg(
     shouldGrant: boolean;
   },
 ): HatchUpData {
-  const hasRoom = data.activeEggs.length < MAX_ACTIVE_EGGS;
-  if (!shouldGrant || !hasRoom || data.eventEggsAwarded.includes(eventId)) {
+  if (!shouldGrant || data.eventEggsAwarded.includes(eventId)) {
     return data;
   }
 
   const egg = createRandomEgg(seed, profile);
-  const activeEggs = [...data.activeEggs, { ...egg, id: `event-${eventId}` }];
+  const awardedEgg = { ...egg, id: `event-${eventId}` };
+  const hasRoom = data.activeEggs.length < MAX_ACTIVE_EGGS;
+  const activeEggs = hasRoom
+    ? [...data.activeEggs, awardedEgg]
+    : data.activeEggs;
+  const pendingEggs = hasRoom
+    ? data.pendingEggs
+    : [...data.pendingEggs, awardedEgg];
 
   return {
     ...data,
     activeEgg: activeEggs[0],
     activeEggs,
     eventEggsAwarded: [...data.eventEggsAwarded, eventId],
+    pendingEggs,
   };
 }

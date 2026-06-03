@@ -3,15 +3,30 @@ import type { EggElement, EggRarity } from "../domain/models";
 import type { MonsterStage } from "../domain/progression";
 
 import eggEmberCommon from "../../assets/creatures/eggs/egg_ember_common.png";
+import eggEmberEpic from "../../assets/creatures/eggs/egg_ember_epic.png";
+import eggEmberRare from "../../assets/creatures/eggs/egg_ember_rare.png";
+import eggEmberUncommon from "../../assets/creatures/eggs/egg_ember_uncommon.png";
 import eggLeafCommon from "../../assets/creatures/eggs/egg_leaf_common.png";
+import eggLeafEpic from "../../assets/creatures/eggs/egg_leaf_epic.png";
+import eggLeafRare from "../../assets/creatures/eggs/egg_leaf_rare.png";
+import eggLeafUncommon from "../../assets/creatures/eggs/egg_leaf_uncommon.png";
 import eggStormCommon from "../../assets/creatures/eggs/egg_storm_common.png";
+import eggStormEpic from "../../assets/creatures/eggs/egg_storm_epic.png";
+import eggStormRare from "../../assets/creatures/eggs/egg_storm_rare.png";
+import eggStormUncommon from "../../assets/creatures/eggs/egg_storm_uncommon.png";
+import eggTideCommon from "../../assets/creatures/eggs/egg_tide_common.png";
+import eggTideEpic from "../../assets/creatures/eggs/egg_tide_epic.png";
+import eggTideRare from "../../assets/creatures/eggs/egg_tide_rare.png";
+import eggTideUncommon from "../../assets/creatures/eggs/egg_tide_uncommon.png";
 import hatchlingEmberCommon from "../../assets/creatures/hatchlings/hatchling_ember_common.png";
+import hatchlingEmberEpic from "../../assets/creatures/hatchlings/hatchling_ember_epic.png";
 import hatchlingEmberRare from "../../assets/creatures/hatchlings/hatchling_ember_rare.png";
 import hatchlingEmberUncommon from "../../assets/creatures/hatchlings/hatchling_ember_uncommon.png";
 import hatchlingStormCommon from "../../assets/creatures/hatchlings/hatchling_storm_common.png";
 import hatchlingStormRare from "../../assets/creatures/hatchlings/hatchling_storm_rare.png";
 import hatchlingStormUncommon from "../../assets/creatures/hatchlings/hatchling_storm_uncommon.png";
 import hatchlingTideCommon from "../../assets/creatures/hatchlings/hatchling_tide_common.png";
+import hatchlingTideEpic from "../../assets/creatures/hatchlings/hatchling_tide_epic.png";
 import hatchlingTideRare from "../../assets/creatures/hatchlings/hatchling_tide_rare.png";
 import hatchlingTideUncommon from "../../assets/creatures/hatchlings/hatchling_tide_uncommon.png";
 import monsterBaby from "../../assets/creatures/monster/monster_baby.png";
@@ -37,18 +52,34 @@ const monsterAssets: Record<MonsterStage, ImageSourcePropType> = {
 const eggAssets: EggAssetMap = {
   ember: {
     common: eggEmberCommon,
+    epic: eggEmberEpic,
+    rare: eggEmberRare,
+    uncommon: eggEmberUncommon,
   },
   leaf: {
     common: eggLeafCommon,
+    epic: eggLeafEpic,
+    rare: eggLeafRare,
+    uncommon: eggLeafUncommon,
   },
   storm: {
     common: eggStormCommon,
+    epic: eggStormEpic,
+    rare: eggStormRare,
+    uncommon: eggStormUncommon,
+  },
+  tide: {
+    common: eggTideCommon,
+    epic: eggTideEpic,
+    rare: eggTideRare,
+    uncommon: eggTideUncommon,
   },
 };
 
 const hatchlingAssets: HatchlingAssetMap = {
   ember: {
     common: hatchlingEmberCommon,
+    epic: hatchlingEmberEpic,
     rare: hatchlingEmberRare,
     uncommon: hatchlingEmberUncommon,
   },
@@ -59,6 +90,7 @@ const hatchlingAssets: HatchlingAssetMap = {
   },
   tide: {
     common: hatchlingTideCommon,
+    epic: hatchlingTideEpic,
     rare: hatchlingTideRare,
     uncommon: hatchlingTideUncommon,
   },
@@ -69,10 +101,6 @@ export function getMonsterAsset(stage: MonsterStage) {
 }
 
 export function getEggAsset(element: EggElement, rarity: EggRarity) {
-  if (rarity === "epic") {
-    return null;
-  }
-
   return eggAssets[element]?.[rarity] ?? eggAssets[element]?.common ?? null;
 }
 

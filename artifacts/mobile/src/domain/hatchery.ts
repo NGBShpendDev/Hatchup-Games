@@ -103,10 +103,14 @@ export function hatchEgg(
     hatchedAt,
     index: eggsHatched,
   });
-  const replacementEgg = createRandomEgg(
-    Date.parse(hatchedAt) + eggsHatched + hashText(eggId),
-    profile,
-  );
+  const [queuedEgg, ...pendingEggs] = data.pendingEggs;
+  const replacementEgg =
+    queuedEgg ??
+    createDistinctReplacementEgg(
+      Date.parse(hatchedAt) + eggsHatched + hashText(eggId),
+      egg,
+      profile,
+    );
   const activeEggs = data.activeEggs
     .map((item) => (item.id === eggId ? replacementEgg : item))
     .slice(0, MAX_ACTIVE_EGGS);
@@ -118,6 +122,7 @@ export function hatchEgg(
     activeHatchlingId: data.activeHatchlingId ?? hatchling.id,
     collection: [hatchling, ...data.collection],
     eggsHatched,
+    pendingEggs,
   };
 }
 
@@ -153,17 +158,24 @@ export function grantMilestoneEggs(
     const id = `xp-${milestone}`;
     const crossed = previousXp < milestone && nextXp >= milestone;
     const alreadyAwarded = next.milestoneEggsAwarded.includes(id);
-    const hasRoom = next.activeEggs.length < MAX_ACTIVE_EGGS;
 
-    if (!crossed || alreadyAwarded || !hasRoom) continue;
+    if (!crossed || alreadyAwarded) continue;
 
     const egg = createRandomEgg(nextXp + milestone + next.activeEggs.length, profile);
-    const activeEggs = [...next.activeEggs, { ...egg, id: `${id}-${egg.id}` }];
+    const awardedEgg = { ...egg, id: `${id}-${egg.id}` };
+    const hasRoom = next.activeEggs.length < MAX_ACTIVE_EGGS;
+    const activeEggs = hasRoom
+      ? [...next.activeEggs, awardedEgg]
+      : next.activeEggs;
+    const pendingEggs = hasRoom
+      ? next.pendingEggs
+      : [...next.pendingEggs, awardedEgg];
     next = {
       ...next,
       activeEgg: activeEggs[0],
       activeEggs,
       milestoneEggsAwarded: [...next.milestoneEggsAwarded, id],
+      pendingEggs,
     };
   }
 
@@ -187,6 +199,26 @@ function pickRarity(roll: number): EggRarity {
   }
 
   return "common";
+}
+
+function createDistinctReplacementEgg(
+  seed: number,
+  previousEgg: IncubatorEgg,
+  profile: ProgressionProfile,
+) {
+  let egg = createRandomEgg(seed, profile);
+  let attempts = 0;
+
+  while (
+    attempts < 4 &&
+    egg.element === previousEgg.element &&
+    egg.rarity === previousEgg.rarity
+  ) {
+    attempts += 1;
+    egg = createRandomEgg(seed + attempts * 97, profile);
+  }
+
+  return egg;
 }
 
 function hashSeed(seed: number) {

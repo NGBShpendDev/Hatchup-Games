@@ -101,4 +101,41 @@ describe("hatchery", () => {
     expect(next.activeEggs).toHaveLength(3);
     expect(next.milestoneEggsAwarded).toEqual(["xp-50", "xp-150"]);
   });
+
+  it("queues milestone eggs when the incubator is full", () => {
+    const next = grantMilestoneEggs(
+      {
+        ...initialHatchUpData,
+        milestoneEggsAwarded: [],
+        pendingEggs: [],
+      },
+      0,
+      200,
+    );
+
+    expect(next.activeEggs).toHaveLength(3);
+    expect(next.pendingEggs).toHaveLength(2);
+    expect(next.milestoneEggsAwarded).toEqual(["xp-50", "xp-150"]);
+  });
+
+  it("uses queued eggs as hatch replacements before rolling random eggs", () => {
+    const activeEggs = initialHatchUpData.activeEggs.map((egg, index) =>
+      index === 0 ? addStepsToEgg(egg, egg.stepsRequired) : egg,
+    );
+    const queuedEgg = {
+      ...createEgg(44),
+      id: "queued-xp-50",
+    };
+    const ready = {
+      ...initialHatchUpData,
+      activeEgg: activeEggs[0],
+      activeEggs,
+      pendingEggs: [queuedEgg],
+    };
+
+    const next = hatchActiveEgg(ready, "2026-06-01T12:00:00.000Z");
+
+    expect(next.activeEggs[0]).toEqual(queuedEgg);
+    expect(next.pendingEggs).toHaveLength(0);
+  });
 });

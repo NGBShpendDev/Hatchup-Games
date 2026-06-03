@@ -12,7 +12,7 @@ import {
   getEggStepsRequired,
 } from "./progressionConfig";
 
-export const DATA_SCHEMA_VERSION = 5;
+export const DATA_SCHEMA_VERSION = 8;
 
 function normalizeXp(xp: Partial<DailyXp> | undefined): DailyXp {
   return {
@@ -88,6 +88,13 @@ export function migrateHatchUpData(
     lastCloudSyncedAt: stored.lastCloudSyncedAt ?? null,
     privacyConsentVersion:
       stored.privacyConsentVersion ?? initialHatchUpData.privacyConsentVersion,
+    profileHatchlingId: stored.profileHatchlingId ?? null,
+    profileTagline: stored.profileTagline ?? "",
+    profileUsername:
+      stored.profileUsername ??
+      stored.leaderboardAlias ??
+      stored.monsterName ??
+      "",
     starterEggElement: stored.starterEggElement ?? null,
     weeklyGoalSteps: stored.weeklyGoalSteps ?? initialHatchUpData.weeklyGoalSteps,
     leaderboardAlias: stored.leaderboardAlias ?? "",
@@ -104,6 +111,7 @@ export function migrateHatchUpData(
     ),
     eventEggsAwarded: stored.eventEggsAwarded ?? [],
     milestoneEggsAwarded: stored.milestoneEggsAwarded ?? [],
+    pendingEggs: (stored.pendingEggs ?? []).map(normalizeEgg),
   };
 }
 

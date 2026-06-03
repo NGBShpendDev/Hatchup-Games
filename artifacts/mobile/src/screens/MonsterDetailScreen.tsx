@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
 import { EggAvatar } from "../components/EggAvatar";
@@ -8,7 +9,7 @@ import { MonsterAvatar } from "../components/MonsterAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
 import { getEggProgress, isEggReady } from "../domain/hatchery";
-import { getActiveHatchling } from "../domain/hatchlings";
+import { getActiveHatchling, getTimeAdjustedHatchling } from "../domain/hatchlings";
 import type { CollectedHatchling, HatchUpData } from "../domain/models";
 import { getProgression, MONSTER_STAGES } from "../domain/progression";
 import { colors } from "../theme";
@@ -22,6 +23,7 @@ interface Props {
   onHatchAll: () => Promise<void>;
   onHatch: (eggId: string) => Promise<void>;
   onLeaderboardPress: () => void;
+  onSetActiveHatchling: (hatchlingId: string) => Promise<void>;
   onSettingsPress: () => void;
 }
 
@@ -34,11 +36,15 @@ export function MonsterDetailScreen({
   onHatchAll,
   onHatch,
   onLeaderboardPress,
+  onSetActiveHatchling,
   onSettingsPress,
 }: Props) {
   const progression = getProgression(data.totalXp);
   const readyEggCount = data.activeEggs.filter(isEggReady).length;
-  const activeHatchling = getActiveHatchling(data);
+  const activeHatchlingRaw = getActiveHatchling(data);
+  const activeHatchling = activeHatchlingRaw
+    ? getTimeAdjustedHatchling(activeHatchlingRaw)
+    : null;
 
   return (
     <Screen
@@ -54,34 +60,18 @@ export function MonsterDetailScreen({
       }
     >
       <Header onBack={onBack} title="Hatchery" />
-      {latestHatchling && (
-        <View style={styles.revealCard}>
-          <Text style={styles.revealKicker}>NEW HATCHLING</Text>
-          <HatchlingAvatar
-            element={latestHatchling.element}
-            rarity={latestHatchling.rarity}
-          />
-          <Text style={styles.revealTitle}>Meet {latestHatchling.name}</Text>
-          <Text style={styles.revealText}>
-            Your movement hatched a {latestHatchling.rarity}{" "}
-            {latestHatchling.element} companion.
-          </Text>
-          <View style={styles.revealActions}>
-            <AppButton
-              label="Add to collection"
-              onPress={onDismissHatch}
-              variant="secondary"
-            />
-            <AppButton
-              label="View in Creature Dex"
-              onPress={() => {
-                onDismissHatch();
-                onDexPress();
-              }}
-            />
-          </View>
-        </View>
-      )}
+      <HatchRevealModal
+        hatchling={latestHatchling}
+        onClose={onDismissHatch}
+        onSetActive={async (hatchlingId) => {
+          await onSetActiveHatchling(hatchlingId);
+          onDismissHatch();
+        }}
+        onViewPal={() => {
+          onDismissHatch();
+          onDexPress();
+        }}
+      />
       <Text style={styles.sectionTitle}>Active companion</Text>
       <View style={styles.card}>
         <MonsterAvatar stage={progression.current.id} />
@@ -113,7 +103,7 @@ export function MonsterDetailScreen({
       <View style={styles.stats}>
         <Stat label="Total XP" value={String(data.totalXp)} />
         <Stat label="Active eggs" value={`${data.activeEggs.length}/3`} />
-        <Stat label="Longest streak" value={`${data.longestStreak} days`} />
+        <Stat label="Queued eggs" value={String(data.pendingEggs.length)} />
       </View>
       <View style={styles.collectionHeader}>
         <Text style={styles.sectionTitle}>Training hatchling</Text>
@@ -159,7 +149,8 @@ export function MonsterDetailScreen({
       </View>
       <Text style={styles.incubatorIntro}>
         Up to three eggs progress together from every health sync. Each new egg
-        rolls a random element and weighted rarity.
+        rolls a random element and weighted rarity. Bonus eggs wait here when
+        your incubator is full.
       </Text>
       {readyEggCount > 1 && (
         <AppButton
@@ -236,6 +227,154 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+function HatchRevealModal({
+  hatchling,
+  onClose,
+  onSetActive,
+  onViewPal,
+}: {
+  hatchling: CollectedHatchling | null;
+  onClose: () => void;
+  onSetActive: (hatchlingId: string) => Promise<void>;
+  onViewPal: () => void;
+}) {
+  const shake = useRef(new Animated.Value(0)).current;
+  const glow = useRef(new Animated.Value(0)).current;
+  const [stage, setStage] = useState<"shake" | "crack" | "reveal">("shake");
+
+  useEffect(() => {
+    if (!hatchling) return;
+
+    setStage("shake");
+    shake.setValue(0);
+    glow.setValue(0);
+    const shakeLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shake, {
+          duration: 80,
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shake, {
+          duration: 80,
+          toValue: -1,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shake, {
+          duration: 80,
+          toValue: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+      { iterations: 6 },
+    );
+    shakeLoop.start();
+    Animated.timing(glow, {
+      duration: 1650,
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+
+    const crackTimer = setTimeout(() => setStage("crack"), 900);
+    const revealTimer = setTimeout(() => setStage("reveal"), 1750);
+
+    return () => {
+      shakeLoop.stop();
+      clearTimeout(crackTimer);
+      clearTimeout(revealTimer);
+    };
+  }, [glow, hatchling, shake]);
+
+  if (!hatchling) return null;
+
+  const rotate = shake.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: ["-7deg", "0deg", "7deg"],
+  });
+  const glowOpacity = glow.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.12, 0.88],
+  });
+  const revealed = stage === "reveal";
+
+  return (
+    <Modal animationType="fade" transparent visible>
+      <View style={styles.revealBackdrop}>
+        <View style={styles.revealModal}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onClose}
+            style={styles.revealClose}
+          >
+            <Text style={styles.revealCloseText}>Close</Text>
+          </Pressable>
+          <Text style={styles.revealKicker}>
+            {revealed ? "NEW HATCHLING" : "HATCHING"}
+          </Text>
+          <Text style={styles.revealStageText}>
+            {stage === "shake"
+              ? "The egg is moving..."
+              : stage === "crack"
+                ? "Cracks of light appear."
+                : "A new Pal has arrived."}
+          </Text>
+          <View style={styles.revealArtStage}>
+            <Animated.View
+              style={[
+                styles.revealGlow,
+                {
+                  opacity: glowOpacity,
+                  transform: [
+                    {
+                      scale: glow.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.85, 1.18],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            />
+            {revealed ? (
+              <HatchlingAvatar
+                element={hatchling.element}
+                rarity={hatchling.rarity}
+              />
+            ) : (
+              <Animated.View style={{ transform: [{ rotate }] }}>
+                <EggAvatar
+                  element={hatchling.element}
+                  rarity={hatchling.rarity}
+                />
+              </Animated.View>
+            )}
+          </View>
+          {revealed && (
+            <View style={styles.revealResult}>
+              <Text style={styles.revealTitle}>Meet {hatchling.name}</Text>
+              <Text style={styles.revealText}>
+                {capitalize(hatchling.rarity)} {capitalize(hatchling.element)} Pal
+                | Level {hatchling.level}
+              </Text>
+              <View style={styles.revealActions}>
+                <AppButton
+                  label="View Pal"
+                  onPress={onViewPal}
+                  variant="secondary"
+                />
+                <AppButton
+                  label="Set Active Pal"
+                  onPress={() => onSetActive(hatchling.id)}
+                />
+              </View>
+            </View>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
@@ -246,10 +385,35 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     padding: 18,
   },
-  revealCard: {
+  revealBackdrop: {
+    alignItems: "center",
+    backgroundColor: "rgba(37, 49, 46, 0.62)",
+    flex: 1,
+    justifyContent: "center",
+    padding: 20,
+  },
+  revealModal: {
+    alignItems: "center",
     backgroundColor: colors.accentSoft,
-    borderRadius: 22,
-    padding: 18,
+    borderColor: "rgba(255, 255, 255, 0.82)",
+    borderRadius: 30,
+    borderWidth: 1,
+    maxWidth: 420,
+    overflow: "hidden",
+    padding: 22,
+    width: "100%",
+  },
+  revealClose: {
+    alignSelf: "flex-end",
+    backgroundColor: "rgba(255, 255, 255, 0.72)",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  revealCloseText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "900",
   },
   revealKicker: {
     color: colors.primary,
@@ -257,6 +421,30 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 1.1,
     textAlign: "center",
+  },
+  revealStageText: {
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: 6,
+    textAlign: "center",
+  },
+  revealArtStage: {
+    alignItems: "center",
+    height: 230,
+    justifyContent: "center",
+    marginVertical: 4,
+    width: "100%",
+  },
+  revealGlow: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 120,
+    height: 210,
+    position: "absolute",
+    width: 210,
+  },
+  revealResult: {
+    width: "100%",
   },
   revealTitle: {
     color: colors.ink,

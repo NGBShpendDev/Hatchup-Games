@@ -39,9 +39,11 @@ function AppContent() {
   }
 
   const activeScreen =
-    app.data.onboardingStatus === "complete" && screen === "welcome"
+    screen === "welcome" && app.data.onboardingStatus === "complete"
       ? "home"
-      : screen;
+      : screen === "welcome" && app.data.onboardingStatus === "monsterCreated"
+        ? "connect"
+        : screen;
 
   return (
     <ErrorBoundary onError={app.reportCrash}>
@@ -95,6 +97,7 @@ function AppContent() {
           onHatchAll={app.hatchAllReadyEggs}
           onHatch={app.hatchEgg}
           onLeaderboardPress={() => setScreen("leaderboard")}
+          onSetActiveHatchling={app.setActiveHatchling}
           onSettingsPress={() => setScreen("settings")}
         />
       )}
@@ -103,11 +106,11 @@ function AppContent() {
           data={app.data}
           onHomePress={() => setScreen("home")}
           onLeaderboardPress={() => setScreen("leaderboard")}
-          onBondWithActiveHatchling={app.bondWithActiveHatchling}
           onMonsterPress={() => setScreen("monster")}
           onRenameHatchling={app.renameCollectedHatchling}
           onSetActiveHatchling={app.setActiveHatchling}
           onSettingsPress={() => setScreen("settings")}
+          onTrainActiveHatchling={app.trainActiveHatchling}
         />
       )}
       {activeScreen === "leaderboard" && (
@@ -140,6 +143,7 @@ function AppContent() {
             await app.resetApp();
             setScreen("welcome");
           }}
+          onSaveProfile={app.saveProfile}
           onSetAnalyticsEnabled={app.setAnalyticsEnabled}
           onSetCloudSyncEnabled={app.setCloudSyncEnabled}
           onSetCrashReportingEnabled={app.setCrashReportingEnabled}

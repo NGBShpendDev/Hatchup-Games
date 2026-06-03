@@ -35,7 +35,7 @@ describe("local data migration", () => {
     const migrated = migrateHatchUpData(stored);
 
     expect(migrated.totalXp).toBe(321);
-    expect(migrated.schemaVersion).toBe(5);
+    expect(migrated.schemaVersion).toBe(8);
     expect(migrated.progressionProfile).toBe("beta");
     expect(migrated.accountId).toEqual(expect.stringMatching(/^account-/));
     expect(migrated.cloudSyncStatus).toBe("localOnly");
@@ -44,6 +44,7 @@ describe("local data migration", () => {
     expect(migrated.starterEggElement).toBeNull();
     expect(migrated.eventEggsAwarded).toEqual([]);
     expect(migrated.milestoneEggsAwarded).toEqual([]);
+    expect(migrated.pendingEggs).toEqual([]);
     expect(migrated.activeEgg).toMatchObject({
       stepsRequired: 1500,
       stepsWalked: 1500,
