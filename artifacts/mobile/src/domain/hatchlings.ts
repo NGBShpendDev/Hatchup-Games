@@ -35,6 +35,7 @@ export const TRAINING_COOLDOWN_HOURS = 4;
 export const TRAINING_XP = 25;
 export const TRAINING_BOND = 4;
 export const PASSIVE_BOND_HOURS = 8;
+export const HATCHLING_XP_PER_LEVEL = 75;
 
 export interface HatchlingTrainingStatus {
   canTrain: boolean;
@@ -42,6 +43,23 @@ export interface HatchlingTrainingStatus {
   nextAvailableAt: string | null;
   remainingToday: number;
   sessionsToday: number;
+}
+
+export interface HatchlingLevelProgress {
+  currentLevelXp: number;
+  nextLevel: number | null;
+  progress: number;
+  xpPerLevel: number;
+  xpToNext: number;
+}
+
+export interface HatchlingTrainingPreview {
+  bondGain: number;
+  levelAfterTraining: number;
+  levelsGained: number;
+  powerAfterTraining: number;
+  powerGain: number;
+  xpGain: number;
 }
 
 export function createHatchlingFromEgg({
@@ -331,12 +349,54 @@ export function getTrainingStatus(
 }
 
 export function getHatchlingLevel(xp: number) {
-  return Math.min(Math.floor(Math.max(xp, 0) / 75) + 1, 50);
+  return Math.min(Math.floor(Math.max(xp, 0) / HATCHLING_XP_PER_LEVEL) + 1, 50);
 }
 
 export function getHatchlingXpProgress(xp: number) {
-  const xpIntoLevel = Math.max(xp, 0) % 75;
-  return xpIntoLevel / 75;
+  return getHatchlingLevelProgress(xp).progress;
+}
+
+export function getHatchlingLevelProgress(xp: number): HatchlingLevelProgress {
+  const safeXp = Math.max(xp, 0);
+  const level = getHatchlingLevel(safeXp);
+  const maxed = level >= 50;
+  const currentLevelXp = maxed ? HATCHLING_XP_PER_LEVEL : safeXp % HATCHLING_XP_PER_LEVEL;
+  const xpToNext = maxed ? 0 : HATCHLING_XP_PER_LEVEL - currentLevelXp;
+
+  return {
+    currentLevelXp,
+    nextLevel: maxed ? null : level + 1,
+    progress: maxed ? 1 : currentLevelXp / HATCHLING_XP_PER_LEVEL,
+    xpPerLevel: HATCHLING_XP_PER_LEVEL,
+    xpToNext,
+  };
+}
+
+export function getTrainingPreview(
+  hatchling: CollectedHatchling,
+): HatchlingTrainingPreview {
+  const xp = hatchling.xp + TRAINING_XP;
+  const levelAfterTraining = getHatchlingLevel(xp);
+  const statsAfterTraining = getHatchlingStats(
+    hatchling.element,
+    hatchling.rarity,
+    levelAfterTraining,
+  );
+  const powerAfterTraining =
+    statsAfterTraining.heart +
+    statsAfterTraining.power +
+    statsAfterTraining.resilience +
+    statsAfterTraining.speed;
+  const currentPower = getHatchlingPowerScore(hatchling);
+
+  return {
+    bondGain: TRAINING_BOND,
+    levelAfterTraining,
+    levelsGained: Math.max(levelAfterTraining - hatchling.level, 0),
+    powerAfterTraining,
+    powerGain: Math.max(powerAfterTraining - currentPower, 0),
+    xpGain: TRAINING_XP,
+  };
 }
 
 export function getHatchlingStats(

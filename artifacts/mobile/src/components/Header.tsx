@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors } from "../theme";
+import { colors, radii } from "../theme";
 
 interface Props {
   title: string;
@@ -30,13 +30,18 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
   back: {
+    alignItems: "center",
+    backgroundColor: colors.softPeach,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
     paddingVertical: 8,
     width: 64,
   },
   backText: {
-    color: colors.primary,
+    color: colors.primaryDeep,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   placeholder: {
     width: 64,
@@ -44,6 +49,6 @@ const styles = StyleSheet.create({
   title: {
     color: colors.ink,
     fontSize: 17,
-    fontWeight: "800",
+    fontWeight: "900",
   },
 });

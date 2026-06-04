@@ -23,13 +23,24 @@ import type {
   DailyAward,
   DailyXp,
   HatchUpData,
+  QuestRewardReceipt,
 } from "../domain/models";
 import { getProgression, type MonsterStage } from "../domain/progression";
 import { ACTIVE_PROGRESSION_PROFILE } from "../domain/progressionConfig";
+import { getWeeklyRewardChest } from "../domain/rewardChests";
 import {
+  getClaimableQuestCount,
   getDailyQuests,
+  getNextQuestSuggestions,
   getMonthlyQuests,
+  getQuestCompletionRatio,
+  getPalQuests,
   getQuestProgress,
+  getQuestRemainingText,
+  getQuestRewardKey,
+  getQuestRewardLabel,
+  getQuestTierLabel,
+  getSeasonalQuests,
   getWeeklyQuests,
   isQuestComplete,
   type Quest as QuestModel,
@@ -41,7 +52,8 @@ import {
   type FirstWeekMission,
   type FirstWeekTarget,
 } from "../domain/retention";
-import { colors } from "../theme";
+import { SHOP_ITEMS, type ShopItem, type ShopItemId } from "../domain/shop";
+import { colors, radii, typography } from "../theme";
 import type { LatestSyncGains } from "../useHatchUpApp";
 
 interface Props {
@@ -51,6 +63,9 @@ interface Props {
   latestSync: DailyAward | null;
   latestSyncGains: LatestSyncGains;
   latestEvolution: MonsterStage | null;
+  onBuyShopItem: (itemId: ShopItemId) => Promise<boolean>;
+  onClaimWeeklyChest: (today: string) => Promise<boolean>;
+  onClaimQuestReward: (quest: QuestModel, today: string) => Promise<boolean>;
   onDexPress: () => void;
   onLeaderboardPress: () => void;
   onMonsterPress: () => void;
@@ -65,6 +80,9 @@ export function HomeScreen({
   latestSync,
   latestSyncGains,
   latestEvolution,
+  onBuyShopItem,
+  onClaimWeeklyChest,
+  onClaimQuestReward,
   onDexPress,
   onLeaderboardPress,
   onMonsterPress,
@@ -84,18 +102,32 @@ export function HomeScreen({
   const quests = getDailyQuests(today);
   const weeklyQuests = getWeeklyQuests(data, todayKey);
   const monthlyQuests = getMonthlyQuests(data, todayKey);
+  const seasonalQuests = getSeasonalQuests(data, todayKey);
+  const palQuests = getPalQuests(data, todayKey);
   const visibleQuests =
     questCadence === "daily"
       ? quests
       : questCadence === "weekly"
         ? weeklyQuests
-        : monthlyQuests;
+        : questCadence === "monthly"
+          ? monthlyQuests
+          : questCadence === "seasonal"
+            ? seasonalQuests
+            : palQuests;
+  const visibleQuestCompletion = getQuestCompletionRatio(visibleQuests);
+  const visibleClaimableQuestCount = getClaimableQuestCount(
+    visibleQuests,
+    todayKey,
+    data.claimedQuestRewards,
+  );
+  const nextQuestSuggestions = getNextQuestSuggestions(visibleQuests);
   const activity = getActivitySummary(data.activityHistory, todayKey);
   const readyEggCount = data.activeEggs.filter(isEggReady).length;
   const completedQuestCount = quests.filter(isQuestComplete).length;
   const todayDistanceMiles = getTodayDistanceMiles(today);
   const retention = getRetentionPlan(data, todayKey);
   const firstWeekMission = getCurrentFirstWeekMission(data, todayKey);
+  const weeklyChest = getWeeklyRewardChest(data, todayKey);
   const activeHatchlingRaw = getActiveHatchling(data);
   const activeHatchling = activeHatchlingRaw
     ? getTimeAdjustedHatchling(activeHatchlingRaw)
@@ -107,8 +139,15 @@ export function HomeScreen({
     : null;
   const showRewardFeedback =
     !rewardDismissed &&
-    latestSync?.date === todayKey &&
-    hasSyncRewards(latestSyncGains);
+    hasSyncRewards(latestSyncGains) &&
+    (latestSync?.date === todayKey ||
+      latestSyncGains.accountXp > 0 ||
+      latestSyncGains.coins > 0);
+  const showStarterGuide =
+    !today &&
+    data.collection.length === 0 &&
+    data.totalXp === 0 &&
+    data.activeEggs.length > 0;
 
   useEffect(() => {
     setRewardDismissed(false);
@@ -161,6 +200,15 @@ export function HomeScreen({
           <Text style={styles.streakLabel}>day streak</Text>
         </View>
       </View>
+      {showStarterGuide && (
+        <StarterGuideCard
+          healthConnected={data.healthConnected}
+          onHatcheryPress={onMonsterPress}
+          onSettingsPress={onSettingsPress}
+          onSync={onSync}
+          syncing={isSyncing}
+        />
+      )}
       <View style={styles.heroCard}>
         {activeHatchling ? (
           <HatchlingAvatar
@@ -207,6 +255,11 @@ export function HomeScreen({
         today={today}
         trainingStatus={trainingStatus}
       />
+      <AccountProgressCard
+        accountXp={data.accountXp}
+        coins={data.coins}
+        history={data.questRewardHistory}
+      />
       {!showRewardFeedback && !today && (
         <EmptyMissionCard
           actionLabel={isSyncing ? "Syncing..." : "Collect rewards"}
@@ -237,6 +290,15 @@ export function HomeScreen({
       <FirstWeekArcCard
         mission={firstWeekMission}
         onPress={handleMissionPress(firstWeekMission.target)}
+      />
+      <WeeklyChestCard
+        chest={weeklyChest}
+        onClaim={() => onClaimWeeklyChest(todayKey)}
+      />
+      <CoinShopCard
+        activeHatchling={activeHatchling}
+        coins={data.coins}
+        onBuy={onBuyShopItem}
       />
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Today's movement</Text>
@@ -331,10 +393,13 @@ export function HomeScreen({
         <Text style={styles.sectionMeta}>
           {visibleQuests.filter(isQuestComplete).length}/{visibleQuests.length}{" "}
           complete
+          {visibleClaimableQuestCount > 0
+            ? ` | ${visibleClaimableQuestCount} claimable`
+            : ""}
         </Text>
       </View>
       <View style={styles.questTabs}>
-        {(["daily", "weekly", "monthly"] as QuestCadence[]).map((cadence) => (
+        {(["daily", "weekly", "monthly", "seasonal", "pal"] as QuestCadence[]).map((cadence) => (
           <Pressable
             key={cadence}
             onPress={() => setQuestCadence(cadence)}
@@ -354,12 +419,72 @@ export function HomeScreen({
           </Pressable>
         ))}
       </View>
+      <QuestBoardSummary
+        cadence={questCadence}
+        claimableCount={visibleClaimableQuestCount}
+        completion={visibleQuestCompletion}
+        quests={visibleQuests}
+        suggestions={nextQuestSuggestions}
+      />
       <View style={styles.questList}>
         {visibleQuests.map((quest) => (
-          <Quest key={quest.id} quest={quest} />
+          <Quest
+            claimed={data.claimedQuestRewards.includes(
+              getQuestRewardKey(quest, todayKey),
+            )}
+            key={quest.id}
+            onClaim={() => onClaimQuestReward(quest, todayKey)}
+            quest={quest}
+          />
         ))}
       </View>
     </Screen>
+  );
+}
+
+function StarterGuideCard({
+  healthConnected,
+  onHatcheryPress,
+  onSettingsPress,
+  onSync,
+  syncing,
+}: {
+  healthConnected: boolean;
+  onHatcheryPress: () => void;
+  onSettingsPress: () => void;
+  onSync: () => Promise<void>;
+  syncing: boolean;
+}) {
+  return (
+    <View style={styles.starterGuideCard}>
+      <Text style={styles.starterGuideKicker}>STARTER GUIDE</Text>
+      <Text style={styles.starterGuideTitle}>Your Egg is waiting.</Text>
+      <Text style={styles.starterGuideBody}>
+        {healthConnected
+          ? "Sync your first movement recap to fill the starter Egg and unlock your first rewards."
+          : "Connect health when you are ready. Until then, you can preview your Hatchery and learn the loop."}
+      </Text>
+      <View style={styles.starterGuideActions}>
+        <AppButton
+          disabled={syncing}
+          label={
+            healthConnected
+              ? syncing
+                ? "Syncing..."
+                : "Sync first rewards"
+              : "Connect in Settings"
+          }
+          onPress={healthConnected ? onSync : onSettingsPress}
+          style={styles.starterGuideButton}
+        />
+        <AppButton
+          label="View Hatchery"
+          onPress={onHatcheryPress}
+          style={styles.starterGuideButton}
+          variant="secondary"
+        />
+      </View>
+    </View>
   );
 }
 
@@ -459,8 +584,61 @@ function TodayLoopCard({
       />
       <Text style={styles.todayProgressPrivacy}>
         Read-only health data stays local for reward calculation unless you opt
-        into beta sharing.
+        into journey board sharing.
       </Text>
+    </View>
+  );
+}
+
+function AccountProgressCard({
+  accountXp,
+  coins,
+  history,
+}: {
+  accountXp: number;
+  coins: number;
+  history: QuestRewardReceipt[];
+}) {
+  const accountLevel = Math.floor(accountXp / 500) + 1;
+  const levelProgress = (accountXp % 500) / 500;
+  const recentHistory = history.slice(0, 3);
+
+  return (
+    <View style={styles.accountCard}>
+      <View style={styles.accountHeader}>
+        <View>
+          <Text style={styles.accountKicker}>PLAYER PROGRESSION</Text>
+          <Text style={styles.accountTitle}>Account Lv {accountLevel}</Text>
+        </View>
+        <Text style={styles.coinPill}>{coins.toLocaleString()} coins</Text>
+      </View>
+      <ProgressBar progress={levelProgress} />
+      <Text style={styles.accountText}>
+        {500 - (accountXp % 500)} Account XP to the next profile level.
+      </Text>
+      <View style={styles.rewardHistoryPanel}>
+        <Text style={styles.rewardHistoryTitle}>Recent quest claims</Text>
+        {recentHistory.length > 0 ? (
+          recentHistory.map((receipt) => (
+            <View key={receipt.id} style={styles.rewardHistoryRow}>
+              <View style={styles.rewardHistoryText}>
+                <Text style={styles.rewardHistoryLabel}>{receipt.label}</Text>
+                <Text style={styles.rewardHistoryMeta}>
+                  Tier {receipt.tier} | {capitalize(receipt.cadence)}
+                </Text>
+              </View>
+              <Text style={styles.rewardHistoryValue}>
+                +{receipt.rewardAccountXp} XP
+              </Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.rewardHistoryEmpty}>
+            Claim weekly, monthly, seasonal, or Pal quests to build a reward
+            history.
+          </Text>
+        )}
+      </View>
     </View>
   );
 }
@@ -687,31 +865,116 @@ function ActivityBar({ day }: { day: ActivityDay }) {
   );
 }
 
-function Quest({ quest }: { quest: QuestModel }) {
-  const complete = isQuestComplete(quest);
+function QuestBoardSummary({
+  cadence,
+  claimableCount,
+  completion,
+  quests,
+  suggestions,
+}: {
+  cadence: QuestCadence;
+  claimableCount: number;
+  completion: number;
+  quests: QuestModel[];
+  suggestions: QuestModel[];
+}) {
+  const completed = quests.filter(isQuestComplete).length;
 
   return (
-    <View style={styles.quest}>
+    <View style={styles.questSummaryCard}>
+      <View style={styles.questSummaryHeader}>
+        <View>
+          <Text style={styles.questSummaryKicker}>
+            {capitalize(cadence)} quest board
+          </Text>
+          <Text style={styles.questSummaryTitle}>
+            {completed}/{quests.length} milestones cleared
+          </Text>
+        </View>
+        <Text
+          style={[
+            styles.questSummaryPill,
+            claimableCount > 0 && styles.questSummaryPillReady,
+          ]}
+        >
+          {claimableCount > 0 ? `${claimableCount} ready` : "On track"}
+        </Text>
+      </View>
+      <ProgressBar progress={completion} />
+      {suggestions.length > 0 ? (
+        <View style={styles.questSuggestionList}>
+          <Text style={styles.questSuggestionKicker}>Next up</Text>
+          {suggestions.map((quest) => (
+            <View key={quest.id} style={styles.questSuggestion}>
+              <View style={styles.questSuggestionBody}>
+                <Text style={styles.questSuggestionTitle}>{quest.label}</Text>
+                <Text style={styles.questSuggestionMeta}>
+                  {getQuestRemainingText(quest)} | {getQuestTierLabel(quest)}
+                </Text>
+              </View>
+              <Text style={styles.questSuggestionReward}>
+                {getQuestRewardLabel(quest)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Text style={styles.questSummaryDone}>
+          This board is complete. Check another cadence or claim ready rewards.
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function Quest({
+  claimed,
+  onClaim,
+  quest,
+}: {
+  claimed: boolean;
+  onClaim: () => Promise<boolean>;
+  quest: QuestModel;
+}) {
+  const complete = isQuestComplete(quest);
+  const claimable = quest.cadence !== "daily" && complete && !claimed;
+
+  return (
+    <View style={[styles.quest, claimable && styles.questReady]}>
       <View style={[styles.questDot, complete && styles.questDotComplete]} />
       <View style={styles.questBody}>
-        <Text style={styles.questLabel}>{quest.label}</Text>
+        <View style={styles.questTitleRow}>
+          <Text style={styles.questLabel}>{quest.label}</Text>
+          <Text style={styles.questTier}>{getQuestTierLabel(quest)}</Text>
+        </View>
         <Text style={styles.questCaption}>
           {Math.min(quest.current, quest.target).toLocaleString()} /{" "}
           {quest.target.toLocaleString()} {quest.unit}
         </Text>
         <ProgressBar progress={getQuestProgress(quest)} />
-        {quest.rewardXp > 0 && quest.cadence === "daily" && (
-          <Text style={styles.questReward}>Reward: +{quest.rewardXp} XP</Text>
+        {!complete && (
+          <Text style={styles.questRemaining}>
+            {getQuestRemainingText(quest)}
+          </Text>
         )}
-        {quest.rewardXp === 0 && (
-          <Text style={styles.questReward}>Milestone tracker</Text>
-        )}
+        <Text style={styles.questReward}>{getQuestRewardLabel(quest)}</Text>
       </View>
-      <Text
-        style={[styles.questStatus, complete && styles.questStatusComplete]}
-      >
-        {complete ? "Done" : "Active"}
-      </Text>
+      {claimable ? (
+        <Pressable
+          onPress={() => {
+            void onClaim();
+          }}
+          style={styles.questClaim}
+        >
+          <Text style={styles.questClaimText}>Claim</Text>
+        </Pressable>
+      ) : (
+        <Text
+          style={[styles.questStatus, complete && styles.questStatusComplete]}
+        >
+          {claimed ? "Claimed" : complete ? "Ready" : "Active"}
+        </Text>
+      )}
       {complete && <SparkleBurst />}
     </View>
   );
@@ -777,11 +1040,137 @@ function FirstWeekArcCard({
   );
 }
 
+function WeeklyChestCard({
+  chest,
+  onClaim,
+}: {
+  chest: ReturnType<typeof getWeeklyRewardChest>;
+  onClaim: () => Promise<boolean>;
+}) {
+  return (
+    <View style={styles.chestCard}>
+      <View style={styles.chestHeader}>
+        <View>
+          <Text style={styles.chestKicker}>WEEKLY REWARD</Text>
+          <Text style={styles.chestTitle}>{chest.label}</Text>
+        </View>
+        {chest.canClaim ? (
+          <SparkleBurst label="READY" tone="accent" />
+        ) : (
+          <Text style={styles.chestPill}>
+            {chest.claimed ? "Claimed" : "Locked"}
+          </Text>
+        )}
+      </View>
+      <Text style={styles.chestBody}>
+        Walk {chest.target.toLocaleString()} steps this week to earn a chest
+        with coins, Account XP, and Egg progress.
+      </Text>
+      <ProgressBar progress={chest.progress} />
+      <Text style={styles.chestReward}>
+        +{chest.rewardCoins} coins | +{chest.rewardAccountXp} Account XP | +
+        {chest.rewardEggSteps.toLocaleString()} egg steps
+      </Text>
+      <AppButton
+        disabled={!chest.canClaim}
+        label={
+          chest.canClaim
+            ? "Claim weekly chest"
+            : chest.claimed
+              ? "Chest claimed"
+              : `${chest.steps.toLocaleString()} / ${chest.target.toLocaleString()} steps`
+        }
+        onPress={() => {
+          void onClaim();
+        }}
+        style={!chest.canClaim ? styles.disabledAction : undefined}
+        variant={chest.canClaim ? "primary" : "secondary"}
+      />
+    </View>
+  );
+}
+
+function CoinShopCard({
+  activeHatchling,
+  coins,
+  onBuy,
+}: {
+  activeHatchling: CollectedHatchling | null;
+  coins: number;
+  onBuy: (itemId: ShopItemId) => Promise<boolean>;
+}) {
+  return (
+    <View style={styles.shopCard}>
+      <View style={styles.shopHeader}>
+        <View>
+          <Text style={styles.shopKicker}>COIN SHOP</Text>
+          <Text style={styles.shopTitle}>Spend what quests earn</Text>
+        </View>
+        <Text style={styles.coinPill}>{coins.toLocaleString()} coins</Text>
+      </View>
+      <Text style={styles.shopBody}>
+        Buy small garden boosts for profile growth, your active Pal, or incubating
+        Eggs.
+      </Text>
+      {SHOP_ITEMS.map((item) => (
+        <ShopRow
+          activeHatchling={activeHatchling}
+          coins={coins}
+          item={item}
+          key={item.id}
+          onBuy={onBuy}
+        />
+      ))}
+    </View>
+  );
+}
+
+function ShopRow({
+  activeHatchling,
+  coins,
+  item,
+  onBuy,
+}: {
+  activeHatchling: CollectedHatchling | null;
+  coins: number;
+  item: ShopItem;
+  onBuy: (itemId: ShopItemId) => Promise<boolean>;
+}) {
+  const disabled = coins < item.priceCoins || (item.rewardPalXp > 0 && !activeHatchling);
+  const effect = [
+    item.rewardAccountXp > 0 ? `+${item.rewardAccountXp} Account XP` : null,
+    item.rewardPalXp > 0 ? `+${item.rewardPalXp} Pal XP` : null,
+    item.rewardEggSteps > 0
+      ? `+${item.rewardEggSteps.toLocaleString()} egg steps`
+      : null,
+  ].filter(Boolean).join(" | ");
+
+  return (
+    <View style={styles.shopRow}>
+      <View style={styles.shopRowText}>
+        <Text style={styles.shopItemName}>{item.label}</Text>
+        <Text style={styles.shopItemBody}>{item.body}</Text>
+        <Text style={styles.shopItemEffect}>{effect}</Text>
+      </View>
+      <Pressable
+        disabled={disabled}
+        onPress={() => {
+          void onBuy(item.id);
+        }}
+        style={[styles.shopBuy, disabled && styles.shopBuyDisabled]}
+      >
+        <Text style={styles.shopBuyText}>{item.priceCoins}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function getRewardBreakdown(xp: DailyXp) {
+  if (xp.total === 0) return "Bonus reward applied outside the daily health XP cap.";
   const movement = xp.steps + xp.activeCalories + xp.workouts;
   const parts = [`Movement +${movement}`];
   if (xp.quests > 0) parts.push(`Quests +${xp.quests}`);
@@ -804,6 +1193,13 @@ function getRewardNextStep(gains: LatestSyncGains) {
 
 function getRewardRows(gains: LatestSyncGains, latestEvolution: MonsterStage | null) {
   const rewards: { icon: string; label: string; value: string }[] = [];
+  if (gains.accountXp > 0) {
+    rewards.push({
+      icon: "LVL",
+      label: "Account XP",
+      value: `+${gains.accountXp} XP`,
+    });
+  }
   if (gains.xp.total > 0) {
     rewards.push({
       icon: "XP",
@@ -838,6 +1234,12 @@ function getRewardRows(gains: LatestSyncGains, latestEvolution: MonsterStage | n
       label: "Coins",
       value: `+${gains.coins}`,
     });
+  } else if (gains.coins < 0) {
+    rewards.push({
+      icon: "$",
+      label: "Coins spent",
+      value: `${gains.coins}`,
+    });
   }
   if (gains.streakProgressed) {
     rewards.push({
@@ -861,6 +1263,7 @@ function getRewardRows(gains: LatestSyncGains, latestEvolution: MonsterStage | n
 
 function hasSyncRewards(gains: LatestSyncGains) {
   return (
+    gains.accountXp > 0 ||
     gains.xp.total > 0 ||
     gains.eggSteps > 0 ||
     gains.palXp > 0 ||
@@ -951,7 +1354,7 @@ function getNextAction({
 
   if (!data.leaderboardShareEnabled) {
     return {
-      body: "Optional sharing lets you compare weekly steps, distance, and journey XP in beta rankings.",
+      body: "Optional sharing lets you compare weekly steps, distance, and journey XP on the journey board.",
       disabled: false,
       label: "View Rankings",
       onPress: onLeaderboardPress,
@@ -1010,14 +1413,16 @@ const styles = StyleSheet.create({
   title: {
     color: colors.ink,
     fontSize: 30,
-    fontWeight: "900",
+    fontWeight: typography.titleWeight,
     letterSpacing: -0.7,
     marginTop: 3,
   },
   streak: {
     alignItems: "center",
-    backgroundColor: colors.accentSoft,
-    borderRadius: 15,
+    backgroundColor: colors.rewardGold,
+    borderColor: colors.accent,
+    borderRadius: radii.card,
+    borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 9,
   },
@@ -1032,37 +1437,295 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   heroCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 22,
+    backgroundColor: colors.softBlue,
+    borderColor: colors.tide,
+    borderRadius: radii.hero,
+    borderWidth: 1,
     marginBottom: 12,
     padding: 18,
+    shadowColor: colors.cardShadowStrong,
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 22,
+  },
+  starterGuideCard: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.hero,
+    borderWidth: 1,
+    gap: 9,
+    marginBottom: 14,
+    padding: 16,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 18,
+  },
+  starterGuideKicker: {
+    color: colors.primaryDeep,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  starterGuideTitle: {
+    color: colors.ink,
+    fontSize: 19,
+    fontWeight: "900",
+  },
+  starterGuideBody: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  starterGuideActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  starterGuideButton: {
+    flex: 1,
   },
   heroSparkles: {
     alignItems: "center",
     marginBottom: 8,
   },
   todayLoopCard: {
-    backgroundColor: colors.accentSoft,
-    borderRadius: 22,
+    backgroundColor: colors.softPeach,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.hero,
+    borderWidth: 1,
     gap: 10,
     marginBottom: 14,
     padding: 16,
   },
   goalCard: {
-    backgroundColor: colors.primarySoft,
-    borderRadius: 18,
+    backgroundColor: colors.softLavender,
+    borderColor: colors.storm,
+    borderWidth: 1,
+    borderRadius: radii.card,
     gap: 10,
     marginBottom: 22,
     padding: 16,
   },
-  arcCard: {
+  accountCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.primarySoft,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 10,
+    marginBottom: 18,
+    padding: 16,
+  },
+  accountHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  accountKicker: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  accountTitle: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+  coinPill: {
+    backgroundColor: colors.rewardGold,
+    borderRadius: radii.pill,
+    color: colors.primaryDeep,
+    fontSize: 11,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  accountText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  rewardHistoryPanel: {
+    backgroundColor: colors.softBlue,
+    borderColor: colors.tide,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12,
+  },
+  rewardHistoryTitle: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  rewardHistoryRow: {
+    alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.line,
-    borderRadius: 20,
+    borderRadius: radii.button,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 10,
+  },
+  rewardHistoryText: {
+    flex: 1,
+  },
+  rewardHistoryLabel: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  rewardHistoryMeta: {
+    color: colors.muted,
+    fontSize: 10,
+    marginTop: 2,
+  },
+  rewardHistoryValue: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  rewardHistoryEmpty: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  arcCard: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
+    borderRadius: radii.card,
     borderWidth: 1,
     gap: 12,
     marginBottom: 22,
     padding: 16,
+  },
+  chestCard: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 11,
+    marginBottom: 14,
+    padding: 16,
+  },
+  chestHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  chestKicker: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  chestTitle: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+  chestPill: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.pill,
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  chestBody: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  chestReward: {
+    color: colors.primaryDeep,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  shopCard: {
+    backgroundColor: colors.softPeach,
+    borderColor: colors.ember,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 10,
+    marginBottom: 22,
+    padding: 16,
+  },
+  shopHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  shopKicker: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  shopTitle: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+  shopBody: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  shopRow: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 12,
+  },
+  shopRowText: {
+    flex: 1,
+  },
+  shopItemName: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  shopItemBody: {
+    color: colors.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 3,
+  },
+  shopItemEffect: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+    marginTop: 5,
+  },
+  shopBuy: {
+    alignItems: "center",
+    backgroundColor: colors.primary,
+    borderRadius: radii.pill,
+    minWidth: 52,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  shopBuyDisabled: {
+    backgroundColor: colors.line,
+  },
+  shopBuyText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
   },
   arcHeader: {
     alignItems: "flex-start",
@@ -1082,9 +1745,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   arcPill: {
-    backgroundColor: colors.primarySoft,
-    borderRadius: 999,
-    color: colors.primary,
+    backgroundColor: colors.rewardGold,
+    borderRadius: radii.pill,
+    color: colors.primaryDeep,
     fontSize: 11,
     fontWeight: "900",
     overflow: "hidden",
@@ -1131,7 +1794,9 @@ const styles = StyleSheet.create({
   journeyStep: {
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderRadius: 15,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
     flexDirection: "row",
     gap: 10,
     padding: 11,
@@ -1139,7 +1804,7 @@ const styles = StyleSheet.create({
   journeyStepMark: {
     alignItems: "center",
     backgroundColor: colors.line,
-    borderRadius: 12,
+    borderRadius: radii.pill,
     height: 24,
     justifyContent: "center",
     width: 24,
@@ -1197,10 +1862,16 @@ const styles = StyleSheet.create({
   },
   rewardBanner: {
     backgroundColor: colors.accentSoft,
-    borderRadius: 20,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.hero,
+    borderWidth: 1,
     gap: 12,
     marginBottom: 22,
     padding: 16,
+    shadowColor: colors.cardShadowStrong,
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 20,
   },
   rewardBannerHeader: {
     alignItems: "flex-start",
@@ -1221,7 +1892,9 @@ const styles = StyleSheet.create({
   },
   rewardDismiss: {
     backgroundColor: colors.surface,
-    borderRadius: 999,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
     paddingHorizontal: 11,
     paddingVertical: 7,
   },
@@ -1236,7 +1909,9 @@ const styles = StyleSheet.create({
   rewardRow: {
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderRadius: 14,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
     flexDirection: "row",
     gap: 10,
     padding: 11,
@@ -1356,7 +2031,9 @@ const styles = StyleSheet.create({
   },
   metric: {
     backgroundColor: colors.surface,
-    borderRadius: 15,
+    borderColor: colors.primarySoft,
+    borderRadius: radii.card,
+    borderWidth: 1,
     padding: 12,
     width: "48%",
   },
@@ -1385,9 +2062,9 @@ const styles = StyleSheet.create({
   },
   emptyMissionCard: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderRadius: 18,
+    backgroundColor: colors.softPeach,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,
@@ -1415,8 +2092,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   syncReceipt: {
-    backgroundColor: colors.primarySoft,
-    borderRadius: 14,
+    backgroundColor: colors.softBlue,
+    borderColor: colors.tide,
+    borderRadius: radii.card,
+    borderWidth: 1,
     marginTop: 10,
     padding: 12,
   },
@@ -1452,8 +2131,10 @@ const styles = StyleSheet.create({
   },
   incubatorCard: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: 18,
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
     flexDirection: "row",
     gap: 12,
     padding: 14,
@@ -1463,8 +2144,10 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
   activityCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 18,
+    backgroundColor: colors.softBlue,
+    borderColor: colors.tide,
+    borderRadius: radii.card,
+    borderWidth: 1,
     marginBottom: 22,
     padding: 14,
   },
@@ -1503,8 +2186,8 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   chartFill: {
-    backgroundColor: colors.primary,
-    borderRadius: 5,
+    backgroundColor: colors.rewardGold,
+    borderRadius: radii.pill,
     width: "70%",
   },
   chartFillEmpty: {
@@ -1533,18 +2216,23 @@ const styles = StyleSheet.create({
   },
   questTabs: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     marginBottom: 10,
   },
   questTab: {
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderRadius: 14,
-    flex: 1,
+    borderColor: colors.line,
+    borderRadius: radii.button,
+    borderWidth: 1,
+    flexGrow: 1,
     paddingVertical: 10,
+    minWidth: "31%",
   },
   questTabActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDeep,
+    borderColor: colors.primaryDeep,
   },
   questTabLabel: {
     color: colors.muted,
@@ -1554,35 +2242,151 @@ const styles = StyleSheet.create({
   questTabLabelActive: {
     color: "#FFFFFF",
   },
+  questSummaryCard: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 10,
+    marginBottom: 10,
+    padding: 14,
+  },
+  questSummaryHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  questSummaryKicker: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  questSummaryTitle: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: "900",
+    marginTop: 3,
+  },
+  questSummaryPill: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.pill,
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  questSummaryPillReady: {
+    backgroundColor: colors.rewardGold,
+    color: colors.primaryDeep,
+  },
+  questSuggestionList: {
+    gap: 8,
+  },
+  questSuggestionKicker: {
+    color: colors.primaryDeep,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  questSuggestion: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.button,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 10,
+  },
+  questSuggestionBody: {
+    flex: 1,
+  },
+  questSuggestionTitle: {
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  questSuggestionMeta: {
+    color: colors.muted,
+    fontSize: 11,
+    marginTop: 3,
+  },
+  questSuggestionReward: {
+    color: colors.primary,
+    flexShrink: 1,
+    fontSize: 10,
+    fontWeight: "900",
+    maxWidth: 112,
+    textAlign: "right",
+  },
+  questSummaryDone: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+  },
   quest: {
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderRadius: 15,
+    borderColor: colors.primarySoft,
+    borderRadius: radii.card,
+    borderWidth: 1,
     flexDirection: "row",
     gap: 10,
     padding: 13,
   },
+  questReady: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.rewardGold,
+  },
   questDot: {
     backgroundColor: colors.line,
-    borderRadius: 7,
+    borderRadius: radii.pill,
     height: 14,
     width: 14,
   },
   questDotComplete: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.rewardGold,
   },
   questBody: {
     flex: 1,
     gap: 6,
   },
+  questTitleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between",
+  },
   questLabel: {
     color: colors.ink,
+    flex: 1,
     fontSize: 14,
     fontWeight: "800",
+  },
+  questTier: {
+    backgroundColor: colors.softLavender,
+    borderRadius: radii.pill,
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   questCaption: {
     color: colors.muted,
     fontSize: 11,
+  },
+  questRemaining: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: "900",
   },
   questReward: {
     color: colors.primary,
@@ -1595,6 +2399,17 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   questStatusComplete: {
-    color: colors.primary,
+    color: colors.primaryDeep,
+  },
+  questClaim: {
+    backgroundColor: colors.primaryDeep,
+    borderRadius: radii.pill,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  questClaimText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
   },
 });

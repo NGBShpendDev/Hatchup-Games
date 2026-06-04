@@ -35,10 +35,16 @@ describe("local data migration", () => {
     const migrated = migrateHatchUpData(stored);
 
     expect(migrated.totalXp).toBe(321);
-    expect(migrated.schemaVersion).toBe(8);
+    expect(migrated.schemaVersion).toBe(10);
     expect(migrated.progressionProfile).toBe("beta");
     expect(migrated.accountId).toEqual(expect.stringMatching(/^account-/));
     expect(migrated.cloudSyncStatus).toBe("localOnly");
+    expect(migrated.accountXp).toBe(0);
+    expect(migrated.claimedQuestRewards).toEqual([]);
+    expect(migrated.claimedRewardChests).toEqual([]);
+    expect(migrated.coins).toBe(0);
+    expect(migrated.questRewardHistory).toEqual([]);
+    expect(migrated.shopPurchaseHistory).toEqual([]);
     expect(migrated.analyticsEnabled).toBe(false);
     expect(migrated.crashReportingEnabled).toBe(true);
     expect(migrated.starterEggElement).toBeNull();

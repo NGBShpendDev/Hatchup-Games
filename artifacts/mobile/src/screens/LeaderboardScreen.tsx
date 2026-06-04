@@ -12,7 +12,7 @@ import {
   type LeaderboardMetric,
 } from "../domain/leaderboard";
 import type { HatchUpData } from "../domain/models";
-import { colors } from "../theme";
+import { colors, radii, typography } from "../theme";
 
 interface Props {
   data: HatchUpData;
@@ -72,11 +72,11 @@ export function LeaderboardScreen({
         />
       }
     >
-      <Text style={styles.kicker}>BETA RANKINGS</Text>
+      <Text style={styles.kicker}>WEEKLY CHALLENGE BOARD</Text>
       <Text style={styles.title}>Move, hatch, climb.</Text>
       <Text style={styles.body}>
-        Compare weekly movement and Pal journey growth. Sharing is optional and local
-        for this beta until backend accounts are added.
+        Compare weekly movement and Pal journey growth. Sharing is optional,
+        and your private health details stay out of the board.
       </Text>
       <Text style={styles.syncLabel}>{leaderboardSyncLabel}</Text>
       <View style={styles.statsGrid}>
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   title: {
     color: colors.ink,
     fontSize: 30,
-    fontWeight: "900",
+    fontWeight: typography.titleWeight,
     letterSpacing: -0.7,
     lineHeight: 35,
     marginTop: 5,
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
   body: {
     color: colors.muted,
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: typography.bodyLineHeight,
     marginTop: 10,
   },
   syncLabel: {
@@ -253,8 +253,10 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   stat: {
-    backgroundColor: colors.surface,
-    borderRadius: 15,
+    backgroundColor: colors.softBlue,
+    borderColor: colors.tide,
+    borderRadius: radii.card,
+    borderWidth: 1,
     flex: 1,
     padding: 12,
   },
@@ -270,15 +272,19 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   shareCard: {
-    backgroundColor: colors.accentSoft,
-    borderRadius: 18,
+    backgroundColor: colors.softPeach,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
     marginTop: 16,
     padding: 16,
   },
   emptyMissionCard: {
     alignItems: "center",
-    backgroundColor: colors.accentSoft,
-    borderRadius: 18,
+    backgroundColor: colors.softLavender,
+    borderColor: colors.storm,
+    borderRadius: radii.card,
+    borderWidth: 1,
     flexDirection: "row",
     gap: 12,
     marginBottom: 16,
@@ -319,12 +325,15 @@ const styles = StyleSheet.create({
   },
   sharePill: {
     backgroundColor: colors.surface,
-    borderRadius: 999,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   sharePillOn: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDeep,
+    borderColor: colors.primaryDeep,
   },
   sharePillText: {
     color: colors.muted,
@@ -337,7 +346,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.surface,
     borderColor: colors.line,
-    borderRadius: 14,
+    borderRadius: radii.button,
     borderWidth: 1,
     color: colors.ink,
     fontSize: 15,
@@ -360,12 +369,15 @@ const styles = StyleSheet.create({
   },
   metricTab: {
     backgroundColor: colors.surface,
-    borderRadius: 999,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
     flex: 1,
     paddingVertical: 10,
   },
   metricTabActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDeep,
+    borderColor: colors.primaryDeep,
   },
   metricTabText: {
     color: colors.muted,
@@ -383,16 +395,19 @@ const styles = StyleSheet.create({
   rankRow: {
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
     flexDirection: "row",
     gap: 10,
     padding: 13,
   },
   userRow: {
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
   },
   rank: {
-    color: colors.primary,
+    color: colors.rewardGold,
     fontSize: 15,
     fontWeight: "900",
     width: 34,

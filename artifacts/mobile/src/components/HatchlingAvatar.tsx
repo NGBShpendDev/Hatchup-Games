@@ -1,20 +1,13 @@
 import { Image, StyleSheet, Text, View } from "react-native";
 import { getHatchlingAsset } from "../assets/creatureAssets";
 import type { EggElement, EggRarity } from "../domain/models";
-import { colors } from "../theme";
+import { colors, elementColors, radii } from "../theme";
 
 interface Props {
   element: EggElement;
   rarity: EggRarity;
   size?: "small" | "large";
 }
-
-const elementColors: Record<EggElement, string> = {
-  leaf: colors.baby,
-  ember: colors.accent,
-  tide: colors.teen,
-  storm: colors.final,
-};
 
 const elementLabels: Record<EggElement, string> = {
   leaf: "LEAF",
@@ -96,16 +89,16 @@ const styles = StyleSheet.create({
   },
   body: {
     alignItems: "center",
-    borderColor: "rgba(37, 49, 46, 0.15)",
-    borderRadius: 54,
+    borderColor: colors.avatarBorder,
+    borderRadius: radii.pill,
     borderWidth: 3,
     height: "68%",
     justifyContent: "center",
     width: "62%",
   },
   ear: {
-    borderColor: "rgba(37, 49, 46, 0.12)",
-    borderRadius: 18,
+    borderColor: colors.avatarBorder,
+    borderRadius: radii.card,
     borderWidth: 2,
     height: "26%",
     position: "absolute",
@@ -127,7 +120,7 @@ const styles = StyleSheet.create({
   },
   eye: {
     backgroundColor: colors.ink,
-    borderRadius: 7,
+    borderRadius: radii.pill,
     height: 13,
     width: 13,
   },
@@ -140,7 +133,7 @@ const styles = StyleSheet.create({
   rarityPill: {
     backgroundColor: colors.surface,
     borderColor: colors.line,
-    borderRadius: 10,
+    borderRadius: radii.pill,
     borderWidth: 1,
     bottom: "2%",
     paddingHorizontal: 7,

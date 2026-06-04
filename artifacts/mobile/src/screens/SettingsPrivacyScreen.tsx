@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -11,12 +12,37 @@ import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
 import { HatchlingAvatar } from "../components/HatchlingAvatar";
 import { Header } from "../components/Header";
+import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
 import { SparkleBurst } from "../components/SparkleBurst";
-import { getBadges, getUnlockedBadgeCount } from "../domain/badges";
+import {
+  buildSupportMailto,
+  IS_PUBLIC_BUILD,
+  PRIVACY_POLICY_URL,
+  SUPPORT_EMAIL,
+  TERMS_URL,
+} from "../config/runtime";
+import {
+  getBadgeCategoryProgress,
+  getBadgeCategorySummary,
+  getBadgeCompletionRatio,
+  getBadgesByCategory,
+  getBadges,
+  getNextBadges,
+  getUnlockedBadgeCount,
+  type Badge,
+  type BadgeCategory,
+} from "../domain/badges";
+import {
+  getDexCompletion,
+  getDexElementSummary,
+  getDexRaritySummary,
+  getNextMissingDexEntry,
+} from "../domain/creatureDex";
 import { toDateKey } from "../domain/date";
 import {
   getActiveHatchling,
+  getHatchlingPowerScore,
   getTimeAdjustedHatchling,
   getTrainingStatus,
 } from "../domain/hatchlings";
@@ -24,10 +50,10 @@ import { getActivitySummary } from "../domain/history";
 import type { CollectedHatchling, HatchUpData } from "../domain/models";
 import type { MonsterStage } from "../domain/progression";
 import type { ProgressionProfile } from "../domain/progressionConfig";
-import { colors } from "../theme";
+import { colors, radii, typography } from "../theme";
 
 const privacyCopy =
-  "HatchUp reads your steps, workouts, and active energy only to reward your Pal with XP. We do not sell your health data or use it for ads. Distance is used only for optional beta rankings when you choose to share.";
+  "HatchUp reads your steps, workouts, and active energy only to reward your Pal with XP. We do not sell your health data or use it for ads. Distance is used only for optional journey board rankings when you choose to share.";
 
 interface Props {
   data: HatchUpData;
@@ -76,6 +102,15 @@ export function SettingsPrivacyScreen({
 }: Props) {
   const today = toDateKey(new Date());
   const badges = getBadges(data, today);
+  const badgeCompletionRatio = getBadgeCompletionRatio(data, today);
+  const badgesByCategory = getBadgesByCategory(data, today);
+  const badgeCategoryProgress = getBadgeCategoryProgress(data, today);
+  const badgeCategorySummary = getBadgeCategorySummary(data, today);
+  const dexCompletion = getDexCompletion(data.collection);
+  const dexElementSummary = getDexElementSummary(data.collection);
+  const dexRaritySummary = getDexRaritySummary(data.collection);
+  const nextMissingDexEntry = getNextMissingDexEntry(data.collection);
+  const nextBadges = getNextBadges(data, today);
   const activeHatchlingRaw = getActiveHatchling(data);
   const activeHatchling = activeHatchlingRaw
     ? getTimeAdjustedHatchling(activeHatchlingRaw)
@@ -106,6 +141,18 @@ export function SettingsPrivacyScreen({
   const profilePet = profilePetRaw
     ? getTimeAdjustedHatchling(profilePetRaw)
     : null;
+  const strongestPal = data.collection
+    .map((hatchling) => getTimeAdjustedHatchling(hatchling))
+    .sort((a, b) => getHatchlingPowerScore(b) - getHatchlingPowerScore(a))[0];
+  const profileChecklist = [
+    { done: usernameDraft.trim().length > 0, label: "Choose username" },
+    { done: Boolean(selectedPetId), label: "Pick profile Pal" },
+    { done: data.collection.length > 0, label: "Hatch first Pal" },
+    { done: unlockedBadgeCount > 0, label: "Unlock first badge" },
+    { done: data.leaderboardShareEnabled, label: "Optional rank sharing" },
+  ];
+  const profileReadiness =
+    profileChecklist.filter((item) => item.done).length / profileChecklist.length;
 
   useEffect(() => {
     setUsernameDraft(
@@ -141,7 +188,7 @@ export function SettingsPrivacyScreen({
       <Header onBack={onBack} title="Profile and privacy" />
       <Text style={styles.title}>Your HatchUp profile.</Text>
       <Text style={styles.body}>
-        Track your collection, badges, and privacy controls in one beta profile
+        Track your collection, badges, and privacy controls in one polished profile
         page.
       </Text>
       <View style={styles.profileTabs}>
@@ -174,7 +221,7 @@ export function SettingsPrivacyScreen({
             )}
           </View>
           <View style={styles.profileHeroText}>
-            <Text style={styles.profileKicker}>Beta trainer card</Text>
+            <Text style={styles.profileKicker}>Garden trainer card</Text>
             <Text style={styles.profileName}>{profileName}</Text>
             <Text style={styles.profileMeta}>
               {taglineDraft.trim() ||
@@ -198,7 +245,7 @@ export function SettingsPrivacyScreen({
             maxLength={80}
             multiline
             onChangeText={setTaglineDraft}
-            placeholder="A short note for your beta profile"
+            placeholder="A short note for your trainer profile"
             placeholderTextColor={colors.muted}
             style={[styles.profileInput, styles.taglineInput]}
             value={taglineDraft}
@@ -254,6 +301,81 @@ export function SettingsPrivacyScreen({
             value={formatCompact(weeklyActivity.steps)}
           />
         </View>
+        <View style={styles.profileReadinessCard}>
+          <View style={styles.profileReadinessHeader}>
+            <Text style={styles.profileReadinessTitle}>Profile readiness</Text>
+            <Text style={styles.profileReadinessValue}>
+              {Math.round(profileReadiness * 100)}%
+            </Text>
+          </View>
+          <ProgressBar progress={profileReadiness} />
+          <View style={styles.profileChecklist}>
+            {profileChecklist.map((item) => (
+              <View
+                key={item.label}
+                style={[
+                  styles.profileChecklistItem,
+                  item.done && styles.profileChecklistItemDone,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.profileChecklistMark,
+                    item.done && styles.profileChecklistMarkDone,
+                  ]}
+                >
+                  {item.done ? "OK" : "Next"}
+                </Text>
+                <Text style={styles.profileChecklistText}>{item.label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+        <View style={styles.profileShowcaseCard}>
+          <View style={styles.profileShowcaseHeader}>
+            <View>
+              <Text style={styles.profileShowcaseKicker}>Collection showcase</Text>
+              <Text style={styles.profileShowcaseTitle}>
+                {dexCompletion.unlocked}/{dexCompletion.total} species found
+              </Text>
+            </View>
+            <Text style={styles.profileShowcasePill}>
+              {Math.round(dexCompletion.percent * 100)}%
+            </Text>
+          </View>
+          <ProgressBar progress={dexCompletion.percent} />
+          <View style={styles.showcaseRows}>
+            <ShowcaseLine
+              label="Element focus"
+              value={getBestSummaryLabel(dexElementSummary)}
+            />
+            <ShowcaseLine
+              label="Rarity focus"
+              value={getBestSummaryLabel(dexRaritySummary)}
+            />
+            <ShowcaseLine
+              label="Strongest Pal"
+              value={
+                strongestPal
+                  ? `${strongestPal.name} | P${getHatchlingPowerScore(strongestPal)}`
+                  : "Hatch a Pal"
+              }
+            />
+            <ShowcaseLine
+              label="Next target"
+              value={
+                nextMissingDexEntry
+                  ? `${capitalize(nextMissingDexEntry.rarity)} ${capitalize(nextMissingDexEntry.element)}`
+                  : "Collection complete"
+              }
+            />
+          </View>
+          <AppButton
+            label="Open Collection"
+            onPress={onDexPress}
+            variant="secondary"
+          />
+        </View>
         {activeHatchling && (
           <View style={styles.activeHatchling}>
             <HatchlingAvatar
@@ -275,6 +397,22 @@ export function SettingsPrivacyScreen({
             </View>
           </View>
         )}
+        {!activeHatchling && (
+          <View style={styles.emptyMissionCard}>
+            <View style={styles.emptyMissionText}>
+              <Text style={styles.emptyMissionTitle}>No active Pal selected</Text>
+              <Text style={styles.privacyText}>
+                Hatch or select a Pal so your trainer card has a companion.
+              </Text>
+            </View>
+            <AppButton
+              label="Find Pal"
+              onPress={onMonsterPress}
+              style={styles.emptyMissionButton}
+              variant="secondary"
+            />
+          </View>
+        )}
         <AppButton
           label="Save profile"
           onPress={() =>
@@ -289,30 +427,63 @@ export function SettingsPrivacyScreen({
       <View style={styles.badgeCard}>
         <Text style={styles.cardTitle}>Milestones and badges</Text>
         <Text style={styles.privacyText}>
-          Badge progress is local for this beta and can become shareable once
+          Badge progress is local on this device and can become shareable once
           accounts are online.
         </Text>
-        <View style={styles.badgeGrid}>
-          {badges.map((badge) => (
-            <View
-              key={badge.id}
-              style={[styles.badge, badge.unlocked && styles.badgeUnlocked]}
-            >
-              <Text style={styles.badgeStatus}>
-                {badge.unlocked ? "Unlocked" : "In progress"}
+        <View style={styles.badgeProgressPanel}>
+          <View style={styles.badgeProgressHeader}>
+            <Text style={styles.badgeProgressTitle}>Trainer milestone path</Text>
+            <Text style={styles.badgeProgressValue}>
+              {unlockedBadgeCount}/{badges.length}
+            </Text>
+          </View>
+          <ProgressBar progress={badgeCompletionRatio} />
+          <Text style={styles.badgeProgressMeta}>
+            {Math.round(badgeCompletionRatio * 100)}% complete across collection,
+            movement, bonds, rarity, streaks, and XP.
+          </Text>
+        </View>
+        <View style={styles.badgeCategoryRow}>
+          {Object.entries(badgeCategorySummary).map(([category, summary]) => (
+            <View key={category} style={styles.badgeCategoryPill}>
+              <Text style={styles.badgeCategoryLabel}>
+                {capitalize(category)}
               </Text>
-              <Text style={styles.badgeName}>{badge.label}</Text>
-              <Text style={styles.badgeText}>{badge.description}</Text>
-              <Text style={styles.badgeProgress}>
-                {Math.min(badge.value, badge.target).toLocaleString()} /{" "}
-                {badge.target.toLocaleString()}
+              <Text style={styles.badgeCategoryValue}>
+                {summary.unlocked}/{summary.total}
               </Text>
-              {badge.unlocked && (
-                <View style={styles.badgeSparkles}>
-                  <SparkleBurst label="BADGE" tone="accent" />
-                </View>
-              )}
             </View>
+          ))}
+        </View>
+        {nextBadges.length > 0 && (
+          <View style={styles.nextBadgePanel}>
+            <Text style={styles.nextBadgeTitle}>Closest unlocks</Text>
+            {nextBadges.map((badge) => (
+              <View key={badge.id} style={styles.nextBadgeRow}>
+                <View style={styles.nextBadgeText}>
+                  <Text style={styles.nextBadgeName}>{badge.label}</Text>
+                  <Text style={styles.nextBadgeMeta}>
+                    {Math.min(badge.value, badge.target).toLocaleString()} /{" "}
+                    {badge.target.toLocaleString()} | {capitalize(badge.category)}
+                  </Text>
+                  <ProgressBar progress={badge.progress} />
+                </View>
+                <Text style={styles.nextBadgePercent}>
+                  {Math.round(badge.progress * 100)}%
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+        <View style={styles.badgeShelves}>
+          {Object.entries(badgesByCategory).map(([category, categoryBadges]) => (
+            <MilestoneShelf
+              badges={categoryBadges}
+              category={category as BadgeCategory}
+              key={category}
+              progress={badgeCategoryProgress[category as BadgeCategory] ?? 0}
+              summary={badgeCategorySummary[category as BadgeCategory]}
+            />
           ))}
         </View>
       </View>
@@ -320,6 +491,48 @@ export function SettingsPrivacyScreen({
       )}
       {activeTab === "settings" && (
         <>
+      <View style={styles.launchCard}>
+        <Text style={styles.launchKicker}>
+          {IS_PUBLIC_BUILD ? "PUBLIC BUILD" : "LAUNCH READINESS"}
+        </Text>
+        <Text style={styles.cardTitle}>Support, privacy, and trust</Text>
+        <Text style={styles.privacyText}>
+          HatchUp is local-first until cloud services are configured. Health
+          access is read-only, rankings are opt-in, and support is available at{" "}
+          {SUPPORT_EMAIL}.
+        </Text>
+        <View style={styles.privacyActions}>
+          <AppButton
+            label="Contact support"
+            onPress={() => {
+              void Linking.openURL(
+                buildSupportMailto({
+                  subject: "HatchUp Support",
+                }),
+              );
+            }}
+            variant="secondary"
+          />
+          <AppButton
+            disabled={!PRIVACY_POLICY_URL}
+            label={PRIVACY_POLICY_URL ? "Privacy policy" : "Privacy policy URL needed"}
+            onPress={() => {
+              if (PRIVACY_POLICY_URL) void Linking.openURL(PRIVACY_POLICY_URL);
+            }}
+            style={!PRIVACY_POLICY_URL ? styles.disabledControl : undefined}
+            variant="secondary"
+          />
+          <AppButton
+            disabled={!TERMS_URL}
+            label={TERMS_URL ? "Terms" : "Terms URL needed"}
+            onPress={() => {
+              if (TERMS_URL) void Linking.openURL(TERMS_URL);
+            }}
+            style={!TERMS_URL ? styles.disabledControl : undefined}
+            variant="secondary"
+          />
+        </View>
+      </View>
       <View style={styles.card}>
         <Setting label="Health source" value={healthMode} />
         <Setting
@@ -356,7 +569,7 @@ export function SettingsPrivacyScreen({
           onLongPress={() => setShowBetaTools((visible) => !visible)}
           style={styles.betaToolsHandle}
         >
-          <Text style={styles.betaToolsHandleTitle}>Beta Tools drawer</Text>
+          <Text style={styles.betaToolsHandleTitle}>Test Tools drawer</Text>
           <Text style={styles.betaToolsHandleText}>
             Press and hold to {showBetaTools ? "hide" : "reveal"} local test controls.
           </Text>
@@ -364,10 +577,10 @@ export function SettingsPrivacyScreen({
       )}
       {testLabEnabled && showBetaTools && (
         <View style={styles.testLabCard}>
-          <Text style={styles.cardTitle}>Beta Test Lab</Text>
+          <Text style={styles.cardTitle}>Local Test Lab</Text>
           <Text style={styles.privacyText}>
             Preview local progression states without changing Apple Health data.
-            These tools are included only in accelerated beta builds.
+            These tools are included only in accelerated testing builds.
           </Text>
           <View style={styles.testLabButtons}>
             <AppButton
@@ -401,6 +614,27 @@ export function SettingsPrivacyScreen({
       <View style={styles.privacyCard}>
         <Text style={styles.cardTitle}>Privacy promise</Text>
         <Text style={styles.privacyText}>{privacyCopy}</Text>
+        <Text style={styles.trustBullet}>Read-only health access.</Text>
+        <Text style={styles.trustBullet}>No ads, no health-data sale.</Text>
+        <Text style={styles.trustBullet}>Leaderboard sharing is opt-in.</Text>
+      </View>
+      <View style={styles.feedbackCard}>
+        <Text style={styles.cardTitle}>Support and feedback</Text>
+        <Text style={styles.privacyText}>
+          Found a confusing flow, rough UI moment, or reward bug? Send a quick
+          support note so we can tune the next build.
+        </Text>
+        <AppButton
+          label="Send feedback"
+          onPress={() => {
+            void Linking.openURL(
+              buildSupportMailto({
+                subject: "HatchUp Feedback",
+              }),
+            );
+          }}
+          variant="secondary"
+        />
       </View>
       <View style={styles.readOnlyCard}>
         <Text style={styles.cardTitle}>Public-ready data controls</Text>
@@ -429,13 +663,39 @@ export function SettingsPrivacyScreen({
             variant="secondary"
           />
         </View>
+        <View style={styles.privacyActions}>
+          <AppButton
+            label="Request data export"
+            onPress={() => {
+              void Linking.openURL(
+                buildSupportMailto({
+                  body: `Leaderboard ID: ${data.leaderboardId}\nAccount ID: ${data.accountId}`,
+                  subject: "HatchUp Data Export Request",
+                }),
+              );
+            }}
+            variant="secondary"
+          />
+          <AppButton
+            label="Request data deletion"
+            onPress={() => {
+              void Linking.openURL(
+                buildSupportMailto({
+                  body: `Leaderboard ID: ${data.leaderboardId}\nAccount ID: ${data.accountId}`,
+                  subject: "HatchUp Data Deletion Request",
+                }),
+              );
+            }}
+            variant="secondary"
+          />
+        </View>
       </View>
       <View style={styles.readOnlyCard}>
         <Text style={styles.cardTitle}>Leaderboard privacy</Text>
         <Text style={styles.privacyText}>
-          Rankings are optional for this beta. Turning sharing on adds your
-          leaderboard name, weekly movement, distance, and XP to the local
-          leaderboard experience.
+          Rankings are optional. Turning sharing on adds your
+          leaderboard name, weekly movement, distance, and XP to the ranking
+          experience.
         </Text>
         <View style={styles.leaderboardActions}>
           <AppButton
@@ -449,16 +709,16 @@ export function SettingsPrivacyScreen({
         <Text style={styles.cardTitle}>Read-only health access</Text>
         <Text style={styles.privacyText}>
           HatchUp never writes data back to Apple Health or Health Connect in
-          this MVP.
+          the current launch build.
         </Text>
       </View>
       <View style={styles.spacer} />
       <AppButton
-        label="Reset local app data"
+        label="Reset app data"
         onPress={() =>
           Alert.alert(
             "Reset HatchUp?",
-            "This removes your Pal name, XP, streaks, Pals, and local sync history.",
+            "This removes your Pal name, XP, streaks, Pals, and saved sync history on this device.",
             [
               { text: "Cancel", style: "cancel" },
               { text: "Reset", style: "destructive", onPress: onReset },
@@ -531,6 +791,25 @@ function ProfileTab({
   );
 }
 
+function ShowcaseLine({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.showcaseLine}>
+      <Text style={styles.showcaseLineLabel}>{label}</Text>
+      <Text style={styles.showcaseLineValue}>{value}</Text>
+    </View>
+  );
+}
+
+function getBestSummaryLabel<T extends string>(
+  summaries: readonly { id: T; percent: number; total: number; unlocked: number }[],
+) {
+  const best = [...summaries].sort(
+    (a, b) => b.percent - a.percent || b.unlocked - a.unlocked,
+  )[0];
+  if (!best) return "Start collecting";
+  return `${capitalize(best.id)} ${best.unlocked}/${best.total}`;
+}
+
 function PetOption({
   hatchling,
   selected,
@@ -561,24 +840,82 @@ function PetOption({
   );
 }
 
+function MilestoneShelf({
+  badges,
+  category,
+  progress,
+  summary,
+}: {
+  badges: Badge[];
+  category: BadgeCategory;
+  progress: number;
+  summary: { total: number; unlocked: number } | undefined;
+}) {
+  return (
+    <View style={styles.milestoneShelf}>
+      <View style={styles.milestoneShelfHeader}>
+        <View style={styles.milestoneShelfTitleWrap}>
+          <Text style={styles.milestoneShelfKicker}>
+            {capitalize(category)} milestones
+          </Text>
+          <Text style={styles.milestoneShelfTitle}>
+            {summary?.unlocked ?? 0}/{summary?.total ?? badges.length} unlocked
+          </Text>
+        </View>
+        <Text style={styles.milestoneShelfPercent}>
+          {Math.round(progress * 100)}%
+        </Text>
+      </View>
+      <ProgressBar progress={progress} />
+      <View style={styles.badgeGrid}>
+        {badges.map((badge) => (
+          <BadgeTile badge={badge} key={badge.id} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function BadgeTile({ badge }: { badge: Badge }) {
+  return (
+    <View style={[styles.badge, badge.unlocked && styles.badgeUnlocked]}>
+      <Text style={styles.badgeStatus}>
+        {badge.unlocked ? "Unlocked" : "In progress"}
+      </Text>
+      <Text style={styles.badgeName}>{badge.label}</Text>
+      <Text style={styles.badgeText}>{badge.description}</Text>
+      <Text style={styles.badgeProgress}>
+        {Math.min(badge.value, badge.target).toLocaleString()} /{" "}
+        {badge.target.toLocaleString()}
+      </Text>
+      <ProgressBar progress={badge.progress} />
+      {badge.unlocked && (
+        <View style={styles.badgeSparkles}>
+          <SparkleBurst label="BADGE" tone="accent" />
+        </View>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   title: {
     color: colors.ink,
     fontSize: 30,
-    fontWeight: "900",
+    fontWeight: typography.titleWeight,
     letterSpacing: -0.7,
     lineHeight: 35,
   },
   body: {
     color: colors.muted,
     fontSize: 16,
-    lineHeight: 23,
+    lineHeight: typography.bodyLineHeight,
     marginTop: 10,
   },
   profileTabs: {
     backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderRadius: 18,
+    borderColor: colors.primarySoft,
+    borderRadius: radii.card,
     borderWidth: 1,
     flexDirection: "row",
     gap: 8,
@@ -587,12 +924,12 @@ const styles = StyleSheet.create({
   },
   profileTab: {
     alignItems: "center",
-    borderRadius: 13,
+    borderRadius: radii.button,
     flex: 1,
     paddingVertical: 11,
   },
   profileTabActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDeep,
   },
   profileTabText: {
     color: colors.muted,
@@ -604,16 +941,44 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 18,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
     marginTop: 22,
     paddingHorizontal: 16,
   },
+  launchCard: {
+    backgroundColor: colors.softBlue,
+    borderColor: colors.tide,
+    borderRadius: radii.hero,
+    borderWidth: 1,
+    gap: 10,
+    marginTop: 22,
+    padding: 16,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 18,
+  },
+  launchKicker: {
+    color: colors.primaryDeep,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
   profileCard: {
-    backgroundColor: colors.accentSoft,
-    borderRadius: 22,
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.hero,
+    borderWidth: 1,
     gap: 14,
     marginTop: 22,
     padding: 16,
+    shadowColor: colors.cardShadowStrong,
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 22,
   },
   profileHero: {
     alignItems: "center",
@@ -622,9 +987,9 @@ const styles = StyleSheet.create({
   },
   profileAvatar: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.62)",
-    borderColor: "rgba(244, 163, 64, 0.35)",
-    borderRadius: 24,
+    backgroundColor: colors.surface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
     borderWidth: 1,
     height: 170,
     justifyContent: "center",
@@ -633,8 +998,8 @@ const styles = StyleSheet.create({
   },
   emptyAvatar: {
     alignItems: "center",
-    backgroundColor: colors.primarySoft,
-    borderRadius: 44,
+    backgroundColor: colors.softBlue,
+    borderRadius: radii.pill,
     height: 88,
     justifyContent: "center",
     width: 88,
@@ -679,7 +1044,7 @@ const styles = StyleSheet.create({
   profileInput: {
     backgroundColor: colors.surface,
     borderColor: colors.line,
-    borderRadius: 14,
+    borderRadius: radii.button,
     borderWidth: 1,
     color: colors.ink,
     fontSize: 15,
@@ -693,8 +1058,10 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   petPicker: {
-    backgroundColor: "rgba(255, 255, 255, 0.54)",
-    borderRadius: 18,
+    backgroundColor: colors.softPeach,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
     padding: 12,
   },
   petOptions: {
@@ -706,14 +1073,15 @@ const styles = StyleSheet.create({
   petOption: {
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderRadius: 16,
+    borderColor: colors.primarySoft,
+    borderRadius: radii.card,
     borderWidth: 1,
     padding: 8,
     width: "30.5%",
   },
   petOptionSelected: {
-    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primaryDeep,
     borderWidth: 2,
   },
   petOptionText: {
@@ -735,9 +1103,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   profileStat: {
-    backgroundColor: colors.surface,
-    borderColor: "rgba(37, 49, 46, 0.08)",
-    borderRadius: 15,
+    backgroundColor: colors.softBlue,
+    borderColor: colors.tide,
+    borderRadius: radii.card,
     borderWidth: 1,
     padding: 10,
     width: "31.5%",
@@ -754,10 +1122,130 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     marginTop: 3,
   },
-  activeHatchling: {
+  profileReadinessCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.primarySoft,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12,
+  },
+  profileReadinessHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  profileReadinessTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  profileReadinessValue: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  profileChecklist: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+  },
+  profileChecklistItem: {
+    alignItems: "center",
+    backgroundColor: colors.background,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+  },
+  profileChecklistItemDone: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
+  },
+  profileChecklistMark: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: "900",
+  },
+  profileChecklistMarkDone: {
+    color: colors.primaryDeep,
+  },
+  profileChecklistText: {
+    color: colors.ink,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  profileShowcaseCard: {
+    backgroundColor: colors.softBlue,
+    borderColor: colors.tide,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12,
+  },
+  profileShowcaseHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+  },
+  profileShowcaseKicker: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  profileShowcaseTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: "900",
+    marginTop: 3,
+  },
+  profileShowcasePill: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.pill,
+    color: colors.primaryDeep,
+    fontSize: 11,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  showcaseRows: {
+    gap: 7,
+  },
+  showcaseLine: {
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderColor: colors.line,
+    borderRadius: radii.button,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 10,
+  },
+  showcaseLineLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  showcaseLineValue: {
+    color: colors.ink,
+    flexShrink: 1,
+    fontSize: 12,
+    fontWeight: "900",
+    textAlign: "right",
+  },
+  activeHatchling: {
+    alignItems: "center",
+    backgroundColor: colors.softLavender,
+    borderColor: colors.storm,
+    borderRadius: radii.card,
+    borderWidth: 1,
     flexDirection: "row",
     gap: 10,
     padding: 10,
@@ -783,9 +1271,45 @@ const styles = StyleSheet.create({
   },
   badgeCard: {
     backgroundColor: colors.surface,
-    borderRadius: 18,
+    borderColor: colors.primarySoft,
+    borderRadius: radii.card,
+    borderWidth: 1,
     marginTop: 16,
     padding: 16,
+  },
+  badgeProgressPanel: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 9,
+    marginTop: 12,
+    padding: 12,
+  },
+  badgeProgressHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  badgeProgressTitle: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  badgeProgressValue: {
+    backgroundColor: colors.rewardGold,
+    borderRadius: radii.pill,
+    color: colors.primaryDeep,
+    fontSize: 11,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  badgeProgressMeta: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
   },
   badgeGrid: {
     flexDirection: "row",
@@ -793,16 +1317,123 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 12,
   },
-  badge: {
+  badgeShelves: {
+    gap: 12,
+    marginTop: 12,
+  },
+  milestoneShelf: {
+    backgroundColor: colors.softBlue,
+    borderColor: colors.tide,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 9,
+    padding: 12,
+  },
+  milestoneShelfHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+  },
+  milestoneShelfTitleWrap: {
+    flex: 1,
+  },
+  milestoneShelfKicker: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  milestoneShelfTitle: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+    marginTop: 3,
+  },
+  milestoneShelfPercent: {
+    color: colors.primaryDeep,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  badgeCategoryRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+  },
+  badgeCategoryPill: {
     backgroundColor: colors.primarySoft,
+    borderRadius: radii.pill,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  badgeCategoryLabel: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  badgeCategoryValue: {
+    color: colors.ink,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  nextBadgePanel: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 8,
+    marginTop: 12,
+    padding: 12,
+  },
+  nextBadgeTitle: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  nextBadgeRow: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
     borderColor: colors.line,
-    borderRadius: 15,
+    borderRadius: radii.button,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 10,
+  },
+  nextBadgeText: {
+    flex: 1,
+  },
+  nextBadgeName: {
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  nextBadgeMeta: {
+    color: colors.muted,
+    fontSize: 11,
+    marginTop: 3,
+  },
+  nextBadgePercent: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  badge: {
+    backgroundColor: colors.softPeach,
+    borderColor: colors.line,
+    borderRadius: radii.card,
     borderWidth: 1,
     padding: 10,
     width: "48%",
   },
   badgeUnlocked: {
-    borderColor: colors.primary,
+    borderColor: colors.rewardGold,
   },
   badgeStatus: {
     color: colors.primary,
@@ -833,8 +1464,10 @@ const styles = StyleSheet.create({
   },
   emptyMissionCard: {
     alignItems: "center",
-    backgroundColor: colors.primarySoft,
-    borderRadius: 15,
+    backgroundColor: colors.softBlue,
+    borderColor: colors.tide,
+    borderRadius: radii.card,
+    borderWidth: 1,
     flexDirection: "row",
     gap: 12,
     padding: 12,
@@ -871,20 +1504,39 @@ const styles = StyleSheet.create({
   },
   privacyCard: {
     backgroundColor: colors.accentSoft,
-    borderRadius: 18,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    marginTop: 14,
+    padding: 16,
+  },
+  trustBullet: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: 8,
+  },
+  feedbackCard: {
+    backgroundColor: colors.softLavender,
+    borderColor: colors.storm,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 10,
     marginTop: 14,
     padding: 16,
   },
   testLabCard: {
-    backgroundColor: colors.accentSoft,
-    borderRadius: 18,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
     marginTop: 14,
     padding: 16,
   },
   betaToolsHandle: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.primarySoft,
     borderColor: colors.line,
-    borderRadius: 16,
+    borderRadius: radii.card,
     borderStyle: "dashed",
     borderWidth: 1,
     marginTop: 14,
@@ -906,8 +1558,10 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   readOnlyCard: {
-    backgroundColor: colors.primarySoft,
-    borderRadius: 18,
+    backgroundColor: colors.softBlue,
+    borderColor: colors.tide,
+    borderRadius: radii.card,
+    borderWidth: 1,
     marginTop: 14,
     padding: 16,
   },
@@ -917,6 +1571,9 @@ const styles = StyleSheet.create({
   privacyActions: {
     gap: 8,
     marginTop: 12,
+  },
+  disabledControl: {
+    opacity: 0.52,
   },
   cardTitle: {
     color: colors.ink,

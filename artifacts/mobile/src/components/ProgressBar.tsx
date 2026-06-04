@@ -1,5 +1,5 @@
 import { StyleSheet, View } from "react-native";
-import { colors } from "../theme";
+import { colors, radii } from "../theme";
 
 export function ProgressBar({ progress }: { progress: number }) {
   const width = `${progress * 100}%` as `${number}%`;
@@ -13,14 +13,16 @@ export function ProgressBar({ progress }: { progress: number }) {
 
 const styles = StyleSheet.create({
   track: {
-    backgroundColor: colors.line,
-    borderRadius: 6,
-    height: 11,
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: radii.pill,
+    height: 12,
     overflow: "hidden",
   },
   fill: {
-    backgroundColor: colors.primary,
-    borderRadius: 6,
+    backgroundColor: colors.rewardGold,
+    borderRadius: radii.pill,
     height: "100%",
   },
 });

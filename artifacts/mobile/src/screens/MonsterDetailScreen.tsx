@@ -9,10 +9,17 @@ import { MonsterAvatar } from "../components/MonsterAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
 import { getEggProgress, isEggReady } from "../domain/hatchery";
-import { getActiveHatchling, getTimeAdjustedHatchling } from "../domain/hatchlings";
+import {
+  getActiveHatchling,
+  getHatchlingLevelProgress,
+  getHatchlingPowerScore,
+  getHatchlingXpProgress,
+  getTimeAdjustedHatchling,
+  getTrainingStatus,
+} from "../domain/hatchlings";
 import type { CollectedHatchling, HatchUpData } from "../domain/models";
 import { getProgression, MONSTER_STAGES } from "../domain/progression";
-import { colors } from "../theme";
+import { colors, radii, typography } from "../theme";
 
 interface Props {
   data: HatchUpData;
@@ -45,6 +52,17 @@ export function MonsterDetailScreen({
   const activeHatchling = activeHatchlingRaw
     ? getTimeAdjustedHatchling(activeHatchlingRaw)
     : null;
+  const activePalProgress = activeHatchling
+    ? getHatchlingLevelProgress(activeHatchling.xp)
+    : null;
+  const activePalTraining = activeHatchling
+    ? getTrainingStatus(activeHatchling)
+    : null;
+  const hatcheryMission = getHatcheryMission({
+    activeEggCount: data.activeEggs.length,
+    collectionCount: data.collection.length,
+    readyEggCount,
+  });
 
   return (
     <Screen
@@ -125,6 +143,22 @@ export function MonsterDetailScreen({
               {capitalize(activeHatchling.element)} | {capitalize(activeHatchling.mood)} | Bond{" "}
               {activeHatchling.bond}
             </Text>
+            <View style={styles.activePalMiniStats}>
+              <Text style={styles.activePalChip}>
+                Power {getHatchlingPowerScore(activeHatchling)}
+              </Text>
+              <Text style={styles.activePalChip}>
+                {activePalTraining?.remainingToday ?? 0} trains left
+              </Text>
+            </View>
+            <View style={styles.activePalProgress}>
+              <ProgressBar progress={getHatchlingXpProgress(activeHatchling.xp)} />
+              <Text style={styles.activePalProgressText}>
+                {activePalProgress?.nextLevel
+                  ? `${activePalProgress.xpToNext} XP to L${activePalProgress.nextLevel}`
+                  : "Max level reached"}
+              </Text>
+            </View>
           </View>
           <AppButton
             label="Collection"
@@ -152,6 +186,22 @@ export function MonsterDetailScreen({
         rolls a random element and weighted rarity. Bonus Eggs wait here when
         your Hatchery is full.
       </Text>
+      <View style={styles.missionCard}>
+        <Text style={styles.missionKicker}>Current mission</Text>
+        <Text style={styles.missionTitle}>{hatcheryMission.title}</Text>
+        <Text style={styles.missionBody}>{hatcheryMission.body}</Text>
+        <AppButton
+          label={hatcheryMission.cta}
+          onPress={
+            hatcheryMission.target === "home"
+              ? onBack
+              : hatcheryMission.target === "collection"
+                ? onDexPress
+                : () => undefined
+          }
+          variant="secondary"
+        />
+      </View>
       {readyEggCount > 1 && (
         <AppButton
           label={`Hatch all ${readyEggCount} ready Eggs`}
@@ -379,24 +429,79 @@ function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function getHatcheryMission({
+  activeEggCount,
+  collectionCount,
+  readyEggCount,
+}: {
+  activeEggCount: number;
+  collectionCount: number;
+  readyEggCount: number;
+}): {
+  body: string;
+  cta: string;
+  target: "collection" | "home" | "stay";
+  title: string;
+} {
+  if (readyEggCount > 0) {
+    return {
+      body: "A ready Egg is waiting below. Hatch it now to add a new Pal to your team.",
+      cta: "Hatch below",
+      target: "stay",
+      title: `${readyEggCount} Egg${readyEggCount === 1 ? "" : "s"} ready`,
+    };
+  }
+
+  if (activeEggCount > 0) {
+    return {
+      body: "Sync movement from Home after walking to fill every Egg slot together.",
+      cta: "Go sync movement",
+      target: "home",
+      title: "Fill your incubator",
+    };
+  }
+
+  if (collectionCount > 0) {
+    return {
+      body: "Your incubator is empty. Check your Collection and pick who trains while you earn the next Egg.",
+      cta: "Open Collection",
+      target: "collection",
+      title: "Train while you hunt Eggs",
+    };
+  }
+
+  return {
+    body: "Start on Home to sync movement and begin filling your starter Egg.",
+    cta: "Go to Home",
+    target: "home",
+    title: "Start your first hatch",
+  };
+}
+
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: 22,
+    backgroundColor: colors.softBlue,
+    borderColor: colors.tide,
+    borderRadius: radii.hero,
+    borderWidth: 1,
     padding: 18,
+    shadowColor: colors.cardShadowStrong,
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 22,
   },
   revealBackdrop: {
     alignItems: "center",
-    backgroundColor: "rgba(37, 49, 46, 0.62)",
+    backgroundColor: colors.modalBackdrop,
     flex: 1,
     justifyContent: "center",
     padding: 20,
   },
   revealModal: {
     alignItems: "center",
-    backgroundColor: colors.accentSoft,
-    borderColor: "rgba(255, 255, 255, 0.82)",
-    borderRadius: 30,
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.hero,
     borderWidth: 1,
     maxWidth: 420,
     overflow: "hidden",
@@ -405,8 +510,10 @@ const styles = StyleSheet.create({
   },
   revealClose: {
     alignSelf: "flex-end",
-    backgroundColor: "rgba(255, 255, 255, 0.72)",
-    borderRadius: 999,
+    backgroundColor: colors.translucentSurface,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: radii.pill,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
@@ -437,8 +544,8 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   revealGlow: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 120,
+    backgroundColor: colors.rewardGold,
+    borderRadius: radii.pill,
     height: 210,
     position: "absolute",
     width: 210,
@@ -487,27 +594,29 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: colors.ink,
     fontSize: 18,
-    fontWeight: "900",
+    fontWeight: typography.titleWeight,
     marginBottom: 10,
     marginTop: 22,
   },
   stageRow: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: 14,
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
+    borderWidth: 1,
+    borderRadius: radii.card,
     flexDirection: "row",
     marginBottom: 8,
     padding: 14,
   },
   dot: {
     backgroundColor: colors.line,
-    borderRadius: 7,
+    borderRadius: radii.pill,
     height: 14,
     marginRight: 11,
     width: 14,
   },
   unlockedDot: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.rewardGold,
   },
   stageText: {
     flex: 1,
@@ -536,8 +645,10 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   stat: {
-    backgroundColor: colors.accentSoft,
-    borderRadius: 15,
+    backgroundColor: colors.softPeach,
+    borderColor: colors.ember,
+    borderWidth: 1,
+    borderRadius: radii.card,
     flex: 1,
     padding: 14,
   },
@@ -553,8 +664,10 @@ const styles = StyleSheet.create({
   },
   trainingCard: {
     alignItems: "center",
-    backgroundColor: colors.accentSoft,
-    borderRadius: 18,
+    backgroundColor: colors.softLavender,
+    borderColor: colors.storm,
+    borderRadius: radii.card,
+    borderWidth: 1,
     flexDirection: "row",
     gap: 10,
     padding: 12,
@@ -572,12 +685,41 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 3,
   },
+  activePalMiniStats: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+  activePalChip: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    color: colors.primaryDeep,
+    fontSize: 10,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  activePalProgress: {
+    gap: 5,
+    marginTop: 8,
+  },
+  activePalProgressText: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "800",
+  },
   trainingButton: {
     minWidth: 110,
   },
   incubatorCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 22,
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.hero,
+    borderWidth: 1,
     padding: 18,
   },
   incubatorIntro: {
@@ -586,6 +728,32 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginBottom: 10,
     marginTop: -4,
+  },
+  missionCard: {
+    backgroundColor: colors.softPeach,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 8,
+    marginBottom: 14,
+    padding: 14,
+  },
+  missionKicker: {
+    color: colors.primaryDeep,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+  },
+  missionTitle: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  missionBody: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
   },
   incubatorStack: {
     gap: 10,
@@ -620,8 +788,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   emptyCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
+    backgroundColor: colors.softPeach,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
     padding: 16,
   },
   emptyTitle: {
@@ -643,7 +813,9 @@ const styles = StyleSheet.create({
   hatchlingCard: {
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderColor: colors.primarySoft,
+    borderRadius: radii.card,
+    borderWidth: 1,
     padding: 10,
     width: "48%",
   },

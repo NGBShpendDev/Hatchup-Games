@@ -12,7 +12,7 @@ import {
   getEggStepsRequired,
 } from "./progressionConfig";
 
-export const DATA_SCHEMA_VERSION = 8;
+export const DATA_SCHEMA_VERSION = 10;
 
 function normalizeXp(xp: Partial<DailyXp> | undefined): DailyXp {
   return {
@@ -80,6 +80,7 @@ export function migrateHatchUpData(
     schemaVersion: DATA_SCHEMA_VERSION,
     progressionProfile: ACTIVE_PROGRESSION_PROFILE.id,
     accountId: stored.accountId ?? createLocalId("account"),
+    accountXp: stored.accountXp ?? 0,
     accountMode: stored.accountMode ?? "local",
     analyticsEnabled: stored.analyticsEnabled ?? false,
     cloudSyncEnabled: stored.cloudSyncEnabled ?? false,
@@ -97,6 +98,11 @@ export function migrateHatchUpData(
       "",
     starterEggElement: stored.starterEggElement ?? null,
     weeklyGoalSteps: stored.weeklyGoalSteps ?? initialHatchUpData.weeklyGoalSteps,
+    coins: stored.coins ?? 0,
+    claimedQuestRewards: stored.claimedQuestRewards ?? [],
+    claimedRewardChests: stored.claimedRewardChests ?? [],
+    questRewardHistory: stored.questRewardHistory ?? [],
+    shopPurchaseHistory: stored.shopPurchaseHistory ?? [],
     leaderboardAlias: stored.leaderboardAlias ?? "",
     leaderboardId: stored.leaderboardId ?? createLeaderboardId(),
     leaderboardShareEnabled: stored.leaderboardShareEnabled ?? false,

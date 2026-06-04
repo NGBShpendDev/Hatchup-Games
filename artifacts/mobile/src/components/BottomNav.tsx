@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors } from "../theme";
+import { colors, radii } from "../theme";
 
 interface Props {
   active: "home" | "monster" | "dex" | "leaderboard" | "settings";
@@ -73,28 +73,36 @@ function NavItem({
 const styles = StyleSheet.create({
   nav: {
     backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderRadius: 18,
+    borderColor: colors.primarySoft,
+    borderRadius: radii.hero,
     borderWidth: 1,
     flexDirection: "row",
     justifyContent: "space-around",
-    paddingVertical: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    shadowColor: colors.cardShadowStrong,
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 22,
   },
   item: {
     alignItems: "center",
     gap: 5,
-    minWidth: 54,
+    minWidth: 58,
   },
   iconWrap: {
     alignItems: "center",
-    backgroundColor: colors.line,
-    borderRadius: 9,
-    height: 18,
+    backgroundColor: colors.softBlue,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: radii.pill,
+    height: 24,
     justifyContent: "center",
-    width: 18,
+    width: 24,
   },
   activeIconWrap: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDeep,
+    borderColor: colors.primaryDeep,
   },
   icon: {
     color: colors.muted,
@@ -110,6 +118,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   activeLabel: {
-    color: colors.primary,
+    color: colors.primaryDeep,
+    fontWeight: "900",
   },
 });

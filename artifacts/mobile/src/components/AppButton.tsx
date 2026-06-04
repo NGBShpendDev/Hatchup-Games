@@ -6,7 +6,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { colors } from "../theme";
+import { colors, radii } from "../theme";
 
 interface Props extends PressableProps {
   label: string;
@@ -22,10 +22,17 @@ export function AppButton({ label, style, variant = "primary", ...props }: Props
         styles.base,
         styles[variant],
         pressed && styles.pressed,
+        props.disabled && styles.disabled,
         style,
       ]}
     >
-      <Text style={[styles.label, variant !== "primary" && styles.darkLabel]}>
+      <Text
+        style={[
+          styles.label,
+          variant !== "primary" && styles.darkLabel,
+          props.disabled && styles.disabledLabel,
+        ]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -35,19 +42,29 @@ export function AppButton({ label, style, variant = "primary", ...props }: Props
 const styles = StyleSheet.create({
   base: {
     alignItems: "center",
-    borderRadius: 16,
+    borderRadius: radii.button,
     justifyContent: "center",
     minHeight: 54,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { height: 5, width: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 10,
   },
   primary: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDeep,
+    borderColor: colors.primary,
+    borderWidth: 1,
   },
   secondary: {
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.softPeach,
+    borderColor: colors.line,
+    borderWidth: 1,
   },
   danger: {
-    backgroundColor: "#F8E2E2",
+    backgroundColor: colors.dangerSoft,
+    borderColor: colors.danger,
+    borderWidth: 1,
   },
   pressed: {
     opacity: 0.75,
@@ -55,9 +72,18 @@ const styles = StyleSheet.create({
   label: {
     color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "900",
+    letterSpacing: 0.1,
   },
   darkLabel: {
-    color: colors.ink,
+    color: colors.primaryDeep,
+  },
+  disabled: {
+    backgroundColor: colors.line,
+    borderColor: colors.line,
+    shadowOpacity: 0,
+  },
+  disabledLabel: {
+    color: colors.muted,
   },
 });

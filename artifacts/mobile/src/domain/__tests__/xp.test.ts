@@ -13,13 +13,13 @@ describe("calculateDailyXp", () => {
         },
         { firstSyncOfDay: true },
       ),
-    ).toEqual({
+      ).toEqual({
       steps: 42,
       activeCalories: 26,
       workouts: 30,
-      quests: 100,
+      quests: 130,
       firstSync: 15,
-      total: 213,
+      total: 240,
     });
   });
 
@@ -35,11 +35,11 @@ describe("calculateDailyXp", () => {
         },
         { firstSyncOfDay: true },
       ),
-    ).toEqual({
+      ).toEqual({
       steps: 80,
       activeCalories: 40,
       workouts: 60,
-      quests: 100,
+      quests: 945,
       firstSync: 15,
       total: 240,
     });

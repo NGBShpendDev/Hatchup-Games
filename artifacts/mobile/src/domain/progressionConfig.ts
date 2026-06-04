@@ -36,7 +36,7 @@ export const PROGRESSION_PROFILES: Record<
 > = {
   beta: {
     id: "beta",
-    label: "Accelerated beta",
+    label: "Accelerated testing",
     xp: {
       stepsPerXp: 100,
       stepsMax: 80,

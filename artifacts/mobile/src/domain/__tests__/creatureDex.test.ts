@@ -1,4 +1,10 @@
-import { getCreatureDexEntries, getDexCompletion } from "../creatureDex";
+import {
+  getCreatureDexEntries,
+  getDexCompletion,
+  getDexElementSummary,
+  getDexRaritySummary,
+  getNextMissingDexEntry,
+} from "../creatureDex";
 import type { CollectedHatchling } from "../models";
 
 describe("creature dex", () => {
@@ -65,6 +71,22 @@ describe("creature dex", () => {
       total: 16,
       unlocked: 1,
       percent: 1 / 16,
+    });
+  });
+
+  it("summarizes collection by element and rarity", () => {
+    const leaf = getDexElementSummary(collection).find(
+      (summary) => summary.id === "leaf",
+    );
+    const common = getDexRaritySummary(collection).find(
+      (summary) => summary.id === "common",
+    );
+
+    expect(leaf).toMatchObject({ total: 4, unlocked: 1, percent: 1 / 4 });
+    expect(common).toMatchObject({ total: 4, unlocked: 1, percent: 1 / 4 });
+    expect(getNextMissingDexEntry(collection)).toMatchObject({
+      element: "ember",
+      rarity: "common",
     });
   });
 });

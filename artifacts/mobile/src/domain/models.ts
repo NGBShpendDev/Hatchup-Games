@@ -36,6 +36,26 @@ export interface DailyAward {
   health: DailyHealthSummary;
 }
 
+export interface QuestRewardReceipt {
+  cadence: string;
+  claimedAt: string;
+  id: string;
+  label: string;
+  questId: string;
+  rewardAccountXp: number;
+  rewardCoins: number;
+  rewardEggSteps: number;
+  tier: number;
+}
+
+export interface ShopPurchaseReceipt {
+  boughtAt: string;
+  id: string;
+  itemId: string;
+  label: string;
+  priceCoins: number;
+}
+
 export type EggRarity = "common" | "uncommon" | "rare" | "epic";
 
 export type EggElement = "leaf" | "ember" | "tide" | "storm";
@@ -84,6 +104,7 @@ export interface HatchUpData {
   schemaVersion: number;
   progressionProfile: ProgressionProfileId;
   accountId: string;
+  accountXp: number;
   accountMode: AccountMode;
   analyticsEnabled: boolean;
   cloudSyncEnabled: boolean;
@@ -103,6 +124,11 @@ export interface HatchUpData {
   lastSyncedDate: string | null;
   onboardingStatus: OnboardingStatus;
   healthConnected: boolean;
+  coins: number;
+  claimedQuestRewards: string[];
+  claimedRewardChests: string[];
+  questRewardHistory: QuestRewardReceipt[];
+  shopPurchaseHistory: ShopPurchaseReceipt[];
   leaderboardAlias: string;
   leaderboardId: string;
   leaderboardShareEnabled: boolean;
@@ -144,9 +170,10 @@ const starterEggs: IncubatorEgg[] = [
 ];
 
 export const initialHatchUpData: HatchUpData = {
-  schemaVersion: 8,
+  schemaVersion: 9,
   progressionProfile: ACTIVE_PROGRESSION_PROFILE.id,
   accountId: "local-beta-account",
+  accountXp: 0,
   accountMode: "local",
   analyticsEnabled: false,
   cloudSyncEnabled: false,
@@ -166,6 +193,11 @@ export const initialHatchUpData: HatchUpData = {
   lastSyncedDate: null,
   onboardingStatus: "notStarted",
   healthConnected: false,
+  coins: 0,
+  claimedQuestRewards: [],
+  claimedRewardChests: [],
+  questRewardHistory: [],
+  shopPurchaseHistory: [],
   leaderboardAlias: "",
   leaderboardId: "local-beta-player",
   leaderboardShareEnabled: false,

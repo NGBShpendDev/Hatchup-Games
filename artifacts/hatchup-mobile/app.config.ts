@@ -31,6 +31,7 @@ const config: ExpoConfig = {
         "HatchUp does not write health data.",
       NSMotionUsageDescription:
         "HatchUp counts your steps with the motion sensor to earn XP for your Pals.",
+      ITSAppUsesNonExemptEncryption: false,
     },
     ...(domain
       ? {
@@ -90,6 +91,11 @@ const config: ExpoConfig = {
   experiments: {
     typedRoutes: true,
     reactCompiler: true,
+  },
+  extra: {
+    eas: {
+      projectId: "c1540f6f-6aa1-43e2-8c43-0a6a919fe1ac",
+    },
   },
 };
 

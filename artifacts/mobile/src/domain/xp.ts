@@ -3,7 +3,7 @@ import {
   ACTIVE_PROGRESSION_PROFILE,
   type ProgressionProfile,
 } from "./progressionConfig";
-import { getCompletedQuestCount } from "./quests";
+import { getCompletedQuestXp } from "./quests";
 
 export const XP_RULES = ACTIVE_PROGRESSION_PROFILE.xp;
 
@@ -30,7 +30,7 @@ export function calculateDailyXp(
     summary.workouts * rules.workoutXp,
     rules.workoutsMax,
   );
-  const quests = getCompletedQuestCount(summary, profile) * rules.questXp;
+  const quests = getCompletedQuestXp(summary, profile);
   const firstSync = options.firstSyncOfDay ? rules.firstSyncXp : 0;
 
   return {

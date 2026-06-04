@@ -1,7 +1,7 @@
 import { Image, StyleSheet, Text, View } from "react-native";
 import { getMonsterAsset } from "../assets/creatureAssets";
 import type { MonsterStage } from "../domain/progression";
-import { colors } from "../theme";
+import { colors, radii } from "../theme";
 
 interface Props {
   stage: MonsterStage;
@@ -68,8 +68,8 @@ const styles = StyleSheet.create({
   },
   body: {
     alignItems: "center",
-    borderColor: "rgba(37, 49, 46, 0.15)",
-    borderRadius: 90,
+    borderColor: colors.avatarBorder,
+    borderRadius: radii.pill,
     borderWidth: 4,
     height: "88%",
     justifyContent: "center",
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   },
   eye: {
     backgroundColor: colors.ink,
-    borderRadius: 8,
+    borderRadius: radii.pill,
     height: 15,
     width: 15,
   },

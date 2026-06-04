@@ -3,8 +3,10 @@ import {
   addXpToActiveHatchling,
   createHatchlingFromEgg,
   getHatchlingLevel,
+  getHatchlingLevelProgress,
   getHatchlingPowerScore,
   getTimeAdjustedHatchling,
+  getTrainingPreview,
   getTrainingStatus,
   trainHatchling,
 } from "../hatchlings";
@@ -106,5 +108,35 @@ describe("hatchling progression", () => {
 
     expect(adjusted.bond).toBe(8);
     expect(adjusted.lastInteractionAt).toBe("2026-06-02T08:00:00.000Z");
+  });
+
+  it("describes level progress and next training gains", () => {
+    const hatchling = createHatchlingFromEgg({
+      egg: {
+        element: "storm",
+        id: "egg-storm",
+        rarity: "epic",
+        stepsRequired: 2500,
+        stepsWalked: 2500,
+      },
+      hatchedAt: "2026-06-01T08:00:00.000Z",
+      index: 1,
+    });
+    const trained = {
+      ...hatchling,
+      xp: 70,
+    };
+
+    expect(getHatchlingLevelProgress(trained.xp)).toMatchObject({
+      currentLevelXp: 70,
+      nextLevel: 2,
+      xpToNext: 5,
+    });
+    expect(getTrainingPreview(trained)).toMatchObject({
+      bondGain: 4,
+      levelAfterTraining: 2,
+      levelsGained: 1,
+      xpGain: 25,
+    });
   });
 });

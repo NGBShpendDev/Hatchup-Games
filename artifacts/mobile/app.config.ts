@@ -2,6 +2,7 @@ import type { ExpoConfig } from "expo/config";
 
 const healthReadDescription =
   "HatchUp reads your steps, distance, workouts, and active energy only to reward your Pal with XP and show optional rankings.";
+const supportEmail = process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? "shpend_95@live.com";
 
 const config: ExpoConfig = {
   name: "HatchUp Games",
@@ -12,6 +13,9 @@ const config: ExpoConfig = {
   userInterfaceStyle: "light",
   newArchEnabled: true,
   extra: {
+    privacyPolicyUrl: process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? null,
+    supportEmail,
+    termsUrl: process.env.EXPO_PUBLIC_TERMS_URL ?? null,
     eas: {
       projectId: "a5389b94-12db-48eb-9496-fee26451e369",
     },

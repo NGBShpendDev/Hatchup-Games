@@ -25,6 +25,7 @@ import {
 } from "./domain/hatchlings";
 import { upsertDailyAward } from "./domain/history";
 import { updateStreak } from "./domain/streak";
+import { getWeeklyRewardChest } from "./domain/rewardChests";
 import {
   getMonsterStage,
   getMonsterStages,
@@ -32,6 +33,16 @@ import {
 } from "./domain/progression";
 import { ACTIVE_PROGRESSION_PROFILE } from "./domain/progressionConfig";
 import { calculateDailyXp, getXpGains, mergeDailyXp } from "./domain/xp";
+import {
+  getQuestRewardKey,
+  isQuestComplete,
+  type Quest,
+} from "./domain/quests";
+import {
+  canBuyShopItem,
+  getShopItem,
+  type ShopItemId,
+} from "./domain/shop";
 import { syncCloudSave } from "./services/account/accountService";
 import { healthService } from "./services/health";
 import { syncLeaderboardEntry } from "./services/leaderboard/leaderboardService";
@@ -39,6 +50,7 @@ import {
   reportCrash as reportObservedCrash,
   trackEvent,
 } from "./services/observability/observabilityService";
+import { IS_PUBLIC_BUILD } from "./config/runtime";
 import {
   clearHatchUpData,
   loadHatchUpData,
@@ -46,6 +58,7 @@ import {
 } from "./storage/appStorage";
 
 export interface LatestSyncGains {
+  accountXp: number;
   coins: number;
   eggSteps: number;
   eggsAwarded: number;
@@ -64,6 +77,7 @@ const emptyDailyXp: DailyXp = {
 };
 
 const emptySyncGains: LatestSyncGains = {
+  accountXp: 0,
   coins: 0,
   eggSteps: 0,
   eggsAwarded: 0,
@@ -86,7 +100,7 @@ export function useHatchUpApp() {
   const [latestHatchling, setLatestHatchling] =
     useState<CollectedHatchling | null>(null);
   const [leaderboardSyncLabel, setLeaderboardSyncLabel] =
-    useState("Local beta rankings");
+    useState("Local challenge board");
   const [cloudSyncLabel, setCloudSyncLabel] = useState("Local-only save");
   const syncInFlight = useRef(false);
 
@@ -144,6 +158,15 @@ export function useHatchUpApp() {
       );
       return false;
     }
+  }
+
+  async function skipHealthConnect() {
+    setError(null);
+    await persist({
+      ...data,
+      onboardingStatus: "complete",
+    });
+    return true;
   }
 
   async function syncHealth() {
@@ -212,6 +235,7 @@ export function useHatchUpApp() {
         previousStage.id === nextStage.id ? null : nextStage.id,
       );
       setLatestSyncGains({
+        accountXp: 0,
         coins: 0,
         eggSteps: newSteps,
         eggsAwarded: Math.max(
@@ -271,7 +295,7 @@ export function useHatchUpApp() {
     setLatestEvolution(null);
     setLatestSyncGains(emptySyncGains);
     setLatestHatchling(null);
-    setLeaderboardSyncLabel("Local beta rankings");
+    setLeaderboardSyncLabel("Local challenge board");
     setCloudSyncLabel("Local-only save");
     setError(null);
   }
@@ -358,6 +382,140 @@ export function useHatchUpApp() {
     await persist(trainHatchling(data, data.activeHatchlingId));
   }
 
+  async function claimQuestReward(quest: Quest, today: string) {
+    const rewardKey = getQuestRewardKey(quest, today);
+    const alreadyClaimed = data.claimedQuestRewards.includes(rewardKey);
+
+    if (quest.cadence === "daily" || !isQuestComplete(quest) || alreadyClaimed) {
+      return false;
+    }
+
+    const activeEggs =
+      quest.rewardEggSteps > 0
+        ? addStepsToEggs(data.activeEggs, quest.rewardEggSteps)
+        : data.activeEggs;
+    const claimedAt = new Date().toISOString();
+    const receipt = {
+      cadence: quest.cadence,
+      claimedAt,
+      id: `${rewardKey}:${claimedAt}`,
+      label: quest.label,
+      questId: quest.id,
+      rewardAccountXp: quest.rewardAccountXp,
+      rewardCoins: quest.rewardCoins,
+      rewardEggSteps: quest.rewardEggSteps,
+      tier: quest.tier,
+    };
+    const next = {
+      ...data,
+      accountXp: data.accountXp + quest.rewardAccountXp,
+      activeEgg: activeEggs[0],
+      activeEggs,
+      claimedQuestRewards: [...data.claimedQuestRewards, rewardKey],
+      coins: data.coins + quest.rewardCoins,
+      questRewardHistory: [receipt, ...data.questRewardHistory].slice(0, 30),
+    };
+
+    await persist(next);
+    setLatestSyncGains({
+      ...emptySyncGains,
+      accountXp: quest.rewardAccountXp,
+      coins: quest.rewardCoins,
+      eggSteps: quest.rewardEggSteps,
+    });
+    void trackEvent(next, "quest_reward_claimed", {
+      cadence: quest.cadence,
+      questId: quest.id,
+      tier: quest.tier,
+    });
+    return true;
+  }
+
+  async function claimWeeklyChest(today: string) {
+    const chest = getWeeklyRewardChest(data, today);
+    if (!chest.canClaim) return false;
+
+    const activeEggs = addStepsToEggs(data.activeEggs, chest.rewardEggSteps);
+    const receipt = {
+      cadence: "weekly",
+      claimedAt: new Date().toISOString(),
+      id: `${chest.key}:${Date.now()}`,
+      label: chest.label,
+      questId: chest.key,
+      rewardAccountXp: chest.rewardAccountXp,
+      rewardCoins: chest.rewardCoins,
+      rewardEggSteps: chest.rewardEggSteps,
+      tier: 1,
+    };
+    const next = {
+      ...data,
+      accountXp: data.accountXp + chest.rewardAccountXp,
+      activeEgg: activeEggs[0],
+      activeEggs,
+      claimedRewardChests: [...data.claimedRewardChests, chest.key],
+      coins: data.coins + chest.rewardCoins,
+      questRewardHistory: [receipt, ...data.questRewardHistory].slice(0, 30),
+    };
+
+    await persist(next);
+    setLatestSyncGains({
+      ...emptySyncGains,
+      accountXp: chest.rewardAccountXp,
+      coins: chest.rewardCoins,
+      eggSteps: chest.rewardEggSteps,
+    });
+    void trackEvent(next, "weekly_chest_claimed", {
+      key: chest.key,
+      steps: chest.steps,
+    });
+    return true;
+  }
+
+  async function buyShopItem(itemId: ShopItemId) {
+    const item = getShopItem(itemId);
+    if (!item || !canBuyShopItem(data, item)) return false;
+
+    const activeEggs =
+      item.rewardEggSteps > 0
+        ? addStepsToEggs(data.activeEggs, item.rewardEggSteps)
+        : data.activeEggs;
+    const withAccountRewards = {
+      ...data,
+      accountXp: data.accountXp + item.rewardAccountXp,
+      activeEgg: activeEggs[0],
+      activeEggs,
+      coins: data.coins - item.priceCoins,
+      shopPurchaseHistory: [
+        {
+          boughtAt: new Date().toISOString(),
+          id: `${item.id}:${Date.now()}`,
+          itemId: item.id,
+          label: item.label,
+          priceCoins: item.priceCoins,
+        },
+        ...data.shopPurchaseHistory,
+      ].slice(0, 30),
+    };
+    const next =
+      item.rewardPalXp > 0
+        ? addXpToActiveHatchling(withAccountRewards, item.rewardPalXp)
+        : withAccountRewards;
+
+    await persist(next);
+    setLatestSyncGains({
+      ...emptySyncGains,
+      accountXp: item.rewardAccountXp,
+      coins: -item.priceCoins,
+      eggSteps: item.rewardEggSteps,
+      palXp: item.rewardPalXp,
+    });
+    void trackEvent(next, "shop_item_purchased", {
+      itemId: item.id,
+      priceCoins: item.priceCoins,
+    });
+    return true;
+  }
+
   async function syncLeaderboard(nextData: HatchUpData) {
     try {
       const result = await syncLeaderboardEntry(nextData, toDateKey(new Date()));
@@ -367,7 +525,7 @@ export function useHatchUpApp() {
               hour: "numeric",
               minute: "2-digit",
             })}`
-          : "Local beta rankings",
+          : "Local challenge board",
       );
     } catch {
       setLeaderboardSyncLabel("Leaderboard sync pending");
@@ -438,7 +596,7 @@ export function useHatchUpApp() {
     cloudSyncLabel,
     leaderboardSyncLabel,
     progressionProfile: ACTIVE_PROGRESSION_PROFILE,
-    testLabEnabled: ACTIVE_PROGRESSION_PROFILE.id === "beta",
+    testLabEnabled: ACTIVE_PROGRESSION_PROFILE.id === "beta" && !IS_PUBLIC_BUILD,
     isSyncing,
     latestHatchling,
     latestEvolution,
@@ -453,10 +611,13 @@ export function useHatchUpApp() {
     readyTestEgg,
     reportCrash,
     saveMonsterSetup,
+    skipHealthConnect,
     saveMonsterName,
     saveLeaderboardAlias,
     saveProfile,
     renameCollectedHatchling,
+    claimQuestReward,
+    claimWeeklyChest,
     setActiveHatchling,
     setAnalyticsEnabled,
     setCloudSyncEnabled,
@@ -464,6 +625,7 @@ export function useHatchUpApp() {
     setLeaderboardSharing,
     setTestStage,
     syncHealth,
+    buyShopItem,
     trainActiveHatchling,
     today: toDateKey(new Date()),
   };

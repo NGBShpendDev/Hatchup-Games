@@ -6,7 +6,7 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
-import { colors } from "../theme";
+import { colors, spacing } from "../theme";
 
 interface Props extends PropsWithChildren {
   footer?: React.ReactNode;
@@ -34,11 +34,13 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    padding: 20,
+    padding: spacing.screen,
+    paddingBottom: spacing.footerBottom + 84,
   },
   footer: {
     backgroundColor: colors.background,
-    padding: 20,
+    padding: spacing.screen,
+    paddingBottom: spacing.footerBottom,
     paddingTop: 8,
   },
 });

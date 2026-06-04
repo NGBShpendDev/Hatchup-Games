@@ -70,6 +70,10 @@ function AppContent() {
             const connected = await app.connectHealth();
             if (connected) setScreen("home");
           }}
+          onSkip={async () => {
+            await app.skipHealthConnect();
+            setScreen("home");
+          }}
         />
       )}
       {activeScreen === "home" && (
@@ -80,6 +84,9 @@ function AppContent() {
           latestSync={app.latestSync}
           latestSyncGains={app.latestSyncGains}
           latestEvolution={app.latestEvolution}
+          onBuyShopItem={app.buyShopItem}
+          onClaimWeeklyChest={app.claimWeeklyChest}
+          onClaimQuestReward={app.claimQuestReward}
           onDexPress={() => setScreen("dex")}
           onLeaderboardPress={() => setScreen("leaderboard")}
           onMonsterPress={() => setScreen("monster")}

@@ -1,6 +1,7 @@
 import { Component, type ReactNode } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Linking, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "./AppButton";
+import { buildSupportMailto } from "../config/runtime";
 import { reportCrash } from "../services/observability/observabilityService";
 import { colors } from "../theme";
 
@@ -33,11 +34,25 @@ export class ErrorBoundary extends Component<Props, State> {
         <Text style={styles.title}>HatchUp needs a quick reset.</Text>
         <Text style={styles.body}>
           Something unexpected happened. Your local progress should still be
-          saved.
+          saved. Try again, or send support a quick note if it keeps happening.
         </Text>
         <AppButton
           label="Try again"
           onPress={() => this.setState({ error: null })}
+        />
+        <AppButton
+          label="Contact support"
+          onPress={() => {
+            void Linking.openURL(
+              buildSupportMailto({
+                body: `Error: ${this.state.error?.name ?? "Unknown"}\nMessage: ${
+                  this.state.error?.message ?? "No message"
+                }`,
+                subject: "HatchUp Crash Help",
+              }),
+            );
+          }}
+          variant="secondary"
         />
       </View>
     );

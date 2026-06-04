@@ -1,7 +1,7 @@
 import { Image, StyleSheet, Text, View } from "react-native";
 import { getEggAsset } from "../assets/creatureAssets";
 import type { EggElement, EggRarity } from "../domain/models";
-import { colors } from "../theme";
+import { colors, radii } from "../theme";
 
 interface Props {
   element: EggElement;
@@ -74,8 +74,8 @@ const styles = StyleSheet.create({
   },
   egg: {
     alignItems: "center",
-    borderColor: "rgba(37, 49, 46, 0.15)",
-    borderRadius: 62,
+    borderColor: colors.avatarBorder,
+    borderRadius: radii.pill,
     borderWidth: 3,
     height: "88%",
     justifyContent: "center",
@@ -88,8 +88,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   spot: {
-    backgroundColor: "rgba(255, 255, 255, 0.52)",
-    borderRadius: 12,
+    backgroundColor: colors.translucentSurface,
+    borderRadius: radii.pill,
     height: 20,
     width: 20,
   },
