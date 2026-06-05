@@ -9,7 +9,9 @@ import {
 import * as AppleAuthentication from "expo-apple-authentication";
 import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { Session, User } from "@supabase/supabase-js";
+import { TEST_LOGIN_ENABLED } from "../../config/runtime";
 import {
   getSupabaseClient,
   isSupabaseConfigured,
@@ -27,7 +29,9 @@ interface AuthContextValue {
   authError: string | null;
   isAppleSignInAvailable: () => Promise<boolean>;
   isConfigured: boolean;
+  isGuestMode: boolean;
   loading: boolean;
+  signInAsGuest: () => Promise<void>;
   resetPassword: (email: string) => Promise<boolean>;
   refreshSession: () => Promise<void>;
   session: Session | null;
@@ -48,6 +52,7 @@ export interface EmailSignUpResult {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const GUEST_MODE_KEY = "@hatchup/auth-guest-mode";
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [accountLoading, setAccountLoading] = useState(false);
@@ -55,9 +60,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
     null,
   );
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isGuestMode, setIsGuestMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const isConfigured = isSupabaseConfigured();
+
+  useEffect(() => {
+    void AsyncStorage.getItem(GUEST_MODE_KEY).then((value) => {
+      setIsGuestMode(TEST_LOGIN_ENABLED && value === "true");
+    });
+  }, []);
 
   useEffect(() => {
     if (!isConfigured) {
@@ -156,6 +168,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setAuthError(null);
     const { data, error } = await getSupabaseClient().auth.signUp({
       email: email.trim(),
+      options: {
+        emailRedirectTo: getAuthRedirectUrl(),
+      },
       password,
     });
     if (error) {
@@ -220,8 +235,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
 
     const tokens = getTokensFromUrl(result.url);
+    if (tokens.error) {
+      setAuthError(getOAuthErrorMessage(tokens.error, tokens.errorDescription));
+      return false;
+    }
     if (!tokens.accessToken || !tokens.refreshToken) {
-      setAuthError("Google sign-in finished without a valid session.");
+      setAuthError(
+        "Google sign-in returned to HatchUp without a valid session. Check Supabase redirect URLs and Google provider settings.",
+      );
       return false;
     }
 
@@ -288,6 +309,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }
 
   async function signOut() {
+    if (isGuestMode) {
+      await AsyncStorage.removeItem(GUEST_MODE_KEY);
+      setIsGuestMode(false);
+      setAuthError(null);
+      return;
+    }
+
     if (!isConfigured) return;
 
     setAuthError(null);
@@ -301,6 +329,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setAccountLoading(false);
   }
 
+  async function signInAsGuest() {
+    if (!TEST_LOGIN_ENABLED) return;
+
+    await AsyncStorage.setItem(GUEST_MODE_KEY, "true");
+    setIsGuestMode(true);
+    setAuthError(null);
+  }
+
   const value = useMemo<AuthContextValue>(
     () => ({
       accountLoading,
@@ -308,18 +344,28 @@ export function AuthProvider({ children }: PropsWithChildren) {
       authError,
       isAppleSignInAvailable,
       isConfigured,
+      isGuestMode,
       loading,
       resetPassword,
       refreshSession,
       session,
       signInWithApple,
+      signInAsGuest,
       signInWithEmail,
       signInWithGoogle,
       signOut,
       signUpWithEmail,
       user: session?.user ?? null,
     }),
-    [accountLoading, accountProfile, authError, isConfigured, loading, session],
+    [
+      accountLoading,
+      accountProfile,
+      authError,
+      isConfigured,
+      isGuestMode,
+      loading,
+      session,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -339,8 +385,25 @@ function getTokensFromUrl(url: string) {
 
   return {
     accessToken: params.get("access_token"),
+    error: params.get("error"),
+    errorDescription: params.get("error_description"),
     refreshToken: params.get("refresh_token"),
   };
+}
+
+function getOAuthErrorMessage(
+  error: string,
+  description: string | null,
+) {
+  const detail = description ? ` (${description.replace(/\+/g, " ")})` : "";
+
+  if (error === "redirect_uri_mismatch") {
+    return `Google sign-in is missing an allowed redirect URL${detail}.`;
+  }
+  if (error === "access_denied") {
+    return "Google sign-in was cancelled before it finished.";
+  }
+  return `Google sign-in could not finish${detail}.`;
 }
 
 export function useAuth() {

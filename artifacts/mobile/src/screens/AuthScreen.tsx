@@ -12,7 +12,11 @@ import {
 import { AppButton } from "../components/AppButton";
 import { MonsterAvatar } from "../components/MonsterAvatar";
 import { Screen } from "../components/Screen";
-import { PRIVACY_POLICY_URL, TERMS_URL } from "../config/runtime";
+import {
+  PRIVACY_POLICY_URL,
+  TERMS_URL,
+  TEST_LOGIN_ENABLED,
+} from "../config/runtime";
 import { useAuth } from "../services/auth/AuthProvider";
 import { colors, radii, typography } from "../theme";
 
@@ -26,6 +30,7 @@ export function AuthScreen() {
     isConfigured,
     resetPassword,
     signInWithApple,
+    signInAsGuest,
     signInWithEmail,
     signInWithGoogle,
     signUpWithEmail,
@@ -138,6 +143,19 @@ export function AuthScreen() {
             : "Apple Sign-In could not finish. Please try again.",
         ),
       );
+    } finally {
+      setSubmitting(null);
+    }
+  }
+
+  async function handleGuestMode() {
+    if (!TEST_LOGIN_ENABLED || submitting) return;
+
+    setSubmitting("email");
+    setLocalError("");
+    setLocalMessage("");
+    try {
+      await signInAsGuest();
     } finally {
       setSubmitting(null);
     }
@@ -281,6 +299,26 @@ export function AuthScreen() {
             onPress={handleApple}
             variant="secondary"
           />
+          {TEST_LOGIN_ENABLED && (
+            <>
+              <View style={styles.dividerRow}>
+                <View style={styles.divider} />
+                <Text style={styles.dividerText}>testing</Text>
+                <View style={styles.divider} />
+              </View>
+              <AppButton
+                disabled={Boolean(submitting)}
+                label="Continue in local test mode"
+                onPress={handleGuestMode}
+                variant="secondary"
+              />
+              <Text style={styles.testNote}>
+                Test mode skips account login and keeps this device local-only.
+                Use it for TestFlight gameplay while Google, Apple, and email
+                redirects are finalized for public launch.
+              </Text>
+            </>
+          )}
           <Text style={styles.note}>
             HatchUp never stores your password manually. Passwords and providers
             are handled by Supabase Auth.
@@ -560,6 +598,12 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
     lineHeight: 17,
+    textAlign: "center",
+  },
+  testNote: {
+    color: colors.muted,
+    fontSize: 11,
+    lineHeight: 16,
     textAlign: "center",
   },
   legalCard: {

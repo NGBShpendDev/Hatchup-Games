@@ -9,6 +9,9 @@ export const APP_VARIANT: AppVariant =
 
 export const IS_PUBLIC_BUILD = APP_VARIANT === "production";
 
+export const TEST_LOGIN_ENABLED =
+  process.env.EXPO_PUBLIC_TEST_LOGIN_ENABLED === "true";
+
 export const SUPPORT_EMAIL =
   process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? "shpend_95@live.com";
 

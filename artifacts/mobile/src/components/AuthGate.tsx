@@ -6,7 +6,7 @@ import { useAuth } from "../services/auth/AuthProvider";
 import { colors, radii, typography } from "../theme";
 
 export function AuthGate({ children }: PropsWithChildren) {
-  const { accountLoading, loading, session, user } = useAuth();
+  const { accountLoading, isGuestMode, loading, session, user } = useAuth();
   const isLoading = loading || accountLoading;
 
   if (isLoading) {
@@ -30,7 +30,7 @@ export function AuthGate({ children }: PropsWithChildren) {
     );
   }
 
-  if (!session || !user) {
+  if (!isGuestMode && (!session || !user)) {
     return <AuthScreen />;
   }
 
