@@ -20,8 +20,8 @@ export function StackedMenuCard({ children, subtitle, title }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.warmSurface,
-    borderColor: colors.rewardGold,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 10,

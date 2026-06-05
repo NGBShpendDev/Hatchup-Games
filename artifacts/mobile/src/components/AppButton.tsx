@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: radii.button,
     justifyContent: "center",
-    minHeight: 54,
+    minHeight: 50,
     paddingHorizontal: 20,
     shadowColor: colors.cardShadow,
     shadowOffset: { height: 5, width: 0 },
@@ -52,12 +52,12 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
   },
   primary: {
-    backgroundColor: colors.primaryDeep,
+    backgroundColor: colors.primary,
     borderColor: colors.primary,
     borderWidth: 1,
   },
   secondary: {
-    backgroundColor: colors.softPeach,
+    backgroundColor: colors.primarySoft,
     borderColor: colors.line,
     borderWidth: 1,
   },

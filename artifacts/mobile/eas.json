@@ -10,7 +10,7 @@
       "env": {
         "EXPO_PUBLIC_HEALTH_MODE": "native",
         "EXPO_PUBLIC_APP_VARIANT": "development",
-        "EXPO_PUBLIC_HATCHUP_THEME": "creatureAdventure",
+        "EXPO_PUBLIC_HATCHUP_THEME": "publicCohesion",
         "EXPO_PUBLIC_PROGRESSION_PROFILE": "beta"
       }
     },
@@ -19,7 +19,7 @@
       "env": {
         "EXPO_PUBLIC_HEALTH_MODE": "native",
         "EXPO_PUBLIC_APP_VARIANT": "preview",
-        "EXPO_PUBLIC_HATCHUP_THEME": "creatureAdventure",
+        "EXPO_PUBLIC_HATCHUP_THEME": "publicCohesion",
         "EXPO_PUBLIC_PROGRESSION_PROFILE": "beta"
       }
     },
@@ -28,7 +28,7 @@
       "env": {
         "EXPO_PUBLIC_HEALTH_MODE": "native",
         "EXPO_PUBLIC_APP_VARIANT": "production",
-        "EXPO_PUBLIC_HATCHUP_THEME": "creatureAdventure",
+        "EXPO_PUBLIC_HATCHUP_THEME": "publicCohesion",
         "EXPO_PUBLIC_PROGRESSION_PROFILE": "market"
       }
     }

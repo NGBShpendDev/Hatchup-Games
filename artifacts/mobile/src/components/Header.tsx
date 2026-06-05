@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
   },
   back: {
     alignItems: "center",
-    backgroundColor: colors.softPeach,
+    backgroundColor: colors.primarySoft,
     borderColor: colors.line,
     borderRadius: radii.pill,
     borderWidth: 1,

@@ -149,20 +149,70 @@ export const themeVariants = {
       bodyLineHeight: 23,
     },
   },
+  publicCohesion: {
+    colors: {
+      background: "#FBF4E6",
+      surface: "#FFFFFF",
+      ink: "#17251F",
+      muted: "#6B7770",
+      line: "#E6D8C4",
+      primary: "#075E4C",
+      primaryDeep: "#043F34",
+      primarySoft: "#DDF4EC",
+      accent: "#F2C84B",
+      accentSoft: "#FFF2C7",
+      softPeach: "#FFE7D2",
+      softBlue: "#E1F5FF",
+      softLavender: "#EEE8FF",
+      rewardGold: "#F2C84B",
+      danger: "#D95C5C",
+      dangerSoft: "#FFE6E2",
+      warmSurface: "#FFF8EA",
+      cardShadow: "rgba(7, 94, 76, 0.08)",
+      cardShadowStrong: "rgba(7, 94, 76, 0.14)",
+      modalBackdrop: "rgba(4, 63, 52, 0.64)",
+      translucentSurface: "rgba(255, 255, 255, 0.84)",
+      avatarBorder: "rgba(7, 94, 76, 0.15)",
+      leaf: "#52B76A",
+      ember: "#FF8A3D",
+      tide: "#38BDF8",
+      storm: "#A78BFA",
+      egg: "#F2C84B",
+      baby: "#52B76A",
+      teen: "#38BDF8",
+      final: "#A78BFA",
+    },
+    radii: {
+      button: 16,
+      card: 20,
+      hero: 26,
+      pill: 999,
+    },
+    spacing: {
+      screen: 20,
+      card: 16,
+      section: 20,
+      footerBottom: 30,
+    },
+    typography: {
+      titleWeight: "900" as const,
+      bodyLineHeight: 22,
+    },
+  },
 } as const;
 
 export type ThemeVariant = keyof typeof themeVariants;
 
 // Rollback switch:
 // - Use EXPO_PUBLIC_HATCHUP_THEME=default to restore the original palette.
-// - Or change ACTIVE_THEME below from "creatureAdventure" to "default".
+// - Or change ACTIVE_THEME below from "publicCohesion" to "default".
 const configuredTheme = process.env.EXPO_PUBLIC_HATCHUP_THEME as
   | ThemeVariant
   | undefined;
 export const ACTIVE_THEME: ThemeVariant =
   configuredTheme && configuredTheme in themeVariants
     ? configuredTheme
-    : "creatureAdventure";
+    : "publicCohesion";
 
 export const theme = themeVariants[ACTIVE_THEME];
 export const colors = theme.colors;

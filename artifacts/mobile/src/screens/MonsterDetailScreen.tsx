@@ -93,21 +93,94 @@ export function MonsterDetailScreen({
         }}
       />
       <Text style={styles.screenLoopCopy}>{getScreenLoopSubtitle("hatchery")}</Text>
-      <Text style={styles.sectionTitle}>Journey Pal</Text>
-      <View style={styles.card}>
-        <MonsterAvatar stage={progression.current.id} />
-        <Text style={styles.name}>{data.monsterName}</Text>
-        <Text style={styles.stage}>{progression.current.label} stage</Text>
-        <ProgressBar progress={progression.progress} />
-        <Text style={styles.caption}>
-          {progression.next
-            ? `${progression.xpToNext} journey XP to reach ${progression.next.label}`
-            : "Your Pal journey has reached its final stage."}
+      <View style={styles.collectionHeader}>
+        <Text style={styles.sectionTitle}>Eggs in Hatchery</Text>
+        <Text style={styles.collectionCount}>
+          {readyEggCount} ready
         </Text>
       </View>
+      <Text style={styles.incubatorIntro}>
+        Up to three Eggs progress together from every movement sync. Every step
+        pushes your next hatch closer, and bonus Eggs wait here when your
+        Hatchery is full.
+      </Text>
+      <View style={styles.missionCard}>
+        <Text style={styles.missionKicker}>Current mission</Text>
+        <Text style={styles.missionTitle}>{hatcheryMission.title}</Text>
+        <Text style={styles.missionBody}>{hatcheryMission.body}</Text>
+        <AppButton
+          label={hatcheryMission.cta}
+          onPress={
+            hatcheryMission.target === "home"
+              ? onBack
+              : hatcheryMission.target === "collection"
+                ? onDexPress
+                : () => undefined
+          }
+          variant="secondary"
+        />
+      </View>
+      {readyEggCount > 1 && (
+        <AppButton
+          label={`Hatch all ${readyEggCount} ready Eggs`}
+          onPress={onHatchAll}
+          style={styles.hatchAllButton}
+        />
+      )}
+      <View style={styles.incubatorStack}>
+        {data.activeEggs.map((egg, index) => {
+          const eggReady = isEggReady(egg);
+          return (
+            <View style={styles.incubatorCard} key={egg.id}>
+              <EggAvatar element={egg.element} rarity={egg.rarity} size="small" />
+              <View style={styles.eggCardBody}>
+                <Text style={styles.eggName}>
+                  Slot {index + 1}: {capitalize(egg.rarity)}{" "}
+                  {capitalize(egg.element)} Egg
+                </Text>
+                <Text style={styles.eggCaption}>
+                  {eggReady
+                    ? "Ready to hatch."
+                    : getEggProgressMessage(egg.stepsWalked, egg.stepsRequired)}
+                </Text>
+                <Text style={styles.eggRemaining}>
+                  {eggReady
+                    ? "Ready now"
+                    : `${Math.max(egg.stepsRequired - egg.stepsWalked, 0).toLocaleString()} steps remaining`}
+                </Text>
+                <ProgressBar progress={getEggProgress(egg)} />
+                <AppButton
+                  disabled={!eggReady}
+                  label={eggReady ? "Hatch Pal" : "Keep moving"}
+                  onPress={() => onHatch(egg.id)}
+                  style={!eggReady ? styles.disabledButton : undefined}
+                  variant={eggReady ? "primary" : "secondary"}
+                />
+              </View>
+            </View>
+          );
+        })}
+      </View>
+      <CollapsibleSection
+        badge={progression.next ? `${progression.xpToNext} XP left` : "Final"}
+        subtitle="Preview the stages your Pal can grow into."
+        title="Journey Pal"
+      >
+        <View style={styles.card}>
+          <MonsterAvatar stage={progression.current.id} />
+          <Text style={styles.name}>{data.monsterName}</Text>
+          <Text style={styles.stage}>{progression.current.label} stage</Text>
+          <ProgressBar progress={progression.progress} />
+          <Text style={styles.caption}>
+            {progression.next
+              ? `${progression.xpToNext} journey XP to reach ${progression.next.label}`
+              : "Your Pal journey has reached its final stage."}
+          </Text>
+        </View>
+      </CollapsibleSection>
       <CollapsibleSection
         badge={`${data.totalXp} XP`}
-        subtitle="See the broader journey milestones after the active Egg loop."
+        subtitle="Preview the stages your Pal can grow into."
         title="Journey stages"
       >
         {MONSTER_STAGES.map((stage) => {
@@ -184,72 +257,6 @@ export function MonsterDetailScreen({
           </View>
         )}
       </CollapsibleSection>
-      <View style={styles.collectionHeader}>
-        <Text style={styles.sectionTitle}>Eggs in Hatchery</Text>
-        <Text style={styles.collectionCount}>
-          {readyEggCount} ready
-        </Text>
-      </View>
-      <Text style={styles.incubatorIntro}>
-        Up to three Eggs progress together from every movement sync. Every step
-        pushes your next hatch closer, and bonus Eggs wait here when your
-        Hatchery is full.
-      </Text>
-      <View style={styles.missionCard}>
-        <Text style={styles.missionKicker}>Current mission</Text>
-        <Text style={styles.missionTitle}>{hatcheryMission.title}</Text>
-        <Text style={styles.missionBody}>{hatcheryMission.body}</Text>
-        <AppButton
-          label={hatcheryMission.cta}
-          onPress={
-            hatcheryMission.target === "home"
-              ? onBack
-              : hatcheryMission.target === "collection"
-                ? onDexPress
-                : () => undefined
-          }
-          variant="secondary"
-        />
-      </View>
-      {readyEggCount > 1 && (
-        <AppButton
-          label={`Hatch all ${readyEggCount} ready Eggs`}
-          onPress={onHatchAll}
-          style={styles.hatchAllButton}
-        />
-      )}
-      <View style={styles.incubatorStack}>
-        {data.activeEggs.map((egg, index) => {
-          const eggReady = isEggReady(egg);
-          return (
-            <View style={styles.incubatorCard} key={egg.id}>
-              <EggAvatar element={egg.element} rarity={egg.rarity} />
-              <Text style={styles.eggName}>
-                Slot {index + 1}: {capitalize(egg.rarity)}{" "}
-                {capitalize(egg.element)} Egg
-              </Text>
-              <Text style={styles.eggCaption}>
-                {eggReady
-                  ? "Your egg is ready. Hatch this Pal."
-                  : getEggProgressMessage(egg.stepsWalked, egg.stepsRequired)}
-              </Text>
-              <Text style={styles.eggRemaining}>
-                {eggReady
-                  ? "Ready now"
-                  : `${Math.max(egg.stepsRequired - egg.stepsWalked, 0).toLocaleString()} steps remaining`}
-              </Text>
-              <ProgressBar progress={getEggProgress(egg)} />
-              <AppButton
-                disabled={!eggReady}
-                label={eggReady ? "Hatch this Pal" : "Keep moving to hatch"}
-                onPress={() => onHatch(egg.id)}
-                style={!eggReady ? styles.disabledButton : undefined}
-                variant={eggReady ? "primary" : "secondary"}
-              />
-            </View>
-          );
-        })}
-      </View>
       <CollapsibleSection
         badge={`${data.collection.length} collected`}
         subtitle="A quick preview of the team your Eggs have hatched."
@@ -499,8 +506,8 @@ function getHatcheryMission({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.softBlue,
-    borderColor: colors.tide,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.hero,
     borderWidth: 1,
     padding: 18,
@@ -626,8 +633,8 @@ const styles = StyleSheet.create({
   },
   stageRow: {
     alignItems: "center",
-    backgroundColor: colors.primarySoft,
-    borderColor: colors.primary,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderWidth: 1,
     borderRadius: radii.card,
     flexDirection: "row",
@@ -671,8 +678,8 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   stat: {
-    backgroundColor: colors.softPeach,
-    borderColor: colors.ember,
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
     borderWidth: 1,
     borderRadius: radii.card,
     flex: 1,
@@ -690,8 +697,8 @@ const styles = StyleSheet.create({
   },
   trainingCard: {
     alignItems: "center",
-    backgroundColor: colors.softLavender,
-    borderColor: colors.storm,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     flexDirection: "row",
@@ -742,11 +749,18 @@ const styles = StyleSheet.create({
     minWidth: 110,
   },
   incubatorCard: {
-    backgroundColor: colors.warmSurface,
-    borderColor: colors.rewardGold,
-    borderRadius: radii.hero,
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
     borderWidth: 1,
-    padding: 18,
+    flexDirection: "row",
+    gap: 12,
+    padding: 12,
+  },
+  eggCardBody: {
+    flex: 1,
+    gap: 6,
   },
   incubatorIntro: {
     color: colors.muted,
@@ -756,8 +770,8 @@ const styles = StyleSheet.create({
     marginTop: -4,
   },
   missionCard: {
-    backgroundColor: colors.softPeach,
-    borderColor: colors.rewardGold,
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 8,
@@ -789,24 +803,18 @@ const styles = StyleSheet.create({
   },
   eggName: {
     color: colors.ink,
-    fontSize: 19,
+    fontSize: 15,
     fontWeight: "900",
-    textAlign: "center",
   },
   eggCaption: {
     color: colors.muted,
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 5,
-    textAlign: "center",
+    fontSize: 12,
+    lineHeight: 17,
   },
   eggRemaining: {
     color: colors.primaryDeep,
     fontSize: 12,
     fontWeight: "900",
-    marginBottom: 12,
-    marginTop: 2,
-    textAlign: "center",
   },
   disabledButton: {
     opacity: 0.58,
@@ -821,8 +829,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   emptyCard: {
-    backgroundColor: colors.softPeach,
-    borderColor: colors.rewardGold,
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     padding: 16,

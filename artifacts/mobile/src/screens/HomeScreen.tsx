@@ -432,7 +432,7 @@ export function HomeScreen({
             ? `${visibleClaimableQuestCount} claimable`
             : `${visibleQuests.filter(isQuestComplete).length}/${visibleQuests.length}`
         }
-        subtitle="Quest boards support the daily loop without taking over Home."
+        subtitle="Small goals that help today's Egg and Pal grow."
         title="Quests"
       >
         <View style={styles.questTabs}>
@@ -478,7 +478,7 @@ export function HomeScreen({
       </CollapsibleSection>
       <CollapsibleSection
         badge={weeklyChest.canClaim ? "Ready" : `${Math.round(weeklyChest.progress * 100)}%`}
-        subtitle="Weekly rewards are deeper progress, not the first thing to parse."
+        subtitle="Earn a weekly chest by staying active."
         title="Weekly chest"
       >
         <StackedMenuCard
@@ -1111,7 +1111,7 @@ function AdvancedSectionIntro({
     <View style={styles.advancedIntroCard}>
       <View style={styles.arcHeader}>
         <View>
-          <Text style={styles.arcKicker}>DEEPER SYSTEMS</Text>
+          <Text style={styles.arcKicker}>NEXT JOURNEY LAYERS</Text>
           <Text style={styles.arcTitle}>{unlockedCopy.title}</Text>
         </View>
         <Text style={styles.arcPill}>Day {mission.day}/7</Text>
@@ -1636,8 +1636,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   heroCard: {
-    backgroundColor: colors.softBlue,
-    borderColor: colors.tide,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.hero,
     borderWidth: 1,
     marginBottom: 12,
@@ -1695,7 +1695,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   nextActionCard: {
-    backgroundColor: colors.softPeach,
+    backgroundColor: colors.warmSurface,
     borderColor: colors.rewardGold,
     borderRadius: radii.hero,
     borderWidth: 1,
@@ -1758,8 +1758,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   dailyMissionCard: {
-    backgroundColor: colors.primarySoft,
-    borderColor: colors.primary,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.hero,
     borderWidth: 1,
     gap: 12,
@@ -1838,8 +1838,8 @@ const styles = StyleSheet.create({
     color: colors.primaryDeep,
   },
   goalCard: {
-    backgroundColor: colors.softLavender,
-    borderColor: colors.storm,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderWidth: 1,
     borderRadius: radii.card,
     gap: 10,
@@ -1888,8 +1888,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   rewardHistoryPanel: {
-    backgroundColor: colors.softBlue,
-    borderColor: colors.tide,
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 8,
@@ -1945,8 +1945,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   advancedIntroCard: {
-    backgroundColor: colors.softLavender,
-    borderColor: colors.storm,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 10,
@@ -2000,8 +2000,8 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   shopCard: {
-    backgroundColor: colors.softPeach,
-    borderColor: colors.ember,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 10,
@@ -2411,8 +2411,8 @@ const styles = StyleSheet.create({
   },
   emptyMissionCard: {
     alignItems: "center",
-    backgroundColor: colors.softPeach,
-    borderColor: colors.rewardGold,
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     flexDirection: "row",
@@ -2441,8 +2441,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   syncReceipt: {
-    backgroundColor: colors.softBlue,
-    borderColor: colors.tide,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     marginTop: 10,
@@ -2493,8 +2493,8 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
   activityCard: {
-    backgroundColor: colors.softBlue,
-    borderColor: colors.tide,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     marginBottom: 22,
@@ -2592,8 +2592,8 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   questSummaryCard: {
-    backgroundColor: colors.warmSurface,
-    borderColor: colors.rewardGold,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 10,
@@ -2719,7 +2719,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   questTier: {
-    backgroundColor: colors.softLavender,
+    backgroundColor: colors.primarySoft,
     borderRadius: radii.pill,
     color: colors.primary,
     fontSize: 10,

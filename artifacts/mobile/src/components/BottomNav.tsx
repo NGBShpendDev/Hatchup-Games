@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   },
   iconWrap: {
     alignItems: "center",
-    backgroundColor: colors.softBlue,
+    backgroundColor: colors.primarySoft,
     borderColor: colors.line,
     borderWidth: 1,
     borderRadius: radii.pill,

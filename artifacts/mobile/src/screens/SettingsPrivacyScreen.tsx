@@ -267,7 +267,7 @@ export function SettingsPrivacyScreen({
               />
             ) : (
               <View style={styles.emptyAvatar}>
-                <Text style={styles.emptyAvatarText}>PAL</Text>
+                <Text style={styles.emptyAvatarText}>Egg</Text>
               </View>
             )}
           </View>
@@ -1133,8 +1133,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   launchCard: {
-    backgroundColor: colors.softBlue,
-    borderColor: colors.tide,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.hero,
     borderWidth: 1,
     gap: 10,
@@ -1196,7 +1196,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   readinessStatus: {
-    backgroundColor: colors.softLavender,
+    backgroundColor: colors.warmSurface,
     borderRadius: radii.pill,
     color: colors.muted,
     fontSize: 9,
@@ -1230,7 +1230,7 @@ const styles = StyleSheet.create({
   },
   profileCard: {
     backgroundColor: colors.warmSurface,
-    borderColor: colors.rewardGold,
+    borderColor: colors.line,
     borderRadius: radii.hero,
     borderWidth: 1,
     gap: 14,
@@ -1249,7 +1249,7 @@ const styles = StyleSheet.create({
   profileAvatar: {
     alignItems: "center",
     backgroundColor: colors.surface,
-    borderColor: colors.rewardGold,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     height: 170,
@@ -1259,7 +1259,7 @@ const styles = StyleSheet.create({
   },
   emptyAvatar: {
     alignItems: "center",
-    backgroundColor: colors.softBlue,
+    backgroundColor: colors.primarySoft,
     borderRadius: radii.pill,
     height: 88,
     justifyContent: "center",
@@ -1325,8 +1325,8 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   petPicker: {
-    backgroundColor: colors.softPeach,
-    borderColor: colors.rewardGold,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     padding: 12,
@@ -1370,8 +1370,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   profileStat: {
-    backgroundColor: colors.softBlue,
-    borderColor: colors.tide,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     padding: 10,
@@ -1413,8 +1413,8 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   profileNextStepCard: {
-    backgroundColor: colors.primarySoft,
-    borderColor: colors.primary,
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 7,
@@ -1471,8 +1471,8 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   profileShowcaseCard: {
-    backgroundColor: colors.softBlue,
-    borderColor: colors.tide,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 10,
@@ -1534,8 +1534,8 @@ const styles = StyleSheet.create({
   },
   activeHatchling: {
     alignItems: "center",
-    backgroundColor: colors.softLavender,
-    borderColor: colors.storm,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     flexDirection: "row",
@@ -1563,7 +1563,7 @@ const styles = StyleSheet.create({
   },
   badgeCard: {
     backgroundColor: colors.surface,
-    borderColor: colors.primarySoft,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     marginTop: 16,
@@ -1614,8 +1614,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   milestoneShelf: {
-    backgroundColor: colors.softBlue,
-    borderColor: colors.tide,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 9,
@@ -1717,7 +1717,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   badge: {
-    backgroundColor: colors.softPeach,
+    backgroundColor: colors.surface,
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
@@ -1756,8 +1756,8 @@ const styles = StyleSheet.create({
   },
   emptyMissionCard: {
     alignItems: "center",
-    backgroundColor: colors.softBlue,
-    borderColor: colors.tide,
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     flexDirection: "row",
@@ -1809,8 +1809,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   feedbackCard: {
-    backgroundColor: colors.softLavender,
-    borderColor: colors.storm,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 10,
@@ -1850,8 +1850,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   readOnlyCard: {
-    backgroundColor: colors.softBlue,
-    borderColor: colors.tide,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     marginTop: 14,

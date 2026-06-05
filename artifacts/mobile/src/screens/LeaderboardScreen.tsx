@@ -336,8 +336,8 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   stat: {
-    backgroundColor: colors.softBlue,
-    borderColor: colors.tide,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     flex: 1,
@@ -355,8 +355,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   shareCard: {
-    backgroundColor: colors.softPeach,
-    borderColor: colors.rewardGold,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     marginTop: 16,
@@ -364,8 +364,8 @@ const styles = StyleSheet.create({
   },
   emptyMissionCard: {
     alignItems: "center",
-    backgroundColor: colors.softLavender,
-    borderColor: colors.storm,
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     flexDirection: "row",

@@ -128,6 +128,58 @@ export function CreatureDexScreen({
         {getScreenLoopSubtitle("collection")} Each Pal has its own level, bond,
         and stats.
       </Text>
+      <View style={styles.progressCard}>
+        <View style={styles.progressHeader}>
+          <Text style={styles.progressTitle}>Collection progress</Text>
+          <Text style={styles.progressMeta}>
+            {completion.unlocked}/{completion.total}
+          </Text>
+        </View>
+        <Text style={styles.progressCopy}>
+          {completion.total} element and rarity entries live in the Collection
+          Book. Each discovered Pal can grow through Baby, Teen, and Final stages.
+        </Text>
+        <ProgressBar progress={completion.percent} />
+        <View style={styles.summaryChips}>
+          {elementSummary.map((summary) => (
+            <SummaryChip
+              key={summary.id}
+              label={capitalize(summary.id)}
+              progress={summary.percent}
+              value={`${summary.unlocked}/${summary.total}`}
+            />
+          ))}
+        </View>
+        <View style={styles.summaryChips}>
+          {raritySummary.map((summary) => (
+            <SummaryChip
+              key={summary.id}
+              label={capitalize(summary.id)}
+              progress={summary.percent}
+              value={`${summary.unlocked}/${summary.total}`}
+            />
+          ))}
+        </View>
+      </View>
+      {nextMissingEntry && (
+        <View style={styles.targetCard}>
+          <View style={styles.targetText}>
+            <Text style={styles.targetKicker}>NEXT COLLECTION TARGET</Text>
+            <Text style={styles.targetTitle}>{nextMissingEntry.name}</Text>
+            <Text style={styles.targetBody}>
+              Hatch a {capitalize(nextMissingEntry.rarity)}{" "}
+              {capitalize(nextMissingEntry.element)} Egg to reveal this Pal.
+            </Text>
+          </View>
+          <View style={styles.targetAvatar}>
+            <HatchlingAvatar
+              element={nextMissingEntry.element}
+              rarity={nextMissingEntry.rarity}
+              size="small"
+            />
+          </View>
+        </View>
+      )}
       {selectedHatchling ? (
         <View style={styles.detailCard}>
           <Text style={styles.detailKicker}>
@@ -366,58 +418,6 @@ export function CreatureDexScreen({
           <AppButton label="Go to Hatchery" onPress={onMonsterPress} />
         </View>
       )}
-      <View style={styles.progressCard}>
-        <View style={styles.progressHeader}>
-          <Text style={styles.progressTitle}>Collection progress</Text>
-          <Text style={styles.progressMeta}>
-            {completion.unlocked}/{completion.total}
-          </Text>
-        </View>
-        <Text style={styles.progressCopy}>
-          Each element and rarity can grow through Baby, Teen, and Final stages.
-        </Text>
-        <ProgressBar progress={completion.percent} />
-        <View style={styles.summaryChips}>
-          {elementSummary.map((summary) => (
-            <SummaryChip
-              key={summary.id}
-              label={capitalize(summary.id)}
-              progress={summary.percent}
-              value={`${summary.unlocked}/${summary.total}`}
-            />
-          ))}
-        </View>
-        <View style={styles.summaryChips}>
-          {raritySummary.map((summary) => (
-            <SummaryChip
-              key={summary.id}
-              label={capitalize(summary.id)}
-              progress={summary.percent}
-              value={`${summary.unlocked}/${summary.total}`}
-            />
-          ))}
-        </View>
-      </View>
-      {nextMissingEntry && (
-        <View style={styles.targetCard}>
-          <View style={styles.targetText}>
-            <Text style={styles.targetKicker}>NEXT COLLECTION TARGET</Text>
-          <Text style={styles.targetTitle}>{nextMissingEntry.name}</Text>
-          <Text style={styles.targetBody}>
-              Hatch more Eggs to discover this Pal: {capitalize(nextMissingEntry.rarity)}{" "}
-              {capitalize(nextMissingEntry.element)} from{" "}
-              {nextMissingEntry.habitat}.
-            </Text>
-          </View>
-          <View style={styles.targetAvatar}>
-            <HatchlingAvatar
-              element={nextMissingEntry.element}
-              rarity={nextMissingEntry.rarity}
-              size="small"
-            />
-          </View>
-        </View>
-      )}
       <CollapsibleSection
         badge={`${filteredEntries.length}`}
         subtitle="Narrow by element, rarity, or discovery status."
@@ -515,7 +515,7 @@ function ActiveFilterSummary({
     <View style={styles.activeFilterCard}>
       <View style={styles.activeFilterText}>
         <Text style={styles.activeFilterTitle}>
-          Showing {filteredCount}/{totalCount} collection entries
+          Collection entries in view: {filteredCount}/{totalCount}
         </Text>
         <Text style={styles.activeFilterBody}>
           {hasFilters
@@ -748,10 +748,10 @@ function DexCard({
       <Text style={styles.cardDescription}>
         {unlocked
           ? entry.description
-          : `Hatch more Eggs to discover this ${entry.rarity} ${entry.element} Pal.`}
+          : `Hatch a ${capitalize(entry.rarity)} ${capitalize(entry.element)} Egg to reveal this Pal.`}
       </Text>
       {!unlocked && (
-        <Text style={styles.lockedHint}>Hidden until discovered</Text>
+        <Text style={styles.lockedHint}>Locked</Text>
       )}
       <View style={styles.cardFooter}>
         <Text style={[styles.status, unlocked && styles.unlockedStatus]}>
@@ -837,8 +837,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   progressCard: {
-    backgroundColor: colors.primarySoft,
-    borderColor: colors.primary,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 12,
@@ -846,8 +846,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   detailCard: {
-    backgroundColor: colors.softBlue,
-    borderColor: colors.tide,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.hero,
     borderWidth: 1,
     gap: 10,
@@ -863,8 +863,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   emptyDetailCard: {
-    backgroundColor: colors.softPeach,
-    borderColor: colors.rewardGold,
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     marginTop: 20,
@@ -920,7 +920,7 @@ const styles = StyleSheet.create({
   },
   identityCard: {
     backgroundColor: colors.surface,
-    borderColor: colors.primarySoft,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 5,
@@ -952,7 +952,7 @@ const styles = StyleSheet.create({
   },
   renameCard: {
     backgroundColor: colors.surface,
-    borderColor: colors.primarySoft,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 8,
@@ -973,8 +973,8 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   trainingCard: {
-    backgroundColor: colors.softPeach,
-    borderColor: colors.ember,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 8,
@@ -996,8 +996,8 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   memoryCard: {
-    backgroundColor: colors.softLavender,
-    borderColor: colors.storm,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 8,
@@ -1237,7 +1237,7 @@ const styles = StyleSheet.create({
   },
   filterCard: {
     backgroundColor: colors.surface,
-    borderColor: colors.primarySoft,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     gap: 9,
@@ -1324,11 +1324,11 @@ const styles = StyleSheet.create({
     width: "48%",
   },
   lockedCard: {
-    backgroundColor: colors.softLavender,
+    backgroundColor: colors.warmSurface,
     borderStyle: "dashed",
   },
   lockedAvatar: {
-    opacity: 0.38,
+    opacity: 0.24,
   },
   lockedHint: {
     color: colors.primaryDeep,
@@ -1396,8 +1396,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   noResultsCard: {
-    backgroundColor: colors.softLavender,
-    borderColor: colors.storm,
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
     marginTop: 14,

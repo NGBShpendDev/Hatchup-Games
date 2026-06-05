@@ -52,11 +52,11 @@ export function CollapsibleSection({
 
 const styles = StyleSheet.create({
   section: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.translucentSurface,
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
-    marginBottom: 14,
+    marginBottom: 12,
     overflow: "hidden",
   },
   header: {
@@ -64,7 +64,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     justifyContent: "space-between",
-    padding: 14,
+    minHeight: 68,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   pressed: {
     opacity: 0.75,
@@ -89,7 +91,9 @@ const styles = StyleSheet.create({
   },
   badge: {
     backgroundColor: colors.primarySoft,
+    borderColor: colors.line,
     borderRadius: radii.pill,
+    borderWidth: 1,
     color: colors.primaryDeep,
     fontSize: 11,
     fontWeight: "900",
@@ -105,6 +109,7 @@ const styles = StyleSheet.create({
   content: {
     borderTopColor: colors.line,
     borderTopWidth: 1,
+    backgroundColor: colors.surface,
     padding: 14,
   },
 });
