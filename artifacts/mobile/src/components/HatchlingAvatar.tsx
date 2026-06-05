@@ -1,10 +1,12 @@
 import { Image, StyleSheet, Text, View } from "react-native";
-import { getHatchlingAsset } from "../assets/creatureAssets";
+import { getCreatureAsset } from "../assets/creatureAssets";
+import { getCreatureVisualStage } from "../domain/creatureVisuals";
 import type { EggElement, EggRarity } from "../domain/models";
 import { colors, elementColors, radii } from "../theme";
 
 interface Props {
   element: EggElement;
+  level?: number;
   rarity: EggRarity;
   size?: "small" | "large";
 }
@@ -23,14 +25,15 @@ const rarityColors: Record<EggRarity, string> = {
   epic: colors.final,
 };
 
-export function HatchlingAvatar({ element, rarity, size = "large" }: Props) {
-  const asset = getHatchlingAsset(element, rarity);
+export function HatchlingAvatar({ element, level = 1, rarity, size = "large" }: Props) {
+  const visualStage = getCreatureVisualStage(level);
+  const asset = getCreatureAsset(element, visualStage, rarity);
 
   if (asset) {
     return (
       <View style={[styles.wrap, styles[size]]}>
         <Image
-          accessibilityLabel={`${rarity} ${element} Pal art`}
+          accessibilityLabel={`${rarity} ${element} ${visualStage} Pal art`}
           resizeMode="contain"
           source={asset}
           style={[styles.image, styles[`${size}Image`]]}

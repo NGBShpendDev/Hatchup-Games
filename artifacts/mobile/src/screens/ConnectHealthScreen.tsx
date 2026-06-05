@@ -1,7 +1,12 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Linking, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { Header } from "../components/Header";
 import { Screen } from "../components/Screen";
+import {
+  buildSupportMailto,
+  PRIVACY_POLICY_URL,
+  TERMS_URL,
+} from "../config/runtime";
 import { colors, radii, typography } from "../theme";
 
 const privacyCopy =
@@ -65,6 +70,38 @@ export function ConnectHealthScreen({
       <View style={styles.privacyCard}>
         <Text style={styles.cardTitle}>Your privacy matters</Text>
         <Text style={styles.privacyBody}>{privacyCopy}</Text>
+        <View style={styles.legalActions}>
+          <AppButton
+            disabled={!PRIVACY_POLICY_URL}
+            label={PRIVACY_POLICY_URL ? "Privacy policy" : "Privacy URL needed"}
+            onPress={() => {
+              if (PRIVACY_POLICY_URL) void Linking.openURL(PRIVACY_POLICY_URL);
+            }}
+            style={styles.legalButton}
+            variant="secondary"
+          />
+          <AppButton
+            disabled={!TERMS_URL}
+            label={TERMS_URL ? "Terms" : "Terms URL needed"}
+            onPress={() => {
+              if (TERMS_URL) void Linking.openURL(TERMS_URL);
+            }}
+            style={styles.legalButton}
+            variant="secondary"
+          />
+        </View>
+        <AppButton
+          label="Ask a privacy question"
+          onPress={() => {
+            void Linking.openURL(
+              buildSupportMailto({
+                subject: "HatchUp Privacy Question",
+              }),
+            );
+          }}
+          style={styles.supportButton}
+          variant="secondary"
+        />
       </View>
       {error && <Text style={styles.error}>{error}</Text>}
       <View style={styles.spacer} />
@@ -245,6 +282,19 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 14,
     lineHeight: 21,
+  },
+  legalActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  legalButton: {
+    flex: 1,
+    minHeight: 46,
+  },
+  supportButton: {
+    marginTop: 8,
+    minHeight: 46,
   },
   error: {
     color: colors.danger,

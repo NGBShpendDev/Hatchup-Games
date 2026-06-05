@@ -8,6 +8,7 @@ import { Header } from "../components/Header";
 import { MonsterAvatar } from "../components/MonsterAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
+import { getEggProgressMessage, getScreenLoopSubtitle } from "../content/coreLoopCopy";
 import { getEggProgress, isEggReady } from "../domain/hatchery";
 import {
   getActiveHatchling,
@@ -90,6 +91,7 @@ export function MonsterDetailScreen({
           onDexPress();
         }}
       />
+      <Text style={styles.screenLoopCopy}>{getScreenLoopSubtitle("hatchery")}</Text>
       <Text style={styles.sectionTitle}>Journey Pal</Text>
       <View style={styles.card}>
         <MonsterAvatar stage={progression.current.id} />
@@ -133,6 +135,7 @@ export function MonsterDetailScreen({
         <View style={styles.trainingCard}>
           <HatchlingAvatar
             element={activeHatchling.element}
+            level={activeHatchling.level}
             rarity={activeHatchling.rarity}
             size="small"
           />
@@ -182,9 +185,9 @@ export function MonsterDetailScreen({
         </Text>
       </View>
       <Text style={styles.incubatorIntro}>
-        Up to three Eggs progress together from every health sync. Each new Egg
-        rolls a random element and weighted rarity. Bonus Eggs wait here when
-        your Hatchery is full.
+        Up to three Eggs progress together from every movement sync. Every step
+        pushes your next hatch closer, and bonus Eggs wait here when your
+        Hatchery is full.
       </Text>
       <View style={styles.missionCard}>
         <Text style={styles.missionKicker}>Current mission</Text>
@@ -221,13 +224,18 @@ export function MonsterDetailScreen({
               </Text>
               <Text style={styles.eggCaption}>
                 {eggReady
-                  ? "Your movement filled this Egg. It is ready to hatch."
-                  : `${egg.stepsWalked.toLocaleString()} / ${egg.stepsRequired.toLocaleString()} steps walked`}
+                  ? "Your egg is ready. Hatch this Pal."
+                  : getEggProgressMessage(egg.stepsWalked, egg.stepsRequired)}
+              </Text>
+              <Text style={styles.eggRemaining}>
+                {eggReady
+                  ? "Ready now"
+                  : `${Math.max(egg.stepsRequired - egg.stepsWalked, 0).toLocaleString()} steps remaining`}
               </Text>
               <ProgressBar progress={getEggProgress(egg)} />
               <AppButton
                 disabled={!eggReady}
-                label={eggReady ? "Hatch this Egg" : "Keep moving to hatch"}
+                label={eggReady ? "Hatch this Pal" : "Keep moving to hatch"}
                 onPress={() => onHatch(egg.id)}
                 style={!eggReady ? styles.disabledButton : undefined}
                 variant={eggReady ? "primary" : "secondary"}
@@ -244,7 +252,8 @@ export function MonsterDetailScreen({
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>Your collection starts with movement.</Text>
           <Text style={styles.emptyText}>
-            Hatch your first Egg to meet a new Pal.
+            Your first Pal is waiting inside an Egg. Move today, sync progress,
+            then hatch it.
           </Text>
         </View>
       ) : (
@@ -253,6 +262,7 @@ export function MonsterDetailScreen({
             <View style={styles.hatchlingCard} key={hatchling.id}>
               <HatchlingAvatar
                 element={hatchling.element}
+                level={hatchling.level}
                 rarity={hatchling.rarity}
                 size="small"
               />
@@ -388,6 +398,7 @@ function HatchRevealModal({
             {revealed ? (
               <HatchlingAvatar
                 element={hatchling.element}
+                level={hatchling.level}
                 rarity={hatchling.rarity}
               />
             ) : (
@@ -591,6 +602,13 @@ const styles = StyleSheet.create({
     marginTop: 9,
     textAlign: "center",
   },
+  screenLoopCopy: {
+    color: colors.primaryDeep,
+    fontSize: 14,
+    fontWeight: "800",
+    lineHeight: 20,
+    marginTop: 10,
+  },
   sectionTitle: {
     color: colors.ink,
     fontSize: 18,
@@ -771,8 +789,15 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 13,
     lineHeight: 19,
-    marginBottom: 12,
     marginTop: 5,
+    textAlign: "center",
+  },
+  eggRemaining: {
+    color: colors.primaryDeep,
+    fontSize: 12,
+    fontWeight: "900",
+    marginBottom: 12,
+    marginTop: 2,
     textAlign: "center",
   },
   disabledButton: {

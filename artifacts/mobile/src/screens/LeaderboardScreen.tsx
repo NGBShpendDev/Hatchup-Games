@@ -4,6 +4,7 @@ import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
 import { Screen } from "../components/Screen";
 import { SparkleBurst } from "../components/SparkleBurst";
+import { getScreenLoopSubtitle } from "../content/coreLoopCopy";
 import {
   getLeaderboardEntries,
   getMetricValue,
@@ -45,10 +46,14 @@ export function LeaderboardScreen({
 }: Props) {
   const [metric, setMetric] = useState<LeaderboardMetric>("steps");
   const [alias, setAlias] = useState(
-    data.leaderboardAlias || data.monsterName || "HatchUp Tester",
+    data.leaderboardAlias || data.monsterName || "HatchUp Trainer",
   );
+  const [blockedIds, setBlockedIds] = useState<string[]>([]);
+  const [reportedId, setReportedId] = useState<string | null>(null);
   const userStats = getUserLeaderboardStats(data, today);
-  const entries = getLeaderboardEntries(data, today, metric);
+  const entries = getLeaderboardEntries(data, today, metric).filter(
+    (entry) => !blockedIds.includes(entry.id),
+  );
   const userRank = entries.find((entry) => entry.isUser)?.rank ?? null;
   const aliasChanged = alias.trim() !== data.leaderboardAlias.trim();
 
@@ -75,8 +80,8 @@ export function LeaderboardScreen({
       <Text style={styles.kicker}>WEEKLY CHALLENGE BOARD</Text>
       <Text style={styles.title}>Move, hatch, climb.</Text>
       <Text style={styles.body}>
-        Compare weekly movement and Pal journey growth. Sharing is optional,
-        and your private health details stay out of the board.
+        {getScreenLoopSubtitle("ranks")} Share only your public ranking name
+        and score.
       </Text>
       <Text style={styles.syncLabel}>{leaderboardSyncLabel}</Text>
       <View style={styles.statsGrid}>
@@ -128,7 +133,7 @@ export function LeaderboardScreen({
             variant="secondary"
           />
           <AppButton
-            label={data.leaderboardShareEnabled ? "Hide me" : "Save & share"}
+            label={data.leaderboardShareEnabled ? "Stay private" : "Share weekly score"}
             onPress={handleShareToggle}
             style={styles.actionButton}
           />
@@ -139,12 +144,12 @@ export function LeaderboardScreen({
           <View style={styles.emptyMissionText}>
             <Text style={styles.emptyMissionTitle}>You are private right now</Text>
             <Text style={styles.emptyMissionBody}>
-              Pick a leaderboard name and opt in when you want your weekly
-              movement to count here.
+              Ranks are optional. Move this week and opt in when you want to
+              compare your public journey score.
             </Text>
           </View>
           <AppButton
-            label="Save & share"
+            label="Share weekly score"
             onPress={handleShareToggle}
             style={styles.emptyMissionButton}
             variant="secondary"
@@ -171,9 +176,33 @@ export function LeaderboardScreen({
       </View>
       <View style={styles.board}>
         {entries.map((entry) => (
-          <RankRow entry={entry} key={entry.id} metric={metric} />
+          <RankRow
+            entry={entry}
+            key={entry.id}
+            metric={metric}
+            onBlock={() => {
+              if (!entry.isUser) {
+                setBlockedIds((ids) => [...new Set([...ids, entry.id])]);
+              }
+            }}
+            onReport={() => setReportedId(entry.id)}
+          />
         ))}
       </View>
+      {reportedId && (
+        <View style={styles.safetyNotice}>
+          <Text style={styles.safetyTitle}>Report received</Text>
+          <Text style={styles.safetyText}>
+            Thanks. We will use this signal to keep the weekly board friendly.
+            You can also block this row from your device.
+          </Text>
+          <AppButton
+            label="Dismiss"
+            onPress={() => setReportedId(null)}
+            variant="secondary"
+          />
+        </View>
+      )}
     </Screen>
   );
 }
@@ -181,10 +210,16 @@ export function LeaderboardScreen({
 function RankRow({
   entry,
   metric,
+  onBlock,
+  onReport,
 }: {
   entry: LeaderboardEntry;
   metric: LeaderboardMetric;
+  onBlock: () => void;
+  onReport: () => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <View style={[styles.rankRow, entry.isUser && styles.userRow]}>
       <Text style={styles.rank}>#{entry.rank}</Text>
@@ -200,6 +235,42 @@ function RankRow({
       </View>
       <Text style={styles.rankScore}>{formatMetric(entry, metric)}</Text>
       {entry.isUser && <SparkleBurst />}
+      {!entry.isUser && (
+        <View style={styles.safetyMenuWrap}>
+          <Pressable
+            accessibilityLabel={`Open safety menu for ${entry.displayName}`}
+            accessibilityRole="button"
+            onPress={() => setMenuOpen((open) => !open)}
+            style={styles.safetyMenuButton}
+          >
+            <Text style={styles.safetyMenuButtonText}>...</Text>
+          </Pressable>
+          {menuOpen && (
+            <View style={styles.safetyMenu}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  setMenuOpen(false);
+                  onReport();
+                }}
+                style={styles.safetyMenuItem}
+              >
+                <Text style={styles.safetyMenuItemText}>Report</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  setMenuOpen(false);
+                  onBlock();
+                }}
+                style={styles.safetyMenuItem}
+              >
+                <Text style={styles.safetyMenuItemText}>Block</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -392,6 +463,25 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 14,
   },
+  safetyNotice: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 9,
+    marginTop: 14,
+    padding: 14,
+  },
+  safetyTitle: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  safetyText: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+  },
   rankRow: {
     alignItems: "center",
     backgroundColor: colors.surface,
@@ -429,6 +519,45 @@ const styles = StyleSheet.create({
   rankScore: {
     color: colors.ink,
     fontSize: 13,
+    fontWeight: "900",
+  },
+  safetyMenuWrap: {
+    position: "relative",
+  },
+  safetyMenuButton: {
+    alignItems: "center",
+    backgroundColor: colors.background,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    height: 30,
+    justifyContent: "center",
+    width: 34,
+  },
+  safetyMenuButtonText: {
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: "900",
+    lineHeight: 14,
+  },
+  safetyMenu: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.button,
+    borderWidth: 1,
+    position: "absolute",
+    right: 0,
+    top: 34,
+    width: 92,
+    zIndex: 2,
+  },
+  safetyMenuItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  safetyMenuItemText: {
+    color: colors.ink,
+    fontSize: 12,
     fontWeight: "900",
   },
 });

@@ -38,12 +38,12 @@ describe("retention plan", () => {
     });
   });
 
-  it("guides new players to hatch their first Pal", () => {
+  it("guides new players to sync movement first", () => {
     const mission = getCurrentFirstWeekMission(initialHatchUpData, "2026-06-02");
 
     expect(mission).toMatchObject({
       day: 1,
-      target: "hatchery",
+      target: "sync",
     });
   });
 
@@ -70,12 +70,13 @@ describe("retention plan", () => {
           },
         ],
         eggsHatched: 1,
+        lastSyncedDate: "2026-06-02",
       },
       "2026-06-02",
     );
 
     expect(mission).toMatchObject({
-      day: 2,
+      day: 3,
       target: "collection",
     });
   });

@@ -3,6 +3,7 @@ import {
   Alert,
   Linking,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -15,6 +16,7 @@ import { Header } from "../components/Header";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
 import { SparkleBurst } from "../components/SparkleBurst";
+import { getScreenLoopSubtitle } from "../content/coreLoopCopy";
 import {
   buildSupportMailto,
   IS_PUBLIC_BUILD,
@@ -50,6 +52,11 @@ import { getActivitySummary } from "../domain/history";
 import type { CollectedHatchling, HatchUpData } from "../domain/models";
 import type { MonsterStage } from "../domain/progression";
 import type { ProgressionProfile } from "../domain/progressionConfig";
+import {
+  getPublicReadinessItems,
+  getPublicReadinessScore,
+  type PublicReadinessItem,
+} from "../domain/publicReadiness";
 import { colors, radii, typography } from "../theme";
 
 const privacyCopy =
@@ -110,6 +117,13 @@ export function SettingsPrivacyScreen({
   const dexElementSummary = getDexElementSummary(data.collection);
   const dexRaritySummary = getDexRaritySummary(data.collection);
   const nextMissingDexEntry = getNextMissingDexEntry(data.collection);
+  const publicReadinessItems = getPublicReadinessItems(data, {
+    isPublicBuild: IS_PUBLIC_BUILD,
+    privacyPolicyUrl: PRIVACY_POLICY_URL,
+    supportEmail: SUPPORT_EMAIL,
+    termsUrl: TERMS_URL,
+  });
+  const publicReadinessScore = getPublicReadinessScore(publicReadinessItems);
   const nextBadges = getNextBadges(data, today);
   const activeHatchlingRaw = getActiveHatchling(data);
   const activeHatchling = activeHatchlingRaw
@@ -128,11 +142,12 @@ export function SettingsPrivacyScreen({
   const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"profile" | "settings">("profile");
   const [showBetaTools, setShowBetaTools] = useState(false);
+  const [profileSaveMessage, setProfileSaveMessage] = useState("");
   const profileName =
     data.profileUsername ||
     data.leaderboardAlias ||
     data.monsterName ||
-    "HatchUp Tester";
+    "HatchUp Trainer";
   const profilePetRaw =
     data.collection.find((hatchling) => hatchling.id === selectedPetId) ??
     activeHatchlingRaw ??
@@ -172,6 +187,32 @@ export function SettingsPrivacyScreen({
     data.profileUsername,
   ]);
 
+  async function shareLocalDataSummary() {
+    await Share.share({
+      message: JSON.stringify(
+        {
+          accountId: data.accountId,
+          activityDaysStored: data.activityHistory.length,
+          app: "HatchUp Games",
+          badgesUnlocked: unlockedBadgeCount,
+          cloudSyncStatus: data.cloudSyncStatus,
+          collectionCount: data.collection.length,
+          currentStreak: data.currentStreak,
+          eggsHatched: data.eggsHatched,
+          exportedAt: new Date().toISOString(),
+          leaderboardId: data.leaderboardId,
+          leaderboardSharing: data.leaderboardShareEnabled,
+          profileUsername: data.profileUsername,
+          schemaVersion: data.schemaVersion,
+          totalXp: data.totalXp,
+        },
+        null,
+        2,
+      ),
+      title: "HatchUp local account summary",
+    });
+  }
+
   return (
     <Screen
       footer={
@@ -188,8 +229,8 @@ export function SettingsPrivacyScreen({
       <Header onBack={onBack} title="Profile and privacy" />
       <Text style={styles.title}>Your HatchUp profile.</Text>
       <Text style={styles.body}>
-        Track your collection, badges, and privacy controls in one polished profile
-        page.
+        {getScreenLoopSubtitle("profile")} Badges remember your journey, and
+        privacy controls stay close by.
       </Text>
       <View style={styles.profileTabs}>
         <ProfileTab
@@ -211,6 +252,7 @@ export function SettingsPrivacyScreen({
             {profilePet ? (
               <HatchlingAvatar
                 element={profilePet.element}
+                level={profilePet.level}
                 rarity={profilePet.rarity}
                 size="large"
               />
@@ -225,7 +267,7 @@ export function SettingsPrivacyScreen({
             <Text style={styles.profileName}>{profileName}</Text>
             <Text style={styles.profileMeta}>
               {taglineDraft.trim() ||
-                "Choose a favorite Pal and make this profile yours."}
+                "Choose a favorite Pal from your collection and make this profile yours."}
             </Text>
           </View>
         </View>
@@ -269,7 +311,7 @@ export function SettingsPrivacyScreen({
               <View style={styles.emptyMissionText}>
                 <Text style={styles.emptyMissionTitle}>No profile pet yet</Text>
                 <Text style={styles.privacyText}>
-                  Hatch a Pal to unlock profile picture choices.
+                  Hatch your first Pal to unlock trainer card picture choices.
                 </Text>
               </View>
               <AppButton
@@ -303,7 +345,7 @@ export function SettingsPrivacyScreen({
         </View>
         <View style={styles.profileReadinessCard}>
           <View style={styles.profileReadinessHeader}>
-            <Text style={styles.profileReadinessTitle}>Profile readiness</Text>
+          <Text style={styles.profileReadinessTitle}>Trainer card growth</Text>
             <Text style={styles.profileReadinessValue}>
               {Math.round(profileReadiness * 100)}%
             </Text>
@@ -380,6 +422,7 @@ export function SettingsPrivacyScreen({
           <View style={styles.activeHatchling}>
             <HatchlingAvatar
               element={activeHatchling.element}
+              level={activeHatchling.level}
               rarity={activeHatchling.rarity}
               size="small"
             />
@@ -415,14 +458,18 @@ export function SettingsPrivacyScreen({
         )}
         <AppButton
           label="Save profile"
-          onPress={() =>
-            onSaveProfile({
+          onPress={async () => {
+            await onSaveProfile({
               profileHatchlingId: selectedPetId,
               profileTagline: taglineDraft,
               profileUsername: usernameDraft,
-            })
-          }
+            });
+            setProfileSaveMessage("Profile saved. Your trainer card is up to date.");
+          }}
         />
+        {profileSaveMessage && (
+          <Text style={styles.profileSaveMessage}>{profileSaveMessage}</Text>
+        )}
       </View>
       <View style={styles.badgeCard}>
         <Text style={styles.cardTitle}>Milestones and badges</Text>
@@ -531,6 +578,23 @@ export function SettingsPrivacyScreen({
             style={!TERMS_URL ? styles.disabledControl : undefined}
             variant="secondary"
           />
+        </View>
+      </View>
+      <View style={styles.readinessCard}>
+        <View style={styles.readinessHeader}>
+          <View>
+            <Text style={styles.readinessKicker}>PUBLIC READINESS</Text>
+            <Text style={styles.cardTitle}>Launch checklist</Text>
+          </View>
+          <Text style={styles.readinessScore}>
+            {Math.round(publicReadinessScore * 100)}%
+          </Text>
+        </View>
+        <ProgressBar progress={publicReadinessScore} />
+        <View style={styles.readinessList}>
+          {publicReadinessItems.map((item) => (
+            <ReadinessRow item={item} key={item.id} />
+          ))}
         </View>
       </View>
       <View style={styles.card}>
@@ -665,6 +729,13 @@ export function SettingsPrivacyScreen({
         </View>
         <View style={styles.privacyActions}>
           <AppButton
+            label="Share local summary"
+            onPress={() => {
+              void shareLocalDataSummary();
+            }}
+            variant="secondary"
+          />
+          <AppButton
             label="Request data export"
             onPress={() => {
               void Linking.openURL(
@@ -791,6 +862,30 @@ function ProfileTab({
   );
 }
 
+function ReadinessRow({ item }: { item: PublicReadinessItem }) {
+  return (
+    <View style={styles.readinessRow}>
+      <Text
+        style={[
+          styles.readinessStatus,
+          item.status === "ready" && styles.readinessStatusReady,
+          item.status === "action" && styles.readinessStatusAction,
+        ]}
+      >
+        {item.status === "ready"
+          ? "Ready"
+          : item.status === "action"
+            ? "Action"
+            : "Optional"}
+      </Text>
+      <View style={styles.readinessText}>
+        <Text style={styles.readinessLabel}>{item.label}</Text>
+        <Text style={styles.readinessBody}>{item.body}</Text>
+      </View>
+    </View>
+  );
+}
+
 function ShowcaseLine({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.showcaseLine}>
@@ -827,6 +922,7 @@ function PetOption({
     >
       <HatchlingAvatar
         element={hatchling.element}
+        level={hatchling.level}
         rarity={hatchling.rarity}
         size="small"
       />
@@ -967,6 +1063,82 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: "uppercase",
   },
+  readinessCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.primarySoft,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 10,
+    marginTop: 14,
+    padding: 16,
+  },
+  readinessHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  readinessKicker: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.9,
+  },
+  readinessScore: {
+    backgroundColor: colors.primarySoft,
+    borderRadius: radii.pill,
+    color: colors.primaryDeep,
+    fontSize: 12,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  readinessList: {
+    gap: 8,
+  },
+  readinessRow: {
+    alignItems: "center",
+    backgroundColor: colors.background,
+    borderColor: colors.line,
+    borderRadius: radii.button,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 10,
+  },
+  readinessStatus: {
+    backgroundColor: colors.softLavender,
+    borderRadius: radii.pill,
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    textTransform: "uppercase",
+  },
+  readinessStatusReady: {
+    backgroundColor: colors.primarySoft,
+    color: colors.primaryDeep,
+  },
+  readinessStatusAction: {
+    backgroundColor: colors.dangerSoft,
+    color: colors.danger,
+  },
+  readinessText: {
+    flex: 1,
+  },
+  readinessLabel: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  readinessBody: {
+    color: colors.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 2,
+  },
   profileCard: {
     backgroundColor: colors.warmSurface,
     borderColor: colors.rewardGold,
@@ -1031,6 +1203,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     marginTop: 4,
+  },
+  profileSaveMessage: {
+    color: colors.primaryDeep,
+    fontSize: 12,
+    fontWeight: "900",
+    textAlign: "center",
   },
   profileForm: {
     gap: 8,

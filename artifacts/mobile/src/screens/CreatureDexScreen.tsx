@@ -6,6 +6,7 @@ import { HatchlingAvatar } from "../components/HatchlingAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
 import { SparkleBurst } from "../components/SparkleBurst";
+import { getCollectionNudge, getScreenLoopSubtitle } from "../content/coreLoopCopy";
 import {
   DEX_ELEMENTS,
   DEX_RARITIES,
@@ -118,11 +119,10 @@ export function CreatureDexScreen({
       }
     >
       <Text style={styles.kicker}>COLLECTION</Text>
-      <Text style={styles.title}>Care for your team of Pals.</Text>
+      <Text style={styles.title}>Grow your team of Pals.</Text>
       <Text style={styles.body}>
-        Each Pal has its own level, XP, bond, and stats. Bond grows over
-        time with your active Pal; training is limited to three sessions a
-        day.
+        {getScreenLoopSubtitle("collection")} Each Pal has its own level, bond,
+        and stats.
       </Text>
       {selectedHatchling ? (
         <View style={styles.detailCard}>
@@ -138,6 +138,7 @@ export function CreatureDexScreen({
           )}
           <HatchlingAvatar
             element={selectedHatchling.element}
+            level={selectedHatchling.level}
             rarity={selectedHatchling.rarity}
           />
           <Text style={styles.detailName}>{selectedHatchling.name}</Text>
@@ -156,6 +157,10 @@ export function CreatureDexScreen({
             </Text>
             <Text style={styles.identityEffect}>
               {getPalCompanionEffect(selectedHatchling)}
+            </Text>
+            <Text style={styles.identityLoop}>
+              Set a favorite Pal to grow bond from daily activity and return
+              visits.
             </Text>
           </View>
           <LabeledProgress
@@ -326,7 +331,7 @@ export function CreatureDexScreen({
           <Text style={styles.promptTitle}>No Pals yet</Text>
           <Text style={styles.promptText}>
             Hatch your starter Egg to unlock individual Pal pages, stats,
-            and training.
+            and training. Your movement grows your team.
           </Text>
           <Text style={styles.promptMission}>Mission: hatch your first Pal.</Text>
           <AppButton label="Go to Hatchery" onPress={onMonsterPress} />
@@ -365,12 +370,11 @@ export function CreatureDexScreen({
         <View style={styles.targetCard}>
           <View style={styles.targetText}>
             <Text style={styles.targetKicker}>NEXT COLLECTION TARGET</Text>
-            <Text style={styles.targetTitle}>{nextMissingEntry.name}</Text>
-            <Text style={styles.targetBody}>
-              Missing {capitalize(nextMissingEntry.rarity)}{" "}
+          <Text style={styles.targetTitle}>{nextMissingEntry.name}</Text>
+          <Text style={styles.targetBody}>
+              Hatch more Eggs to discover this Pal: {capitalize(nextMissingEntry.rarity)}{" "}
               {capitalize(nextMissingEntry.element)} from{" "}
-              {nextMissingEntry.habitat}. Hatch matching Eggs to complete this
-              page.
+              {nextMissingEntry.habitat}.
             </Text>
           </View>
           <View style={styles.targetAvatar}>
@@ -426,8 +430,8 @@ export function CreatureDexScreen({
       <View style={styles.promptCard}>
         <Text style={styles.promptTitle}>Collection loop</Text>
         <Text style={styles.promptText}>
-          Use the Hatchery for active Eggs. Use Collection to pick who trains
-          next and to track every element and rarity still missing.
+          {getCollectionNudge(data.collection.length)} Use Collection to pick
+          who trains next and track every element and rarity still missing.
         </Text>
         <AppButton label="Keep hatching" onPress={onMonsterPress} />
       </View>
@@ -581,6 +585,7 @@ function DexCard({
       <View style={!unlocked && styles.lockedAvatar}>
         <HatchlingAvatar
           element={entry.element}
+          level={bestOwned?.level}
           rarity={entry.rarity}
           size="small"
         />
@@ -590,7 +595,9 @@ function DexCard({
         {capitalize(entry.rarity)} | {capitalize(entry.element)}
       </Text>
       <Text style={styles.cardDescription}>
-        {unlocked ? entry.description : `Hatch a ${entry.rarity} ${entry.element} Egg.`}
+        {unlocked
+          ? entry.description
+          : `Hatch more Eggs to discover this ${entry.rarity} ${entry.element} Pal.`}
       </Text>
       <View style={styles.cardFooter}>
         <Text style={[styles.status, unlocked && styles.unlockedStatus]}>
@@ -781,6 +788,12 @@ const styles = StyleSheet.create({
   identityEffect: {
     color: colors.muted,
     fontSize: 12,
+    lineHeight: 17,
+  },
+  identityLoop: {
+    color: colors.primaryDeep,
+    fontSize: 12,
+    fontWeight: "800",
     lineHeight: 17,
   },
   renameCard: {
