@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
+import { CollapsibleSection } from "../components/CollapsibleSection";
+import { CompactSummaryRow } from "../components/CompactSummaryRow";
 import { HatchlingAvatar } from "../components/HatchlingAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
@@ -25,6 +27,7 @@ import {
   getTimeAdjustedHatchling,
   getTrainingPreview,
   getTrainingStatus,
+  HATCHLING_XP_PER_LEVEL,
   TRAINING_DAILY_LIMIT,
   PASSIVE_BOND_HOURS,
   TRAINING_XP,
@@ -36,6 +39,7 @@ import type {
   HatchUpData,
   HatchlingStats,
 } from "../domain/models";
+import { getCreatureVisualStage, type CreatureVisualStage } from "../domain/creatureVisuals";
 import { colors, elementColors, radii, typography } from "../theme";
 
 interface Props {
@@ -188,107 +192,132 @@ export function CreatureDexScreen({
               ? ` | ${levelProgress.xpToNext} XP to L${levelProgress.nextLevel}`
               : " | Max level"}
           </Text>
-          <View style={styles.renameCard}>
-            <Text style={styles.renameLabel}>Nickname</Text>
-            <TextInput
-              autoCapitalize="words"
-              maxLength={18}
-              onChangeText={setDraftName}
-              placeholder={selectedHatchling.name}
-              placeholderTextColor={colors.muted}
-              style={styles.renameInput}
-              value={draftName}
-            />
-            <AppButton
-              label="Save nickname"
-              onPress={async () => {
-                await onRenameHatchling(selectedHatchling.id, draftName);
-              }}
-              variant="secondary"
-            />
-          </View>
-          <View style={styles.statGrid}>
-            <Stat
-              highlight={getTopStats(selectedHatchling.stats).includes("heart")}
-              label="Heart"
-              max={getStatBarMax(selectedHatchling.stats)}
-              value={selectedHatchling.stats.heart}
-            />
-            <Stat
-              highlight={getTopStats(selectedHatchling.stats).includes("power")}
-              label="Power"
-              max={getStatBarMax(selectedHatchling.stats)}
-              value={selectedHatchling.stats.power}
-            />
-            <Stat
-              highlight={getTopStats(selectedHatchling.stats).includes("resilience")}
-              label="Guard"
-              max={getStatBarMax(selectedHatchling.stats)}
-              value={selectedHatchling.stats.resilience}
-            />
-            <Stat
-              highlight={getTopStats(selectedHatchling.stats).includes("speed")}
-              label="Speed"
-              max={getStatBarMax(selectedHatchling.stats)}
-              value={selectedHatchling.stats.speed}
-            />
-          </View>
-          <View style={styles.trainingCard}>
-            <Text style={styles.trainingTitle}>Training plan</Text>
-            <Text style={styles.trainingText}>
-              {selectedHatchling.id === data.activeHatchlingId
-                ? trainingStatus?.cooldownLabel
-                : "Make this Pal active before training."}
-            </Text>
-            <TrainingPips sessionsToday={trainingStatus?.sessionsToday ?? 0} />
-            <Text style={styles.trainingHint}>
-              +{trainingPreview?.xpGain ?? TRAINING_XP} XP and +
-              {trainingPreview?.bondGain ?? 0} bond per session.{" "}
-              {trainingPreview?.levelsGained
-                ? `Next training reaches L${trainingPreview.levelAfterTraining}.`
-                : `Power +${trainingPreview?.powerGain ?? 0} after the next level-up.`}{" "}
-              Passive bond grows every {PASSIVE_BOND_HOURS} hours.
-            </Text>
-            <AppButton
-              disabled={
-                selectedHatchling.id === data.activeHatchlingId &&
-                !trainingStatus?.canTrain
-              }
-              label={
-                selectedHatchling.id !== data.activeHatchlingId
-                  ? "Set active Pal"
-                  : trainingStatus?.canTrain
-                    ? "Train now"
-                    : "Training cooling down"
-              }
-              onPress={() => {
-                if (selectedHatchling.id !== data.activeHatchlingId) {
-                  void onSetActiveHatchling(selectedHatchling.id);
-                  return;
+          <EvolutionPreviewCard hatchling={selectedHatchling} />
+          <CollapsibleSection
+            badge="Edit"
+            subtitle="Rename this Pal whenever its personality clicks."
+            title="Nickname"
+          >
+            <View style={styles.renameCard}>
+              <Text style={styles.renameLabel}>Nickname</Text>
+              <TextInput
+                autoCapitalize="words"
+                maxLength={18}
+                onChangeText={setDraftName}
+                placeholder={selectedHatchling.name}
+                placeholderTextColor={colors.muted}
+                style={styles.renameInput}
+                value={draftName}
+              />
+              <AppButton
+                label="Save nickname"
+                onPress={async () => {
+                  await onRenameHatchling(selectedHatchling.id, draftName);
+                }}
+                variant="secondary"
+              />
+            </View>
+          </CollapsibleSection>
+          <CollapsibleSection
+            badge={`P${getHatchlingPowerScore(selectedHatchling)}`}
+            subtitle="Heart, power, guard, and speed for this Pal."
+            title="Stats"
+          >
+            <View style={styles.statGrid}>
+              <Stat
+                highlight={getTopStats(selectedHatchling.stats).includes("heart")}
+                label="Heart"
+                max={getStatBarMax(selectedHatchling.stats)}
+                value={selectedHatchling.stats.heart}
+              />
+              <Stat
+                highlight={getTopStats(selectedHatchling.stats).includes("power")}
+                label="Power"
+                max={getStatBarMax(selectedHatchling.stats)}
+                value={selectedHatchling.stats.power}
+              />
+              <Stat
+                highlight={getTopStats(selectedHatchling.stats).includes("resilience")}
+                label="Guard"
+                max={getStatBarMax(selectedHatchling.stats)}
+                value={selectedHatchling.stats.resilience}
+              />
+              <Stat
+                highlight={getTopStats(selectedHatchling.stats).includes("speed")}
+                label="Speed"
+                max={getStatBarMax(selectedHatchling.stats)}
+                value={selectedHatchling.stats.speed}
+              />
+            </View>
+          </CollapsibleSection>
+          <CollapsibleSection
+            badge={`${trainingStatus?.remainingToday ?? 0} left`}
+            subtitle="Training is limited each day so growth feels earned."
+            title="Training plan"
+          >
+            <View style={styles.trainingCard}>
+              <Text style={styles.trainingTitle}>Training plan</Text>
+              <Text style={styles.trainingText}>
+                {selectedHatchling.id === data.activeHatchlingId
+                  ? trainingStatus?.cooldownLabel
+                  : "Make this Pal active before training."}
+              </Text>
+              <TrainingPips sessionsToday={trainingStatus?.sessionsToday ?? 0} />
+              <Text style={styles.trainingHint}>
+                +{trainingPreview?.xpGain ?? TRAINING_XP} XP and +
+                {trainingPreview?.bondGain ?? 0} bond per session.{" "}
+                {trainingPreview?.levelsGained
+                  ? `Next training reaches L${trainingPreview.levelAfterTraining}.`
+                  : `Power +${trainingPreview?.powerGain ?? 0} after the next level-up.`}{" "}
+                Passive bond grows every {PASSIVE_BOND_HOURS} hours.
+              </Text>
+              <AppButton
+                disabled={
+                  selectedHatchling.id === data.activeHatchlingId &&
+                  !trainingStatus?.canTrain
                 }
-                void onTrainActiveHatchling();
-              }}
-              style={
-                selectedHatchling.id === data.activeHatchlingId &&
-                !trainingStatus?.canTrain
-                  ? styles.disabledAction
-                  : undefined
-              }
-              variant="secondary"
-            />
-          </View>
-          <View style={styles.memoryCard}>
-            <Text style={styles.trainingTitle}>Memory log</Text>
-            {selectedHatchling.memories.slice(0, 4).map((memory) => (
-              <View key={memory.id} style={styles.memoryRow}>
-                <Text style={styles.memoryLabel}>{memory.label}</Text>
-                <Text style={styles.memoryText}>{memory.description}</Text>
-                <Text style={styles.memoryDate}>
-                  {new Date(memory.happenedAt).toLocaleDateString()}
-                </Text>
-              </View>
-            ))}
-          </View>
+                label={
+                  selectedHatchling.id !== data.activeHatchlingId
+                    ? "Set active Pal"
+                    : trainingStatus?.canTrain
+                      ? "Train now"
+                      : "Training cooling down"
+                }
+                onPress={() => {
+                  if (selectedHatchling.id !== data.activeHatchlingId) {
+                    void onSetActiveHatchling(selectedHatchling.id);
+                    return;
+                  }
+                  void onTrainActiveHatchling();
+                }}
+                style={
+                  selectedHatchling.id === data.activeHatchlingId &&
+                  !trainingStatus?.canTrain
+                    ? styles.disabledAction
+                    : undefined
+                }
+                variant="secondary"
+              />
+            </View>
+          </CollapsibleSection>
+          <CollapsibleSection
+            badge={String(selectedHatchling.memories.length)}
+            subtitle="Key moments this Pal has earned with you."
+            title="Memory log"
+          >
+            <View style={styles.memoryCard}>
+              <Text style={styles.trainingTitle}>Memory log</Text>
+              {selectedHatchling.memories.slice(0, 4).map((memory) => (
+                <View key={memory.id} style={styles.memoryRow}>
+                  <Text style={styles.memoryLabel}>{memory.label}</Text>
+                  <Text style={styles.memoryText}>{memory.description}</Text>
+                  <Text style={styles.memoryDate}>
+                    {new Date(memory.happenedAt).toLocaleDateString()}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </CollapsibleSection>
           <View style={styles.carouselActions}>
             <AppButton
               label="Previous"
@@ -344,6 +373,9 @@ export function CreatureDexScreen({
             {completion.unlocked}/{completion.total}
           </Text>
         </View>
+        <Text style={styles.progressCopy}>
+          Each element and rarity can grow through Baby, Teen, and Final stages.
+        </Text>
         <ProgressBar progress={completion.percent} />
         <View style={styles.summaryChips}>
           {elementSummary.map((summary) => (
@@ -386,24 +418,42 @@ export function CreatureDexScreen({
           </View>
         </View>
       )}
-      <View style={styles.filterCard}>
-        <Text style={styles.filterTitle}>Collection filters</Text>
-        <FilterRow
-          activeValue={elementFilter}
-          options={["all", ...DEX_ELEMENTS]}
-          onChange={(value) => setElementFilter(value as "all" | EggElement)}
-        />
-        <FilterRow
-          activeValue={rarityFilter}
-          options={["all", ...DEX_RARITIES]}
-          onChange={(value) => setRarityFilter(value as "all" | EggRarity)}
-        />
-        <FilterRow
-          activeValue={statusFilter}
-          options={["all", "owned", "missing"]}
-          onChange={(value) => setStatusFilter(value as "all" | "owned" | "missing")}
-        />
-      </View>
+      <CollapsibleSection
+        badge={`${filteredEntries.length}`}
+        subtitle="Narrow by element, rarity, or discovery status."
+        title="Collection filters"
+      >
+        <View style={styles.filterCard}>
+          <Text style={styles.filterTitle}>Collection filters</Text>
+          <FilterRow
+            activeValue={elementFilter}
+            options={["all", ...DEX_ELEMENTS]}
+            onChange={(value) => setElementFilter(value as "all" | EggElement)}
+          />
+          <FilterRow
+            activeValue={rarityFilter}
+            options={["all", ...DEX_RARITIES]}
+            onChange={(value) => setRarityFilter(value as "all" | EggRarity)}
+          />
+          <FilterRow
+            activeValue={statusFilter}
+            options={["all", "owned", "missing"]}
+            onChange={(value) => setStatusFilter(value as "all" | "owned" | "missing")}
+          />
+        </View>
+      </CollapsibleSection>
+      <ActiveFilterSummary
+        elementFilter={elementFilter}
+        filteredCount={filteredEntries.length}
+        onClear={() => {
+          setElementFilter("all");
+          setRarityFilter("all");
+          setStatusFilter("all");
+        }}
+        rarityFilter={rarityFilter}
+        statusFilter={statusFilter}
+        totalCount={entries.length}
+      />
       <View style={styles.grid}>
         {filteredEntries.map((entry) => (
           <DexCard collection={data.collection} entry={entry} key={entry.id} />
@@ -436,6 +486,49 @@ export function CreatureDexScreen({
         <AppButton label="Keep hatching" onPress={onMonsterPress} />
       </View>
     </Screen>
+  );
+}
+
+function ActiveFilterSummary({
+  elementFilter,
+  filteredCount,
+  onClear,
+  rarityFilter,
+  statusFilter,
+  totalCount,
+}: {
+  elementFilter: "all" | EggElement;
+  filteredCount: number;
+  onClear: () => void;
+  rarityFilter: "all" | EggRarity;
+  statusFilter: "all" | "owned" | "missing";
+  totalCount: number;
+}) {
+  const activeFilters = [
+    elementFilter !== "all" ? capitalize(elementFilter) : null,
+    rarityFilter !== "all" ? capitalize(rarityFilter) : null,
+    statusFilter !== "all" ? capitalize(statusFilter) : null,
+  ].filter(Boolean);
+  const hasFilters = activeFilters.length > 0;
+
+  return (
+    <View style={styles.activeFilterCard}>
+      <View style={styles.activeFilterText}>
+        <Text style={styles.activeFilterTitle}>
+          Showing {filteredCount}/{totalCount} collection entries
+        </Text>
+        <Text style={styles.activeFilterBody}>
+          {hasFilters
+            ? `Active filters: ${activeFilters.join(" + ")}`
+            : "No filters active. You are viewing the full collection book."}
+        </Text>
+      </View>
+      {hasFilters && (
+        <Pressable onPress={onClear} style={styles.clearFilterButton}>
+          <Text style={styles.clearFilterText}>Clear</Text>
+        </Pressable>
+      )}
+    </View>
   );
 }
 
@@ -523,6 +616,54 @@ function SummaryChip({
   );
 }
 
+function EvolutionPreviewCard({ hatchling }: { hatchling: CollectedHatchling }) {
+  const currentStage = getCreatureVisualStage(hatchling.level);
+  const next = getNextEvolutionStage(currentStage);
+  const xpRemaining = next
+    ? Math.max((next.levelRequired - 1) * HATCHLING_XP_PER_LEVEL - hatchling.xp, 0)
+    : 0;
+
+  return (
+    <View style={styles.evolutionCard}>
+      <View style={styles.evolutionHeader}>
+        <View>
+          <Text style={styles.evolutionKicker}>Evolution preview</Text>
+          <Text style={styles.evolutionTitle}>
+            {capitalize(currentStage)}
+            {next ? ` -> ${capitalize(next.stage)}` : " stage complete"}
+          </Text>
+        </View>
+        <View style={styles.evolutionPreviewAvatar}>
+          <HatchlingAvatar
+            element={hatchling.element}
+            level={next?.levelRequired ?? hatchling.level}
+            rarity={hatchling.rarity}
+            size="small"
+          />
+        </View>
+      </View>
+      <CompactSummaryRow label="Current stage" value={capitalize(currentStage)} />
+      <CompactSummaryRow
+        label="Next stage"
+        value={next ? capitalize(next.stage) : "Fully grown"}
+        tone={next ? undefined : "ready"}
+      />
+      <CompactSummaryRow
+        label="Level required"
+        value={next ? `Level ${next.levelRequired}` : "Complete"}
+      />
+      <CompactSummaryRow
+        label="XP remaining"
+        value={next ? `${xpRemaining} XP` : "0 XP"}
+        tone={xpRemaining === 0 ? "ready" : undefined}
+      />
+      <Text style={styles.evolutionMicrocopy}>
+        Move, train, and return tomorrow to grow this Pal.
+      </Text>
+    </View>
+  );
+}
+
 function FilterRow({
   activeValue,
   onChange,
@@ -556,6 +697,16 @@ function FilterRow({
       })}
     </View>
   );
+}
+
+function getNextEvolutionStage(stage: CreatureVisualStage) {
+  if (stage === "baby") {
+    return { levelRequired: 5, stage: "teen" as const };
+  }
+  if (stage === "teen") {
+    return { levelRequired: 15, stage: "final" as const };
+  }
+  return null;
 }
 
 function DexCard({
@@ -599,6 +750,9 @@ function DexCard({
           ? entry.description
           : `Hatch more Eggs to discover this ${entry.rarity} ${entry.element} Pal.`}
       </Text>
+      {!unlocked && (
+        <Text style={styles.lockedHint}>Hidden until discovered</Text>
+      )}
       <View style={styles.cardFooter}>
         <Text style={[styles.status, unlocked && styles.unlockedStatus]}>
           {unlocked ? "Unlocked" : "Locked"}
@@ -970,6 +1124,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "900",
   },
+  progressCopy: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+  },
   progressMeta: {
     color: colors.primary,
     fontSize: 13,
@@ -1003,6 +1162,43 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 11,
     fontWeight: "900",
+  },
+  evolutionCard: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12,
+  },
+  evolutionHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+  },
+  evolutionKicker: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+  },
+  evolutionTitle: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: "900",
+    marginTop: 3,
+  },
+  evolutionPreviewAvatar: {
+    opacity: 0.72,
+  },
+  evolutionMicrocopy: {
+    color: colors.primaryDeep,
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 17,
+    marginTop: 2,
   },
   targetCard: {
     alignItems: "center",
@@ -1078,6 +1274,42 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     color: "#FFFFFF",
   },
+  activeFilterCard: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 12,
+    padding: 12,
+  },
+  activeFilterText: {
+    flex: 1,
+  },
+  activeFilterTitle: {
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  activeFilterBody: {
+    color: colors.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 3,
+  },
+  clearFilterButton: {
+    backgroundColor: colors.primaryDeep,
+    borderRadius: radii.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  clearFilterText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+  },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1097,6 +1329,14 @@ const styles = StyleSheet.create({
   },
   lockedAvatar: {
     opacity: 0.38,
+  },
+  lockedHint: {
+    color: colors.primaryDeep,
+    fontSize: 10,
+    fontWeight: "900",
+    marginTop: 6,
+    textAlign: "center",
+    textTransform: "uppercase",
   },
   cardName: {
     color: colors.ink,

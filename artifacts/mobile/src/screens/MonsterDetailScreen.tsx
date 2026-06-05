@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
+import { CollapsibleSection } from "../components/CollapsibleSection";
 import { EggAvatar } from "../components/EggAvatar";
 import { HatchlingAvatar } from "../components/HatchlingAvatar";
 import { Header } from "../components/Header";
@@ -104,80 +105,85 @@ export function MonsterDetailScreen({
             : "Your Pal journey has reached its final stage."}
         </Text>
       </View>
-      <Text style={styles.sectionTitle}>Journey stages</Text>
-      {MONSTER_STAGES.map((stage) => {
-        const unlocked = data.totalXp >= stage.xp;
-        return (
-          <View style={styles.stageRow} key={stage.id}>
-            <View style={[styles.dot, unlocked && styles.unlockedDot]} />
-            <View style={styles.stageText}>
-              <Text style={styles.rowTitle}>{stage.label}</Text>
-              <Text style={styles.rowCaption}>{stage.xp} journey XP</Text>
+      <CollapsibleSection
+        badge={`${data.totalXp} XP`}
+        subtitle="See the broader journey milestones after the active Egg loop."
+        title="Journey stages"
+      >
+        {MONSTER_STAGES.map((stage) => {
+          const unlocked = data.totalXp >= stage.xp;
+          return (
+            <View style={styles.stageRow} key={stage.id}>
+              <View style={[styles.dot, unlocked && styles.unlockedDot]} />
+              <View style={styles.stageText}>
+                <Text style={styles.rowTitle}>{stage.label}</Text>
+                <Text style={styles.rowCaption}>{stage.xp} journey XP</Text>
+              </View>
+              <Text style={[styles.status, unlocked && styles.unlocked]}>
+                {unlocked ? "Unlocked" : "Locked"}
+              </Text>
             </View>
-            <Text style={[styles.status, unlocked && styles.unlocked]}>
-              {unlocked ? "Unlocked" : "Locked"}
+          );
+        })}
+        <View style={styles.stats}>
+          <Stat label="Journey XP" value={String(data.totalXp)} />
+          <Stat label="Active Eggs" value={`${data.activeEggs.length}/3`} />
+          <Stat label="Queued Eggs" value={String(data.pendingEggs.length)} />
+        </View>
+      </CollapsibleSection>
+      <CollapsibleSection
+        badge={activeHatchling ? `L${activeHatchling.level}` : "None"}
+        subtitle="Active Pal growth details stay tucked below the Hatchery loop."
+        title="Active Pal details"
+      >
+        {activeHatchling ? (
+          <View style={styles.trainingCard}>
+            <HatchlingAvatar
+              element={activeHatchling.element}
+              level={activeHatchling.level}
+              rarity={activeHatchling.rarity}
+              size="small"
+            />
+            <View style={styles.trainingBody}>
+              <Text style={styles.trainingName}>{activeHatchling.name}</Text>
+              <Text style={styles.trainingMeta}>
+                {capitalize(activeHatchling.rarity)}{" "}
+                {capitalize(activeHatchling.element)} | {capitalize(activeHatchling.mood)} | Bond{" "}
+                {activeHatchling.bond}
+              </Text>
+              <View style={styles.activePalMiniStats}>
+                <Text style={styles.activePalChip}>
+                  Power {getHatchlingPowerScore(activeHatchling)}
+                </Text>
+                <Text style={styles.activePalChip}>
+                  {activePalTraining?.remainingToday ?? 0} trains left
+                </Text>
+              </View>
+              <View style={styles.activePalProgress}>
+                <ProgressBar progress={getHatchlingXpProgress(activeHatchling.xp)} />
+                <Text style={styles.activePalProgressText}>
+                  {activePalProgress?.nextLevel
+                    ? `${activePalProgress.xpToNext} XP to L${activePalProgress.nextLevel}`
+                    : "Max level reached"}
+                </Text>
+              </View>
+            </View>
+            <AppButton
+              label="Collection"
+              onPress={onDexPress}
+              style={styles.trainingButton}
+              variant="secondary"
+            />
+          </View>
+        ) : (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>No active Pal yet.</Text>
+            <Text style={styles.emptyText}>
+              Hatch an Egg to unlock Pal training.
             </Text>
           </View>
-        );
-      })}
-      <View style={styles.stats}>
-        <Stat label="Journey XP" value={String(data.totalXp)} />
-        <Stat label="Active Eggs" value={`${data.activeEggs.length}/3`} />
-        <Stat label="Queued Eggs" value={String(data.pendingEggs.length)} />
-      </View>
-      <View style={styles.collectionHeader}>
-        <Text style={styles.sectionTitle}>Active Pal</Text>
-        <Text style={styles.collectionCount}>
-          {activeHatchling ? `Level ${activeHatchling.level}` : "None active"}
-        </Text>
-      </View>
-      {activeHatchling ? (
-        <View style={styles.trainingCard}>
-          <HatchlingAvatar
-            element={activeHatchling.element}
-            level={activeHatchling.level}
-            rarity={activeHatchling.rarity}
-            size="small"
-          />
-          <View style={styles.trainingBody}>
-            <Text style={styles.trainingName}>{activeHatchling.name}</Text>
-            <Text style={styles.trainingMeta}>
-              {capitalize(activeHatchling.rarity)}{" "}
-              {capitalize(activeHatchling.element)} | {capitalize(activeHatchling.mood)} | Bond{" "}
-              {activeHatchling.bond}
-            </Text>
-            <View style={styles.activePalMiniStats}>
-              <Text style={styles.activePalChip}>
-                Power {getHatchlingPowerScore(activeHatchling)}
-              </Text>
-              <Text style={styles.activePalChip}>
-                {activePalTraining?.remainingToday ?? 0} trains left
-              </Text>
-            </View>
-            <View style={styles.activePalProgress}>
-              <ProgressBar progress={getHatchlingXpProgress(activeHatchling.xp)} />
-              <Text style={styles.activePalProgressText}>
-                {activePalProgress?.nextLevel
-                  ? `${activePalProgress.xpToNext} XP to L${activePalProgress.nextLevel}`
-                  : "Max level reached"}
-              </Text>
-            </View>
-          </View>
-          <AppButton
-            label="Collection"
-            onPress={onDexPress}
-            style={styles.trainingButton}
-            variant="secondary"
-          />
-        </View>
-      ) : (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>No active Pal yet.</Text>
-          <Text style={styles.emptyText}>
-            Hatch an Egg to unlock Pal training.
-          </Text>
-        </View>
-      )}
+        )}
+      </CollapsibleSection>
       <View style={styles.collectionHeader}>
         <Text style={styles.sectionTitle}>Eggs in Hatchery</Text>
         <Text style={styles.collectionCount}>
@@ -244,36 +250,38 @@ export function MonsterDetailScreen({
           );
         })}
       </View>
-      <View style={styles.collectionHeader}>
-        <Text style={styles.sectionTitle}>Your Pals</Text>
-        <Text style={styles.collectionCount}>{data.collection.length} collected</Text>
-      </View>
-      {data.collection.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>Your collection starts with movement.</Text>
-          <Text style={styles.emptyText}>
-            Your first Pal is waiting inside an Egg. Move today, sync progress,
-            then hatch it.
-          </Text>
-        </View>
-      ) : (
-        <View style={styles.collection}>
-          {data.collection.map((hatchling) => (
-            <View style={styles.hatchlingCard} key={hatchling.id}>
-              <HatchlingAvatar
-                element={hatchling.element}
-                level={hatchling.level}
-                rarity={hatchling.rarity}
-                size="small"
-              />
-              <Text style={styles.hatchlingName}>{hatchling.name}</Text>
-              <Text style={styles.hatchlingMeta}>
-                {capitalize(hatchling.rarity)} {capitalize(hatchling.element)}
-              </Text>
-            </View>
-          ))}
-        </View>
-      )}
+      <CollapsibleSection
+        badge={`${data.collection.length} collected`}
+        subtitle="A quick preview of the team your Eggs have hatched."
+        title="Your Pals preview"
+      >
+        {data.collection.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>Your collection starts with movement.</Text>
+            <Text style={styles.emptyText}>
+              Your first Pal is waiting inside an Egg. Move today, sync progress,
+              then hatch it.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.collection}>
+            {data.collection.map((hatchling) => (
+              <View style={styles.hatchlingCard} key={hatchling.id}>
+                <HatchlingAvatar
+                  element={hatchling.element}
+                  level={hatchling.level}
+                  rarity={hatchling.rarity}
+                  size="small"
+                />
+                <Text style={styles.hatchlingName}>{hatchling.name}</Text>
+                <Text style={styles.hatchlingMeta}>
+                  {capitalize(hatchling.rarity)} {capitalize(hatchling.element)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </CollapsibleSection>
     </Screen>
   );
 }

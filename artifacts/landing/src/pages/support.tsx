@@ -7,10 +7,9 @@ import {
   Shield,
   Egg,
   Activity,
-  CreditCard,
-  Users,
+  BookOpen,
   ArrowLeft,
-  MessageCircle,
+  Trophy,
 } from "lucide-react";
 
 const fadeUp = {
@@ -37,100 +36,96 @@ interface Category {
 const CATEGORIES: Category[] = [
   {
     icon: Egg,
-    label: "Hatchlings & Gameplay",
-    color: "text-pink-400",
+    label: "Pals & Gameplay",
+    color: "text-emerald-400",
     faqs: [
       {
-        q: "What are Hatchlings?",
-        a: "Hatchlings are digital creatures you earn by staying active. Complete workouts, hit step goals, and log meals to earn eggs — then hatch them to get randomized creatures with unique stats, abilities, and rarity.",
+        q: "What are Pals?",
+        a: "Pals are collectible creature companions you hatch from eggs. Each Pal can have an element, rarity, level, bond, stats, training progress, and memories.",
       },
       {
-        q: "How do creatures evolve?",
-        a: "Your Hatchlings gain XP every time you exercise. Reach milestone levels to trigger evolutions. Check the Evolutions page in the app for all possible evolution paths.",
+        q: "How do Pals grow?",
+        a: "Pals gain progress from movement rewards and training. The current build supports Baby, Teen, and Final visual stages so players can see their companions grow over time.",
       },
       {
-        q: "How many Hatchlings can I keep?",
-        a: "Free accounts support up to 6 Hatchlings. Premium members get unlimited storage.",
+        q: "What is the core loop?",
+        a: "Move your body, sync progress, hatch Pals, grow your collection, and return tomorrow to keep building momentum.",
       },
     ],
   },
   {
     icon: Activity,
-    label: "Fitness Tracking",
+    label: "Health Sync",
     color: "text-emerald-400",
     faqs: [
       {
-        q: "Which health platforms does HATCHUP support?",
-        a: "HATCHUP connects with Apple Health, Google Fit, Fitbit, Garmin, and Oura. Go to Health Settings in the app to link your preferred platform.",
+        q: "Which health data does HatchUp use?",
+        a: "The mobile build is designed around read-only movement data: steps, distance, workouts, and active energy. This activity powers egg progress, Pal XP, rewards, and streaks.",
       },
       {
-        q: "How is XP calculated from workouts?",
-        a: "XP is based on workout duration, intensity, and verification level. Camera-verified reps earn a 3× XP bonus. Premium members earn 2× XP on all meal logs.",
+        q: "Does HatchUp write data back to health apps?",
+        a: "No. HatchUp is designed as read-only for Apple Health and Health Connect in the current mobile beta.",
       },
       {
-        q: "My steps aren't syncing — what do I do?",
-        a: "Open Health Settings and re-check your connected platform. On iOS, confirm HATCHUP has Steps and Workout read permissions in the Health app. Sync can take up to 30 minutes.",
+        q: "My steps are not syncing. What should I check?",
+        a: "Open the app's Trust & Data or health connection area and confirm health permissions are enabled. On iOS, make sure Steps, Workouts, and Active Energy read permissions are allowed.",
       },
     ],
   },
   {
-    icon: CreditCard,
-    label: "Premium & Billing",
+    icon: BookOpen,
+    label: "Collection",
     color: "text-amber-400",
     faqs: [
       {
-        q: "Is HATCHUP free?",
-        a: "Yes — HATCHUP is free to download and play. All new accounts include a 7-day free Premium trial with no credit card required.",
+        q: "What is the Collection book?",
+        a: "The Collection book tracks discovered and missing Pals across Leaf, Ember, Tide, and Storm elements and rarity tiers.",
       },
       {
-        q: "What's included in Premium?",
-        a: "Premium unlocks 2× XP on meals, unlimited Hatchlings, unlimited AI Coach messages, all leaderboard scopes, AI Food Scanner, AI Body Fat Scanner, premium cosmetics, and more.",
+        q: "What are rarity tiers?",
+        a: "The current beta uses common, uncommon, rare, and epic rarity tiers for eggs and Pals.",
       },
       {
-        q: "How do I cancel my subscription?",
-        a: "Go to the Subscription page inside the app and tap 'Manage Subscription'. You can cancel, change plans, or update billing via the Stripe portal at any time.",
-      },
-      {
-        q: "What is the Top-10 City exemption?",
-        a: "Top 10 players in any city for XP, steps, workouts, battle wins, streaks, or artifacts automatically receive free Premium. This is recalculated every 24 hours.",
+        q: "Can I choose my starter egg?",
+        a: "The current onboarding direction lets new players begin by choosing a starter egg type before discovering more eggs through milestones and daily progress.",
       },
     ],
   },
   {
-    icon: Users,
-    label: "Community & Social",
+    icon: Trophy,
+    label: "Ranks & Profile",
     color: "text-blue-400",
     faqs: [
       {
-        q: "How do clubs work?",
-        a: "Clubs let you team up with other players, compete in group leaderboards, and share achievements. Each player belongs to one club at a time. Browse public clubs or create your own.",
+        q: "How do weekly ranks work?",
+        a: "Ranks are optional. Players can choose to share a public ranking name and weekly score while keeping private health details off the board.",
       },
       {
-        q: "How do I report or block someone?",
-        a: "Tap the three-dot (⋯) menu on any player's profile, post, or message. Choose 'Report' to flag content for moderation or 'Block' to hide them from your experience entirely.",
+        q: "What can I show on my profile?",
+        a: "The profile area includes a trainer card, selected profile Pal, collection progress, milestones, badges, and privacy controls.",
       },
       {
-        q: "Are chats moderated?",
-        a: "Yes. All group messages are automatically scanned. Flagged content is hidden and replaced with 'Message removed'. Repeated violations can result in suspension.",
+        q: "Can I stay private?",
+        a: "Yes. Ranking sharing is opt-in, and the app keeps Trust & Data controls visible so players understand what is shared.",
       },
     ],
   },
   {
     icon: Shield,
-    label: "Safety & Privacy",
+    label: "Trust & Privacy",
     color: "text-purple-400",
     faqs: [
       {
-        q: "How do you protect my location?",
-        a: "GPS data is AES-256 encrypted and never shared without your consent. You control your visibility in Privacy Settings — Exact, Neighborhood, City (default), or Hidden.",
+        q: "Do you sell health data?",
+        a: "No. HatchUp's privacy promise is that movement data is used to power gameplay, not sold or used for ads.",
       },
       {
-        q: "Is HATCHUP safe for kids?",
-        a: "HATCHUP is family-friendly. Minor accounts automatically enforce City-level location visibility and require workout partner approval. Parent accounts can manage these settings.",
+        q: "What data is public?",
+        a: "Only the public ranking name and score are shared when a player chooses to opt into weekly ranks. Private health details stay off rankings.",
       },
       {
-        q: "Tips for meeting other users safely?",
-        a: "Always meet workout partners in public locations — gyms, parks, or recreation centers. Never share your home address. Report any suspicious behavior immediately using the in-app report tool.",
+        q: "How do I contact support?",
+        a: "Email support@hatchup.app for account, privacy, beta access, or app feedback questions.",
       },
     ],
   },
@@ -269,7 +264,7 @@ export default function SupportPage() {
           </div>
         </div>
 
-        {/* Safety note */}
+        {/* Trust note */}
         <motion.div
           variants={fadeUp}
           initial="hidden"
@@ -279,11 +274,10 @@ export default function SupportPage() {
         >
           <Shield className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
           <div>
-            <p className="font-semibold text-emerald-300 mb-1">Safety reminder</p>
+            <p className="font-semibold text-emerald-300 mb-1">Health-data trust</p>
             <p className="text-sm text-white/60 leading-relaxed">
-              Always meet workout partners and event participants in public locations — gyms, parks, or recreation centers.
-              Never share your home address. Report suspicious behavior immediately using the in-app report tool.
-              HatchUp is a safe, trusted, and family-friendly community.
+              HatchUp reads movement data only to power gameplay. Health details
+              are not sold or used for ads, and weekly ranking sharing is optional.
             </p>
           </div>
         </motion.div>
@@ -296,7 +290,7 @@ export default function SupportPage() {
           viewport={{ once: true }}
           className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center"
         >
-          <MessageCircle className="w-10 h-10 text-pink-400 mx-auto mb-4" />
+          <Mail className="w-10 h-10 text-pink-400 mx-auto mb-4" />
           <h3 className="text-xl font-bold mb-2">Still need help?</h3>
           <p className="text-white/60 text-sm mb-6 max-w-md mx-auto">
             Our support team is available Monday–Friday. We aim to respond within 24 hours.

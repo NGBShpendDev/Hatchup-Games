@@ -28,10 +28,14 @@ const rarityColors: Record<EggRarity, string> = {
 export function HatchlingAvatar({ element, level = 1, rarity, size = "large" }: Props) {
   const visualStage = getCreatureVisualStage(level);
   const asset = getCreatureAsset(element, visualStage, rarity);
+  const visualStageLabel = capitalize(visualStage);
 
   if (asset) {
     return (
       <View style={[styles.wrap, styles[size]]}>
+        <View style={styles.stagePill}>
+          <Text style={styles.stage}>{visualStageLabel}</Text>
+        </View>
         <Image
           accessibilityLabel={`${rarity} ${element} ${visualStage} Pal art`}
           resizeMode="contain"
@@ -51,6 +55,9 @@ export function HatchlingAvatar({ element, level = 1, rarity, size = "large" }: 
 
   return (
     <View style={[styles.wrap, styles[size]]}>
+      <View style={styles.stagePill}>
+        <Text style={styles.stage}>{visualStageLabel}</Text>
+      </View>
       <View style={[styles.ear, styles.leftEar, { backgroundColor: elementColors[element] }]} />
       <View style={[styles.ear, styles.rightEar, { backgroundColor: elementColors[element] }]} />
       <View style={[styles.body, { backgroundColor: elementColors[element] }]}>
@@ -67,6 +74,10 @@ export function HatchlingAvatar({ element, level = 1, rarity, size = "large" }: 
       </View>
     </View>
   );
+}
+
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 const styles = StyleSheet.create({
@@ -142,6 +153,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 3,
     position: "absolute",
+  },
+  stagePill: {
+    backgroundColor: colors.primaryDeep,
+    borderRadius: radii.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    position: "absolute",
+    top: 0,
+    zIndex: 2,
+  },
+  stage: {
+    color: "#FFFFFF",
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 0.6,
   },
   rarity: {
     color: colors.muted,

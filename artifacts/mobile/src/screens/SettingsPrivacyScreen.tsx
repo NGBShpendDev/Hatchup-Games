@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
+import { CollapsibleSection } from "../components/CollapsibleSection";
 import { HatchlingAvatar } from "../components/HatchlingAvatar";
 import { Header } from "../components/Header";
 import { ProgressBar } from "../components/ProgressBar";
@@ -168,6 +169,14 @@ export function SettingsPrivacyScreen({
   ];
   const profileReadiness =
     profileChecklist.filter((item) => item.done).length / profileChecklist.length;
+  const nextProfileStep = profileChecklist.find((item) => !item.done) ?? null;
+  const nextProfileAction = nextProfileStep
+    ? getProfileStepAction(nextProfileStep.label, {
+        onDexPress,
+        onLeaderboardPress,
+        onMonsterPress,
+      })
+    : null;
 
   useEffect(() => {
     setUsernameDraft(
@@ -345,12 +354,32 @@ export function SettingsPrivacyScreen({
         </View>
         <View style={styles.profileReadinessCard}>
           <View style={styles.profileReadinessHeader}>
-          <Text style={styles.profileReadinessTitle}>Trainer card growth</Text>
+            <Text style={styles.profileReadinessTitle}>Trainer card growth</Text>
             <Text style={styles.profileReadinessValue}>
               {Math.round(profileReadiness * 100)}%
             </Text>
           </View>
           <ProgressBar progress={profileReadiness} />
+          <View style={styles.profileNextStepCard}>
+            <Text style={styles.profileNextStepKicker}>
+              {nextProfileStep ? "Next profile step" : "Profile ready"}
+            </Text>
+            <Text style={styles.profileNextStepTitle}>
+              {nextProfileStep?.label ?? "Trainer card is complete"}
+            </Text>
+            <Text style={styles.profileNextStepBody}>
+              {nextProfileStep
+                ? getProfileStepCopy(nextProfileStep.label)
+                : "Your public-facing trainer card has the basics covered. Keep hatching, earning badges, and updating your showcase."}
+            </Text>
+            {nextProfileAction?.onPress ? (
+              <AppButton
+                label={nextProfileAction.label}
+                onPress={nextProfileAction.onPress}
+                variant="secondary"
+              />
+            ) : null}
+          </View>
           <View style={styles.profileChecklist}>
             {profileChecklist.map((item) => (
               <View
@@ -373,51 +402,57 @@ export function SettingsPrivacyScreen({
             ))}
           </View>
         </View>
-        <View style={styles.profileShowcaseCard}>
-          <View style={styles.profileShowcaseHeader}>
-            <View>
-              <Text style={styles.profileShowcaseKicker}>Collection showcase</Text>
-              <Text style={styles.profileShowcaseTitle}>
-                {dexCompletion.unlocked}/{dexCompletion.total} species found
+        <CollapsibleSection
+          badge={`${Math.round(dexCompletion.percent * 100)}%`}
+          subtitle="Your species progress, strongest Pal, and next target."
+          title="Collection showcase"
+        >
+          <View style={styles.profileShowcaseCard}>
+            <View style={styles.profileShowcaseHeader}>
+              <View>
+                <Text style={styles.profileShowcaseKicker}>Collection showcase</Text>
+                <Text style={styles.profileShowcaseTitle}>
+                  {dexCompletion.unlocked}/{dexCompletion.total} species found
+                </Text>
+              </View>
+              <Text style={styles.profileShowcasePill}>
+                {Math.round(dexCompletion.percent * 100)}%
               </Text>
             </View>
-            <Text style={styles.profileShowcasePill}>
-              {Math.round(dexCompletion.percent * 100)}%
-            </Text>
+            <ProgressBar progress={dexCompletion.percent} />
+            <View style={styles.showcaseRows}>
+              <ShowcaseLine
+                label="Element focus"
+                value={getBestSummaryLabel(dexElementSummary)}
+              />
+              <ShowcaseLine
+                label="Rarity focus"
+                value={getBestSummaryLabel(dexRaritySummary)}
+              />
+              <ShowcaseLine
+                label="Strongest Pal"
+                value={
+                  strongestPal
+                    ? `${strongestPal.name} | P${getHatchlingPowerScore(strongestPal)}`
+                    : "Hatch a Pal"
+                }
+              />
+              <ShowcaseLine
+                label="Next target"
+                value={
+                  nextMissingDexEntry
+                    ? `${capitalize(nextMissingDexEntry.rarity)} ${capitalize(nextMissingDexEntry.element)}`
+                    : "Collection complete"
+                }
+              />
+            </View>
+            <AppButton
+              label="Open Collection"
+              onPress={onDexPress}
+              variant="secondary"
+            />
           </View>
-          <ProgressBar progress={dexCompletion.percent} />
-          <View style={styles.showcaseRows}>
-            <ShowcaseLine
-              label="Element focus"
-              value={getBestSummaryLabel(dexElementSummary)}
-            />
-            <ShowcaseLine
-              label="Rarity focus"
-              value={getBestSummaryLabel(dexRaritySummary)}
-            />
-            <ShowcaseLine
-              label="Strongest Pal"
-              value={
-                strongestPal
-                  ? `${strongestPal.name} | P${getHatchlingPowerScore(strongestPal)}`
-                  : "Hatch a Pal"
-              }
-            />
-            <ShowcaseLine
-              label="Next target"
-              value={
-                nextMissingDexEntry
-                  ? `${capitalize(nextMissingDexEntry.rarity)} ${capitalize(nextMissingDexEntry.element)}`
-                  : "Collection complete"
-              }
-            />
-          </View>
-          <AppButton
-            label="Open Collection"
-            onPress={onDexPress}
-            variant="secondary"
-          />
-        </View>
+        </CollapsibleSection>
         {activeHatchling && (
           <View style={styles.activeHatchling}>
             <HatchlingAvatar
@@ -471,73 +506,84 @@ export function SettingsPrivacyScreen({
           <Text style={styles.profileSaveMessage}>{profileSaveMessage}</Text>
         )}
       </View>
-      <View style={styles.badgeCard}>
-        <Text style={styles.cardTitle}>Milestones and badges</Text>
-        <Text style={styles.privacyText}>
-          Badge progress is local on this device and can become shareable once
-          accounts are online.
-        </Text>
-        <View style={styles.badgeProgressPanel}>
-          <View style={styles.badgeProgressHeader}>
-            <Text style={styles.badgeProgressTitle}>Trainer milestone path</Text>
-            <Text style={styles.badgeProgressValue}>
-              {unlockedBadgeCount}/{badges.length}
-            </Text>
-          </View>
-          <ProgressBar progress={badgeCompletionRatio} />
-          <Text style={styles.badgeProgressMeta}>
-            {Math.round(badgeCompletionRatio * 100)}% complete across collection,
-            movement, bonds, rarity, streaks, and XP.
+      <CollapsibleSection
+        badge={`${unlockedBadgeCount}/${badges.length}`}
+        subtitle="Badge paths for collection, movement, bonds, rarity, streaks, and XP."
+        title="Badges"
+      >
+        <View style={styles.badgeCard}>
+          <Text style={styles.cardTitle}>Milestones and badges</Text>
+          <Text style={styles.privacyText}>
+            Badge progress is local on this device and can become shareable once
+            accounts are online.
           </Text>
-        </View>
-        <View style={styles.badgeCategoryRow}>
-          {Object.entries(badgeCategorySummary).map(([category, summary]) => (
-            <View key={category} style={styles.badgeCategoryPill}>
-              <Text style={styles.badgeCategoryLabel}>
-                {capitalize(category)}
-              </Text>
-              <Text style={styles.badgeCategoryValue}>
-                {summary.unlocked}/{summary.total}
+          <View style={styles.badgeProgressPanel}>
+            <View style={styles.badgeProgressHeader}>
+              <Text style={styles.badgeProgressTitle}>Trainer milestone path</Text>
+              <Text style={styles.badgeProgressValue}>
+                {unlockedBadgeCount}/{badges.length}
               </Text>
             </View>
-          ))}
-        </View>
-        {nextBadges.length > 0 && (
-          <View style={styles.nextBadgePanel}>
-            <Text style={styles.nextBadgeTitle}>Closest unlocks</Text>
-            {nextBadges.map((badge) => (
-              <View key={badge.id} style={styles.nextBadgeRow}>
-                <View style={styles.nextBadgeText}>
-                  <Text style={styles.nextBadgeName}>{badge.label}</Text>
-                  <Text style={styles.nextBadgeMeta}>
-                    {Math.min(badge.value, badge.target).toLocaleString()} /{" "}
-                    {badge.target.toLocaleString()} | {capitalize(badge.category)}
-                  </Text>
-                  <ProgressBar progress={badge.progress} />
-                </View>
-                <Text style={styles.nextBadgePercent}>
-                  {Math.round(badge.progress * 100)}%
+            <ProgressBar progress={badgeCompletionRatio} />
+            <Text style={styles.badgeProgressMeta}>
+              {Math.round(badgeCompletionRatio * 100)}% complete across collection,
+              movement, bonds, rarity, streaks, and XP.
+            </Text>
+          </View>
+          <View style={styles.badgeCategoryRow}>
+            {Object.entries(badgeCategorySummary).map(([category, summary]) => (
+              <View key={category} style={styles.badgeCategoryPill}>
+                <Text style={styles.badgeCategoryLabel}>
+                  {capitalize(category)}
+                </Text>
+                <Text style={styles.badgeCategoryValue}>
+                  {summary.unlocked}/{summary.total}
                 </Text>
               </View>
             ))}
           </View>
-        )}
-        <View style={styles.badgeShelves}>
-          {Object.entries(badgesByCategory).map(([category, categoryBadges]) => (
-            <MilestoneShelf
-              badges={categoryBadges}
-              category={category as BadgeCategory}
-              key={category}
-              progress={badgeCategoryProgress[category as BadgeCategory] ?? 0}
-              summary={badgeCategorySummary[category as BadgeCategory]}
-            />
-          ))}
+          {nextBadges.length > 0 && (
+            <View style={styles.nextBadgePanel}>
+              <Text style={styles.nextBadgeTitle}>Closest unlocks</Text>
+              {nextBadges.map((badge) => (
+                <View key={badge.id} style={styles.nextBadgeRow}>
+                  <View style={styles.nextBadgeText}>
+                    <Text style={styles.nextBadgeName}>{badge.label}</Text>
+                    <Text style={styles.nextBadgeMeta}>
+                      {Math.min(badge.value, badge.target).toLocaleString()} /{" "}
+                      {badge.target.toLocaleString()} | {capitalize(badge.category)}
+                    </Text>
+                    <ProgressBar progress={badge.progress} />
+                  </View>
+                  <Text style={styles.nextBadgePercent}>
+                    {Math.round(badge.progress * 100)}%
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+          <View style={styles.badgeShelves}>
+            {Object.entries(badgesByCategory).map(([category, categoryBadges]) => (
+              <MilestoneShelf
+                badges={categoryBadges}
+                category={category as BadgeCategory}
+                key={category}
+                progress={badgeCategoryProgress[category as BadgeCategory] ?? 0}
+                summary={badgeCategorySummary[category as BadgeCategory]}
+              />
+            ))}
+          </View>
         </View>
-      </View>
+      </CollapsibleSection>
         </>
       )}
       {activeTab === "settings" && (
         <>
+      <CollapsibleSection
+        badge={`${Math.round(publicReadinessScore * 100)}%`}
+        subtitle="Support, privacy, local data controls, and launch readiness."
+        title="Trust & Data"
+      >
       <View style={styles.launchCard}>
         <Text style={styles.launchKicker}>
           {IS_PUBLIC_BUILD ? "PUBLIC BUILD" : "LAUNCH READINESS"}
@@ -628,53 +674,6 @@ export function SettingsPrivacyScreen({
           withBorder={false}
         />
       </View>
-      {testLabEnabled && (
-        <Pressable
-          onLongPress={() => setShowBetaTools((visible) => !visible)}
-          style={styles.betaToolsHandle}
-        >
-          <Text style={styles.betaToolsHandleTitle}>Test Tools drawer</Text>
-          <Text style={styles.betaToolsHandleText}>
-            Press and hold to {showBetaTools ? "hide" : "reveal"} local test controls.
-          </Text>
-        </Pressable>
-      )}
-      {testLabEnabled && showBetaTools && (
-        <View style={styles.testLabCard}>
-          <Text style={styles.cardTitle}>Local Test Lab</Text>
-          <Text style={styles.privacyText}>
-            Preview local progression states without changing Apple Health data.
-            These tools are included only in accelerated testing builds.
-          </Text>
-          <View style={styles.testLabButtons}>
-            <AppButton
-              label="Preview Egg"
-              onPress={() => onSetTestStage("egg")}
-              variant="secondary"
-            />
-            <AppButton
-              label="Preview Baby"
-              onPress={() => onSetTestStage("baby")}
-              variant="secondary"
-            />
-            <AppButton
-              label="Preview Teen"
-              onPress={() => onSetTestStage("teen")}
-              variant="secondary"
-            />
-            <AppButton
-              label="Preview Final"
-              onPress={() => onSetTestStage("final")}
-              variant="secondary"
-            />
-            <AppButton
-              label="Ready all Eggs"
-              onPress={onReadyTestEgg}
-              variant="secondary"
-            />
-          </View>
-        </View>
-      )}
       <View style={styles.privacyCard}>
         <Text style={styles.cardTitle}>Privacy promise</Text>
         <Text style={styles.privacyText}>{privacyCopy}</Text>
@@ -783,6 +782,60 @@ export function SettingsPrivacyScreen({
           the current launch build.
         </Text>
       </View>
+      </CollapsibleSection>
+      {testLabEnabled && (
+        <CollapsibleSection
+          badge={showBetaTools ? "Open" : "Hidden"}
+          subtitle="Local-only progression previews for testing builds."
+          title="Test tools"
+        >
+          <Pressable
+            onLongPress={() => setShowBetaTools((visible) => !visible)}
+            style={styles.betaToolsHandle}
+          >
+            <Text style={styles.betaToolsHandleTitle}>Test Tools drawer</Text>
+            <Text style={styles.betaToolsHandleText}>
+              Press and hold to {showBetaTools ? "hide" : "reveal"} local test controls.
+            </Text>
+          </Pressable>
+          {showBetaTools && (
+            <View style={styles.testLabCard}>
+              <Text style={styles.cardTitle}>Local Test Lab</Text>
+              <Text style={styles.privacyText}>
+                Preview local progression states without changing Apple Health data.
+                These tools are included only in accelerated testing builds.
+              </Text>
+              <View style={styles.testLabButtons}>
+                <AppButton
+                  label="Preview Egg"
+                  onPress={() => onSetTestStage("egg")}
+                  variant="secondary"
+                />
+                <AppButton
+                  label="Preview Baby"
+                  onPress={() => onSetTestStage("baby")}
+                  variant="secondary"
+                />
+                <AppButton
+                  label="Preview Teen"
+                  onPress={() => onSetTestStage("teen")}
+                  variant="secondary"
+                />
+                <AppButton
+                  label="Preview Final"
+                  onPress={() => onSetTestStage("final")}
+                  variant="secondary"
+                />
+                <AppButton
+                  label="Ready all Eggs"
+                  onPress={onReadyTestEgg}
+                  variant="secondary"
+                />
+              </View>
+            </View>
+          )}
+        </CollapsibleSection>
+      )}
       <View style={styles.spacer} />
       <AppButton
         label="Reset app data"
@@ -836,6 +889,42 @@ function ProfileStat({ label, value }: { label: string; value: string }) {
       <Text style={styles.profileStatLabel}>{label}</Text>
     </View>
   );
+}
+
+function getProfileStepCopy(label: string) {
+  if (label === "Choose username") {
+    return "Add a username above so your trainer card feels owned before sharing or testing with friends.";
+  }
+  if (label === "Pick profile Pal") {
+    return "Choose a favorite Pal as your picture so the profile has a creature anchor.";
+  }
+  if (label === "Hatch first Pal") {
+    return "Hatch a starter Pal to unlock profile pictures, bond, stats, and collection identity.";
+  }
+  if (label === "Unlock first badge") {
+    return "Earn one milestone so the profile shows progress beyond raw numbers.";
+  }
+  return "Opt into ranks only when you want weekly movement to appear on the journey board.";
+}
+
+function getProfileStepAction(
+  label: string,
+  actions: {
+    onDexPress: () => void;
+    onLeaderboardPress: () => void;
+    onMonsterPress: () => void;
+  },
+) {
+  if (label === "Pick profile Pal" || label === "Hatch first Pal") {
+    return { label: "Open Hatchery", onPress: actions.onMonsterPress };
+  }
+  if (label === "Unlock first badge") {
+    return { label: "Open Collection", onPress: actions.onDexPress };
+  }
+  if (label === "Optional rank sharing") {
+    return { label: "Open Ranks", onPress: actions.onLeaderboardPress };
+  }
+  return { label: "Edit above", onPress: null };
 }
 
 function ProfileTab({
@@ -1322,6 +1411,31 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 13,
     fontWeight: "900",
+  },
+  profileNextStepCard: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 7,
+    padding: 12,
+  },
+  profileNextStepKicker: {
+    color: colors.primaryDeep,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+  },
+  profileNextStepTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  profileNextStepBody: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
   },
   profileChecklist: {
     flexDirection: "row",

@@ -43,8 +43,14 @@ import {
   getShopItem,
   type ShopItemId,
 } from "./domain/shop";
-import { syncCloudSave } from "./services/account/accountService";
+import {
+  loadCloudSave,
+  mergeLocalAndCloudSave,
+  saveCloudSave,
+  syncCloudSave,
+} from "./services/account/accountService";
 import { healthService } from "./services/health";
+import { useAuth } from "./services/auth/AuthProvider";
 import { syncLeaderboardEntry } from "./services/leaderboard/leaderboardService";
 import {
   reportCrash as reportObservedCrash,
@@ -87,6 +93,7 @@ const emptySyncGains: LatestSyncGains = {
 };
 
 export function useHatchUpApp() {
+  const { user } = useAuth();
   const [data, setData] = useState<HatchUpData>(initialHatchUpData);
   const [ready, setReady] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -102,6 +109,7 @@ export function useHatchUpApp() {
   const [leaderboardSyncLabel, setLeaderboardSyncLabel] =
     useState("Local challenge board");
   const [cloudSyncLabel, setCloudSyncLabel] = useState("Local-only save");
+  const cloudBootstrapUserRef = useRef<string | null>(null);
   const syncInFlight = useRef(false);
 
   useEffect(() => {
@@ -109,6 +117,87 @@ export function useHatchUpApp() {
       .then(setData)
       .finally(() => setReady(true));
   }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+
+    if (!user?.id) {
+      cloudBootstrapUserRef.current = null;
+      setCloudSyncLabel("Local-only save");
+      return;
+    }
+
+    const userId = user.id;
+    if (cloudBootstrapUserRef.current === userId) return;
+
+    let cancelled = false;
+    cloudBootstrapUserRef.current = userId;
+
+    async function bootstrapCloudSave() {
+      const remoteLocalData = migrateHatchUpData({
+        ...data,
+        accountId: userId,
+        accountMode: "remote",
+        cloudSyncEnabled: true,
+        cloudSyncStatus: "pending",
+      });
+
+      setCloudSyncLabel("Cloud sync pending");
+      setData(remoteLocalData);
+      await saveHatchUpData(remoteLocalData);
+
+      try {
+        const cloudSave = await loadCloudSave(userId);
+        const merged = cloudSave
+          ? mergeLocalAndCloudSave(remoteLocalData, cloudSave.data)
+          : remoteLocalData;
+        const pendingSave = {
+          ...merged,
+          accountId: userId,
+          accountMode: "remote",
+          cloudSyncEnabled: true,
+          cloudSyncStatus: "pending",
+        } as HatchUpData;
+
+        if (cancelled) return;
+        setData(pendingSave);
+        await saveHatchUpData(pendingSave);
+
+        const saved = await saveCloudSave(userId, pendingSave);
+        const synced = {
+          ...saved.data,
+          cloudSyncStatus: "synced",
+          lastCloudSyncedAt: saved.syncedAt,
+        } as HatchUpData;
+
+        if (cancelled) return;
+        setData(synced);
+        await saveHatchUpData(synced);
+        setCloudSyncLabel(
+          `Cloud synced ${new Date(saved.syncedAt).toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+          })}`,
+        );
+      } catch {
+        const failed = {
+          ...remoteLocalData,
+          cloudSyncStatus: "failed",
+        } as HatchUpData;
+
+        if (cancelled) return;
+        setData(failed);
+        await saveHatchUpData(failed);
+        setCloudSyncLabel("Cloud sync failed; local save kept");
+      }
+    }
+
+    void bootstrapCloudSave();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, user?.id]);
 
   async function persist(next: HatchUpData, options = { syncCloud: true }) {
     setData(next);
@@ -559,9 +648,9 @@ export function useHatchUpApp() {
 
   async function syncCloud(nextData: HatchUpData) {
     try {
-      const result = await syncCloudSave(nextData);
+      const result = await syncCloudSave(nextData, user?.id);
       const synced = {
-        ...nextData,
+        ...result.data,
         accountMode: result.accountMode,
         cloudSyncStatus: result.status,
         lastCloudSyncedAt: result.syncedAt ?? nextData.lastCloudSyncedAt,
@@ -580,6 +669,13 @@ export function useHatchUpApp() {
             : "Local-only save",
       );
     } catch {
+      const failed = {
+        ...nextData,
+        cloudSyncStatus: "failed",
+      } as HatchUpData;
+
+      setData(failed);
+      await saveHatchUpData(failed);
       setCloudSyncLabel("Cloud sync failed");
       void trackEvent(nextData, "cloud_sync_failed");
     }

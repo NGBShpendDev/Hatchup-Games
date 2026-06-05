@@ -3,6 +3,7 @@ import "expo-dev-client";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { AuthGate } from "./src/components/AuthGate";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { ConnectHealthScreen } from "./src/screens/ConnectHealthScreen";
 import { CreatureDexScreen } from "./src/screens/CreatureDexScreen";
@@ -12,6 +13,7 @@ import { MonsterDetailScreen } from "./src/screens/MonsterDetailScreen";
 import { MonsterSetupScreen } from "./src/screens/MonsterSetupScreen";
 import { SettingsPrivacyScreen } from "./src/screens/SettingsPrivacyScreen";
 import { WelcomeScreen } from "./src/screens/WelcomeScreen";
+import { AuthProvider } from "./src/services/auth/AuthProvider";
 import { colors } from "./src/theme";
 import { useHatchUpApp } from "./src/useHatchUpApp";
 
@@ -165,7 +167,11 @@ function AppContent() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <AppContent />
+      <AuthProvider>
+        <AuthGate>
+          <AppContent />
+        </AuthGate>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }

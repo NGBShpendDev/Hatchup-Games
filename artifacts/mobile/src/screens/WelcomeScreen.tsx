@@ -1,22 +1,32 @@
 import { StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { MonsterAvatar } from "../components/MonsterAvatar";
+import { OnboardingSteps } from "../components/OnboardingSteps";
 import { Screen } from "../components/Screen";
 import { colors, radii, typography } from "../theme";
 
 export function WelcomeScreen({ onContinue }: { onContinue: () => void }) {
   return (
     <Screen>
-      <OnboardingSteps currentStep={1} />
+      <OnboardingSteps currentStep={1} helperText="Your first Pal starts here" />
       <View style={styles.brand}>
         <Text style={styles.kicker}>HATCHUP GAMES</Text>
-        <Text style={styles.title}>Raise a Pal with your daily movement.</Text>
+        <Text style={styles.title}>Start a tiny creature journey today.</Text>
         <Text style={styles.body}>
           Your steps, distance, active energy, and workouts turn into XP. Pick
-          your first Egg, then train a team of Pals as you move.
+          your first Egg, place it in the incubator, then let movement grow your
+          Pal.
         </Text>
       </View>
       <MonsterAvatar stage="egg" />
+      <View style={styles.todayCard}>
+        <Text style={styles.todayKicker}>Today's setup</Text>
+        <Text style={styles.todayTitle}>Choose Egg - decide sync - land on Home</Text>
+        <Text style={styles.todayBody}>
+          Home will show one clear next action after setup, so new players do
+          not have to guess where to tap first.
+        </Text>
+      </View>
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Move. Hatch. Climb.</Text>
         <Text style={styles.cardBody}>
@@ -38,25 +48,8 @@ export function WelcomeScreen({ onContinue }: { onContinue: () => void }) {
         <LoopStep number="3" title="Hatch & train" body="Meet your first Pal, then grow your team." />
       </View>
       <View style={styles.spacer} />
-      <AppButton label="Start raising my Pal" onPress={onContinue} />
+      <AppButton label="Choose my starter Egg" onPress={onContinue} />
     </Screen>
-  );
-}
-
-function OnboardingSteps({ currentStep }: { currentStep: number }) {
-  return (
-    <View style={styles.steps}>
-      {["Preview", "Egg", "Health"].map((label, index) => {
-        const active = index + 1 === currentStep;
-        return (
-          <View key={label} style={[styles.stepPill, active && styles.stepPillActive]}>
-            <Text style={[styles.stepText, active && styles.stepTextActive]}>
-              {index + 1}. {label}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
   );
 }
 
@@ -84,32 +77,6 @@ const styles = StyleSheet.create({
   brand: {
     marginTop: 20,
   },
-  steps: {
-    flexDirection: "row",
-    gap: 7,
-    marginTop: 8,
-  },
-  stepPill: {
-    backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    flex: 1,
-    paddingVertical: 7,
-  },
-  stepPillActive: {
-    backgroundColor: colors.primaryDeep,
-    borderColor: colors.primaryDeep,
-  },
-  stepText: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  stepTextActive: {
-    color: "#FFFFFF",
-  },
   kicker: {
     color: colors.primary,
     fontSize: 13,
@@ -129,6 +96,33 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 25,
     marginTop: 14,
+  },
+  todayCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    marginBottom: 14,
+    padding: 16,
+  },
+  todayKicker: {
+    color: colors.rewardGold,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+  },
+  todayTitle: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: "900",
+    marginTop: 5,
+  },
+  todayBody: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 5,
   },
   card: {
     backgroundColor: colors.accentSoft,

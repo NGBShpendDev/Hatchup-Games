@@ -4,6 +4,7 @@ import { AppButton } from "../components/AppButton";
 import { EggAvatar } from "../components/EggAvatar";
 import { Header } from "../components/Header";
 import { MonsterAvatar } from "../components/MonsterAvatar";
+import { OnboardingSteps } from "../components/OnboardingSteps";
 import { Screen } from "../components/Screen";
 import type { EggElement } from "../domain/models";
 import { colors, elementColors, radii, typography } from "../theme";
@@ -18,12 +19,37 @@ const STARTER_EGGS: {
   element: EggElement;
   label: string;
   pitch: string;
+  firstMission: string;
   trait: string;
 }[] = [
-  { element: "leaf", label: "Leaf", pitch: "Steady growth", trait: "Best for streaks and bonding." },
-  { element: "ember", label: "Ember", pitch: "High energy", trait: "Best for training days." },
-  { element: "tide", label: "Tide", pitch: "Balanced flow", trait: "Best for walking distance." },
-  { element: "storm", label: "Storm", pitch: "Fast sparks", trait: "Best for weekly challenges." },
+  {
+    element: "leaf",
+    label: "Leaf",
+    pitch: "Steady growth",
+    firstMission: "Build a streak",
+    trait: "Best for bonding and returning tomorrow.",
+  },
+  {
+    element: "ember",
+    label: "Ember",
+    pitch: "High energy",
+    firstMission: "Train your Pal",
+    trait: "Best for active days and quick training wins.",
+  },
+  {
+    element: "tide",
+    label: "Tide",
+    pitch: "Balanced flow",
+    firstMission: "Walk for distance",
+    trait: "Best for steady movement and longer walks.",
+  },
+  {
+    element: "storm",
+    label: "Storm",
+    pitch: "Fast sparks",
+    firstMission: "Chase challenges",
+    trait: "Best for weekly goals and bursty progress.",
+  },
 ];
 
 const NAME_IDEAS = ["Moss", "Nova", "Ripple", "Bolt"];
@@ -33,17 +59,27 @@ export function MonsterSetupScreen({ initialName, onBack, onContinue }: Props) {
   const [starterEggElement, setStarterEggElement] =
     useState<EggElement>("leaf");
   const canContinue = name.trim().length > 0;
+  const selectedEgg =
+    STARTER_EGGS.find((egg) => egg.element === starterEggElement) ??
+    STARTER_EGGS[0];
 
   return (
     <Screen>
       <Header onBack={onBack} title="Choose your Egg" />
-      <OnboardingSteps currentStep={2} />
+      <OnboardingSteps currentStep={2} helperText="Pick your first play style" />
       <Text style={styles.title}>Every big evolution starts small.</Text>
       <Text style={styles.body}>
         Name your journey and choose your first starter Egg. More random Eggs
         drop as you hit movement milestones.
       </Text>
       <MonsterAvatar stage="egg" />
+      <View style={styles.guidanceCard}>
+        <Text style={styles.guidanceTitle}>This is your first Egg, not your forever choice.</Text>
+        <Text style={styles.guidanceBody}>
+          Start with the style that sounds fun today. Other elements and
+          rarities can still appear as milestone rewards.
+        </Text>
+      </View>
       <Text style={styles.label}>Starter Egg</Text>
       <View style={styles.eggGrid}>
         {STARTER_EGGS.map((egg) => {
@@ -70,11 +106,11 @@ export function MonsterSetupScreen({ initialName, onBack, onContinue }: Props) {
       <View style={styles.starterSummary}>
         <Text style={styles.summaryKicker}>Starter path</Text>
         <Text style={styles.summaryTitle}>
-          {capitalize(starterEggElement)} Egg selected
+          {selectedEgg.label} Egg selected
         </Text>
         <Text style={styles.summaryBody}>
-          This Egg goes into your incubator first. Other elements and rarities
-          unlock through milestone Eggs as you move.
+          First mission: {selectedEgg.firstMission}. This Egg goes into your
+          incubator first, then Home will guide your next action.
         </Text>
       </View>
       <Text style={styles.label}>Journey name</Text>
@@ -101,7 +137,7 @@ export function MonsterSetupScreen({ initialName, onBack, onContinue }: Props) {
       )}
       <AppButton
         disabled={!canContinue}
-        label="Start with this Egg"
+        label="Place Egg in incubator"
         onPress={() => onContinue(name, starterEggElement)}
         style={!canContinue ? styles.disabled : undefined}
       />
@@ -109,50 +145,7 @@ export function MonsterSetupScreen({ initialName, onBack, onContinue }: Props) {
   );
 }
 
-function OnboardingSteps({ currentStep }: { currentStep: number }) {
-  return (
-    <View style={styles.steps}>
-      {["Preview", "Egg", "Health"].map((label, index) => {
-        const active = index + 1 === currentStep;
-        return (
-          <View key={label} style={[styles.stepPill, active && styles.stepPillActive]}>
-            <Text style={[styles.stepText, active && styles.stepTextActive]}>
-              {index + 1}. {label}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  steps: {
-    flexDirection: "row",
-    gap: 7,
-    marginBottom: 18,
-  },
-  stepPill: {
-    backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    flex: 1,
-    paddingVertical: 7,
-  },
-  stepPillActive: {
-    backgroundColor: colors.primaryDeep,
-    borderColor: colors.primaryDeep,
-  },
-  stepText: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  stepTextActive: {
-    color: "#FFFFFF",
-  },
   title: {
     color: colors.ink,
     fontSize: 30,
@@ -165,6 +158,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 23,
     marginTop: 10,
+  },
+  guidanceCard: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    marginBottom: 16,
+    padding: 14,
+  },
+  guidanceTitle: {
+    color: colors.primaryDeep,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  guidanceBody: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 5,
   },
   label: {
     color: colors.ink,
@@ -288,7 +300,3 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
 });
-
-function capitalize(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}

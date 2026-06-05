@@ -1,6 +1,7 @@
 import { Linking, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { Header } from "../components/Header";
+import { OnboardingSteps } from "../components/OnboardingSteps";
 import { Screen } from "../components/Screen";
 import {
   buildSupportMailto,
@@ -30,12 +31,20 @@ export function ConnectHealthScreen({
   return (
     <Screen>
       <Header onBack={onBack} title="Connect health" />
-      <OnboardingSteps currentStep={3} />
+      <OnboardingSteps currentStep={3} helperText="Read-only movement rewards" />
       <Text style={styles.title}>Turn movement into Pal progress.</Text>
       <Text style={styles.body}>
-        Connect your health source so HatchUp can calculate your daily rewards.
-        You can skip this and explore first.
+        Connect your health source so HatchUp can calculate your daily rewards,
+        hatch progress, and first-week journey. You can still explore first.
       </Text>
+      <View style={styles.handoffCard}>
+        <Text style={styles.handoffKicker}>Almost home</Text>
+        <Text style={styles.handoffTitle}>After this, Home gives you one next action.</Text>
+        <Text style={styles.handoffBody}>
+          If you connect now, HatchUp can reward today's movement. If you
+          skip, the app uses safe demo progress until you connect from Profile.
+        </Text>
+      </View>
       <View style={styles.sourceCard}>
         <View style={styles.sourceMark}>
           <Text style={styles.sourceMarkText}>H</Text>
@@ -55,10 +64,10 @@ export function ConnectHealthScreen({
         </View>
       </View>
       <View style={styles.nextCard}>
-        <Text style={styles.cardTitle}>Recommended first sync</Text>
-        <Text style={styles.item}>1. HatchUp syncs today's movement.</Text>
-        <Text style={styles.item}>2. Your starter Egg gains progress.</Text>
-        <Text style={styles.item}>3. Any rewards appear on Home.</Text>
+        <Text style={styles.cardTitle}>What to expect</Text>
+        <Text style={styles.item}>1. Tap Connect and approve read-only categories.</Text>
+        <Text style={styles.item}>2. Return to HatchUp after the permission sheet.</Text>
+        <Text style={styles.item}>3. Home shows today's rewards and next action.</Text>
       </View>
       <View style={styles.skipCard}>
         <Text style={styles.cardTitle}>Not ready yet?</Text>
@@ -105,30 +114,13 @@ export function ConnectHealthScreen({
       </View>
       {error && <Text style={styles.error}>{error}</Text>}
       <View style={styles.spacer} />
-      <AppButton label={`Connect ${healthMode}`} onPress={onConnect} />
-      <AppButton label="Skip for now" onPress={onSkip} variant="secondary" />
+      <AppButton label={`Connect ${healthMode} and continue`} onPress={onConnect} />
+      <AppButton label="Explore with demo progress" onPress={onSkip} variant="secondary" />
       <Text style={styles.note}>
-        Native health sync requires an Expo development build. Expo Go is not
-        supported.
+        Health data is read-only. Native sync is available in TestFlight and
+        development builds; demo progress keeps the app testable without access.
       </Text>
     </Screen>
-  );
-}
-
-function OnboardingSteps({ currentStep }: { currentStep: number }) {
-  return (
-    <View style={styles.steps}>
-      {["Preview", "Egg", "Health"].map((label, index) => {
-        const active = index + 1 === currentStep;
-        return (
-          <View key={label} style={[styles.stepPill, active && styles.stepPillActive]}>
-            <Text style={[styles.stepText, active && styles.stepTextActive]}>
-              {index + 1}. {label}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
   );
 }
 
@@ -141,32 +133,6 @@ function PermissionChip({ label }: { label: string }) {
 }
 
 const styles = StyleSheet.create({
-  steps: {
-    flexDirection: "row",
-    gap: 7,
-    marginBottom: 18,
-  },
-  stepPill: {
-    backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    flex: 1,
-    paddingVertical: 7,
-  },
-  stepPillActive: {
-    backgroundColor: colors.primaryDeep,
-    borderColor: colors.primaryDeep,
-  },
-  stepText: {
-    color: colors.muted,
-    fontSize: 11,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  stepTextActive: {
-    color: "#FFFFFF",
-  },
   title: {
     color: colors.ink,
     fontSize: 30,
@@ -180,6 +146,33 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     marginTop: 10,
   },
+  handoffCard: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    marginTop: 18,
+    padding: 16,
+  },
+  handoffKicker: {
+    color: colors.rewardGold,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+  },
+  handoffTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: "900",
+    marginTop: 5,
+  },
+  handoffBody: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 5,
+  },
   sourceCard: {
     alignItems: "center",
     backgroundColor: colors.primarySoft,
@@ -187,7 +180,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.card,
     borderWidth: 1,
     flexDirection: "row",
-    marginTop: 24,
+    marginTop: 14,
     padding: 16,
   },
   sourceMark: {

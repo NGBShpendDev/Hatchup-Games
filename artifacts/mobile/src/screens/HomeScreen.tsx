@@ -2,12 +2,15 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
+import { CollapsibleSection } from "../components/CollapsibleSection";
+import { CompactSummaryRow } from "../components/CompactSummaryRow";
 import { EggAvatar } from "../components/EggAvatar";
 import { HatchlingAvatar } from "../components/HatchlingAvatar";
 import { MonsterAvatar } from "../components/MonsterAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
 import { SparkleBurst } from "../components/SparkleBurst";
+import { StackedMenuCard } from "../components/StackedMenuCard";
 import {
   getCollectionNudge,
   getEggProgressMessage,
@@ -265,6 +268,13 @@ export function HomeScreen({
         <Text style={styles.loopPromise}>{getScreenLoopSubtitle("home")}</Text>
       </View>
       <NextActionCard nextAction={nextAction} />
+      <DailySnapshotStrip
+        activeHatchling={activeHatchling}
+        claimableRewards={visibleClaimableQuestCount + (weeklyChest.canClaim ? 1 : 0)}
+        focusEgg={focusEgg}
+        readyEggCount={readyEggCount}
+        today={today}
+      />
       <TodayProgressCard
         activeHatchling={activeHatchling}
         dailyStepGoal={ACTIVE_PROGRESSION_PROFILE.questTargets.steps}
@@ -305,72 +315,80 @@ export function HomeScreen({
         <ProgressBar progress={retention.progress} />
         <Text style={styles.goalText}>{retention.message}</Text>
       </View>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Today's movement</Text>
-        <Text style={styles.sectionMeta}>
-          {ACTIVE_PROGRESSION_PROFILE.xp.dailyMax} XP daily max
+      <CollapsibleSection
+        badge={`${today?.health.steps.toLocaleString() ?? "0"} steps`}
+        subtitle="Detailed movement stats are here when you want the full breakdown."
+        title="Movement details"
+      >
+        <View style={styles.metrics}>
+          <Metric
+            label="Steps"
+            value={today?.health.steps.toLocaleString() ?? "0"}
+            xp={today?.xp.steps ?? 0}
+            animate={Boolean(today?.xp.steps)}
+          />
+          <Metric
+            label="Distance"
+            value={`${todayDistanceMiles.toFixed(1)} mi`}
+          />
+          <Metric
+            label="Energy"
+            value={today?.health.activeCalories.toLocaleString() ?? "0"}
+            xp={today?.xp.activeCalories ?? 0}
+            animate={Boolean(today?.xp.activeCalories)}
+          />
+          <Metric
+            label="Workouts"
+            value={String(today?.health.workouts ?? 0)}
+            xp={today?.xp.workouts ?? 0}
+            animate={Boolean(today?.xp.workouts)}
+          />
+        </View>
+        <AppButton
+          label={isSyncing ? "Syncing movement..." : "Sync movement"}
+          onPress={onSync}
+        />
+        {error && <Text style={styles.error}>{error}</Text>}
+        <Text style={styles.syncNote}>
+          {data.lastSyncedDate
+            ? `Last synced ${new Date(data.lastSyncedDate).toLocaleTimeString(
+                [],
+                {
+                  hour: "numeric",
+                  minute: "2-digit",
+                },
+              )}`
+            : "Sync once to collect today's XP."}
         </Text>
-      </View>
-      <View style={styles.metrics}>
-        <Metric
-          label="Steps"
-          value={today?.health.steps.toLocaleString() ?? "0"}
-          xp={today?.xp.steps ?? 0}
-          animate={Boolean(today?.xp.steps)}
-        />
-        <Metric
-          label="Distance"
-          value={`${todayDistanceMiles.toFixed(1)} mi`}
-        />
-        <Metric
-          label="Energy"
-          value={today?.health.activeCalories.toLocaleString() ?? "0"}
-          xp={today?.xp.activeCalories ?? 0}
-          animate={Boolean(today?.xp.activeCalories)}
-        />
-        <Metric
-          label="Workouts"
-          value={String(today?.health.workouts ?? 0)}
-          xp={today?.xp.workouts ?? 0}
-          animate={Boolean(today?.xp.workouts)}
-        />
-      </View>
-      <AppButton
-        label={isSyncing ? "Syncing movement..." : "Sync movement"}
-        onPress={onSync}
-      />
-      {error && <Text style={styles.error}>{error}</Text>}
-      <Text style={styles.syncNote}>
-        {data.lastSyncedDate
-          ? `Last synced ${new Date(data.lastSyncedDate).toLocaleTimeString(
-              [],
-              {
-                hour: "numeric",
-                minute: "2-digit",
-              },
-            )}`
-          : "Sync once to collect today's XP."}
-      </Text>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Your last 7 days</Text>
-        <Text style={styles.sectionMeta}>{activity.activeDays}/7 active</Text>
-      </View>
-      <View style={styles.activityCard}>
-        <View style={styles.activityStats}>
-          <ActivityStat label="Steps" value={activity.steps.toLocaleString()} />
-          <ActivityStat label="Movement XP" value={String(activity.xp)} />
+      </CollapsibleSection>
+      <CollapsibleSection
+        badge={`${activity.activeDays}/7 active`}
+        subtitle="Review the recent movement that fed your Eggs, quests, and streak."
+        title="Last 7 days"
+      >
+        <View style={styles.activityCard}>
+          <View style={styles.activityStats}>
+            <ActivityStat label="Steps" value={activity.steps.toLocaleString()} />
+            <ActivityStat label="Movement XP" value={String(activity.xp)} />
+          </View>
+          <View style={styles.chart}>
+            {activity.days.map((day) => (
+              <ActivityBar day={day} key={day.date} />
+            ))}
+          </View>
         </View>
-        <View style={styles.chart}>
-          {activity.days.map((day) => (
-            <ActivityBar day={day} key={day.date} />
-          ))}
-        </View>
-      </View>
-      <AccountProgressCard
-        accountXp={data.accountXp}
-        coins={data.coins}
-        history={data.questRewardHistory}
-      />
+      </CollapsibleSection>
+      <CollapsibleSection
+        badge={`${data.coins.toLocaleString()} coins`}
+        subtitle="Trainer level and recent reward claims."
+        title="Account progression"
+      >
+        <AccountProgressCard
+          accountXp={data.accountXp}
+          coins={data.coins}
+          history={data.questRewardHistory}
+        />
+      </CollapsibleSection>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Eggs in Hatchery</Text>
         <Text style={styles.sectionMeta}>
@@ -381,83 +399,114 @@ export function HomeScreen({
         </Text>
       </View>
       <View style={styles.incubatorStack}>
-        {data.activeEggs.map((egg, index) => (
-          <View style={styles.incubatorCard} key={egg.id}>
-            <EggAvatar element={egg.element} rarity={egg.rarity} size="small" />
-            <View style={styles.incubatorBody}>
-              <Text style={styles.eggTitle}>
-                Slot {index + 1}: {capitalize(egg.rarity)} {capitalize(egg.element)}
-              </Text>
-              <Text style={styles.eggCaption}>
-                {isEggReady(egg)
-                  ? "Ready to hatch in your Hatchery."
-                  : getEggProgressMessage(egg.stepsWalked, egg.stepsRequired)}
-              </Text>
-              <ProgressBar progress={getEggProgress(egg)} />
+        {data.activeEggs.length > 0 ? (
+          data.activeEggs.map((egg, index) => (
+            <View style={styles.incubatorCard} key={egg.id}>
+              <EggAvatar element={egg.element} rarity={egg.rarity} size="small" />
+              <View style={styles.incubatorBody}>
+                <Text style={styles.eggTitle}>
+                  Slot {index + 1}: {capitalize(egg.rarity)} {capitalize(egg.element)}
+                </Text>
+                <Text style={styles.eggCaption}>
+                  {isEggReady(egg)
+                    ? "Ready to hatch in your Hatchery."
+                    : getEggProgressMessage(egg.stepsWalked, egg.stepsRequired)}
+                </Text>
+                <ProgressBar progress={getEggProgress(egg)} />
+              </View>
             </View>
-          </View>
-        ))}
+          ))
+        ) : (
+          <EmptyMissionCard
+            actionLabel="Open Hatchery"
+            body="No Egg is incubating right now. Add an Egg so movement has somewhere visible to land."
+            onPress={onMonsterPress}
+            title="Your incubator is empty"
+          />
+        )}
       </View>
       <AdvancedSectionIntro mission={firstWeekMission} />
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Quests</Text>
-        <Text style={styles.sectionMeta}>
-          {visibleQuests.filter(isQuestComplete).length}/{visibleQuests.length}{" "}
-          complete
-          {visibleClaimableQuestCount > 0
-            ? ` | ${visibleClaimableQuestCount} claimable`
-            : ""}
-        </Text>
-      </View>
-      <View style={styles.questTabs}>
-        {(["daily", "weekly", "monthly", "seasonal", "pal"] as QuestCadence[]).map((cadence) => (
-          <Pressable
-            key={cadence}
-            onPress={() => setQuestCadence(cadence)}
-            style={[
-              styles.questTab,
-              questCadence === cadence && styles.questTabActive,
-            ]}
-          >
-            <Text
+      <CollapsibleSection
+        badge={
+          visibleClaimableQuestCount > 0
+            ? `${visibleClaimableQuestCount} claimable`
+            : `${visibleQuests.filter(isQuestComplete).length}/${visibleQuests.length}`
+        }
+        subtitle="Quest boards support the daily loop without taking over Home."
+        title="Quests"
+      >
+        <View style={styles.questTabs}>
+          {(["daily", "weekly", "monthly", "seasonal", "pal"] as QuestCadence[]).map((cadence) => (
+            <Pressable
+              key={cadence}
+              onPress={() => setQuestCadence(cadence)}
               style={[
-                styles.questTabLabel,
-                questCadence === cadence && styles.questTabLabelActive,
+                styles.questTab,
+                questCadence === cadence && styles.questTabActive,
               ]}
             >
-              {capitalize(cadence)}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-      <QuestBoardSummary
-        cadence={questCadence}
-        claimableCount={visibleClaimableQuestCount}
-        completion={visibleQuestCompletion}
-        quests={visibleQuests}
-        suggestions={nextQuestSuggestions}
-      />
-      <View style={styles.questList}>
-        {visibleQuests.map((quest) => (
-          <Quest
-            claimed={data.claimedQuestRewards.includes(
-              getQuestRewardKey(quest, todayKey),
-            )}
-            key={quest.id}
-            onClaim={() => onClaimQuestReward(quest, todayKey)}
-            quest={quest}
+              <Text
+                style={[
+                  styles.questTabLabel,
+                  questCadence === cadence && styles.questTabLabelActive,
+                ]}
+              >
+                {capitalize(cadence)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <QuestBoardSummary
+          cadence={questCadence}
+          claimableCount={visibleClaimableQuestCount}
+          completion={visibleQuestCompletion}
+          quests={visibleQuests}
+          suggestions={nextQuestSuggestions}
+        />
+        <View style={styles.questList}>
+          {visibleQuests.map((quest) => (
+            <Quest
+              claimed={data.claimedQuestRewards.includes(
+                getQuestRewardKey(quest, todayKey),
+              )}
+              key={quest.id}
+              onClaim={() => onClaimQuestReward(quest, todayKey)}
+              quest={quest}
+            />
+          ))}
+        </View>
+      </CollapsibleSection>
+      <CollapsibleSection
+        badge={weeklyChest.canClaim ? "Ready" : `${Math.round(weeklyChest.progress * 100)}%`}
+        subtitle="Weekly rewards are deeper progress, not the first thing to parse."
+        title="Weekly chest"
+      >
+        <StackedMenuCard
+          subtitle="Claim weekly movement rewards when the chest is ready."
+          title="Weekly reward"
+        >
+          <CompactSummaryRow
+            label="Progress"
+            tone={weeklyChest.canClaim ? "ready" : "default"}
+            value={`${weeklyChest.steps.toLocaleString()} / ${weeklyChest.target.toLocaleString()} steps`}
           />
-        ))}
-      </View>
-      <WeeklyChestCard
-        chest={weeklyChest}
-        onClaim={() => onClaimWeeklyChest(todayKey)}
-      />
-      <CoinShopCard
-        activeHatchling={activeHatchling}
-        coins={data.coins}
-        onBuy={onBuyShopItem}
-      />
+          <WeeklyChestCard
+            chest={weeklyChest}
+            onClaim={() => onClaimWeeklyChest(todayKey)}
+          />
+        </StackedMenuCard>
+      </CollapsibleSection>
+      <CollapsibleSection
+        badge={`${data.coins.toLocaleString()} coins`}
+        subtitle="Boosts stay available, but the daily loop stays first."
+        title="Coin shop"
+      >
+        <CoinShopCard
+          activeHatchling={activeHatchling}
+          coins={data.coins}
+          onBuy={onBuyShopItem}
+        />
+      </CollapsibleSection>
     </Screen>
   );
 }
@@ -523,6 +572,9 @@ function NextActionCard({
         {nextAction.priority <= 3 && <SparkleBurst label="NOW" tone="accent" />}
       </View>
       <Text style={styles.actionText}>{nextAction.body}</Text>
+      <Text style={styles.actionReason}>
+        {getNextActionReason(nextAction.priority)}
+      </Text>
       <AppButton
         disabled={nextAction.disabled}
         label={nextAction.label}
@@ -530,6 +582,70 @@ function NextActionCard({
         style={nextAction.disabled ? styles.disabledAction : undefined}
         variant={nextAction.variant}
       />
+    </View>
+  );
+}
+
+function DailySnapshotStrip({
+  activeHatchling,
+  claimableRewards,
+  focusEgg,
+  readyEggCount,
+  today,
+}: {
+  activeHatchling: CollectedHatchling | null;
+  claimableRewards: number;
+  focusEgg: HatchUpData["activeEgg"] | undefined;
+  readyEggCount: number;
+  today: DailyAward | null;
+}) {
+  return (
+    <View style={styles.snapshotStrip}>
+      <SnapshotPill
+        label="Sync"
+        tone={today ? "ready" : "default"}
+        value={today ? "Done today" : "Not yet"}
+      />
+      <SnapshotPill
+        label="Egg"
+        tone={readyEggCount > 0 ? "ready" : "default"}
+        value={
+          readyEggCount > 0
+            ? `${readyEggCount} ready`
+            : focusEgg
+              ? `${Math.round(getEggProgress(focusEgg) * 100)}%`
+              : "Empty"
+        }
+      />
+      <SnapshotPill
+        label="Pal"
+        tone={activeHatchling ? "ready" : "default"}
+        value={activeHatchling ? `Lv ${activeHatchling.level}` : "Hatch one"}
+      />
+      <SnapshotPill
+        label="Rewards"
+        tone={claimableRewards > 0 ? "ready" : "default"}
+        value={claimableRewards > 0 ? `${claimableRewards} ready` : "None"}
+      />
+    </View>
+  );
+}
+
+function SnapshotPill({
+  label,
+  tone,
+  value,
+}: {
+  label: string;
+  tone: "default" | "ready";
+  value: string;
+}) {
+  return (
+    <View style={[styles.snapshotPill, tone === "ready" && styles.snapshotPillReady]}>
+      <Text style={styles.snapshotLabel}>{label}</Text>
+      <Text style={[styles.snapshotValue, tone === "ready" && styles.snapshotValueReady]}>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -1447,6 +1563,15 @@ function getAdvancedSectionCopy(mission: FirstWeekMission) {
   };
 }
 
+function getNextActionReason(priority: number) {
+  if (priority === 1) return "Recommended because a hatch is ready now.";
+  if (priority === 2) return "Recommended because today has not been rewarded yet.";
+  if (priority === 3) return "Recommended because progress is waiting to be claimed.";
+  if (priority === 4) return "Recommended because your active Pal can grow today.";
+  if (priority === 5) return "Recommended because it advances the first-week journey.";
+  return "Recommended because collection goals keep the loop moving.";
+}
+
 function getMissionAction({
   onDexPress,
   onLeaderboardPress,
@@ -1582,6 +1707,46 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     flexDirection: "row",
     justifyContent: "space-between",
+  },
+  actionReason: {
+    color: colors.primaryDeep,
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 17,
+  },
+  snapshotStrip: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 14,
+  },
+  snapshotPill: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    padding: 10,
+    width: "48%",
+  },
+  snapshotPillReady: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
+  },
+  snapshotLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+  },
+  snapshotValue: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+    marginTop: 3,
+  },
+  snapshotValueReady: {
+    color: colors.primaryDeep,
   },
   todayProgressCard: {
     backgroundColor: colors.surface,

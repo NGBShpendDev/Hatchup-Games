@@ -23,6 +23,7 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: false,
     bundleIdentifier: "com.hatchup.games",
+    usesAppleSignIn: true,
     infoPlist: {
       NSHealthShareUsageDescription: healthReadDescription,
       ITSAppUsesNonExemptEncryption: false,
@@ -41,6 +42,7 @@ const config: ExpoConfig = {
     ],
   },
   plugins: [
+    "expo-apple-authentication",
     [
       "expo-dev-client",
       {

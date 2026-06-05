@@ -1,17 +1,18 @@
 import { motion } from "framer-motion";
 import {
-  Sparkles,
-  Flame,
-  Trophy,
-  Users,
-  Shield,
-  HeartPulse,
-  Apple,
-  Egg,
-  Zap,
-  Star,
+  Activity,
+  BookOpen,
   ChevronRight,
+  Egg,
+  Flame,
+  HeartPulse,
+  Leaf,
+  ShieldCheck,
   Smartphone,
+  Sparkles,
+  Trophy,
+  Waves,
+  Zap,
 } from "lucide-react";
 import { FaApple, FaGooglePlay } from "react-icons/fa";
 
@@ -27,33 +28,31 @@ const fadeUp = {
 function StoreButtons({ size = "lg" }: { size?: "lg" | "md" }) {
   const pad = size === "lg" ? "px-6 py-4" : "px-5 py-3";
   return (
-    <div className="flex flex-col sm:flex-row gap-3">
-      <a
-        href="#"
-        aria-label="Download on the App Store"
-        className={`group flex items-center gap-3 ${pad} rounded-2xl bg-white text-black hover:bg-white/90 transition-colors shadow-lg`}
+    <div className="flex flex-col gap-3 sm:flex-row">
+      <span
+        aria-label="App Store beta access coming soon"
+        className={`flex items-center gap-3 ${pad} rounded-2xl border border-[#EADCC8] bg-white text-[#20312A] shadow-lg shadow-[#0B6F5C]/10`}
       >
-        <FaApple className="w-7 h-7" />
+        <FaApple className="h-7 w-7" />
         <div className="text-left">
-          <div className="text-[10px] uppercase tracking-wider opacity-70 leading-none">
-            Download on the
+          <div className="text-[10px] uppercase leading-none tracking-wider text-[#718078]">
+            Beta access
           </div>
-          <div className="text-lg font-semibold leading-tight">App Store</div>
+          <div className="text-lg font-semibold leading-tight">iOS coming soon</div>
         </div>
-      </a>
-      <a
-        href="#"
-        aria-label="Get it on Google Play"
-        className={`group flex items-center gap-3 ${pad} rounded-2xl bg-white text-black hover:bg-white/90 transition-colors shadow-lg`}
+      </span>
+      <span
+        aria-label="Google Play beta access coming soon"
+        className={`flex items-center gap-3 ${pad} rounded-2xl border border-[#EADCC8] bg-white text-[#20312A] shadow-lg shadow-[#0B6F5C]/10`}
       >
-        <FaGooglePlay className="w-6 h-6" />
+        <FaGooglePlay className="h-6 w-6" />
         <div className="text-left">
-          <div className="text-[10px] uppercase tracking-wider opacity-70 leading-none">
-            Get it on
+          <div className="text-[10px] uppercase leading-none tracking-wider text-[#718078]">
+            Beta access
           </div>
-          <div className="text-lg font-semibold leading-tight">Google Play</div>
+          <div className="text-lg font-semibold leading-tight">Android coming soon</div>
         </div>
-      </a>
+      </span>
     </div>
   );
 }
@@ -61,21 +60,44 @@ function StoreButtons({ size = "lg" }: { size?: "lg" | "md" }) {
 function Logo() {
   return (
     <div className="flex items-center gap-2">
-      <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-pink-500 via-fuchsia-500 to-purple-600 grid place-items-center neon-glow">
-        <Egg className="w-5 h-5 text-white" />
+      <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[#0B6F5C] to-[#79A66A] shadow-lg shadow-[#0B6F5C]/20">
+        <Egg className="h-5 w-5 text-white" />
       </div>
-      <span className="font-display text-xl tracking-tight font-bold">HATCHUP</span>
+      <span className="font-display text-xl font-bold tracking-tight text-[#20312A]">
+        HATCHUP
+      </span>
+    </div>
+  );
+}
+
+function MiniProgress({
+  label,
+  progress,
+  value,
+}: {
+  label: string;
+  progress: number;
+  value: string;
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex justify-between text-xs">
+        <span className="font-semibold text-[#718078]">{label}</span>
+        <span className="font-black text-[#0B6F5C]">{value}</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-[#DDF4EC]">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: 1.2, delay: 0.35 }}
+          className="h-full rounded-full bg-gradient-to-r from-[#0B6F5C] to-[#E8B84A]"
+        />
+      </div>
     </div>
   );
 }
 
 function PhoneMockup() {
-  const stats = [
-    { label: "Happiness", value: 92, color: "from-pink-500 to-rose-500" },
-    { label: "Energy", value: 78, color: "from-violet-500 to-fuchsia-500" },
-    { label: "Hunger", value: 64, color: "from-amber-500 to-orange-500" },
-  ];
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 40, rotate: -2 }}
@@ -83,88 +105,82 @@ function PhoneMockup() {
       transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
       className="relative mx-auto"
     >
-      <div className="relative w-[280px] sm:w-[320px] h-[600px] rounded-[44px] bg-gradient-to-br from-zinc-900 to-zinc-950 border-[10px] border-zinc-800 shadow-2xl shadow-pink-500/20 overflow-hidden float-slow">
-        {/* notch */}
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-6 bg-black rounded-full z-20" />
-
-        {/* screen */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a14] via-[#160a1f] to-[#0a0a14] p-5 pt-12 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] uppercase tracking-widest text-pink-400">Active Partner</p>
-              <h3 className="font-display text-lg font-bold">Ember</h3>
-            </div>
-            <div className="rounded-full px-2 py-1 bg-pink-500/20 text-pink-300 text-xs font-semibold">
-              Lv 14
-            </div>
+      <div className="float-slow relative h-[610px] w-[280px] overflow-hidden rounded-[44px] border-[10px] border-[#20312A] bg-[#20312A] shadow-2xl shadow-[#0B6F5C]/25 sm:w-[320px]">
+        <div className="absolute left-1/2 top-2 z-20 h-6 w-24 -translate-x-1/2 rounded-full bg-[#111B17]" />
+        <div className="absolute inset-0 flex flex-col gap-4 bg-[#FBF4E6] p-5 pt-12 text-[#20312A]">
+          <div className="rounded-3xl border border-[#EADCC8] bg-white p-4 shadow-lg shadow-[#0B6F5C]/10">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0B6F5C]">
+              Today's Journey
+            </p>
+            <h3 className="mt-1 font-display text-2xl font-black">Grow Ember</h3>
+            <p className="mt-1 text-xs leading-5 text-[#718078]">
+              Move, sync, hatch, and return tomorrow.
+            </p>
           </div>
 
-          {/* creature */}
-          <div className="relative aspect-square rounded-3xl bg-gradient-to-br from-pink-500/20 via-fuchsia-500/10 to-violet-600/20 border border-white/10 overflow-hidden grid place-items-center">
-            <div className="absolute inset-0 grid-bg opacity-50" />
-            <motion.div
-              animate={{ y: [0, -8, 0] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="text-8xl drop-shadow-[0_0_20px_rgba(244,114,182,0.6)]"
-            >
-              🐉
-            </motion.div>
-            <div className="absolute top-3 right-3 flex items-center gap-1 text-xs bg-black/40 backdrop-blur rounded-full px-2 py-1 border border-white/10">
-              <Star className="w-3 h-3 text-amber-300 fill-amber-300" /> Legendary
-            </div>
-          </div>
-
-          {/* stats */}
-          <div className="space-y-2">
-            {stats.map((s) => (
-              <div key={s.label}>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-white/70">{s.label}</span>
-                  <span className="text-white/90 font-semibold">{s.value}%</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${s.value}%` }}
-                    transition={{ duration: 1.2, delay: 0.4 }}
-                    className={`h-full bg-gradient-to-r ${s.color}`}
-                  />
-                </div>
+          <div className="relative overflow-hidden rounded-3xl border border-[#EADCC8] bg-[#FFF3D8] p-4">
+            <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-[#E8B84A]/25 blur-2xl" />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0B6F5C]">
+                  Active Pal
+                </p>
+                <h4 className="mt-1 text-lg font-black">Ember Sprout</h4>
+                <p className="text-xs font-bold text-[#FF9B5F]">Rare Ember | Baby</p>
               </div>
-            ))}
+              <motion.div
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                className="grid h-24 w-24 place-items-center rounded-[28px] border border-[#EADCC8] bg-white text-5xl shadow-inner"
+              >
+                <Flame className="h-12 w-12 fill-[#FF9B5F] text-[#FF9B5F]" />
+              </motion.div>
+            </div>
           </div>
 
-          {/* xp */}
-          <div className="mt-auto rounded-2xl border border-white/10 bg-white/5 p-3">
-            <div className="flex items-center justify-between text-xs mb-2">
-              <span className="text-white/70">XP to next evolution</span>
-              <span className="text-pink-300 font-semibold">2,140 / 3,000</span>
+          <div className="rounded-3xl border border-[#0B6F5C]/30 bg-[#DDF4EC] p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0B6F5C]">
+              Next Action
+            </p>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <div>
+                <h4 className="text-base font-black">Sync movement</h4>
+                <p className="text-xs leading-5 text-[#4F6259]">
+                  Convert today's activity into egg progress and Pal XP.
+                </p>
+              </div>
+              <ChevronRight className="h-5 w-5 text-[#0B6F5C]" />
             </div>
-            <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: "71%" }}
-                transition={{ duration: 1.4, delay: 0.6 }}
-                className="h-full bg-gradient-to-r from-pink-500 to-violet-500"
-              />
+          </div>
+
+          <div className="space-y-3 rounded-3xl border border-[#EADCC8] bg-white p-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-black">Today Progress</h4>
+              <span className="rounded-full bg-[#FFF3D8] px-2 py-1 text-[10px] font-black text-[#8A641D]">
+                +42 XP
+              </span>
             </div>
+            <MiniProgress label="Steps" progress={68} value="6.8k / 10k" />
+            <MiniProgress label="Egg progress" progress={82} value="82%" />
+            <MiniProgress label="Collection" progress={31} value="5 / 16" />
           </div>
         </div>
       </div>
 
-      {/* floating chips */}
       <motion.div
         initial={{ opacity: 0, x: -20, y: 10 }}
         animate={{ opacity: 1, x: 0, y: 0 }}
         transition={{ delay: 0.6, duration: 0.6 }}
-        className="hidden md:flex absolute -left-10 top-24 card-glass rounded-2xl px-4 py-3 items-center gap-2"
+        className="absolute -left-10 top-24 hidden items-center gap-2 rounded-2xl border border-[#EADCC8] bg-white px-4 py-3 shadow-xl shadow-[#0B6F5C]/10 md:flex"
       >
-        <div className="w-9 h-9 rounded-xl bg-amber-500/20 grid place-items-center">
-          <Flame className="w-5 h-5 text-amber-300" />
+        <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#FFF3D8]">
+          <Sparkles className="h-5 w-5 text-[#E8B84A]" />
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-white/60">Streak</div>
-          <div className="font-semibold text-sm">12 days</div>
+          <div className="text-[10px] font-black uppercase tracking-wider text-[#718078]">
+            Streak
+          </div>
+          <div className="text-sm font-black text-[#20312A]">Return tomorrow</div>
         </div>
       </motion.div>
 
@@ -172,14 +188,16 @@ function PhoneMockup() {
         initial={{ opacity: 0, x: 20, y: 10 }}
         animate={{ opacity: 1, x: 0, y: 0 }}
         transition={{ delay: 0.8, duration: 0.6 }}
-        className="hidden md:flex absolute -right-12 bottom-32 card-glass rounded-2xl px-4 py-3 items-center gap-2"
+        className="absolute -right-12 bottom-32 hidden items-center gap-2 rounded-2xl border border-[#EADCC8] bg-white px-4 py-3 shadow-xl shadow-[#0B6F5C]/10 md:flex"
       >
-        <div className="w-9 h-9 rounded-xl bg-fuchsia-500/20 grid place-items-center">
-          <Trophy className="w-5 h-5 text-fuchsia-300" />
+        <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#DDF4EC]">
+          <BookOpen className="h-5 w-5 text-[#0B6F5C]" />
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-white/60">City Rank</div>
-          <div className="font-semibold text-sm">#7 of 1,420</div>
+          <div className="text-[10px] font-black uppercase tracking-wider text-[#718078]">
+            Collection
+          </div>
+          <div className="text-sm font-black text-[#20312A]">Leaf, Ember, Tide, Storm</div>
         </div>
       </motion.div>
     </motion.div>
@@ -189,95 +207,108 @@ function PhoneMockup() {
 export default function Home() {
   const features = [
     {
-      icon: Egg,
-      title: "Hatch & Evolve",
-      body: "Open eggs to find creatures with randomized stats and rarity. Train them up and watch them evolve through dozens of branching paths.",
-      color: "from-pink-500 to-rose-500",
+      icon: Activity,
+      title: "Movement-powered hatching",
+      body: "Steps, distance, workouts, and active energy push your eggs closer to hatching.",
+      color: "bg-[#DDF4EC] text-[#0B6F5C]",
     },
     {
       icon: HeartPulse,
-      title: "Real-world Fitness",
-      body: "Steps, workouts, and runs all power your creatures. Every move you make in the real world levels up your Pal in the game.",
-      color: "from-violet-500 to-fuchsia-500",
+      title: "Hatch and grow Pals",
+      body: "Hatch elemental Pals, train your active companion, build bond, and unlock Baby, Teen, and Final forms.",
+      color: "bg-[#FFF3D8] text-[#B16F1A]",
     },
     {
-      icon: Apple,
-      title: "Smart Nutrition",
-      body: "Log meals, hit macro targets, and earn streak rewards. Your Hatchling celebrates with you when you eat right.",
-      color: "from-emerald-500 to-teal-500",
+      icon: BookOpen,
+      title: "Collection book",
+      body: "Discover Leaf, Ember, Tide, and Storm Pals across rarity tiers and track what is still missing.",
+      color: "bg-[#EAF7D9] text-[#5E8D4C]",
+    },
+    {
+      icon: Sparkles,
+      title: "Daily journey",
+      body: "Home gives you one clear next action so today’s movement turns into progress, rewards, and a reason to return tomorrow.",
+      color: "bg-[#FFF3D8] text-[#8A641D]",
     },
     {
       icon: Trophy,
-      title: "Compete & Climb",
-      body: "Enter races, join tournaments, and climb city, country, and global leaderboards. Rise to the top 10 to unlock perks.",
-      color: "from-amber-500 to-orange-500",
+      title: "Optional weekly ranks",
+      body: "Compare public weekly scores only when you choose. Private health details stay off rankings.",
+      color: "bg-[#F0ECFF] text-[#7F67D8]",
     },
     {
-      icon: Users,
-      title: "Clubs & Friends",
-      body: "Join a club, find workout partners, and challenge friends. Group bonuses, live events, and shared rewards.",
-      color: "from-cyan-500 to-blue-500",
-    },
-    {
-      icon: Shield,
-      title: "Family Safe",
-      body: "Built for everyone. Privacy-first location, public-only meetups, anti-harassment filters, and parental controls.",
-      color: "from-indigo-500 to-purple-500",
+      icon: ShieldCheck,
+      title: "Trust and data controls",
+      body: "HatchUp explains what health data is used, what is private, and how ranking sharing works.",
+      color: "bg-[#DDF4EC] text-[#064E43]",
     },
   ];
 
   const steps = [
     {
+      icon: Activity,
       n: "01",
-      title: "Hatch your first Pal",
-      body: "Crack open an egg and meet your starter creature. Every Hatchling is unique.",
+      title: "Move your body",
+      body: "Walk, work out, or complete daily activity.",
     },
     {
+      icon: Zap,
       n: "02",
-      title: "Move in the real world",
-      body: "Walk, run, lift, or log a meal. Every action feeds your Hatchling and grows your bond.",
+      title: "Sync progress",
+      body: "Movement becomes egg progress, Pal XP, streak progress, and rewards.",
     },
     {
+      icon: Egg,
       n: "03",
-      title: "Evolve and compete",
-      body: "Level up, evolve into rarer forms, race against friends, and climb the leaderboards.",
+      title: "Hatch and grow",
+      body: "Hatch Pals, train your active companion, and expand your collection.",
+    },
+    {
+      icon: Sparkles,
+      n: "04",
+      title: "Return tomorrow",
+      body: "Keep your streak alive and continue growing your Pal.",
     },
   ];
 
+  const trustItems = [
+    { icon: ShieldCheck, label: "Read-only health access" },
+    { icon: Activity, label: "Movement data powers gameplay" },
+    { icon: Trophy, label: "Ranks are optional" },
+    { icon: Smartphone, label: "Support links stay accessible" },
+  ];
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[hsl(var(--background))] text-white">
-      {/* Navbar */}
-      <header className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 py-5 flex items-center justify-between">
+    <div className="relative min-h-screen overflow-hidden bg-[#FBF4E6] text-[#20312A]">
+      <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-6 py-5 sm:px-8">
         <Logo />
-        <nav className="hidden md:flex items-center gap-8 text-sm text-white/70">
-          <a href="#features" className="hover:text-white">Features</a>
-          <a href="#how-it-works" className="hover:text-white">How it works</a>
-          <a href="#safety" className="hover:text-white">Safety</a>
-          <a href="/demo" className="text-pink-200 hover:text-white">Live demo</a>
-          <a href="/support" className="hover:text-white">Support</a>
+        <nav className="hidden items-center gap-8 text-sm font-semibold text-[#718078] md:flex">
+          <a href="#features" className="hover:text-[#0B6F5C]">Features</a>
+          <a href="#how-it-works" className="hover:text-[#0B6F5C]">How it works</a>
+          <a href="#trust" className="hover:text-[#0B6F5C]">Trust</a>
+          <a href="/support" className="hover:text-[#0B6F5C]">Support</a>
         </nav>
         <a
-          href="/demo"
-          className="hidden md:inline-flex items-center gap-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 px-4 py-2 text-sm font-medium"
+          href="/support"
+          className="hidden items-center gap-1 rounded-full border border-[#0B6F5C]/20 bg-white px-4 py-2 text-sm font-black text-[#0B6F5C] shadow-sm transition hover:bg-[#DDF4EC] md:inline-flex"
         >
-          Test the MVP <ChevronRight className="w-4 h-4" />
+          Get beta updates <ChevronRight className="h-4 w-4" />
         </a>
       </header>
 
-      {/* Hero */}
       <section className="relative">
-        <div className="aurora" />
-        <div className="absolute inset-0 grid-bg" />
-        <div className="relative max-w-7xl mx-auto px-6 sm:px-8 pt-12 pb-24 lg:py-24 grid lg:grid-cols-2 gap-12 items-center">
+        <div className="absolute -left-40 top-0 h-96 w-96 rounded-full bg-[#E8B84A]/25 blur-3xl" />
+        <div className="absolute -right-32 top-40 h-[32rem] w-[32rem] rounded-full bg-[#DDF4EC] blur-3xl" />
+        <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-6 pb-24 pt-12 sm:px-8 lg:grid-cols-2 lg:py-24">
           <div>
             <motion.div
               variants={fadeUp}
               initial="hidden"
               animate="visible"
               custom={0}
-              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs uppercase tracking-wider border border-pink-400/30 bg-pink-500/10 text-pink-200 mb-6"
+              className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#E8B84A]/40 bg-[#FFF3D8] px-3 py-1 text-xs font-black uppercase tracking-wider text-[#8A641D]"
             >
-              <Sparkles className="w-3.5 h-3.5" /> New season — Live now
+              <Sparkles className="h-3.5 w-3.5" /> Advanced beta in progress
             </motion.div>
 
             <motion.h1
@@ -285,10 +316,11 @@ export default function Home() {
               initial="hidden"
               animate="visible"
               custom={1}
-              className="font-display text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.05] tracking-tight"
+              className="font-display text-5xl font-black leading-[1.05] tracking-tight text-[#20312A] sm:text-6xl lg:text-7xl"
             >
-              Your fitness, <br />
-              <span className="neon-text">hatched.</span>
+              Move your body.
+              <br />
+              <span className="text-[#0B6F5C]">Hatch your Pal.</span>
             </motion.h1>
 
             <motion.p
@@ -296,11 +328,11 @@ export default function Home() {
               initial="hidden"
               animate="visible"
               custom={2}
-              className="mt-6 text-lg sm:text-xl text-white/70 max-w-xl"
+              className="mt-6 max-w-xl text-lg leading-8 text-[#4F6259] sm:text-xl"
             >
-              HATCHUP turns every step, workout, and meal into a creature-collecting
-              adventure. Hatch your Pal, evolve together, and compete with friends —
-              all in one playful, family-friendly universe.
+              HatchUp turns real-world movement into egg progress, Pal growth,
+              collection goals, and daily rewards. Sync your activity, hatch
+              creatures, grow your team, and return tomorrow.
             </motion.p>
 
             <motion.div
@@ -311,15 +343,24 @@ export default function Home() {
               className="mt-8"
               id="download"
             >
-              <a
-                href="/demo"
-                className="mb-4 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-pink-500 to-violet-500 px-6 py-4 text-sm font-bold text-white shadow-lg shadow-pink-500/25 transition-transform hover:-translate-y-0.5"
-              >
-                Live test the MVP <ChevronRight className="h-4 w-4" />
-              </a>
+              <div className="mb-5 flex flex-col gap-3 sm:flex-row">
+                <a
+                  href="/support"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0B6F5C] px-6 py-4 text-sm font-black text-white shadow-lg shadow-[#0B6F5C]/25 transition-transform hover:-translate-y-0.5"
+                >
+                  Get beta updates <ChevronRight className="h-4 w-4" />
+                </a>
+                <a
+                  href="#how-it-works"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#EADCC8] bg-white px-6 py-4 text-sm font-black text-[#0B6F5C] transition hover:bg-[#DDF4EC]"
+                >
+                  Learn how it works
+                </a>
+              </div>
               <StoreButtons />
-              <p className="mt-3 text-xs text-white/50">
-                Free to play. No ads. Premium unlocks customization, never advantages.
+              <p className="mt-3 text-xs font-semibold text-[#718078]">
+                Mobile beta access is rolling out through test builds first. Store
+                links will be added when public listings are ready.
               </p>
             </motion.div>
 
@@ -328,18 +369,20 @@ export default function Home() {
               initial="hidden"
               animate="visible"
               custom={4}
-              className="mt-10 flex items-center gap-6 text-sm text-white/60"
+              className="mt-10 grid max-w-xl gap-3 text-sm sm:grid-cols-3"
             >
-              <div className="flex items-center gap-1">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-4 h-4 text-amber-300 fill-amber-300" />
-                ))}
-                <span className="ml-2 text-white/80 font-semibold">4.8</span>
-              </div>
-              <div className="h-4 w-px bg-white/15" />
-              <span>100k+ workouts logged</span>
-              <div className="hidden sm:block h-4 w-px bg-white/15" />
-              <span className="hidden sm:inline">Family-friendly</span>
+              {[
+                "Health sync",
+                "Pal evolution",
+                "Daily rewards",
+              ].map((item) => (
+                <div
+                  className="rounded-2xl border border-[#EADCC8] bg-white px-4 py-3 font-black text-[#0B6F5C] shadow-sm"
+                  key={item}
+                >
+                  {item}
+                </div>
+              ))}
             </motion.div>
           </div>
 
@@ -349,42 +392,42 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Features */}
       <section id="features" className="relative py-24">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8">
-          <div className="max-w-2xl mb-14">
-            <p className="text-xs uppercase tracking-widest text-pink-300 mb-3">
-              Everything in one app
+        <div className="mx-auto max-w-7xl px-6 sm:px-8">
+          <div className="mb-14 max-w-2xl">
+            <p className="mb-3 text-xs font-black uppercase tracking-widest text-[#0B6F5C]">
+              Current mobile app
             </p>
-            <h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tight">
-              A whole world to <span className="neon-text">play in</span>
+            <h2 className="font-display text-4xl font-black tracking-tight text-[#20312A] sm:text-5xl">
+              A cozy creature loop powered by real movement.
             </h2>
-            <p className="mt-4 text-white/70 text-lg">
-              Six core systems that turn healthy habits into something you actually
-              look forward to.
+            <p className="mt-4 text-lg leading-8 text-[#718078]">
+              Move your body → hatch Pals → grow your collection → return tomorrow.
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {features.map((f, i) => {
-              const Icon = f.icon;
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {features.map((feature, i) => {
+              const Icon = feature.icon;
               return (
                 <motion.div
-                  key={f.title}
+                  key={feature.title}
                   variants={fadeUp}
                   initial="hidden"
                   whileInView="visible"
                   viewport={{ once: true, margin: "-60px" }}
                   custom={i}
-                  className="card-glass rounded-3xl p-6 hover:translate-y-[-2px] transition-transform"
+                  className="rounded-3xl border border-[#EADCC8] bg-white p-6 shadow-lg shadow-[#0B6F5C]/5 transition-transform hover:-translate-y-0.5"
                 >
-                  <div
-                    className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${f.color} grid place-items-center mb-5 shadow-lg`}
-                  >
-                    <Icon className="w-6 h-6 text-white" />
+                  <div className={`mb-5 grid h-12 w-12 place-items-center rounded-2xl ${feature.color}`}>
+                    <Icon className="h-6 w-6" />
                   </div>
-                  <h3 className="font-display text-xl font-semibold mb-2">{f.title}</h3>
-                  <p className="text-white/65 text-sm leading-relaxed">{f.body}</p>
+                  <h3 className="font-display text-xl font-black text-[#20312A]">
+                    {feature.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-[#718078]">
+                    {feature.body}
+                  </p>
                 </motion.div>
               );
             })}
@@ -392,85 +435,131 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How it works */}
       <section id="how-it-works" className="relative py-24">
-        <div className="absolute inset-0 grid-bg opacity-50" />
-        <div className="relative max-w-7xl mx-auto px-6 sm:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <p className="text-xs uppercase tracking-widest text-pink-300 mb-3">
+        <div className="absolute inset-x-0 top-20 h-64 bg-[#FFF3D8]" />
+        <div className="relative mx-auto max-w-7xl px-6 sm:px-8">
+          <div className="mx-auto mb-14 max-w-2xl text-center">
+            <p className="mb-3 text-xs font-black uppercase tracking-widest text-[#8A641D]">
               How it works
             </p>
-            <h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tight">
-              From egg to evolution in <span className="neon-text">three steps</span>
+            <h2 className="font-display text-4xl font-black tracking-tight text-[#20312A] sm:text-5xl">
+              The daily loop is simple on purpose.
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
-            {steps.map((s, i) => (
-              <motion.div
-                key={s.n}
-                variants={fadeUp}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                custom={i}
-                className="card-glass rounded-3xl p-8 relative overflow-hidden"
-              >
-                <div className="absolute top-4 right-4 font-display text-6xl font-bold text-white/[0.06]">
-                  {s.n}
-                </div>
-                <div className="relative">
-                  <div className="w-10 h-10 rounded-xl bg-pink-500/15 border border-pink-400/30 text-pink-300 grid place-items-center mb-5">
-                    <Zap className="w-5 h-5" />
+          <div className="grid gap-6 md:grid-cols-4">
+            {steps.map((step, i) => {
+              const Icon = step.icon;
+              return (
+                <motion.div
+                  key={step.n}
+                  variants={fadeUp}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true }}
+                  custom={i}
+                  className="relative overflow-hidden rounded-3xl border border-[#EADCC8] bg-white p-6 shadow-lg shadow-[#0B6F5C]/5"
+                >
+                  <div className="absolute right-4 top-4 font-display text-5xl font-black text-[#EADCC8]/60">
+                    {step.n}
                   </div>
-                  <h3 className="font-display text-xl font-semibold mb-2">{s.title}</h3>
-                  <p className="text-white/65 text-sm">{s.body}</p>
-                </div>
-              </motion.div>
-            ))}
+                  <div className="relative">
+                    <div className="mb-5 grid h-10 w-10 place-items-center rounded-xl bg-[#DDF4EC] text-[#0B6F5C]">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <h3 className="font-display text-xl font-black text-[#20312A]">
+                      {step.title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-[#718078]">
+                      {step.body}
+                    </p>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* Safety */}
-      <section id="safety" className="relative py-24">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8">
+      <section className="relative py-20">
+        <div className="mx-auto max-w-7xl px-6 sm:px-8">
+          <div className="rounded-[2rem] border border-[#EADCC8] bg-white p-8 shadow-xl shadow-[#0B6F5C]/10 sm:p-12">
+            <div className="grid gap-8 lg:grid-cols-[1fr_0.9fr] lg:items-center">
+              <div>
+                <p className="mb-3 text-xs font-black uppercase tracking-widest text-[#0B6F5C]">
+                  Creature collection
+                </p>
+                <h2 className="font-display text-3xl font-black tracking-tight sm:text-4xl">
+                  Leaf, Ember, Tide, and Storm Pals grow from Baby to Final forms.
+                </h2>
+                <p className="mt-4 text-lg leading-8 text-[#718078]">
+                  Each Pal has element, rarity, level, bond, stats, training,
+                  and memories. The Collection book helps players see what they
+                  have discovered and what is still waiting to hatch.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { icon: Leaf, label: "Leaf", color: "bg-[#EAF7D9] text-[#79A66A]" },
+                  { icon: Flame, label: "Ember", color: "bg-[#FFF0E6] text-[#FF9B5F]" },
+                  { icon: Waves, label: "Tide", color: "bg-[#E5F8FE] text-[#2BA4C7]" },
+                  { icon: Zap, label: "Storm", color: "bg-[#F0ECFF] text-[#8B73E6]" },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div
+                      className="rounded-3xl border border-[#EADCC8] bg-[#FBF4E6] p-5"
+                      key={item.label}
+                    >
+                      <div className={`mb-4 grid h-12 w-12 place-items-center rounded-2xl ${item.color}`}>
+                        <Icon className="h-6 w-6" />
+                      </div>
+                      <p className="font-display text-xl font-black">{item.label}</p>
+                      <p className="mt-1 text-xs font-semibold text-[#718078]">
+                        Common → Epic rarity tiers
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="trust" className="relative py-24">
+        <div className="mx-auto max-w-7xl px-6 sm:px-8">
           <motion.div
             variants={fadeUp}
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            className="card-glass rounded-3xl p-8 sm:p-12 grid md:grid-cols-[1fr_auto] gap-8 items-center"
+            className="grid items-center gap-8 rounded-[2rem] border border-[#0B6F5C]/20 bg-[#DDF4EC] p-8 sm:p-12 md:grid-cols-[1fr_auto]"
           >
             <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs uppercase tracking-wider border border-emerald-400/30 bg-emerald-500/10 text-emerald-200 mb-5">
-                <Shield className="w-3.5 h-3.5" /> Family-friendly by design
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#0B6F5C]/20 bg-white px-3 py-1 text-xs font-black uppercase tracking-wider text-[#0B6F5C]">
+                <ShieldCheck className="h-3.5 w-3.5" /> Health-data trust
               </div>
-              <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-3">
-                A safe, trusted community
+              <h2 className="font-display text-3xl font-black tracking-tight text-[#20312A] sm:text-4xl">
+                Private movement data should stay understandable.
               </h2>
-              <p className="text-white/70">
-                Privacy-first location (you choose exact, neighborhood, city, or
-                hidden). Public-location-only meetups. Block and report on every
-                profile. Anti-harassment filters in chat. Parental controls for
-                minors. Real safety — not an afterthought.
+              <p className="mt-4 leading-8 text-[#4F6259]">
+                HatchUp reads movement data only to power gameplay. Health details
+                are not sold or used for ads. Weekly ranks are optional, and
+                players choose whether to share a public ranking name and score.
+                Support and privacy links stay accessible from the app and site.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3 min-w-[240px]">
-              {[
-                { icon: Shield, label: "Privacy controls" },
-                { icon: Users, label: "Block & Report" },
-                { icon: HeartPulse, label: "Minor protections" },
-                { icon: Sparkles, label: "Verified profiles" },
-              ].map((b) => {
-                const Icon = b.icon;
+            <div className="grid min-w-[240px] grid-cols-2 gap-3">
+              {trustItems.map((item) => {
+                const Icon = item.icon;
                 return (
                   <div
-                    key={b.label}
-                    className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-center"
+                    key={item.label}
+                    className="rounded-2xl border border-[#0B6F5C]/15 bg-white p-4 text-center"
                   >
-                    <Icon className="w-5 h-5 mx-auto mb-2 text-emerald-300" />
-                    <div className="text-xs font-medium text-white/80">{b.label}</div>
+                    <Icon className="mx-auto mb-2 h-5 w-5 text-[#0B6F5C]" />
+                    <div className="text-xs font-black text-[#20312A]">{item.label}</div>
                   </div>
                 );
               })}
@@ -479,44 +568,48 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Final CTA */}
       <section className="relative py-24">
-        <div className="aurora opacity-60" />
-        <div className="relative max-w-4xl mx-auto px-6 sm:px-8 text-center">
+        <div className="absolute inset-x-0 bottom-0 h-72 bg-[#FFF3D8]" />
+        <div className="relative mx-auto max-w-4xl px-6 text-center sm:px-8">
           <motion.h2
             variants={fadeUp}
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            className="font-display text-4xl sm:text-6xl font-bold tracking-tight"
+            className="font-display text-4xl font-black tracking-tight text-[#20312A] sm:text-6xl"
           >
-            Ready to <span className="neon-text">hatch yours?</span>
+            Follow the beta as HatchUp gets ready for launch.
           </motion.h2>
-          <p className="mt-5 text-lg text-white/70 max-w-xl mx-auto">
-            Download HATCHUP free on iOS and Android. Your first egg is waiting.
+          <p className="mx-auto mt-5 max-w-xl text-lg leading-8 text-[#718078]">
+            The mobile app is being shaped around a tighter daily creature loop,
+            clearer onboarding, richer collection goals, and privacy-first health
+            sync.
           </p>
           <div className="mt-8 flex justify-center">
-            <StoreButtons />
+            <a
+              href="/support"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0B6F5C] px-6 py-4 text-sm font-black text-white shadow-lg shadow-[#0B6F5C]/25 transition-transform hover:-translate-y-0.5"
+            >
+              Contact support <ChevronRight className="h-4 w-4" />
+            </a>
           </div>
-          <div className="mt-6 inline-flex items-center gap-2 text-xs text-white/50">
-            <Smartphone className="w-3.5 h-3.5" /> iOS 15+ · Android 9+
+          <div className="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-[#718078]">
+            <Smartphone className="h-3.5 w-3.5" /> iOS and Android beta access coming soon
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="relative border-t border-white/10 mt-12">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8 py-10 flex flex-col sm:flex-row gap-6 sm:items-center sm:justify-between text-sm text-white/55">
+      <footer className="relative border-t border-[#EADCC8] bg-[#FBF4E6]">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-10 text-sm text-[#718078] sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div className="flex items-center gap-3">
             <Logo />
-            <span className="text-white/30">·</span>
+            <span className="text-[#B9AA96]">·</span>
             <span>© {new Date().getFullYear()} HATCHUP</span>
           </div>
           <div className="flex items-center gap-6">
-            <a href="#" className="hover:text-white">Privacy</a>
-            <a href="#" className="hover:text-white">Terms</a>
-            <a href="/demo" className="hover:text-white">Live demo</a>
-            <a href="/support" className="hover:text-white">Support</a>
+            <a href="/support" className="hover:text-[#0B6F5C]">Privacy</a>
+            <a href="/support" className="hover:text-[#0B6F5C]">Terms</a>
+            <a href="/support" className="hover:text-[#0B6F5C]">Support</a>
           </div>
         </div>
       </footer>

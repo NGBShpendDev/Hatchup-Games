@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
+import { CollapsibleSection } from "../components/CollapsibleSection";
 import { Screen } from "../components/Screen";
 import { SparkleBurst } from "../components/SparkleBurst";
 import { getScreenLoopSubtitle } from "../content/coreLoopCopy";
@@ -89,73 +90,84 @@ export function LeaderboardScreen({
         <Stat label="Distance" value={`${userStats.distanceMiles.toFixed(1)} mi`} />
         <Stat label="Journey XP" value={String(userStats.totalXp)} />
       </View>
-      <View style={styles.shareCard}>
-        <View style={styles.shareHeader}>
-          <View>
-            <Text style={styles.cardTitle}>Leaderboard sharing</Text>
-            <Text style={styles.shareStatus}>
-              {data.leaderboardShareEnabled
-                ? `Ranked as #${userRank ?? "-"}`
-                : "Not ranked yet"}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.sharePill,
-              data.leaderboardShareEnabled && styles.sharePillOn,
-            ]}
-          >
-            <Text
+      <CollapsibleSection
+        badge={data.leaderboardShareEnabled ? "ON" : "OFF"}
+        defaultOpen={!data.leaderboardShareEnabled}
+        subtitle="Ranks are optional. Private health details stay off the board."
+        title="Sharing and privacy"
+      >
+        <View style={styles.shareCard}>
+          <View style={styles.shareHeader}>
+            <View>
+              <Text style={styles.cardTitle}>Leaderboard sharing</Text>
+              <Text style={styles.shareStatus}>
+                {data.leaderboardShareEnabled
+                  ? `Ranked as #${userRank ?? "-"}`
+                  : "Not ranked yet"}
+              </Text>
+            </View>
+            <View
               style={[
-                styles.sharePillText,
-                data.leaderboardShareEnabled && styles.sharePillTextOn,
+                styles.sharePill,
+                data.leaderboardShareEnabled && styles.sharePillOn,
               ]}
             >
-              {data.leaderboardShareEnabled ? "ON" : "OFF"}
-            </Text>
+              <Text
+                style={[
+                  styles.sharePillText,
+                  data.leaderboardShareEnabled && styles.sharePillTextOn,
+                ]}
+              >
+                {data.leaderboardShareEnabled ? "ON" : "OFF"}
+              </Text>
+            </View>
+          </View>
+          <TextInput
+            autoCapitalize="words"
+            maxLength={24}
+            onChangeText={setAlias}
+            onSubmitEditing={() => onSaveAlias(alias)}
+            placeholder="Leaderboard name"
+            placeholderTextColor={colors.muted}
+            style={styles.input}
+            value={alias}
+          />
+          <View style={styles.shareActions}>
+            <AppButton
+              label={aliasChanged ? "Save name" : "Name saved"}
+              onPress={() => onSaveAlias(alias)}
+              style={styles.actionButton}
+              variant="secondary"
+            />
+            <AppButton
+              label={
+                data.leaderboardShareEnabled
+                  ? "Stay private"
+                  : "Share weekly score"
+              }
+              onPress={handleShareToggle}
+              style={styles.actionButton}
+            />
           </View>
         </View>
-        <TextInput
-          autoCapitalize="words"
-          maxLength={24}
-          onChangeText={setAlias}
-          onSubmitEditing={() => onSaveAlias(alias)}
-          placeholder="Leaderboard name"
-          placeholderTextColor={colors.muted}
-          style={styles.input}
-          value={alias}
-        />
-        <View style={styles.shareActions}>
-          <AppButton
-            label={aliasChanged ? "Save name" : "Name saved"}
-            onPress={() => onSaveAlias(alias)}
-            style={styles.actionButton}
-            variant="secondary"
-          />
-          <AppButton
-            label={data.leaderboardShareEnabled ? "Stay private" : "Share weekly score"}
-            onPress={handleShareToggle}
-            style={styles.actionButton}
-          />
-        </View>
-      </View>
-      {!data.leaderboardShareEnabled && (
-        <View style={styles.emptyMissionCard}>
-          <View style={styles.emptyMissionText}>
-            <Text style={styles.emptyMissionTitle}>You are private right now</Text>
-            <Text style={styles.emptyMissionBody}>
-              Ranks are optional. Move this week and opt in when you want to
-              compare your public journey score.
-            </Text>
+        {!data.leaderboardShareEnabled && (
+          <View style={styles.emptyMissionCard}>
+            <View style={styles.emptyMissionText}>
+              <Text style={styles.emptyMissionTitle}>You are private right now</Text>
+              <Text style={styles.emptyMissionBody}>
+                Ranks are optional. Move this week and opt in when you want to
+                compare your public journey score.
+              </Text>
+            </View>
+            <AppButton
+              label="Share weekly score"
+              onPress={handleShareToggle}
+              style={styles.emptyMissionButton}
+              variant="secondary"
+            />
           </View>
-          <AppButton
-            label="Share weekly score"
-            onPress={handleShareToggle}
-            style={styles.emptyMissionButton}
-            variant="secondary"
-          />
-        </View>
-      )}
+        )}
+      </CollapsibleSection>
       <View style={styles.metricTabs}>
         {(Object.keys(metricLabels) as LeaderboardMetric[]).map((item) => (
           <Pressable
