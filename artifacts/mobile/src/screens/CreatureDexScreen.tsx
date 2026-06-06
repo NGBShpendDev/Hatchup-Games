@@ -4,10 +4,12 @@ import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
 import { CollapsibleSection } from "../components/CollapsibleSection";
 import { CompactSummaryRow } from "../components/CompactSummaryRow";
+import { EggAvatar } from "../components/EggAvatar";
 import { HatchlingAvatar } from "../components/HatchlingAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
 import { SparkleBurst } from "../components/SparkleBurst";
+import { PageTitle, SegmentedControl } from "../components/ui";
 import { getCollectionNudge, getScreenLoopSubtitle } from "../content/coreLoopCopy";
 import {
   DEX_ELEMENTS,
@@ -41,6 +43,8 @@ import type {
 } from "../domain/models";
 import { getCreatureVisualStage, type CreatureVisualStage } from "../domain/creatureVisuals";
 import { colors, elementColors, radii, typography } from "../theme";
+import { CardEntrance } from "../utils/animations";
+import { formatNumber, formatXp } from "../utils/format";
 
 interface Props {
   data: HatchUpData;
@@ -97,6 +101,7 @@ export function CreatureDexScreen({
   const trainingPreview = selectedHatchling
     ? getTrainingPreview(selectedHatchling)
     : null;
+  const hasPals = data.collection.length > 0;
   const filteredEntries = entries.filter((entry) => {
     const elementMatches =
       elementFilter === "all" || entry.element === elementFilter;
@@ -107,7 +112,7 @@ export function CreatureDexScreen({
       (statusFilter === "owned" && entry.ownedCount > 0) ||
       (statusFilter === "missing" && entry.ownedCount === 0);
     return elementMatches && rarityMatches && statusMatches;
-  });
+  }).sort((left, right) => right.ownedCount - left.ownedCount);
 
   return (
     <Screen
@@ -122,45 +127,48 @@ export function CreatureDexScreen({
         />
       }
     >
-      <Text style={styles.kicker}>COLLECTION</Text>
-      <Text style={styles.title}>Grow your team of Pals.</Text>
-      <Text style={styles.body}>
-        {getScreenLoopSubtitle("collection")} Each Pal has its own level, bond,
-        and stats.
-      </Text>
-      <View style={styles.progressCard}>
-        <View style={styles.progressHeader}>
-          <Text style={styles.progressTitle}>Collection progress</Text>
-          <Text style={styles.progressMeta}>
-            {completion.unlocked}/{completion.total}
+      <PageTitle
+        eyebrow="Collection"
+        subtitle={`${getScreenLoopSubtitle("collection")} Each Pal has its own level, bond, and stats.`}
+        title="Grow your team of Pals."
+      />
+      {!hasPals ? (
+        <EmptyCollectionState onHatcheryPress={onMonsterPress} />
+      ) : (
+        <View style={styles.progressCard}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressTitle}>Collection progress</Text>
+            <Text style={styles.progressMeta}>
+              {completion.unlocked}/{completion.total}
+            </Text>
+          </View>
+          <Text style={styles.progressCopy}>
+            {completion.total} element and rarity entries live in the Collection
+            Book. Each discovered Pal can grow through Baby, Teen, and Final stages.
           </Text>
+          <ProgressBar progress={completion.percent} />
+          <View style={styles.summaryChips}>
+            {elementSummary.map((summary) => (
+              <SummaryChip
+                key={summary.id}
+                label={capitalize(summary.id)}
+                progress={summary.percent}
+                value={`${summary.unlocked}/${summary.total}`}
+              />
+            ))}
+          </View>
+          <View style={styles.summaryChips}>
+            {raritySummary.map((summary) => (
+              <SummaryChip
+                key={summary.id}
+                label={capitalize(summary.id)}
+                progress={summary.percent}
+                value={`${summary.unlocked}/${summary.total}`}
+              />
+            ))}
+          </View>
         </View>
-        <Text style={styles.progressCopy}>
-          {completion.total} element and rarity entries live in the Collection
-          Book. Each discovered Pal can grow through Baby, Teen, and Final stages.
-        </Text>
-        <ProgressBar progress={completion.percent} />
-        <View style={styles.summaryChips}>
-          {elementSummary.map((summary) => (
-            <SummaryChip
-              key={summary.id}
-              label={capitalize(summary.id)}
-              progress={summary.percent}
-              value={`${summary.unlocked}/${summary.total}`}
-            />
-          ))}
-        </View>
-        <View style={styles.summaryChips}>
-          {raritySummary.map((summary) => (
-            <SummaryChip
-              key={summary.id}
-              label={capitalize(summary.id)}
-              progress={summary.percent}
-              value={`${summary.unlocked}/${summary.total}`}
-            />
-          ))}
-        </View>
-      </View>
+      )}
       {nextMissingEntry && (
         <View style={styles.targetCard}>
           <View style={styles.targetText}>
@@ -172,13 +180,39 @@ export function CreatureDexScreen({
             </Text>
           </View>
           <View style={styles.targetAvatar}>
-            <HatchlingAvatar
+            <EggAvatar
               element={nextMissingEntry.element}
               rarity={nextMissingEntry.rarity}
               size="small"
             />
           </View>
         </View>
+      )}
+      {!hasPals && (
+        <CollapsibleSection
+          badge={`${entries.length}`}
+          defaultOpen={false}
+          subtitle="Peek at future element and rarity goals without filling the page."
+          title="Preview Collection Book"
+        >
+          <View style={styles.grid}>
+            {entries.map((entry) => (
+              <DexCard collection={data.collection} entry={entry} key={entry.id} />
+            ))}
+          </View>
+        </CollapsibleSection>
+      )}
+      {hasPals && (
+        <OwnedPalShelf
+          activeHatchlingId={data.activeHatchlingId}
+          collection={data.collection}
+          onSelect={(hatchlingId) => {
+            const index = data.collection.findIndex((item) => item.id === hatchlingId);
+            if (index >= 0) setSelectedIndex(index);
+          }}
+          onSetActiveHatchling={onSetActiveHatchling}
+          onTrainActiveHatchling={onTrainActiveHatchling}
+        />
       )}
       {selectedHatchling ? (
         <View style={styles.detailCard}>
@@ -233,15 +267,15 @@ export function CreatureDexScreen({
             progress={getHatchlingXpProgress(selectedHatchling.xp)}
             value={
               levelProgress?.nextLevel
-                ? `${levelProgress.currentLevelXp}/${levelProgress.xpPerLevel} XP`
+                ? `${formatNumber(levelProgress.currentLevelXp)}/${formatNumber(levelProgress.xpPerLevel)} XP`
                 : "Complete"
             }
           />
           <Text style={styles.detailCaption}>
-            {selectedHatchling.xp} Pal XP | Power{" "}
+            {formatNumber(selectedHatchling.xp)} Pal XP | Power{" "}
             {getHatchlingPowerScore(selectedHatchling)}
             {levelProgress?.nextLevel
-              ? ` | ${levelProgress.xpToNext} XP to L${levelProgress.nextLevel}`
+              ? ` | ${formatXp(levelProgress.xpToNext)} to L${levelProgress.nextLevel}`
               : " | Max level"}
           </Text>
           <EvolutionPreviewCard hatchling={selectedHatchling} />
@@ -407,85 +441,201 @@ export function CreatureDexScreen({
             }
           />
         </View>
-      ) : (
-        <View style={styles.emptyDetailCard}>
-          <Text style={styles.promptTitle}>No Pals yet</Text>
-          <Text style={styles.promptText}>
-            Hatch your starter Egg to unlock individual Pal pages, stats,
-            and training. Your movement grows your team.
-          </Text>
-          <Text style={styles.promptMission}>Mission: hatch your first Pal.</Text>
-          <AppButton label="Go to Hatchery" onPress={onMonsterPress} />
-        </View>
-      )}
-      <CollapsibleSection
-        badge={`${filteredEntries.length}`}
-        subtitle="Narrow by element, rarity, or discovery status."
-        title="Collection filters"
-      >
-        <View style={styles.filterCard}>
-          <Text style={styles.filterTitle}>Collection filters</Text>
-          <FilterRow
-            activeValue={elementFilter}
-            options={["all", ...DEX_ELEMENTS]}
-            onChange={(value) => setElementFilter(value as "all" | EggElement)}
-          />
-          <FilterRow
-            activeValue={rarityFilter}
-            options={["all", ...DEX_RARITIES]}
-            onChange={(value) => setRarityFilter(value as "all" | EggRarity)}
-          />
-          <FilterRow
-            activeValue={statusFilter}
-            options={["all", "owned", "missing"]}
-            onChange={(value) => setStatusFilter(value as "all" | "owned" | "missing")}
-          />
-        </View>
-      </CollapsibleSection>
-      <ActiveFilterSummary
-        elementFilter={elementFilter}
-        filteredCount={filteredEntries.length}
-        onClear={() => {
-          setElementFilter("all");
-          setRarityFilter("all");
-          setStatusFilter("all");
-        }}
-        rarityFilter={rarityFilter}
-        statusFilter={statusFilter}
-        totalCount={entries.length}
-      />
-      <View style={styles.grid}>
-        {filteredEntries.map((entry) => (
-          <DexCard collection={data.collection} entry={entry} key={entry.id} />
-        ))}
-      </View>
-      {filteredEntries.length === 0 && (
-        <View style={styles.noResultsCard}>
-          <Text style={styles.promptTitle}>No matches yet</Text>
-          <Text style={styles.promptText}>
-            Clear a filter or keep hatching to discover this corner of the
-            collection book.
-          </Text>
-          <AppButton
-            label="Clear filters"
-            onPress={() => {
+      ) : null}
+      {hasPals && (
+        <>
+          <CollapsibleSection
+            badge={`${filteredEntries.length}`}
+            defaultOpen={false}
+            subtitle="Narrow by element, rarity, or discovery status."
+            title="Filter"
+          >
+            <View style={styles.filterCard}>
+              <Text style={styles.filterTitle}>Collection filters</Text>
+              <FilterRow
+                activeValue={elementFilter}
+                options={["all", ...DEX_ELEMENTS]}
+                onChange={(value) => setElementFilter(value as "all" | EggElement)}
+              />
+              <FilterRow
+                activeValue={rarityFilter}
+                options={["all", ...DEX_RARITIES]}
+                onChange={(value) => setRarityFilter(value as "all" | EggRarity)}
+              />
+              <FilterRow
+                activeValue={statusFilter}
+                options={["all", "owned", "missing"]}
+                onChange={(value) => setStatusFilter(value as "all" | "owned" | "missing")}
+              />
+            </View>
+          </CollapsibleSection>
+          <ActiveFilterSummary
+            elementFilter={elementFilter}
+            filteredCount={filteredEntries.length}
+            onClear={() => {
               setElementFilter("all");
               setRarityFilter("all");
               setStatusFilter("all");
             }}
-            variant="secondary"
+            rarityFilter={rarityFilter}
+            statusFilter={statusFilter}
+            totalCount={entries.length}
           />
-        </View>
+          <View style={styles.grid}>
+            {filteredEntries.map((entry) => (
+              <DexCard collection={data.collection} entry={entry} key={entry.id} />
+            ))}
+          </View>
+          {filteredEntries.length === 0 && (
+            <View style={styles.noResultsCard}>
+              <Text style={styles.promptTitle}>No matches yet</Text>
+              <Text style={styles.promptText}>
+                Clear a filter or keep hatching to discover this corner of the
+                collection book.
+              </Text>
+              <AppButton
+                label="Clear filters"
+                onPress={() => {
+                  setElementFilter("all");
+                  setRarityFilter("all");
+                  setStatusFilter("all");
+                }}
+                variant="secondary"
+              />
+            </View>
+          )}
+          <View style={styles.promptCard}>
+            <Text style={styles.promptTitle}>Collection loop</Text>
+            <Text style={styles.promptText}>
+              {getCollectionNudge(data.collection.length)} Use Collection to pick
+              who trains next and track every element and rarity still missing.
+            </Text>
+            <AppButton label="Keep hatching" onPress={onMonsterPress} />
+          </View>
+        </>
       )}
-      <View style={styles.promptCard}>
-        <Text style={styles.promptTitle}>Collection loop</Text>
-        <Text style={styles.promptText}>
-          {getCollectionNudge(data.collection.length)} Use Collection to pick
-          who trains next and track every element and rarity still missing.
-        </Text>
-        <AppButton label="Keep hatching" onPress={onMonsterPress} />
-      </View>
     </Screen>
+  );
+}
+
+function EmptyCollectionState({
+  onHatcheryPress,
+}: {
+  onHatcheryPress: () => void;
+}) {
+  return (
+    <View style={styles.emptyCollectionHero}>
+      <Text style={styles.emptyCollectionTitle}>No Pals yet</Text>
+      <Text style={styles.emptyCollectionBody}>
+        Hatch your first Egg to unlock your first Pal.
+      </Text>
+      <AppButton label="Go to Hatchery" onPress={onHatcheryPress} />
+    </View>
+  );
+}
+
+function OwnedPalShelf({
+  activeHatchlingId,
+  collection,
+  onSelect,
+  onSetActiveHatchling,
+  onTrainActiveHatchling,
+}: {
+  activeHatchlingId: string | null;
+  collection: readonly CollectedHatchling[];
+  onSelect: (hatchlingId: string) => void;
+  onSetActiveHatchling: (hatchlingId: string) => Promise<void>;
+  onTrainActiveHatchling: () => Promise<void>;
+}) {
+  const ownedPals = collection
+    .map((hatchling) => getTimeAdjustedHatchling(hatchling))
+    .sort((left, right) => {
+      if (left.id === activeHatchlingId) return -1;
+      if (right.id === activeHatchlingId) return 1;
+      return getHatchlingPowerScore(right) - getHatchlingPowerScore(left);
+    });
+
+  return (
+    <View style={styles.ownedShelf}>
+      <View style={styles.ownedShelfHeader}>
+        <View>
+          <Text style={styles.ownedShelfKicker}>Your Pals</Text>
+          <Text style={styles.ownedShelfTitle}>Owned Pals come first</Text>
+        </View>
+        <Text style={styles.ownedShelfCount}>{formatNumber(ownedPals.length)}</Text>
+      </View>
+      <View style={styles.ownedGrid}>
+        {ownedPals.map((hatchling, index) => {
+          const active = hatchling.id === activeHatchlingId;
+          const recentlyHatched = isRecentlyHatched(hatchling);
+          const trainingStatus = getTrainingStatus(hatchling);
+          return (
+            <CardEntrance
+              delay={Math.min(index * 35, 140)}
+              key={hatchling.id}
+              style={[
+                styles.ownedPalCard,
+                active && styles.ownedPalCardActive,
+                recentlyHatched && styles.ownedPalCardNew,
+              ]}
+            >
+              {active && <Text style={styles.favoriteBadge}>Active</Text>}
+              {recentlyHatched && !active && <Text style={styles.newBadge}>New</Text>}
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => onSelect(hatchling.id)}
+                style={styles.ownedPalTapTarget}
+              >
+                <HatchlingAvatar
+                  element={hatchling.element}
+                  level={hatchling.level}
+                  rarity={hatchling.rarity}
+                  size="small"
+                />
+                <Text style={styles.ownedPalName}>{hatchling.name}</Text>
+                <Text style={styles.ownedPalMeta}>
+                  L{hatchling.level} | {capitalize(hatchling.rarity)} {capitalize(hatchling.element)}
+                </Text>
+              </Pressable>
+              <View style={styles.ownedActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={active}
+                  onPress={() => {
+                    void onSetActiveHatchling(hatchling.id);
+                  }}
+                  style={[styles.quickAction, active && styles.quickActionDisabled]}
+                >
+                  <Text style={styles.quickActionText}>
+                    {active ? "Active" : "Set active"}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={!active || !trainingStatus.canTrain}
+                  onPress={() => {
+                    void onTrainActiveHatchling();
+                  }}
+                  style={[
+                    styles.quickAction,
+                    (!active || !trainingStatus.canTrain) && styles.quickActionDisabled,
+                  ]}
+                >
+                  <Text style={styles.quickActionText}>Train</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => onSelect(hatchling.id)}
+                  style={styles.quickAction}
+                >
+                  <Text style={styles.quickActionText}>Rename</Text>
+                </Pressable>
+              </View>
+            </CardEntrance>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
@@ -510,6 +660,7 @@ function ActiveFilterSummary({
     statusFilter !== "all" ? capitalize(statusFilter) : null,
   ].filter(Boolean);
   const hasFilters = activeFilters.length > 0;
+  if (!hasFilters) return null;
 
   return (
     <View style={styles.activeFilterCard}>
@@ -518,16 +669,12 @@ function ActiveFilterSummary({
           Collection entries in view: {filteredCount}/{totalCount}
         </Text>
         <Text style={styles.activeFilterBody}>
-          {hasFilters
-            ? `Active filters: ${activeFilters.join(" + ")}`
-            : "No filters active. You are viewing the full collection book."}
+          Active filters: {activeFilters.join(" + ")}
         </Text>
       </View>
-      {hasFilters && (
-        <Pressable onPress={onClear} style={styles.clearFilterButton}>
-          <Text style={styles.clearFilterText}>Clear</Text>
-        </Pressable>
-      )}
+      <Pressable onPress={onClear} style={styles.clearFilterButton}>
+        <Text style={styles.clearFilterText}>Clear</Text>
+      </Pressable>
     </View>
   );
 }
@@ -654,7 +801,7 @@ function EvolutionPreviewCard({ hatchling }: { hatchling: CollectedHatchling }) 
       />
       <CompactSummaryRow
         label="XP remaining"
-        value={next ? `${xpRemaining} XP` : "0 XP"}
+        value={next ? formatXp(xpRemaining) : formatXp(0)}
         tone={xpRemaining === 0 ? "ready" : undefined}
       />
       <Text style={styles.evolutionMicrocopy}>
@@ -674,28 +821,14 @@ function FilterRow({
   options: readonly string[];
 }) {
   return (
-    <View style={styles.filterRow}>
-      {options.map((option) => {
-        const active = option === activeValue;
-        return (
-          <Pressable
-            accessibilityRole="button"
-            key={option}
-            onPress={() => onChange(option)}
-            style={[styles.filterChip, active && styles.filterChipActive]}
-          >
-            <Text
-              style={[
-                styles.filterChipText,
-                active && styles.filterChipTextActive,
-              ]}
-            >
-              {capitalize(option)}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
+    <SegmentedControl
+      onChange={onChange}
+      options={options.map((option) => ({
+        label: capitalize(option),
+        value: option,
+      }))}
+      value={activeValue}
+    />
   );
 }
 
@@ -734,21 +867,34 @@ function DexCard({
       ]}
     >
       <View style={!unlocked && styles.lockedAvatar}>
-        <HatchlingAvatar
-          element={entry.element}
-          level={bestOwned?.level}
-          rarity={entry.rarity}
-          size="small"
-        />
+        {unlocked ? (
+          <HatchlingAvatar
+            element={entry.element}
+            level={bestOwned?.level}
+            rarity={entry.rarity}
+            size="small"
+          />
+        ) : (
+          <View style={styles.mysteryEggWrap}>
+            <EggAvatar
+              element={entry.element}
+              rarity={entry.rarity}
+              size="small"
+            />
+            <Text style={styles.mysteryMark}>?</Text>
+          </View>
+        )}
       </View>
-      <Text style={styles.cardName}>{unlocked ? entry.name : "Unknown"}</Text>
+      <Text style={styles.cardName}>
+        {unlocked ? entry.name : `${capitalize(entry.rarity)} ${capitalize(entry.element)}`}
+      </Text>
       <Text style={[styles.cardMeta, { color: elementColor }]}>
-        {capitalize(entry.rarity)} | {capitalize(entry.element)}
+        {unlocked ? `${capitalize(entry.rarity)} | ${capitalize(entry.element)}` : "Unrevealed"}
       </Text>
       <Text style={styles.cardDescription}>
         {unlocked
           ? entry.description
-          : `Hatch a ${capitalize(entry.rarity)} ${capitalize(entry.element)} Egg to reveal this Pal.`}
+          : "Hatch this Egg type to discover."}
       </Text>
       {!unlocked && (
         <Text style={styles.lockedHint}>Locked</Text>
@@ -773,6 +919,10 @@ function DexCard({
 
 function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function isRecentlyHatched(hatchling: CollectedHatchling) {
+  return Date.now() - Date.parse(hatchling.hatchedAt) < 1000 * 60 * 60 * 24;
 }
 
 function getPalPersonality(hatchling: CollectedHatchling) {
@@ -861,6 +1011,150 @@ const styles = StyleSheet.create({
   detailSparkles: {
     alignItems: "center",
     marginBottom: 4,
+  },
+  emptyCollectionHero: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.hero,
+    borderWidth: 1,
+    gap: 10,
+    marginTop: 20,
+    padding: 18,
+  },
+  emptyCollectionTitle: {
+    color: colors.ink,
+    fontSize: 24,
+    fontWeight: "900",
+    letterSpacing: -0.4,
+  },
+  emptyCollectionBody: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  ownedShelf: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 12,
+    marginTop: 16,
+    padding: 14,
+  },
+  ownedShelfHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  ownedShelfKicker: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+  },
+  ownedShelfTitle: {
+    color: colors.ink,
+    fontSize: 17,
+    fontWeight: "900",
+    marginTop: 3,
+  },
+  ownedShelfCount: {
+    backgroundColor: colors.primaryDeep,
+    borderRadius: radii.pill,
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  ownedGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 9,
+  },
+  ownedPalCard: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    padding: 10,
+    position: "relative",
+    width: "48%",
+  },
+  ownedPalCardActive: {
+    borderColor: colors.rewardGold,
+  },
+  ownedPalCardNew: {
+    borderColor: colors.primary,
+  },
+  favoriteBadge: {
+    backgroundColor: colors.rewardGold,
+    borderRadius: radii.pill,
+    color: colors.ink,
+    fontSize: 9,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    position: "absolute",
+    right: 8,
+    top: 8,
+    zIndex: 1,
+  },
+  newBadge: {
+    backgroundColor: colors.primary,
+    borderRadius: radii.pill,
+    color: colors.surface,
+    fontSize: 9,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    position: "absolute",
+    right: 8,
+    top: 8,
+    zIndex: 1,
+  },
+  ownedPalTapTarget: {
+    alignItems: "center",
+    gap: 4,
+  },
+  ownedPalName: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  ownedPalMeta: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "800",
+    lineHeight: 14,
+    textAlign: "center",
+  },
+  ownedActions: {
+    gap: 6,
+    marginTop: 8,
+  },
+  quickAction: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    minHeight: 34,
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+  quickActionDisabled: {
+    opacity: 0.5,
+  },
+  quickActionText: {
+    color: colors.primaryDeep,
+    fontSize: 10,
+    fontWeight: "900",
   },
   emptyDetailCard: {
     backgroundColor: colors.warmSurface,
@@ -1328,7 +1622,7 @@ const styles = StyleSheet.create({
     borderStyle: "dashed",
   },
   lockedAvatar: {
-    opacity: 0.24,
+    alignItems: "center",
   },
   lockedHint: {
     color: colors.primaryDeep,
@@ -1337,6 +1631,24 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: "center",
     textTransform: "uppercase",
+  },
+  mysteryEggWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    opacity: 0.72,
+  },
+  mysteryMark: {
+    backgroundColor: colors.translucentSurface,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    color: colors.primaryDeep,
+    fontSize: 18,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    position: "absolute",
   },
   cardName: {
     color: colors.ink,

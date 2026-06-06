@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
-import { CollapsibleSection } from "../components/CollapsibleSection";
 import { Screen } from "../components/Screen";
 import { SparkleBurst } from "../components/SparkleBurst";
+import { PageTitle, SegmentedControl } from "../components/ui";
 import { getScreenLoopSubtitle } from "../content/coreLoopCopy";
 import {
   getLeaderboardEntries,
@@ -15,6 +15,7 @@ import {
 } from "../domain/leaderboard";
 import type { HatchUpData } from "../domain/models";
 import { colors, radii, typography } from "../theme";
+import { formatDistanceMiles, formatNumber, formatSteps } from "../utils/format";
 
 interface Props {
   data: HatchUpData;
@@ -49,20 +50,38 @@ export function LeaderboardScreen({
   const [alias, setAlias] = useState(
     data.leaderboardAlias || data.monsterName || "HatchUp Trainer",
   );
+  const [aliasSaved, setAliasSaved] = useState(false);
   const [blockedIds, setBlockedIds] = useState<string[]>([]);
+  const [confirmShareOpen, setConfirmShareOpen] = useState(false);
   const [reportedId, setReportedId] = useState<string | null>(null);
   const userStats = getUserLeaderboardStats(data, today);
-  const entries = getLeaderboardEntries(data, today, metric).filter(
+  const sharedEntries = getLeaderboardEntries(data, today, metric).filter(
     (entry) => !blockedIds.includes(entry.id),
   );
-  const userRank = entries.find((entry) => entry.isUser)?.rank ?? null;
+  const entries = data.leaderboardShareEnabled ? sharedEntries : [];
+  const userRank = data.leaderboardShareEnabled
+    ? sharedEntries.find((entry) => entry.isUser)?.rank ?? null
+    : null;
   const aliasChanged = alias.trim() !== data.leaderboardAlias.trim();
 
-  async function handleShareToggle() {
+  async function handleSaveAlias() {
     if (aliasChanged) {
       await onSaveAlias(alias);
+      setAliasSaved(true);
     }
-    await onSetSharing(!data.leaderboardShareEnabled);
+  }
+
+  async function handleConfirmShare() {
+    if (aliasChanged) {
+      await onSaveAlias(alias);
+      setAliasSaved(true);
+    }
+    await onSetSharing(true);
+    setConfirmShareOpen(false);
+  }
+
+  async function handleGoPrivate() {
+    await onSetSharing(false);
   }
 
   return (
@@ -78,128 +97,144 @@ export function LeaderboardScreen({
         />
       }
     >
-      <Text style={styles.kicker}>WEEKLY CHALLENGE BOARD</Text>
-      <Text style={styles.title}>Move, hatch, climb.</Text>
-      <Text style={styles.body}>
-        {getScreenLoopSubtitle("ranks")} Share only your public ranking name
-        and score.
-      </Text>
+      <PageTitle
+        eyebrow="Weekly challenge board"
+        subtitle={getScreenLoopSubtitle("ranks")}
+        title="Move, hatch, climb."
+      />
       <Text style={styles.syncLabel}>{leaderboardSyncLabel}</Text>
-      <View style={styles.statsGrid}>
-        <Stat label="7-day steps" value={userStats.steps.toLocaleString()} />
-        <Stat label="Distance" value={`${userStats.distanceMiles.toFixed(1)} mi`} />
-        <Stat label="Journey XP" value={String(userStats.totalXp)} />
-      </View>
-      <CollapsibleSection
-        badge={data.leaderboardShareEnabled ? "ON" : "OFF"}
-        defaultOpen={!data.leaderboardShareEnabled}
-        subtitle="Ranks are optional. Private health details stay off the board."
-        title="Sharing and privacy"
-      >
-        <View style={styles.shareCard}>
-          <View style={styles.shareHeader}>
-            <View>
-              <Text style={styles.cardTitle}>Leaderboard sharing</Text>
-              <Text style={styles.shareStatus}>
-                {data.leaderboardShareEnabled
-                  ? `Ranked as #${userRank ?? "-"}`
-                  : "Not ranked yet"}
-              </Text>
-            </View>
-            <View
+      <View style={styles.privacyCard}>
+        <View style={styles.privacyHeader}>
+          <View style={styles.privacyText}>
+            <Text style={styles.cardTitle}>Ranks privacy</Text>
+            <Text style={styles.privacyBody}>
+              Ranks are optional. Only your public name and weekly score are shared.
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.statePill,
+              data.leaderboardShareEnabled && styles.statePillSharing,
+            ]}
+          >
+            <Text
               style={[
-                styles.sharePill,
-                data.leaderboardShareEnabled && styles.sharePillOn,
+                styles.statePillText,
+                data.leaderboardShareEnabled && styles.statePillTextSharing,
               ]}
             >
-              <Text
-                style={[
-                  styles.sharePillText,
-                  data.leaderboardShareEnabled && styles.sharePillTextOn,
-                ]}
-              >
-                {data.leaderboardShareEnabled ? "ON" : "OFF"}
-              </Text>
-            </View>
+              {data.leaderboardShareEnabled ? "Sharing" : "Private"}
+            </Text>
           </View>
-          <TextInput
-            autoCapitalize="words"
-            maxLength={24}
-            onChangeText={setAlias}
-            onSubmitEditing={() => onSaveAlias(alias)}
-            placeholder="Leaderboard name"
-            placeholderTextColor={colors.muted}
-            style={styles.input}
-            value={alias}
-          />
-          <View style={styles.shareActions}>
+        </View>
+        <TextInput
+          autoCapitalize="words"
+          maxLength={24}
+          onChangeText={(value) => {
+            setAlias(value);
+            setAliasSaved(false);
+          }}
+          onSubmitEditing={handleSaveAlias}
+          placeholder="Public Ranks name"
+          placeholderTextColor={colors.muted}
+          style={styles.input}
+          value={alias}
+        />
+        <View style={styles.shareActions}>
+          {aliasChanged ? (
             <AppButton
-              label={aliasChanged ? "Save name" : "Name saved"}
-              onPress={() => onSaveAlias(alias)}
+              label="Save name"
+              onPress={handleSaveAlias}
               style={styles.actionButton}
               variant="secondary"
             />
+          ) : (
+            <Text style={styles.savedStatusText}>
+              {aliasSaved || data.leaderboardAlias ? "Name saved" : "Name ready"}
+            </Text>
+          )}
+          {data.leaderboardShareEnabled ? (
             <AppButton
-              label={
-                data.leaderboardShareEnabled
-                  ? "Stay private"
-                  : "Share weekly score"
-              }
-              onPress={handleShareToggle}
+              label="Go private"
+              onPress={handleGoPrivate}
               style={styles.actionButton}
+              variant="secondary"
             />
-          </View>
-        </View>
-        {!data.leaderboardShareEnabled && (
-          <View style={styles.emptyMissionCard}>
-            <View style={styles.emptyMissionText}>
-              <Text style={styles.emptyMissionTitle}>You are private right now</Text>
-              <Text style={styles.emptyMissionBody}>
-                Ranks are optional. Move this week and opt in when you want to
-                compare your public journey score.
-              </Text>
-            </View>
+          ) : (
             <AppButton
               label="Share weekly score"
-              onPress={handleShareToggle}
-              style={styles.emptyMissionButton}
+              onPress={() => setConfirmShareOpen(true)}
+              style={styles.actionButton}
+            />
+          )}
+        </View>
+      </View>
+      <View style={styles.scoreCard}>
+        <View style={styles.scoreHeader}>
+          <Text style={styles.cardTitle}>Your weekly score</Text>
+          <Text style={styles.rankLabel}>
+            {data.leaderboardShareEnabled
+              ? `Rank #${userRank ?? "-"}`
+              : "Private"}
+          </Text>
+        </View>
+        <View style={styles.statsGrid}>
+          <Stat label="Steps" value={formatNumber(userStats.steps)} />
+          <Stat label="Distance" value={formatDistanceMiles(userStats.distanceMiles)} />
+          <Stat label="Journey XP" value={formatNumber(userStats.totalXp)} />
+        </View>
+      </View>
+      <View style={styles.leaderboardCard}>
+        <View style={styles.boardHeader}>
+          <View>
+            <Text style={styles.cardTitle}>Leaderboard</Text>
+            <Text style={styles.boardSubtitle}>
+              {data.leaderboardShareEnabled
+                ? "Weekly public scores from players who opted in."
+                : "Preview Ranks without sharing your score yet."}
+            </Text>
+          </View>
+        </View>
+        {data.leaderboardShareEnabled ? (
+          <>
+            <SegmentedControl
+              onChange={setMetric}
+              options={(Object.keys(metricLabels) as LeaderboardMetric[]).map((item) => ({
+                label: metricLabels[item],
+                value: item,
+              }))}
+              value={metric}
+            />
+            <View style={styles.board}>
+              {entries.map((entry) => (
+                <RankRow
+                  entry={entry}
+                  key={entry.id}
+                  metric={metric}
+                  onBlock={() => {
+                    if (!entry.isUser) {
+                      setBlockedIds((ids) => [...new Set([...ids, entry.id])]);
+                    }
+                  }}
+                  onReport={() => setReportedId(entry.id)}
+                />
+              ))}
+            </View>
+          </>
+        ) : (
+          <View style={styles.privatePreviewCard}>
+            <Text style={styles.emptyMissionTitle}>You are private right now</Text>
+            <Text style={styles.emptyMissionBody}>
+              Share only your display name and weekly score when you want to compare.
+              Health details stay private.
+            </Text>
+            <AppButton
+              label="Share weekly score"
+              onPress={() => setConfirmShareOpen(true)}
               variant="secondary"
             />
           </View>
         )}
-      </CollapsibleSection>
-      <View style={styles.metricTabs}>
-        {(Object.keys(metricLabels) as LeaderboardMetric[]).map((item) => (
-          <Pressable
-            key={item}
-            onPress={() => setMetric(item)}
-            style={[styles.metricTab, metric === item && styles.metricTabActive]}
-          >
-            <Text
-              style={[
-                styles.metricTabText,
-                metric === item && styles.metricTabTextActive,
-              ]}
-            >
-              {metricLabels[item]}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-      <View style={styles.board}>
-        {entries.map((entry) => (
-          <RankRow
-            entry={entry}
-            key={entry.id}
-            metric={metric}
-            onBlock={() => {
-              if (!entry.isUser) {
-                setBlockedIds((ids) => [...new Set([...ids, entry.id])]);
-              }
-            }}
-            onReport={() => setReportedId(entry.id)}
-          />
-        ))}
       </View>
       {reportedId && (
         <View style={styles.safetyNotice}>
@@ -215,6 +250,11 @@ export function LeaderboardScreen({
           />
         </View>
       )}
+      <ShareScoreModal
+        onCancel={() => setConfirmShareOpen(false)}
+        onConfirm={handleConfirmShare}
+        visible={confirmShareOpen}
+      />
     </Screen>
   );
 }
@@ -241,8 +281,8 @@ function RankRow({
           {entry.isUser ? " (you)" : ""}
         </Text>
         <Text style={styles.rankMeta}>
-          {entry.monsterStage} | {entry.steps.toLocaleString()} steps |{" "}
-          {entry.distanceMiles.toFixed(1)} mi
+          {entry.monsterStage} | {formatSteps(entry.steps)} |{" "}
+          {formatDistanceMiles(entry.distanceMiles)}
         </Text>
       </View>
       <Text style={styles.rankScore}>{formatMetric(entry, metric)}</Text>
@@ -255,7 +295,7 @@ function RankRow({
             onPress={() => setMenuOpen((open) => !open)}
             style={styles.safetyMenuButton}
           >
-            <Text style={styles.safetyMenuButtonText}>...</Text>
+            <Text style={styles.safetyMenuButtonText}>More</Text>
           </Pressable>
           {menuOpen && (
             <View style={styles.safetyMenu}>
@@ -287,6 +327,45 @@ function RankRow({
   );
 }
 
+function ShareScoreModal({
+  onCancel,
+  onConfirm,
+  visible,
+}: {
+  onCancel: () => void;
+  onConfirm: () => Promise<void>;
+  visible: boolean;
+}) {
+  return (
+    <Modal animationType="fade" transparent visible={visible}>
+      <View style={styles.modalBackdrop}>
+        <View style={styles.shareModal}>
+          <Text style={styles.modalKicker}>Ranks sharing</Text>
+          <Text style={styles.modalTitle}>Share your weekly score?</Text>
+          <Text style={styles.modalBody}>
+            Only your display name and weekly score are shared. Health details stay private.
+          </Text>
+          <View style={styles.modalActions}>
+            <AppButton
+              label="Not now"
+              onPress={onCancel}
+              style={styles.modalButton}
+              variant="secondary"
+            />
+            <AppButton
+              label="Share score"
+              onPress={() => {
+                void onConfirm();
+              }}
+              style={styles.modalButton}
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.stat}>
@@ -298,9 +377,9 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function formatMetric(entry: LeaderboardEntry, metric: LeaderboardMetric) {
   const value = getMetricValue(entry, metric);
-  if (metric === "distance") return `${value.toFixed(1)} mi`;
-  if (metric === "xp") return `${value} XP`;
-  return value.toLocaleString();
+  if (metric === "distance") return formatDistanceMiles(value);
+  if (metric === "xp") return `${formatNumber(value)} XP`;
+  return formatNumber(value);
 }
 
 const styles = StyleSheet.create({
@@ -330,10 +409,86 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginTop: 8,
   },
+  privacyCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 12,
+    marginTop: 16,
+    padding: 16,
+  },
+  privacyHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  privacyText: {
+    flex: 1,
+  },
+  privacyBody: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 5,
+  },
+  statePill: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  statePillSharing: {
+    backgroundColor: colors.primaryDeep,
+    borderColor: colors.primaryDeep,
+  },
+  statePillText: {
+    color: colors.primaryDeep,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  statePillTextSharing: {
+    color: "#FFFFFF",
+  },
+  savedStatusText: {
+    color: colors.muted,
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "900",
+    lineHeight: 48,
+  },
+  scoreCard: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 12,
+    marginTop: 14,
+    padding: 16,
+  },
+  scoreHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  rankLabel: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    color: colors.primaryDeep,
+    fontSize: 11,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
   statsGrid: {
     flexDirection: "row",
     gap: 8,
-    marginTop: 18,
   },
   stat: {
     backgroundColor: colors.surface,
@@ -445,6 +600,19 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 48,
   },
+  savedNamePill: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.button,
+    borderWidth: 1,
+    justifyContent: "center",
+  },
+  savedNameText: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "900",
+  },
   metricTabs: {
     flexDirection: "row",
     gap: 8,
@@ -474,6 +642,33 @@ const styles = StyleSheet.create({
   board: {
     gap: 8,
     marginTop: 14,
+  },
+  leaderboardCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 12,
+    marginTop: 14,
+    padding: 16,
+  },
+  boardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  boardSubtitle: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 4,
+  },
+  privatePreviewCard: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 10,
+    padding: 14,
   },
   safetyNotice: {
     backgroundColor: colors.accentSoft,
@@ -544,13 +739,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 30,
     justifyContent: "center",
-    width: 34,
+    width: 50,
   },
   safetyMenuButtonText: {
     color: colors.muted,
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: "900",
-    lineHeight: 14,
   },
   safetyMenu: {
     backgroundColor: colors.surface,
@@ -571,5 +765,47 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 12,
     fontWeight: "900",
+  },
+  modalBackdrop: {
+    alignItems: "center",
+    backgroundColor: colors.modalBackdrop,
+    flex: 1,
+    justifyContent: "flex-end",
+    padding: 16,
+  },
+  shareModal: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.hero,
+    borderWidth: 1,
+    gap: 10,
+    maxWidth: 440,
+    padding: 18,
+    width: "100%",
+  },
+  modalKicker: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  modalTitle: {
+    color: colors.ink,
+    fontSize: 22,
+    fontWeight: "900",
+  },
+  modalBody: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 6,
+  },
+  modalButton: {
+    flex: 1,
   },
 });

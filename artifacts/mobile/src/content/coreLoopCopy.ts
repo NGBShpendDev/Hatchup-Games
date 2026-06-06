@@ -1,3 +1,5 @@
+import { formatNumber, formatSteps } from "../utils/format";
+
 export const CORE_LOOP_PROMISE =
   "Move your body, hatch Pals, grow your collection, and return tomorrow.";
 
@@ -11,16 +13,16 @@ export function getReturnTomorrowMessage(streak: number) {
 export function getEggProgressMessage(stepsWalked: number, stepsRequired: number) {
   const remaining = Math.max(stepsRequired - stepsWalked, 0);
   if (remaining === 0) {
-    return "Your egg is ready. Hatch this Pal when you are ready.";
+    return "Your Egg is ready. Hatch this Pal when you are ready.";
   }
-  return `${remaining.toLocaleString()} steps left. Sync movement to push this Egg forward.`;
+  return `${formatSteps(remaining)} left. Sync movement to push this Egg forward.`;
 }
 
 export function getCollectionNudge(collectionCount: number) {
   if (collectionCount === 0) {
     return "Your first Pal is waiting inside an Egg. Move today, sync, then hatch it.";
   }
-  return `${collectionCount} Pal${collectionCount === 1 ? "" : "s"} discovered. Hatch more Eggs to grow your team.`;
+  return `${formatNumber(collectionCount)} Pal${collectionCount === 1 ? "" : "s"} discovered. Hatch more Eggs to grow your team.`;
 }
 
 export function getScreenLoopSubtitle(screen: "collection" | "hatchery" | "home" | "profile" | "ranks") {

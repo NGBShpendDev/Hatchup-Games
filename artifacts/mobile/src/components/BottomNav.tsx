@@ -1,5 +1,15 @@
+import {
+  Egg,
+  House,
+  LayoutGrid,
+  Trophy,
+  User,
+  type LucideIcon,
+} from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ENABLE_LEADERBOARD } from "../config/features";
 import { colors, radii } from "../theme";
+import { ActiveTabTransition } from "../utils/animations";
 
 interface Props {
   active: "home" | "monster" | "dex" | "leaderboard" | "settings";
@@ -18,53 +28,94 @@ export function BottomNav({
   onMonsterPress,
   onSettingsPress,
 }: Props) {
+  const items: NavItemConfig[] = [
+    {
+      accessibilityLabel: "Go to Home",
+      active: active === "home",
+      Icon: House,
+      label: "Home",
+      onPress: onHomePress,
+    },
+    {
+      accessibilityLabel: "Go to Hatchery",
+      active: active === "monster",
+      Icon: Egg,
+      label: "Hatchery",
+      onPress: onMonsterPress,
+    },
+    {
+      accessibilityLabel: "Go to Collection",
+      active: active === "dex",
+      Icon: LayoutGrid,
+      label: "Collection",
+      onPress: onDexPress,
+    },
+    ...(ENABLE_LEADERBOARD
+      ? [
+          {
+            accessibilityLabel: "Go to Ranks",
+            active: active === "leaderboard",
+            Icon: Trophy,
+            label: "Ranks",
+            onPress: onLeaderboardPress,
+          },
+        ]
+      : []),
+    {
+      accessibilityLabel: "Go to Profile",
+      active: active === "settings",
+      Icon: User,
+      label: "Profile",
+      onPress: onSettingsPress,
+    },
+  ];
+
   return (
     <View style={styles.nav}>
-      <NavItem active={active === "home"} icon="H" label="Home" onPress={onHomePress} />
-      <NavItem
-        active={active === "monster"}
-        icon="E"
-        label="Hatchery"
-        onPress={onMonsterPress}
-      />
-      <NavItem
-        active={active === "dex"}
-        icon="C"
-        label="Collection"
-        onPress={onDexPress}
-      />
-      <NavItem
-        active={active === "leaderboard"}
-        icon="R"
-        label="Ranks"
-        onPress={onLeaderboardPress}
-      />
-      <NavItem
-        active={active === "settings"}
-        icon="P"
-        label="Profile"
-        onPress={onSettingsPress}
-      />
+      {items.map((item) => (
+        <NavItem key={item.label} {...item} />
+      ))}
     </View>
   );
 }
 
-function NavItem({
-  active,
-  icon,
-  label,
-  onPress,
-}: {
+interface NavItemConfig {
+  accessibilityLabel: string;
   active: boolean;
-  icon: string;
+  Icon: LucideIcon;
   label: string;
   onPress: () => void;
-}) {
+}
+
+function NavItem({
+  accessibilityLabel,
+  active,
+  Icon,
+  label,
+  onPress,
+}: NavItemConfig) {
   return (
-    <Pressable onPress={onPress} style={styles.item}>
-      <View style={[styles.iconWrap, active && styles.activeIconWrap]}>
-        <Text style={[styles.icon, active && styles.activeIcon]}>{icon}</Text>
-      </View>
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.item,
+        active && styles.activeItem,
+        pressed && styles.pressedItem,
+      ]}
+    >
+      <ActiveTabTransition
+        active={active}
+        style={[styles.iconWrap, active && styles.activeIconWrap]}
+      >
+        <Icon
+          color={active ? colors.surface : colors.muted}
+          size={19}
+          strokeWidth={active ? 2.7 : 2.3}
+        />
+      </ActiveTabTransition>
       <Text style={[styles.label, active && styles.activeLabel]}>{label}</Text>
     </Pressable>
   );
@@ -77,9 +128,10 @@ const styles = StyleSheet.create({
     borderRadius: radii.hero,
     borderWidth: 1,
     flexDirection: "row",
-    justifyContent: "space-around",
-    paddingHorizontal: 8,
-    paddingVertical: 10,
+    gap: 4,
+    justifyContent: "space-between",
+    paddingHorizontal: 7,
+    paddingVertical: 8,
     shadowColor: colors.cardShadowStrong,
     shadowOffset: { height: 10, width: 0 },
     shadowOpacity: 1,
@@ -87,35 +139,40 @@ const styles = StyleSheet.create({
   },
   item: {
     alignItems: "center",
-    gap: 5,
-    minWidth: 58,
+    borderRadius: radii.card,
+    flex: 1,
+    gap: 4,
+    justifyContent: "center",
+    minHeight: 54,
+    minWidth: 44,
+    paddingHorizontal: 3,
+    paddingVertical: 5,
+  },
+  activeItem: {
+    backgroundColor: colors.primarySoft,
+  },
+  pressedItem: {
+    opacity: 0.72,
   },
   iconWrap: {
     alignItems: "center",
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.surface,
     borderColor: colors.line,
     borderWidth: 1,
     borderRadius: radii.pill,
-    height: 24,
+    height: 32,
     justifyContent: "center",
-    width: 24,
+    width: 32,
   },
   activeIconWrap: {
     backgroundColor: colors.primaryDeep,
     borderColor: colors.primaryDeep,
   },
-  icon: {
-    color: colors.muted,
-    fontSize: 9,
-    fontWeight: "900",
-  },
-  activeIcon: {
-    color: "#FFFFFF",
-  },
   label: {
     color: colors.muted,
-    fontSize: 11,
-    fontWeight: "700",
+    fontSize: 10,
+    fontWeight: "800",
+    textAlign: "center",
   },
   activeLabel: {
     color: colors.primaryDeep,

@@ -58,10 +58,15 @@ import {
 } from "./services/observability/observabilityService";
 import { IS_PUBLIC_BUILD } from "./config/runtime";
 import {
+  ENABLE_CLOUD_SYNC,
+  ENABLE_TEST_LAB,
+} from "./config/features";
+import {
   clearHatchUpData,
   loadHatchUpData,
   saveHatchUpData,
 } from "./storage/appStorage";
+import { getQaFixtureById, type QaFixtureId } from "./qa/fixtures";
 
 export interface LatestSyncGains {
   accountXp: number;
@@ -121,7 +126,7 @@ export function useHatchUpApp() {
   useEffect(() => {
     if (!ready) return;
 
-    if (!user?.id) {
+    if (!ENABLE_CLOUD_SYNC || !user?.id) {
       cloudBootstrapUserRef.current = null;
       setCloudSyncLabel("Local-only save");
       return;
@@ -413,6 +418,25 @@ export function useHatchUpApp() {
     });
   }
 
+  async function applyQaFixture(fixtureId: QaFixtureId) {
+    const today = toDateKey(new Date());
+    const fixture = getQaFixtureById(fixtureId, today);
+    if (!fixture) return;
+
+    await persist(fixture.data, { syncCloud: false });
+    setLatestSync(fixture.data.dailyAward);
+    setLatestEvolution(null);
+    setLatestSyncGains(emptySyncGains);
+    setLatestHatchling(null);
+    setLeaderboardSyncLabel(
+      fixture.data.leaderboardShareEnabled
+        ? "Shared QA fixture"
+        : "Private QA fixture",
+    );
+    setCloudSyncLabel("QA fixture local-only");
+    setError(null);
+  }
+
   async function setLeaderboardSharing(enabled: boolean) {
     const next = {
       ...data,
@@ -622,6 +646,18 @@ export function useHatchUpApp() {
   }
 
   async function setCloudSyncEnabled(enabled: boolean) {
+    if (!ENABLE_CLOUD_SYNC || !user?.id) {
+      const localOnly = {
+        ...data,
+        cloudSyncEnabled: false,
+        cloudSyncStatus: "localOnly",
+      } as HatchUpData;
+
+      await persist(localOnly, { syncCloud: false });
+      setCloudSyncLabel("Sign in to enable cloud save");
+      return;
+    }
+
     const next = {
       ...data,
       cloudSyncEnabled: enabled,
@@ -647,6 +683,11 @@ export function useHatchUpApp() {
   }
 
   async function syncCloud(nextData: HatchUpData) {
+    if (!ENABLE_CLOUD_SYNC || !user?.id || !nextData.cloudSyncEnabled) {
+      setCloudSyncLabel("Local-only save");
+      return;
+    }
+
     try {
       const result = await syncCloudSave(nextData, user?.id);
       const synced = {
@@ -692,7 +733,10 @@ export function useHatchUpApp() {
     cloudSyncLabel,
     leaderboardSyncLabel,
     progressionProfile: ACTIVE_PROGRESSION_PROFILE,
-    testLabEnabled: ACTIVE_PROGRESSION_PROFILE.id === "beta" && !IS_PUBLIC_BUILD,
+    testLabEnabled:
+      ENABLE_TEST_LAB &&
+      ACTIVE_PROGRESSION_PROFILE.id === "beta" &&
+      !IS_PUBLIC_BUILD,
     isSyncing,
     latestHatchling,
     latestEvolution,
@@ -722,6 +766,7 @@ export function useHatchUpApp() {
     setTestStage,
     syncHealth,
     buyShopItem,
+    applyQaFixture,
     trainActiveHatchling,
     today: toDateKey(new Date()),
   };

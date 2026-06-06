@@ -5,11 +5,11 @@ import { BottomNav } from "../components/BottomNav";
 import { CollapsibleSection } from "../components/CollapsibleSection";
 import { EggAvatar } from "../components/EggAvatar";
 import { HatchlingAvatar } from "../components/HatchlingAvatar";
-import { Header } from "../components/Header";
 import { MonsterAvatar } from "../components/MonsterAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
-import { getEggProgressMessage, getScreenLoopSubtitle } from "../content/coreLoopCopy";
+import { ScreenHeader } from "../components/ui";
+import { toDateKey } from "../domain/date";
 import { getEggProgress, isEggReady } from "../domain/hatchery";
 import {
   getActiveHatchling,
@@ -22,6 +22,12 @@ import {
 import type { CollectedHatchling, HatchUpData } from "../domain/models";
 import { getProgression, MONSTER_STAGES } from "../domain/progression";
 import { colors, radii, typography } from "../theme";
+import {
+  EggReadyPulse,
+  HatchCelebration,
+  useReducedMotion,
+} from "../utils/animations";
+import { formatNumber, formatSteps, formatXp } from "../utils/format";
 
 interface Props {
   data: HatchUpData;
@@ -36,6 +42,13 @@ interface Props {
   onSettingsPress: () => void;
 }
 
+type ActiveEgg = HatchUpData["activeEggs"][number];
+type ClosestEggSummary = {
+  egg: ActiveEgg;
+  slotNumber: number;
+  stepsLeft: number;
+};
+
 export function MonsterDetailScreen({
   data,
   latestHatchling,
@@ -48,8 +61,12 @@ export function MonsterDetailScreen({
   onSetActiveHatchling,
   onSettingsPress,
 }: Props) {
+  const todayKey = toDateKey(new Date());
   const progression = getProgression(data.totalXp);
   const readyEggCount = data.activeEggs.filter(isEggReady).length;
+  const firstReadyEgg = data.activeEggs.find(isEggReady);
+  const closestEgg = getClosestEgg(data.activeEggs);
+  const todaySteps = data.dailyAward?.date === todayKey ? data.dailyAward.health.steps : 0;
   const activeHatchlingRaw = getActiveHatchling(data);
   const activeHatchling = activeHatchlingRaw
     ? getTimeAdjustedHatchling(activeHatchlingRaw)
@@ -60,11 +77,6 @@ export function MonsterDetailScreen({
   const activePalTraining = activeHatchling
     ? getTrainingStatus(activeHatchling)
     : null;
-  const hatcheryMission = getHatcheryMission({
-    activeEggCount: data.activeEggs.length,
-    collectionCount: data.collection.length,
-    readyEggCount,
-  });
 
   return (
     <Screen
@@ -79,7 +91,11 @@ export function MonsterDetailScreen({
         />
       }
     >
-      <Header onBack={onBack} title="Hatchery" />
+      <ScreenHeader
+        onBack={onBack}
+        subtitle="Your steps fill Eggs. Ready Eggs hatch into Pals."
+        title="Hatchery"
+      />
       <HatchRevealModal
         hatchling={latestHatchling}
         onClose={onDismissHatch}
@@ -92,34 +108,38 @@ export function MonsterDetailScreen({
           onDexPress();
         }}
       />
-      <Text style={styles.screenLoopCopy}>{getScreenLoopSubtitle("hatchery")}</Text>
-      <View style={styles.collectionHeader}>
-        <Text style={styles.sectionTitle}>Eggs in Hatchery</Text>
-        <Text style={styles.collectionCount}>
-          {readyEggCount} ready
+      <View style={styles.hatcheryStatusRow}>
+        <View style={styles.hatcheryStatusPill}>
+          <Text style={styles.hatcheryStatusText}>
+            {readyEggCount} ready
+          </Text>
+        </View>
+        <Text style={styles.hatcheryStatusHint}>
+          Up to three Eggs fill together from each movement sync.
         </Text>
       </View>
-      <Text style={styles.incubatorIntro}>
-        Up to three Eggs progress together from every movement sync. Every step
-        pushes your next hatch closer, and bonus Eggs wait here when your
-        Hatchery is full.
-      </Text>
-      <View style={styles.missionCard}>
-        <Text style={styles.missionKicker}>Current mission</Text>
-        <Text style={styles.missionTitle}>{hatcheryMission.title}</Text>
-        <Text style={styles.missionBody}>{hatcheryMission.body}</Text>
-        <AppButton
-          label={hatcheryMission.cta}
-          onPress={
-            hatcheryMission.target === "home"
-              ? onBack
-              : hatcheryMission.target === "collection"
-                ? onDexPress
-                : () => undefined
-          }
-          variant="secondary"
-        />
-      </View>
+      <AllEggsSummary
+        closestEgg={closestEgg}
+        readyEggCount={readyEggCount}
+        todaySteps={todaySteps}
+      />
+      {firstReadyEgg && (
+        <EggReadyPulse active style={styles.readyCelebrationPulse}>
+          <View style={styles.readyCelebration}>
+            <View style={styles.readyCelebrationText}>
+              <Text style={styles.readyCelebrationKicker}>Egg ready!</Text>
+              <Text style={styles.readyCelebrationBody}>
+                A {capitalize(firstReadyEgg.rarity)} {capitalize(firstReadyEgg.element)} Egg is ready to hatch.
+              </Text>
+            </View>
+            <AppButton
+              label="Hatch now"
+              onPress={() => onHatch(firstReadyEgg.id)}
+              style={styles.readyCelebrationButton}
+            />
+          </View>
+        </EggReadyPulse>
+      )}
       {readyEggCount > 1 && (
         <AppButton
           label={`Hatch all ${readyEggCount} ready Eggs`}
@@ -128,61 +148,37 @@ export function MonsterDetailScreen({
         />
       )}
       <View style={styles.incubatorStack}>
-        {data.activeEggs.map((egg, index) => {
-          const eggReady = isEggReady(egg);
-          return (
-            <View style={styles.incubatorCard} key={egg.id}>
-              <EggAvatar element={egg.element} rarity={egg.rarity} size="small" />
-              <View style={styles.eggCardBody}>
-                <Text style={styles.eggName}>
-                  Slot {index + 1}: {capitalize(egg.rarity)}{" "}
-                  {capitalize(egg.element)} Egg
-                </Text>
-                <Text style={styles.eggCaption}>
-                  {eggReady
-                    ? "Ready to hatch."
-                    : getEggProgressMessage(egg.stepsWalked, egg.stepsRequired)}
-                </Text>
-                <Text style={styles.eggRemaining}>
-                  {eggReady
-                    ? "Ready now"
-                    : `${Math.max(egg.stepsRequired - egg.stepsWalked, 0).toLocaleString()} steps remaining`}
-                </Text>
-                <ProgressBar progress={getEggProgress(egg)} />
-                <AppButton
-                  disabled={!eggReady}
-                  label={eggReady ? "Hatch Pal" : "Keep moving"}
-                  onPress={() => onHatch(egg.id)}
-                  style={!eggReady ? styles.disabledButton : undefined}
-                  variant={eggReady ? "primary" : "secondary"}
-                />
-              </View>
-            </View>
-          );
-        })}
+        {data.activeEggs.map((egg, index) => (
+          <EggSlotCard
+            egg={egg}
+            key={egg.id}
+            onHatch={() => onHatch(egg.id)}
+            slotNumber={index + 1}
+          />
+        ))}
       </View>
       <CollapsibleSection
-        badge={progression.next ? `${progression.xpToNext} XP left` : "Final"}
-        subtitle="Preview the stages your Pal can grow into."
-        title="Journey Pal"
+        badge={`${data.collection.length} Pals`}
+        subtitle="Growth details, stages, and your Pal preview live here when you want the deeper view."
+        title="More about your Pals"
       >
-        <View style={styles.card}>
+        <View style={styles.palInfoBlock}>
+          <Text style={styles.palInfoTitle}>Journey Pal</Text>
           <MonsterAvatar stage={progression.current.id} />
           <Text style={styles.name}>{data.monsterName}</Text>
           <Text style={styles.stage}>{progression.current.label} stage</Text>
           <ProgressBar progress={progression.progress} />
           <Text style={styles.caption}>
             {progression.next
-              ? `${progression.xpToNext} journey XP to reach ${progression.next.label}`
+              ? `${formatNumber(progression.xpToNext)} Journey XP to reach ${progression.next.label}`
               : "Your Pal journey has reached its final stage."}
           </Text>
         </View>
-      </CollapsibleSection>
-      <CollapsibleSection
-        badge={`${data.totalXp} XP`}
-        subtitle="Preview the stages your Pal can grow into."
-        title="Journey stages"
-      >
+        <View style={styles.palInfoBlock}>
+          <View style={styles.palInfoHeader}>
+            <Text style={styles.palInfoTitle}>Journey stages</Text>
+            <Text style={styles.palInfoBadge}>{formatXp(data.totalXp)}</Text>
+          </View>
         {MONSTER_STAGES.map((stage) => {
           const unlocked = data.totalXp >= stage.xp;
           return (
@@ -190,7 +186,7 @@ export function MonsterDetailScreen({
               <View style={[styles.dot, unlocked && styles.unlockedDot]} />
               <View style={styles.stageText}>
                 <Text style={styles.rowTitle}>{stage.label}</Text>
-                <Text style={styles.rowCaption}>{stage.xp} journey XP</Text>
+                <Text style={styles.rowCaption}>{formatNumber(stage.xp)} Journey XP</Text>
               </View>
               <Text style={[styles.status, unlocked && styles.unlocked]}>
                 {unlocked ? "Unlocked" : "Locked"}
@@ -199,16 +195,18 @@ export function MonsterDetailScreen({
           );
         })}
         <View style={styles.stats}>
-          <Stat label="Journey XP" value={String(data.totalXp)} />
+          <Stat label="Journey XP" value={formatNumber(data.totalXp)} />
           <Stat label="Active Eggs" value={`${data.activeEggs.length}/3`} />
           <Stat label="Queued Eggs" value={String(data.pendingEggs.length)} />
         </View>
-      </CollapsibleSection>
-      <CollapsibleSection
-        badge={activeHatchling ? `L${activeHatchling.level}` : "None"}
-        subtitle="Active Pal growth details stay tucked below the Hatchery loop."
-        title="Active Pal details"
-      >
+        </View>
+        <View style={styles.palInfoBlock}>
+          <View style={styles.palInfoHeader}>
+            <Text style={styles.palInfoTitle}>Active Pal details</Text>
+            <Text style={styles.palInfoBadge}>
+              {activeHatchling ? `L${activeHatchling.level}` : "None"}
+            </Text>
+          </View>
         {activeHatchling ? (
           <View style={styles.trainingCard}>
             <HatchlingAvatar
@@ -256,12 +254,14 @@ export function MonsterDetailScreen({
             </Text>
           </View>
         )}
-      </CollapsibleSection>
-      <CollapsibleSection
-        badge={`${data.collection.length} collected`}
-        subtitle="A quick preview of the team your Eggs have hatched."
-        title="Your Pals preview"
-      >
+        </View>
+        <View style={styles.palInfoBlock}>
+          <View style={styles.palInfoHeader}>
+            <Text style={styles.palInfoTitle}>Your Pals preview</Text>
+            <Text style={styles.palInfoBadge}>
+              {formatNumber(data.collection.length)} collected
+            </Text>
+          </View>
         {data.collection.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>Your collection starts with movement.</Text>
@@ -288,6 +288,7 @@ export function MonsterDetailScreen({
             ))}
           </View>
         )}
+        </View>
       </CollapsibleSection>
     </Screen>
   );
@@ -299,6 +300,107 @@ function Stat({ label, value }: { label: string; value: string }) {
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
+  );
+}
+
+function AllEggsSummary({
+  closestEgg,
+  readyEggCount,
+  todaySteps,
+}: {
+  closestEgg: ClosestEggSummary | null;
+  readyEggCount: number;
+  todaySteps: number;
+}) {
+  return (
+    <View style={styles.eggsSummaryCard}>
+      <View style={styles.eggsSummaryHeader}>
+        <View>
+          <Text style={styles.eggsSummaryKicker}>All Eggs</Text>
+          <Text style={styles.eggsSummaryTitle}>Incubator overview</Text>
+        </View>
+        {readyEggCount > 0 && <Text style={styles.eggsSummaryReady}>Ready</Text>}
+      </View>
+      <View style={styles.eggsSummaryGrid}>
+        <SummaryStat label="Steps added today" value={formatSteps(todaySteps)} />
+        <SummaryStat label="Eggs ready" value={String(readyEggCount)} />
+        <SummaryStat
+          label="Closest next Egg"
+          value={
+            closestEgg
+              ? `Slot ${closestEgg.slotNumber}`
+              : readyEggCount > 0
+                ? "Ready now"
+                : "No Egg"
+          }
+        />
+      </View>
+      <Text style={styles.eggsSummaryNote}>
+        {closestEgg
+          ? `${capitalize(closestEgg.egg.rarity)} ${capitalize(closestEgg.egg.element)} Egg has ${formatSteps(closestEgg.stepsLeft)} left.`
+          : readyEggCount > 0
+            ? "Open a ready Egg below to meet your next Pal."
+            : "Add an Egg to start filling the incubator."}
+      </Text>
+    </View>
+  );
+}
+
+function SummaryStat({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.eggsSummaryStat}>
+      <Text style={styles.eggsSummaryValue}>{value}</Text>
+      <Text style={styles.eggsSummaryLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function EggSlotCard({
+  egg,
+  onHatch,
+  slotNumber,
+}: {
+  egg: ActiveEgg;
+  onHatch: () => Promise<void>;
+  slotNumber: number;
+}) {
+  const ready = isEggReady(egg);
+  const stepsLeft = Math.max(egg.stepsRequired - egg.stepsWalked, 0);
+
+  return (
+    <EggReadyPulse active={ready}>
+      <View style={[styles.eggSlotCard, ready && styles.eggSlotCardReady]}>
+      <View style={styles.eggSlotArt}>
+        <EggAvatar element={egg.element} rarity={egg.rarity} size="small" />
+      </View>
+      <View style={styles.eggSlotBody}>
+        <View style={styles.eggSlotHeader}>
+          <View>
+            <Text style={styles.eggSlotNumber}>Slot {slotNumber}</Text>
+            <Text style={styles.eggSlotName}>
+              {capitalize(egg.rarity)} {capitalize(egg.element)} Egg
+            </Text>
+          </View>
+          <Text style={[styles.eggSlotStatus, ready && styles.eggSlotStatusReady]}>
+            {ready ? "Ready" : `${formatSteps(stepsLeft)} left`}
+          </Text>
+        </View>
+        <ProgressBar progress={getEggProgress(egg)} />
+        {ready ? (
+          <AppButton
+            label="Hatch Egg"
+            onPress={() => {
+              void onHatch();
+            }}
+          />
+        ) : (
+          <Text style={styles.eggSlotHint}>
+            Sync movement from Home to keep this Egg filling.
+          </Text>
+        )}
+      </View>
+      </View>
+    </EggReadyPulse>
   );
 }
 
@@ -315,6 +417,7 @@ function HatchRevealModal({
 }) {
   const shake = useRef(new Animated.Value(0)).current;
   const glow = useRef(new Animated.Value(0)).current;
+  const reducedMotion = useReducedMotion();
   const [stage, setStage] = useState<"shake" | "crack" | "reveal">("shake");
 
   useEffect(() => {
@@ -323,6 +426,12 @@ function HatchRevealModal({
     setStage("shake");
     shake.setValue(0);
     glow.setValue(0);
+    if (reducedMotion) {
+      setStage("reveal");
+      glow.setValue(1);
+      return;
+    }
+
     const shakeLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(shake, {
@@ -358,7 +467,7 @@ function HatchRevealModal({
       clearTimeout(crackTimer);
       clearTimeout(revealTimer);
     };
-  }, [glow, hatchling, shake]);
+  }, [glow, hatchling, reducedMotion, shake]);
 
   if (!hatchling) return null;
 
@@ -384,7 +493,7 @@ function HatchRevealModal({
             <Text style={styles.revealCloseText}>Close</Text>
           </Pressable>
           <Text style={styles.revealKicker}>
-            {revealed ? "NEW HATCHLING" : "HATCHING"}
+            {revealed ? "NEW PAL" : "HATCHING"}
           </Text>
           <Text style={styles.revealStageText}>
             {stage === "shake"
@@ -394,6 +503,7 @@ function HatchRevealModal({
                 : "A new Pal has arrived."}
           </Text>
           <View style={styles.revealArtStage}>
+            <HatchCelebration active={revealed} />
             <Animated.View
               style={[
                 styles.revealGlow,
@@ -455,53 +565,19 @@ function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function getHatcheryMission({
-  activeEggCount,
-  collectionCount,
-  readyEggCount,
-}: {
-  activeEggCount: number;
-  collectionCount: number;
-  readyEggCount: number;
-}): {
-  body: string;
-  cta: string;
-  target: "collection" | "home" | "stay";
-  title: string;
-} {
-  if (readyEggCount > 0) {
-    return {
-      body: "A ready Egg is waiting below. Hatch it now to add a new Pal to your team.",
-      cta: "Hatch below",
-      target: "stay",
-      title: `${readyEggCount} Egg${readyEggCount === 1 ? "" : "s"} ready`,
-    };
-  }
-
-  if (activeEggCount > 0) {
-    return {
-      body: "Sync movement from Home after walking to fill every Egg slot together.",
-      cta: "Go sync movement",
-      target: "home",
-      title: "Fill your incubator",
-    };
-  }
-
-  if (collectionCount > 0) {
-    return {
-      body: "Your incubator is empty. Check your Collection and pick who trains while you earn the next Egg.",
-      cta: "Open Collection",
-      target: "collection",
-      title: "Train while you hunt Eggs",
-    };
-  }
-
-  return {
-    body: "Start on Home to sync movement and begin filling your starter Egg.",
-    cta: "Go to Home",
-    target: "home",
-    title: "Start your first hatch",
-  };
+function getClosestEgg(eggs: ActiveEgg[]): ClosestEggSummary | null {
+  return eggs.reduce<ClosestEggSummary | null>((closest, egg, index) => {
+    if (isEggReady(egg)) return closest;
+    const stepsLeft = Math.max(egg.stepsRequired - egg.stepsWalked, 0);
+    if (!closest || stepsLeft < closest.stepsLeft) {
+      return {
+        egg,
+        slotNumber: index + 1,
+        stepsLeft,
+      };
+    }
+    return closest;
+  }, null);
 }
 
 const styles = StyleSheet.create({
@@ -748,6 +824,217 @@ const styles = StyleSheet.create({
   trainingButton: {
     minWidth: 110,
   },
+  hatcheryStatusRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  hatcheryStatusPill: {
+    backgroundColor: colors.primaryDeep,
+    borderRadius: radii.pill,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  hatcheryStatusText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  hatcheryStatusHint: {
+    color: colors.muted,
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  eggsSummaryCard: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 12,
+    marginBottom: 12,
+    padding: 14,
+  },
+  eggsSummaryHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  eggsSummaryKicker: {
+    color: colors.primaryDeep,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+  },
+  eggsSummaryTitle: {
+    color: colors.ink,
+    fontSize: 17,
+    fontWeight: "900",
+    marginTop: 3,
+  },
+  eggsSummaryReady: {
+    backgroundColor: colors.rewardGold,
+    borderRadius: radii.pill,
+    color: colors.ink,
+    fontSize: 11,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  eggsSummaryGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  eggsSummaryStat: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    flex: 1,
+    padding: 10,
+  },
+  eggsSummaryValue: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  eggsSummaryLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "800",
+    lineHeight: 14,
+    marginTop: 4,
+  },
+  eggsSummaryNote: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  readyCelebration: {
+    alignItems: "center",
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 12,
+    padding: 14,
+  },
+  readyCelebrationText: {
+    flex: 1,
+  },
+  readyCelebrationKicker: {
+    color: colors.primaryDeep,
+    fontSize: 17,
+    fontWeight: "900",
+  },
+  readyCelebrationBody: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 3,
+  },
+  readyCelebrationButton: {
+    minWidth: 106,
+  },
+  readyCelebrationPulse: {
+    marginBottom: 0,
+  },
+  eggSlotCard: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    padding: 12,
+  },
+  eggSlotCardReady: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+  },
+  eggSlotArt: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 92,
+  },
+  eggSlotBody: {
+    flex: 1,
+    gap: 8,
+  },
+  eggSlotHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between",
+  },
+  eggSlotNumber: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  eggSlotName: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  eggSlotStatus: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "900",
+    lineHeight: 15,
+    maxWidth: 96,
+    textAlign: "right",
+  },
+  eggSlotStatusReady: {
+    color: colors.primaryDeep,
+  },
+  eggSlotHint: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 17,
+  },
+  palInfoBlock: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 10,
+    marginTop: 10,
+    padding: 14,
+  },
+  palInfoHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  palInfoTitle: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  palInfoBadge: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    color: colors.primaryDeep,
+    fontSize: 11,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
   incubatorCard: {
     alignItems: "center",
     backgroundColor: colors.surface,
@@ -816,8 +1103,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
   },
-  disabledButton: {
-    opacity: 0.58,
+  eggProgressStatus: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  eggProgressStatusText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "900",
+    textAlign: "center",
   },
   collectionHeader: {
     alignItems: "baseline",

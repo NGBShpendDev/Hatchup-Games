@@ -13,10 +13,12 @@ import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
 import { CollapsibleSection } from "../components/CollapsibleSection";
 import { HatchlingAvatar } from "../components/HatchlingAvatar";
-import { Header } from "../components/Header";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
 import { SparkleBurst } from "../components/SparkleBurst";
+import { PageTitle, SegmentedControl } from "../components/ui";
+import { QaTestLabScreen } from "./QaTestLabScreen";
+import { ENABLE_PROFILE_BADGES } from "../config/features";
 import { getScreenLoopSubtitle } from "../content/coreLoopCopy";
 import {
   buildSupportMailto,
@@ -53,12 +55,14 @@ import { getActivitySummary } from "../domain/history";
 import type { CollectedHatchling, HatchUpData } from "../domain/models";
 import type { MonsterStage } from "../domain/progression";
 import type { ProgressionProfile } from "../domain/progressionConfig";
+import type { QaFixtureId } from "../qa/fixtures";
 import {
   getPublicReadinessItems,
   getPublicReadinessScore,
   type PublicReadinessItem,
 } from "../domain/publicReadiness";
 import { colors, radii, typography } from "../theme";
+import { formatNumber, formatPercent } from "../utils/format";
 
 const privacyCopy =
   "HatchUp reads your steps, workouts, and active energy only to reward your Pal with XP. We do not sell your health data or use it for ads. Distance is used only for optional journey board rankings when you choose to share.";
@@ -86,6 +90,7 @@ interface Props {
   onSetCrashReportingEnabled: (enabled: boolean) => Promise<void>;
   onSetLeaderboardSharing: (enabled: boolean) => Promise<void>;
   onSetTestStage: (stage: MonsterStage) => Promise<void>;
+  onApplyQaFixture: (fixtureId: QaFixtureId) => Promise<void>;
 }
 
 export function SettingsPrivacyScreen({
@@ -107,6 +112,7 @@ export function SettingsPrivacyScreen({
   onSetCrashReportingEnabled,
   onSetLeaderboardSharing,
   onSetTestStage,
+  onApplyQaFixture,
 }: Props) {
   const today = toDateKey(new Date());
   const badges = getBadges(data, today);
@@ -235,24 +241,19 @@ export function SettingsPrivacyScreen({
         />
       }
     >
-      <Header onBack={onBack} title="Profile and privacy" />
-      <Text style={styles.title}>Your HatchUp profile.</Text>
-      <Text style={styles.body}>
-        {getScreenLoopSubtitle("profile")} Badges remember your journey, and
-        privacy controls stay close by.
-      </Text>
-      <View style={styles.profileTabs}>
-        <ProfileTab
-          active={activeTab === "profile"}
-          label="Profile"
-          onPress={() => setActiveTab("profile")}
-        />
-        <ProfileTab
-          active={activeTab === "settings"}
-          label="Settings"
-          onPress={() => setActiveTab("settings")}
-        />
-      </View>
+      <PageTitle
+        eyebrow="Profile and privacy"
+        subtitle={`${getScreenLoopSubtitle("profile")} Badges remember your journey, and privacy controls stay close by.`}
+        title="Your HatchUp profile."
+      />
+      <SegmentedControl
+        onChange={setActiveTab}
+        options={[
+          { label: "Profile", value: "profile" },
+          { label: "Settings", value: "settings" },
+        ]}
+        value={activeTab}
+      />
       {activeTab === "profile" && (
         <>
       <View style={styles.profileCard}>
@@ -303,7 +304,7 @@ export function SettingsPrivacyScreen({
           />
         </View>
         <View style={styles.petPicker}>
-          <Text style={styles.cardTitle}>Profile pet picture</Text>
+          <Text style={styles.cardTitle}>Profile Pal</Text>
           {data.collection.length > 0 ? (
             <View style={styles.petOptions}>
               {data.collection.map((hatchling) => (
@@ -506,75 +507,77 @@ export function SettingsPrivacyScreen({
           <Text style={styles.profileSaveMessage}>{profileSaveMessage}</Text>
         )}
       </View>
-      <CollapsibleSection
-        badge={`${unlockedBadgeCount}/${badges.length}`}
-        subtitle="Badge paths for collection, movement, bonds, rarity, streaks, and XP."
-        title="Badges"
-      >
-        <View style={styles.badgeCard}>
-          <Text style={styles.cardTitle}>Milestones and badges</Text>
-          <Text style={styles.privacyText}>
-            Badge progress is local on this device and can become shareable once
-            accounts are online.
-          </Text>
-          <View style={styles.badgeProgressPanel}>
-            <View style={styles.badgeProgressHeader}>
-              <Text style={styles.badgeProgressTitle}>Trainer milestone path</Text>
-              <Text style={styles.badgeProgressValue}>
-                {unlockedBadgeCount}/{badges.length}
-              </Text>
-            </View>
-            <ProgressBar progress={badgeCompletionRatio} />
-            <Text style={styles.badgeProgressMeta}>
-              {Math.round(badgeCompletionRatio * 100)}% complete across collection,
-              movement, bonds, rarity, streaks, and XP.
+      {ENABLE_PROFILE_BADGES && (
+        <CollapsibleSection
+          badge={`${unlockedBadgeCount}/${badges.length}`}
+          subtitle="Badge paths for collection, movement, bonds, rarity, streaks, and XP."
+          title="Badges"
+        >
+          <View style={styles.badgeCard}>
+            <Text style={styles.cardTitle}>Milestones and badges</Text>
+            <Text style={styles.privacyText}>
+              Badge progress is local on this device and can become shareable once
+              accounts are online.
             </Text>
-          </View>
-          <View style={styles.badgeCategoryRow}>
-            {Object.entries(badgeCategorySummary).map(([category, summary]) => (
-              <View key={category} style={styles.badgeCategoryPill}>
-                <Text style={styles.badgeCategoryLabel}>
-                  {capitalize(category)}
-                </Text>
-                <Text style={styles.badgeCategoryValue}>
-                  {summary.unlocked}/{summary.total}
+            <View style={styles.badgeProgressPanel}>
+              <View style={styles.badgeProgressHeader}>
+                <Text style={styles.badgeProgressTitle}>Trainer milestone path</Text>
+                <Text style={styles.badgeProgressValue}>
+                  {unlockedBadgeCount}/{badges.length}
                 </Text>
               </View>
-            ))}
-          </View>
-          {nextBadges.length > 0 && (
-            <View style={styles.nextBadgePanel}>
-              <Text style={styles.nextBadgeTitle}>Closest unlocks</Text>
-              {nextBadges.map((badge) => (
-                <View key={badge.id} style={styles.nextBadgeRow}>
-                  <View style={styles.nextBadgeText}>
-                    <Text style={styles.nextBadgeName}>{badge.label}</Text>
-                    <Text style={styles.nextBadgeMeta}>
-                      {Math.min(badge.value, badge.target).toLocaleString()} /{" "}
-                      {badge.target.toLocaleString()} | {capitalize(badge.category)}
-                    </Text>
-                    <ProgressBar progress={badge.progress} />
-                  </View>
-                  <Text style={styles.nextBadgePercent}>
-                    {Math.round(badge.progress * 100)}%
+              <ProgressBar progress={badgeCompletionRatio} />
+              <Text style={styles.badgeProgressMeta}>
+                {formatPercent(badgeCompletionRatio)} complete across collection,
+                movement, bonds, rarity, streaks, and XP.
+              </Text>
+            </View>
+            <View style={styles.badgeCategoryRow}>
+              {Object.entries(badgeCategorySummary).map(([category, summary]) => (
+                <View key={category} style={styles.badgeCategoryPill}>
+                  <Text style={styles.badgeCategoryLabel}>
+                    {capitalize(category)}
+                  </Text>
+                  <Text style={styles.badgeCategoryValue}>
+                    {summary.unlocked}/{summary.total}
                   </Text>
                 </View>
               ))}
             </View>
-          )}
-          <View style={styles.badgeShelves}>
-            {Object.entries(badgesByCategory).map(([category, categoryBadges]) => (
-              <MilestoneShelf
-                badges={categoryBadges}
-                category={category as BadgeCategory}
-                key={category}
-                progress={badgeCategoryProgress[category as BadgeCategory] ?? 0}
-                summary={badgeCategorySummary[category as BadgeCategory]}
-              />
-            ))}
+            {nextBadges.length > 0 && (
+              <View style={styles.nextBadgePanel}>
+                <Text style={styles.nextBadgeTitle}>Closest unlocks</Text>
+                {nextBadges.map((badge) => (
+                  <View key={badge.id} style={styles.nextBadgeRow}>
+                    <View style={styles.nextBadgeText}>
+                      <Text style={styles.nextBadgeName}>{badge.label}</Text>
+                      <Text style={styles.nextBadgeMeta}>
+                        {formatNumber(Math.min(badge.value, badge.target))} /{" "}
+                        {formatNumber(badge.target)} | {capitalize(badge.category)}
+                      </Text>
+                      <ProgressBar progress={badge.progress} />
+                    </View>
+                    <Text style={styles.nextBadgePercent}>
+                      {formatPercent(badge.progress)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+            <View style={styles.badgeShelves}>
+              {Object.entries(badgesByCategory).map(([category, categoryBadges]) => (
+                <MilestoneShelf
+                  badges={categoryBadges}
+                  category={category as BadgeCategory}
+                  key={category}
+                  progress={badgeCategoryProgress[category as BadgeCategory] ?? 0}
+                  summary={badgeCategorySummary[category as BadgeCategory]}
+                />
+              ))}
+            </View>
           </View>
-        </View>
-      </CollapsibleSection>
+        </CollapsibleSection>
+      )}
         </>
       )}
       {activeTab === "settings" && (
@@ -653,7 +656,10 @@ export function SettingsPrivacyScreen({
           label="Last sync"
           value={
             data.lastSyncedDate
-              ? new Date(data.lastSyncedDate).toLocaleString()
+              ? new Intl.DateTimeFormat("en-US", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                }).format(new Date(data.lastSyncedDate))
               : "Not synced yet"
           }
         />
@@ -799,40 +805,12 @@ export function SettingsPrivacyScreen({
             </Text>
           </Pressable>
           {showBetaTools && (
-            <View style={styles.testLabCard}>
-              <Text style={styles.cardTitle}>Local Test Lab</Text>
-              <Text style={styles.privacyText}>
-                Preview local progression states without changing Apple Health data.
-                These tools are included only in accelerated testing builds.
-              </Text>
-              <View style={styles.testLabButtons}>
-                <AppButton
-                  label="Preview Egg"
-                  onPress={() => onSetTestStage("egg")}
-                  variant="secondary"
-                />
-                <AppButton
-                  label="Preview Baby"
-                  onPress={() => onSetTestStage("baby")}
-                  variant="secondary"
-                />
-                <AppButton
-                  label="Preview Teen"
-                  onPress={() => onSetTestStage("teen")}
-                  variant="secondary"
-                />
-                <AppButton
-                  label="Preview Final"
-                  onPress={() => onSetTestStage("final")}
-                  variant="secondary"
-                />
-                <AppButton
-                  label="Ready all Eggs"
-                  onPress={onReadyTestEgg}
-                  variant="secondary"
-                />
-              </View>
-            </View>
+            <QaTestLabScreen
+              onApplyQaFixture={onApplyQaFixture}
+              onReadyTestEgg={onReadyTestEgg}
+              onSetTestStage={onSetTestStage}
+              today={today}
+            />
           )}
         </CollapsibleSection>
       )}
@@ -1048,7 +1026,7 @@ function MilestoneShelf({
           </Text>
         </View>
         <Text style={styles.milestoneShelfPercent}>
-          {Math.round(progress * 100)}%
+          {formatPercent(progress)}
         </Text>
       </View>
       <ProgressBar progress={progress} />
@@ -1070,8 +1048,8 @@ function BadgeTile({ badge }: { badge: Badge }) {
       <Text style={styles.badgeName}>{badge.label}</Text>
       <Text style={styles.badgeText}>{badge.description}</Text>
       <Text style={styles.badgeProgress}>
-        {Math.min(badge.value, badge.target).toLocaleString()} /{" "}
-        {badge.target.toLocaleString()}
+        {formatNumber(Math.min(badge.value, badge.target))} /{" "}
+        {formatNumber(badge.target)}
       </Text>
       <ProgressBar progress={badge.progress} />
       {badge.unlocked && (
@@ -1817,14 +1795,6 @@ const styles = StyleSheet.create({
     marginTop: 14,
     padding: 16,
   },
-  testLabCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    marginTop: 14,
-    padding: 16,
-  },
   betaToolsHandle: {
     backgroundColor: colors.primarySoft,
     borderColor: colors.line,
@@ -1844,10 +1814,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     marginTop: 4,
-  },
-  testLabButtons: {
-    gap: 8,
-    marginTop: 12,
   },
   readOnlyCard: {
     backgroundColor: colors.surface,

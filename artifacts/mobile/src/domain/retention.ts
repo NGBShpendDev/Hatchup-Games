@@ -1,6 +1,7 @@
 import { getActivitySummary } from "./history";
 import type { HatchUpData } from "./models";
 import { getUnlockedBadgeCount } from "./badges";
+import { formatSteps } from "../utils/format";
 
 export interface RetentionPlan {
   label: string;
@@ -31,7 +32,7 @@ export function getRetentionPlan(data: HatchUpData, today: string): RetentionPla
   if (stepsRemaining === 0) {
     return {
       label: "Weekly goal complete",
-      message: "Your eggs felt that. Keep moving to climb rankings or bank extra hatch progress.",
+      message: "Your Eggs felt that. Extra movement can climb Ranks or bank more Egg progress.",
       progress,
       stepsRemaining,
       weeklyGoalSteps,
@@ -42,7 +43,7 @@ export function getRetentionPlan(data: HatchUpData, today: string): RetentionPla
   if (data.currentStreak === 0 && data.lastSyncedDate) {
     return {
       label: "Comeback window",
-      message: `${stepsRemaining.toLocaleString()} steps left this week. One sync today restarts your momentum.`,
+      message: `${formatSteps(stepsRemaining)} left this week. One sync today restarts your momentum.`,
       progress,
       stepsRemaining,
       weeklyGoalSteps,
@@ -52,7 +53,7 @@ export function getRetentionPlan(data: HatchUpData, today: string): RetentionPla
 
   return {
     label: "Weekly hatch goal",
-    message: `${stepsRemaining.toLocaleString()} steps left to hit your weekly movement target.`,
+    message: `${formatSteps(stepsRemaining)} left to hit your weekly movement target.`,
     progress,
     stepsRemaining,
     weeklyGoalSteps,

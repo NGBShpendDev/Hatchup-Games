@@ -5,6 +5,7 @@ import {
   ACTIVE_PROGRESSION_PROFILE,
   type ProgressionProfile,
 } from "./progressionConfig";
+import { formatNumber } from "../utils/format";
 
 export type QuestCadence = "daily" | "weekly" | "monthly" | "seasonal" | "pal";
 
@@ -75,7 +76,7 @@ export function getDailyQuests(
       tier("Ten-mile odyssey", 10, questReward(baseReward, 70)),
     ]),
     getTieredQuest("daily", "firstSync", award ? 1 : 0, "sync", [
-      tier("Collect today's rewards", 1, baseReward),
+      tier("Sync movement", 1, baseReward),
     ]),
   ];
 }
@@ -156,7 +157,7 @@ function getDailyQuestLines(
     },
     {
       current: 1,
-      tiers: [tier("Collect today's rewards", 1, baseReward)],
+      tiers: [tier("Sync movement", 1, baseReward)],
     },
   ];
 }
@@ -389,7 +390,7 @@ function getQuestRemaining(quest: Quest) {
 }
 
 function formatQuestAmount(value: number) {
-  return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(1);
+  return Number.isInteger(value) ? formatNumber(value) : value.toFixed(1);
 }
 
 function formatQuestUnit(unit: string, value: number) {
@@ -465,13 +466,13 @@ export function getQuestRewardKey(quest: Quest, today: string) {
 export function getQuestRewardLabel(quest: Quest) {
   const rewards: string[] = [];
   if (quest.rewardAccountXp > 0) {
-    rewards.push(`+${quest.rewardAccountXp} Account XP`);
+    rewards.push(`+${formatNumber(quest.rewardAccountXp)} Journey XP`);
   }
   if (quest.rewardCoins > 0) rewards.push(`+${quest.rewardCoins} coins`);
   if (quest.rewardEggSteps > 0) {
-    rewards.push(`+${quest.rewardEggSteps.toLocaleString()} egg steps`);
+    rewards.push(`+${formatNumber(quest.rewardEggSteps)} Egg progress`);
   }
-  if (quest.rewardXp > 0) rewards.push(`+${quest.rewardXp} Journey XP`);
+  if (quest.rewardXp > 0) rewards.push(`+${formatNumber(quest.rewardXp)} Journey XP`);
   return rewards.length > 0 ? rewards.join(" | ") : "Milestone tracker";
 }
 

@@ -1,12 +1,36 @@
-import { StyleSheet, View } from "react-native";
+import { useEffect, useRef } from "react";
+import { Animated, StyleSheet, View } from "react-native";
 import { colors, radii } from "../theme";
+import { useReducedMotion } from "../utils/animations";
 
 export function ProgressBar({ progress }: { progress: number }) {
-  const width = `${progress * 100}%` as `${number}%`;
+  const reducedMotion = useReducedMotion();
+  const clampedProgress = Math.max(0, Math.min(progress, 1));
+  const fill = useRef(new Animated.Value(clampedProgress)).current;
+
+  useEffect(() => {
+    if (reducedMotion) {
+      fill.setValue(clampedProgress);
+      return;
+    }
+
+    const animation = Animated.timing(fill, {
+      duration: 420,
+      toValue: clampedProgress,
+      useNativeDriver: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [clampedProgress, fill, reducedMotion]);
+
+  const width = fill.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0%", "100%"],
+  });
 
   return (
     <View style={styles.track}>
-      <View style={[styles.fill, { width }]} />
+      <Animated.View style={[styles.fill, { width }]} />
     </View>
   );
 }

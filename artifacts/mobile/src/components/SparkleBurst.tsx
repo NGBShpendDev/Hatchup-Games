@@ -1,33 +1,41 @@
 import { useEffect, useRef } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 import { colors } from "../theme";
+import { useReducedMotion } from "../utils/animations";
 
 interface Props {
   label?: string;
+  loop?: boolean;
   tone?: "accent" | "primary";
 }
 
-export function SparkleBurst({ label, tone = "primary" }: Props) {
+export function SparkleBurst({ label, loop = false, tone = "primary" }: Props) {
   const pulse = useRef(new Animated.Value(0)).current;
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          duration: 720,
-          toValue: 1,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          duration: 720,
-          toValue: 0,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulse]);
+    if (reducedMotion) {
+      pulse.setValue(1);
+      return;
+    }
+
+    pulse.setValue(0);
+    const sequence = Animated.sequence([
+      Animated.timing(pulse, {
+        duration: 720,
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.timing(pulse, {
+        duration: 720,
+        toValue: 0,
+        useNativeDriver: true,
+      }),
+    ]);
+    const animation = loop ? Animated.loop(sequence) : sequence;
+    animation.start();
+    return () => animation.stop();
+  }, [loop, pulse, reducedMotion]);
 
   const scale = pulse.interpolate({
     inputRange: [0, 1],

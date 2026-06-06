@@ -182,7 +182,7 @@ describe("daily quests", () => {
       rewardCoins: 130,
       rewardEggSteps: 1400,
     });
-    expect(getQuestRewardLabel(elementQuest!)).toContain("Account XP");
+    expect(getQuestRewardLabel(elementQuest!)).toContain("Journey XP");
     expect(getQuestRewardKey(elementQuest!, "2026-06-03")).toBe(
       "week-2026-05-31:weeklyElementTraining:tier-3",
     );

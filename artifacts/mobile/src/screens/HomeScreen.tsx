@@ -1,16 +1,19 @@
-import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
 import { CollapsibleSection } from "../components/CollapsibleSection";
-import { CompactSummaryRow } from "../components/CompactSummaryRow";
 import { EggAvatar } from "../components/EggAvatar";
 import { HatchlingAvatar } from "../components/HatchlingAvatar";
 import { MonsterAvatar } from "../components/MonsterAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
 import { SparkleBurst } from "../components/SparkleBurst";
-import { StackedMenuCard } from "../components/StackedMenuCard";
+import { PageTitle, SegmentedControl } from "../components/ui";
+import {
+  ENABLE_SHOP,
+  ENABLE_WEEKLY_CHEST,
+} from "../config/features";
 import {
   getCollectionNudge,
   getEggProgressMessage,
@@ -41,15 +44,12 @@ import {
   getClaimableQuestCount,
   getDailyQuests,
   getNextQuestSuggestions,
-  getMonthlyQuests,
   getQuestCompletionRatio,
-  getPalQuests,
   getQuestProgress,
   getQuestRemainingText,
   getQuestRewardKey,
   getQuestRewardLabel,
   getQuestTierLabel,
-  getSeasonalQuests,
   getWeeklyQuests,
   isQuestComplete,
   type Quest as QuestModel,
@@ -65,6 +65,18 @@ import {
 import { SHOP_ITEMS, type ShopItem, type ShopItemId } from "../domain/shop";
 import { colors, radii, typography } from "../theme";
 import type { LatestSyncGains } from "../useHatchUpApp";
+import {
+  formatDistanceMiles,
+  formatNumber,
+  formatPercent,
+  formatSteps,
+} from "../utils/format";
+import {
+  impactSyncSuccess,
+  notifySyncSuccess,
+  notifySyncWarning,
+} from "../utils/haptics";
+import { CardEntrance, SyncSuccessShimmer } from "../utils/animations";
 
 interface Props {
   data: HatchUpData;
@@ -101,6 +113,8 @@ export function HomeScreen({
 }: Props) {
   const [questCadence, setQuestCadence] = useState<QuestCadence>("daily");
   const [rewardDismissed, setRewardDismissed] = useState(false);
+  const lastErrorRef = useRef(error);
+  const wasSyncingRef = useRef(isSyncing);
   const todayKey = toDateKey(new Date());
   const progression = getProgression(data.totalXp);
   const today =
@@ -111,19 +125,14 @@ export function HomeScreen({
         : null;
   const quests = getDailyQuests(today);
   const weeklyQuests = getWeeklyQuests(data, todayKey);
-  const monthlyQuests = getMonthlyQuests(data, todayKey);
-  const seasonalQuests = getSeasonalQuests(data, todayKey);
-  const palQuests = getPalQuests(data, todayKey);
+  const enabledQuestCadences: QuestCadence[] = ["daily", "weekly"];
+  const activeQuestCadence = enabledQuestCadences.includes(questCadence)
+    ? questCadence
+    : "daily";
   const visibleQuests =
-    questCadence === "daily"
+    activeQuestCadence === "daily"
       ? quests
-      : questCadence === "weekly"
-        ? weeklyQuests
-        : questCadence === "monthly"
-          ? monthlyQuests
-          : questCadence === "seasonal"
-            ? seasonalQuests
-            : palQuests;
+      : weeklyQuests;
   const visibleQuestCompletion = getQuestCompletionRatio(visibleQuests);
   const visibleClaimableQuestCount = getClaimableQuestCount(
     visibleQuests,
@@ -139,6 +148,10 @@ export function HomeScreen({
   const firstWeekMission = getCurrentFirstWeekMission(data, todayKey);
   const firstWeekMissions = getFirstWeekMissions(data, todayKey);
   const weeklyChest = getWeeklyRewardChest(data, todayKey);
+  const effectiveWeeklyChest = {
+    ...weeklyChest,
+    canClaim: ENABLE_WEEKLY_CHEST && weeklyChest.canClaim,
+  };
   const activeHatchlingRaw = getActiveHatchling(data);
   const activeHatchling = activeHatchlingRaw
     ? getTimeAdjustedHatchling(activeHatchlingRaw)
@@ -154,15 +167,29 @@ export function HomeScreen({
     (latestSync?.date === todayKey ||
       latestSyncGains.accountXp > 0 ||
       latestSyncGains.coins > 0);
-  const showStarterGuide =
-    !today &&
-    data.collection.length === 0 &&
-    data.totalXp === 0 &&
-    data.activeEggs.length > 0;
-
   useEffect(() => {
     setRewardDismissed(false);
   }, [latestSync]);
+  useEffect(() => {
+    if (wasSyncingRef.current && !isSyncing) {
+      if (!error && hasSyncRewards(latestSyncGains)) {
+        if (readyEggCount > 0) {
+          void notifySyncSuccess();
+        } else {
+          void impactSyncSuccess();
+        }
+      }
+    }
+
+    wasSyncingRef.current = isSyncing;
+  }, [error, isSyncing, latestSyncGains, readyEggCount]);
+  useEffect(() => {
+    if (error && error !== lastErrorRef.current) {
+      void notifySyncWarning();
+    }
+
+    lastErrorRef.current = error;
+  }, [error]);
   const handleMissionPress = getMissionAction({
     onDexPress,
     onLeaderboardPress,
@@ -172,7 +199,7 @@ export function HomeScreen({
   });
   const firstWeekMissionAction = handleMissionPress(firstWeekMission.target);
   const claimableQuest = getFirstClaimableQuest(
-    [...weeklyQuests, ...monthlyQuests, ...seasonalQuests, ...palQuests],
+    [...quests, ...weeklyQuests],
     todayKey,
     data.claimedQuestRewards,
   );
@@ -193,8 +220,19 @@ export function HomeScreen({
     trainingStatus,
     today,
     todayKey,
-    weeklyChest,
+    weeklyChest: effectiveWeeklyChest,
   });
+  const syncResultAction = getSyncResultAction({
+    activeHatchling,
+    gains: latestSyncGains,
+    onDexPress,
+    onMonsterPress,
+    readyEggCount,
+  });
+  const handleSyncResultAction = () => {
+    setRewardDismissed(true);
+    syncResultAction.onPress();
+  };
 
   return (
     <Screen
@@ -209,131 +247,70 @@ export function HomeScreen({
         />
       }
     >
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.kicker}>TODAY'S JOURNEY</Text>
-          <Text style={styles.title}>
-            {activeHatchling ? activeHatchling.name : data.monsterName}
-          </Text>
-        </View>
-        <View style={styles.streak}>
-          {data.currentStreak > 0 && <SparkleBurst tone="accent" />}
-          <Text style={styles.streakNumber}>{data.currentStreak}</Text>
-          <Text style={styles.streakLabel}>day streak</Text>
-        </View>
-      </View>
-      {showStarterGuide && (
-        <StarterGuideCard
-          healthConnected={data.healthConnected}
-          onHatcheryPress={onMonsterPress}
-          onSettingsPress={onSettingsPress}
-          onSync={onSync}
-          syncing={isSyncing}
-        />
-      )}
-      <View style={styles.heroCard}>
-        {activeHatchling ? (
-          <HatchlingAvatar
-            element={activeHatchling.element}
-            level={activeHatchling.level}
-            rarity={activeHatchling.rarity}
-          />
-        ) : (
-          <MonsterAvatar stage={progression.current.id} />
-        )}
-        <Text style={styles.stage}>
-          {activeHatchling
-            ? `Active Pal | ${capitalize(activeHatchling.rarity)} ${capitalize(activeHatchling.element)}`
-            : `${progression.current.label} starter Pal`}
-        </Text>
-        <Text style={styles.xp}>
-          {activeHatchling
-            ? `Level ${activeHatchling.level} | Bond ${activeHatchling.bond}/100`
-            : `${data.totalXp} journey XP`}
-        </Text>
-        {(latestEvolution || latestSyncGains.xp.total > 0 || latestSyncGains.palXp > 0) && (
-          <View style={styles.heroSparkles}>
-            <SparkleBurst
-              label={latestEvolution ? "LEVEL UP" : "XP GAIN"}
-              tone="accent"
-            />
+      <PageTitle
+        eyebrow="Today's journey"
+        right={
+          <View style={styles.streak}>
+            {data.currentStreak > 0 && <SparkleBurst tone="accent" />}
+            <Text style={styles.streakNumber}>{data.currentStreak}</Text>
+            <Text style={styles.streakLabel}>day streak</Text>
           </View>
-        )}
-        <ProgressBar progress={progression.progress} />
-        <Text style={styles.next}>
-          {progression.next
-            ? `${progression.xpToNext} journey XP until ${progression.next.label}`
-            : "Final journey stage reached"}
-        </Text>
-        <Text style={styles.loopPromise}>{getScreenLoopSubtitle("home")}</Text>
-      </View>
+        }
+        title={activeHatchling ? activeHatchling.name : data.monsterName}
+      />
+      <DailyHeroCard
+        activeHatchling={activeHatchling}
+        focusEgg={focusEgg}
+        latestEvolution={latestEvolution}
+        latestSyncGains={latestSyncGains}
+        progression={progression}
+        today={today}
+      />
       <NextActionCard nextAction={nextAction} />
-      <DailySnapshotStrip
-        activeHatchling={activeHatchling}
-        claimableRewards={visibleClaimableQuestCount + (weeklyChest.canClaim ? 1 : 0)}
-        focusEgg={focusEgg}
-        readyEggCount={readyEggCount}
-        today={today}
-      />
-      <TodayProgressCard
-        activeHatchling={activeHatchling}
-        dailyStepGoal={ACTIVE_PROGRESSION_PROFILE.questTargets.steps}
-        focusEgg={focusEgg}
-        today={today}
-      />
-      <DailyMissionSummaryCard
-        completedQuestCount={completedQuestCount}
-        firstWeekMission={firstWeekMission}
-        firstWeekMissions={firstWeekMissions}
-        onFirstWeekPress={firstWeekMissionAction}
-        questCount={quests.length}
-      />
-      {!showRewardFeedback && !today && (
-        <EmptyMissionCard
-          actionLabel={isSyncing ? "Syncing..." : "Collect rewards"}
-          body="No rewards yet today. Move a little, then sync to push your Eggs and Pal forward."
-          disabled={isSyncing}
-          onPress={onSync}
-          title="Your movement has not powered today yet"
-        />
-      )}
-      {showRewardFeedback && (
-        <RewardFeedbackBanner
+      {today && (
+        <SyncSummaryCard
+          focusEgg={focusEgg}
           gains={latestSyncGains}
-          latestEvolution={latestEvolution}
-          onDismiss={() => setRewardDismissed(true)}
+          today={today}
         />
       )}
-      <View style={styles.goalCard}>
-        <View style={styles.goalHeader}>
-          <Text style={styles.goalTitle}>{retention.label}</Text>
-          <Text style={styles.goalMeta}>
-            {retention.weeklySteps.toLocaleString()} /{" "}
-            {retention.weeklyGoalSteps.toLocaleString()}
-          </Text>
-        </View>
-        <ProgressBar progress={retention.progress} />
-        <Text style={styles.goalText}>{retention.message}</Text>
-      </View>
+      <SyncResultBottomSheet
+        gains={latestSyncGains}
+        latestEvolution={latestEvolution}
+        onClose={() => setRewardDismissed(true)}
+        onPrimaryAction={handleSyncResultAction}
+        primaryLabel={syncResultAction.label}
+        visible={showRewardFeedback}
+      />
+      <TodaySummaryRow
+        focusEgg={focusEgg}
+        movementXp={today?.xp.total ?? 0}
+        today={today}
+      />
+      <WeeklyGoalCard
+        chest={effectiveWeeklyChest}
+        onClaim={() => onClaimWeeklyChest(todayKey)}
+        retention={retention}
+      />
       <CollapsibleSection
-        badge={`${today?.health.steps.toLocaleString() ?? "0"} steps`}
+        badge={formatSteps(today?.health.steps ?? 0)}
         subtitle="Detailed movement stats are here when you want the full breakdown."
         title="Movement details"
       >
         <View style={styles.metrics}>
           <Metric
             label="Steps"
-            value={today?.health.steps.toLocaleString() ?? "0"}
+            value={formatNumber(today?.health.steps ?? 0)}
             xp={today?.xp.steps ?? 0}
             animate={Boolean(today?.xp.steps)}
           />
           <Metric
             label="Distance"
-            value={`${todayDistanceMiles.toFixed(1)} mi`}
+            value={formatDistanceMiles(todayDistanceMiles)}
           />
           <Metric
             label="Energy"
-            value={today?.health.activeCalories.toLocaleString() ?? "0"}
+            value={formatNumber(today?.health.activeCalories ?? 0)}
             xp={today?.xp.activeCalories ?? 0}
             animate={Boolean(today?.xp.activeCalories)}
           />
@@ -358,74 +335,9 @@ export function HomeScreen({
                   minute: "2-digit",
                 },
               )}`
-            : "Sync once to collect today's XP."}
+            : "Sync movement once to start today's Egg progress."}
         </Text>
       </CollapsibleSection>
-      <CollapsibleSection
-        badge={`${activity.activeDays}/7 active`}
-        subtitle="Review the recent movement that fed your Eggs, quests, and streak."
-        title="Last 7 days"
-      >
-        <View style={styles.activityCard}>
-          <View style={styles.activityStats}>
-            <ActivityStat label="Steps" value={activity.steps.toLocaleString()} />
-            <ActivityStat label="Movement XP" value={String(activity.xp)} />
-          </View>
-          <View style={styles.chart}>
-            {activity.days.map((day) => (
-              <ActivityBar day={day} key={day.date} />
-            ))}
-          </View>
-        </View>
-      </CollapsibleSection>
-      <CollapsibleSection
-        badge={`${data.coins.toLocaleString()} coins`}
-        subtitle="Trainer level and recent reward claims."
-        title="Account progression"
-      >
-        <AccountProgressCard
-          accountXp={data.accountXp}
-          coins={data.coins}
-          history={data.questRewardHistory}
-        />
-      </CollapsibleSection>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Eggs in Hatchery</Text>
-        <Text style={styles.sectionMeta}>
-          {readyEggCount}/{data.activeEggs.length} ready
-          {data.pendingEggs.length > 0
-            ? ` | ${data.pendingEggs.length} queued`
-            : ""}
-        </Text>
-      </View>
-      <View style={styles.incubatorStack}>
-        {data.activeEggs.length > 0 ? (
-          data.activeEggs.map((egg, index) => (
-            <View style={styles.incubatorCard} key={egg.id}>
-              <EggAvatar element={egg.element} rarity={egg.rarity} size="small" />
-              <View style={styles.incubatorBody}>
-                <Text style={styles.eggTitle}>
-                  Slot {index + 1}: {capitalize(egg.rarity)} {capitalize(egg.element)}
-                </Text>
-                <Text style={styles.eggCaption}>
-                  {isEggReady(egg)
-                    ? "Ready to hatch in your Hatchery."
-                    : getEggProgressMessage(egg.stepsWalked, egg.stepsRequired)}
-                </Text>
-                <ProgressBar progress={getEggProgress(egg)} />
-              </View>
-            </View>
-          ))
-        ) : (
-          <EmptyMissionCard
-            actionLabel="Open Hatchery"
-            body="No Egg is incubating right now. Add an Egg so movement has somewhere visible to land."
-            onPress={onMonsterPress}
-            title="Your incubator is empty"
-          />
-        )}
-      </View>
-      <AdvancedSectionIntro mission={firstWeekMission} />
       <CollapsibleSection
         badge={
           visibleClaimableQuestCount > 0
@@ -435,29 +347,23 @@ export function HomeScreen({
         subtitle="Small goals that help today's Egg and Pal grow."
         title="Quests"
       >
-        <View style={styles.questTabs}>
-          {(["daily", "weekly", "monthly", "seasonal", "pal"] as QuestCadence[]).map((cadence) => (
-            <Pressable
-              key={cadence}
-              onPress={() => setQuestCadence(cadence)}
-              style={[
-                styles.questTab,
-                questCadence === cadence && styles.questTabActive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.questTabLabel,
-                  questCadence === cadence && styles.questTabLabelActive,
-                ]}
-              >
-                {capitalize(cadence)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        <SegmentedControl
+          onChange={setQuestCadence}
+          options={enabledQuestCadences.map((cadence) => ({
+            label: capitalize(cadence),
+            value: cadence,
+          }))}
+          value={activeQuestCadence}
+        />
+        <DailyMissionSummaryCard
+          completedQuestCount={completedQuestCount}
+          firstWeekMission={firstWeekMission}
+          firstWeekMissions={firstWeekMissions}
+          onFirstWeekPress={firstWeekMissionAction}
+          questCount={quests.length}
+        />
         <QuestBoardSummary
-          cadence={questCadence}
+          cadence={activeQuestCadence}
           claimableCount={visibleClaimableQuestCount}
           completion={visibleQuestCompletion}
           quests={visibleQuests}
@@ -477,37 +383,202 @@ export function HomeScreen({
         </View>
       </CollapsibleSection>
       <CollapsibleSection
-        badge={weeklyChest.canClaim ? "Ready" : `${Math.round(weeklyChest.progress * 100)}%`}
-        subtitle="Earn a weekly chest by staying active."
-        title="Weekly chest"
+        badge={`${activity.activeDays}/7 active`}
+        subtitle="Review the recent movement that fed your Eggs, quests, and streak."
+        title="Last 7 days"
       >
-        <StackedMenuCard
-          subtitle="Claim weekly movement rewards when the chest is ready."
-          title="Weekly reward"
+        <View style={styles.activityCard}>
+          <View style={styles.activityStats}>
+            <ActivityStat label="Steps" value={formatNumber(activity.steps)} />
+            <ActivityStat label="Journey XP" value={formatNumber(activity.xp)} />
+          </View>
+          <View style={styles.chart}>
+            {activity.days.map((day) => (
+              <ActivityBar day={day} key={day.date} />
+            ))}
+          </View>
+        </View>
+      </CollapsibleSection>
+      {ENABLE_SHOP && (
+        <CollapsibleSection
+          badge={`${formatNumber(data.coins)} coins`}
+          subtitle="Boosts stay available, but the daily loop stays first."
+          title="Coin shop"
         >
-          <CompactSummaryRow
-            label="Progress"
-            tone={weeklyChest.canClaim ? "ready" : "default"}
-            value={`${weeklyChest.steps.toLocaleString()} / ${weeklyChest.target.toLocaleString()} steps`}
+          <CoinShopCard
+            activeHatchling={activeHatchling}
+            coins={data.coins}
+            onBuy={onBuyShopItem}
           />
-          <WeeklyChestCard
-            chest={weeklyChest}
-            onClaim={() => onClaimWeeklyChest(todayKey)}
-          />
-        </StackedMenuCard>
-      </CollapsibleSection>
-      <CollapsibleSection
-        badge={`${data.coins.toLocaleString()} coins`}
-        subtitle="Boosts stay available, but the daily loop stays first."
-        title="Coin shop"
-      >
-        <CoinShopCard
-          activeHatchling={activeHatchling}
-          coins={data.coins}
-          onBuy={onBuyShopItem}
-        />
-      </CollapsibleSection>
+        </CollapsibleSection>
+      )}
     </Screen>
+  );
+}
+
+function DailyHeroCard({
+  activeHatchling,
+  focusEgg,
+  latestEvolution,
+  latestSyncGains,
+  progression,
+  today,
+}: {
+  activeHatchling: CollectedHatchling | null;
+  focusEgg: HatchUpData["activeEgg"] | undefined;
+  latestEvolution: MonsterStage | null;
+  latestSyncGains: LatestSyncGains;
+  progression: ReturnType<typeof getProgression>;
+  today: DailyAward | null;
+}) {
+  const showingEgg = Boolean(focusEgg);
+
+  return (
+    <CardEntrance style={styles.heroCard}>
+      {focusEgg ? (
+        <EggAvatar element={focusEgg.element} rarity={focusEgg.rarity} />
+      ) : activeHatchling ? (
+        <HatchlingAvatar
+          element={activeHatchling.element}
+          level={activeHatchling.level}
+          rarity={activeHatchling.rarity}
+        />
+      ) : (
+        <MonsterAvatar stage={progression.current.id} />
+      )}
+      <Text style={styles.stage}>
+        {focusEgg
+          ? `${capitalize(focusEgg.rarity)} ${capitalize(focusEgg.element)} Egg`
+          : activeHatchling
+            ? `Active Pal | ${capitalize(activeHatchling.rarity)} ${capitalize(activeHatchling.element)}`
+            : `${progression.current.label} starter Pal`}
+      </Text>
+      <Text style={styles.xp}>
+        {focusEgg
+          ? `${formatPercent(getEggProgress(focusEgg))} hatch progress`
+          : activeHatchling
+            ? `Level ${activeHatchling.level} | Bond ${activeHatchling.bond}/100`
+            : `${progression.current.label} journey`}
+      </Text>
+      {(latestEvolution || latestSyncGains.xp.total > 0 || latestSyncGains.palXp > 0) && (
+        <View style={styles.heroSparkles}>
+          <SparkleBurst
+            label={latestEvolution ? "LEVEL UP" : showingEgg ? "EGG PROGRESS" : "XP GAIN"}
+            tone="accent"
+          />
+        </View>
+      )}
+      <ProgressBar
+        progress={
+          focusEgg
+            ? getEggProgress(focusEgg)
+            : activeHatchling
+              ? getHatchlingXpProgress(activeHatchling.xp)
+              : progression.progress
+        }
+      />
+      <Text style={styles.next}>
+        {getDailyHeroMessage({
+          activeHatchling,
+          focusEgg,
+          latestSyncGains,
+          today,
+        })}
+      </Text>
+      <Text style={styles.loopPromise}>{getScreenLoopSubtitle("home")}</Text>
+    </CardEntrance>
+  );
+}
+
+function TodaySummaryRow({
+  focusEgg,
+  movementXp,
+  today,
+}: {
+  focusEgg: HatchUpData["activeEgg"] | undefined;
+  movementXp: number;
+  today: DailyAward | null;
+}) {
+  const todayDistanceMiles = getTodayDistanceMiles(today);
+
+  return (
+    <View style={styles.summaryRow}>
+      <SummaryTile
+        label="Steps"
+        value={formatNumber(today?.health.steps ?? 0)}
+      />
+      <SummaryTile label="Distance" value={formatDistanceMiles(todayDistanceMiles)} />
+      <SummaryTile label="Journey XP" value={`+${formatNumber(movementXp)}`} />
+      <SummaryTile
+        label="Egg progress"
+        value={focusEgg ? formatPercent(getEggProgress(focusEgg)) : "None"}
+      />
+    </View>
+  );
+}
+
+function SummaryTile({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.summaryTile}>
+      <Text style={styles.summaryValue}>{value}</Text>
+      <Text style={styles.summaryLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function WeeklyGoalCard({
+  chest,
+  onClaim,
+  retention,
+}: {
+  chest: ReturnType<typeof getWeeklyRewardChest>;
+  onClaim: () => Promise<boolean>;
+  retention: ReturnType<typeof getRetentionPlan>;
+}) {
+  return (
+    <View style={styles.goalCard}>
+      <View style={styles.goalHeader}>
+        <View style={styles.goalHeaderText}>
+          <Text style={styles.goalKicker}>WEEKLY GOAL</Text>
+          <Text style={styles.goalTitle}>{retention.label}</Text>
+        </View>
+        <Text style={styles.goalMeta}>
+          {formatNumber(retention.weeklySteps)} /{" "}
+          {formatNumber(retention.weeklyGoalSteps)}
+        </Text>
+      </View>
+      <ProgressBar progress={retention.progress} />
+      <Text style={styles.goalText}>{retention.message}</Text>
+      {ENABLE_WEEKLY_CHEST && (
+        <View style={styles.weeklyChestTeaser}>
+          <View style={styles.weeklyChestText}>
+            <Text style={styles.weeklyChestTitle}>
+              {chest.canClaim ? "Weekly chest ready" : "Weekly chest progress"}
+            </Text>
+            <Text style={styles.weeklyChestBody}>
+              {chest.canClaim
+                ? `Claim ${formatNumber(chest.rewardCoins)} coins, ${formatNumber(chest.rewardAccountXp)} Journey XP, and ${formatNumber(chest.rewardEggSteps)} Egg progress.`
+                : `${formatPercent(chest.progress)} toward coins, Journey XP, and Egg progress.`}
+            </Text>
+          </View>
+          {chest.canClaim ? (
+            <AppButton
+              label="Claim"
+              onPress={() => {
+                void onClaim();
+              }}
+              style={styles.weeklyChestButton}
+            />
+          ) : (
+            <View style={[styles.weeklyChestButton, styles.statusPill]}>
+              <Text style={styles.statusPillText}>
+                {formatPercent(chest.progress)}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -572,9 +643,6 @@ function NextActionCard({
         {nextAction.priority <= 3 && <SparkleBurst label="NOW" tone="accent" />}
       </View>
       <Text style={styles.actionText}>{nextAction.body}</Text>
-      <Text style={styles.actionReason}>
-        {getNextActionReason(nextAction.priority)}
-      </Text>
       <AppButton
         disabled={nextAction.disabled}
         label={nextAction.label}
@@ -582,6 +650,42 @@ function NextActionCard({
         style={nextAction.disabled ? styles.disabledAction : undefined}
         variant={nextAction.variant}
       />
+    </View>
+  );
+}
+
+function SyncSummaryCard({
+  focusEgg,
+  gains,
+  today,
+}: {
+  focusEgg: HatchUpData["activeEgg"] | undefined;
+  gains: LatestSyncGains;
+  today: DailyAward;
+}) {
+  const eggProgress = gains.eggSteps > 0
+    ? `+${formatSteps(gains.eggSteps)}`
+    : focusEgg
+      ? formatPercent(getEggProgress(focusEgg))
+      : "No Egg";
+
+  return (
+    <View style={styles.syncSummaryCard}>
+      <View style={styles.syncSummaryHeader}>
+        <View>
+          <Text style={styles.syncSummaryKicker}>SYNCED TODAY</Text>
+          <Text style={styles.syncSummaryTitle}>Movement saved</Text>
+        </View>
+        {hasSyncRewards(gains) && <SparkleBurst tone="accent" />}
+      </View>
+      <View style={styles.syncSummaryRow}>
+        <SummaryTile label="Steps" value={formatSteps(today.health.steps)} />
+        <SummaryTile
+          label="XP"
+          value={`+${formatNumber(gains.xp.total || today.xp.total)}`}
+        />
+        <SummaryTile label="Egg progress" value={eggProgress} />
+      </View>
     </View>
   );
 }
@@ -613,7 +717,7 @@ function DailySnapshotStrip({
           readyEggCount > 0
             ? `${readyEggCount} ready`
             : focusEgg
-              ? `${Math.round(getEggProgress(focusEgg) * 100)}%`
+              ? formatPercent(getEggProgress(focusEgg))
               : "Empty"
         }
       />
@@ -681,23 +785,23 @@ function TodayProgressCard({
       <ProgressRow
         label="Daily steps"
         progress={stepProgress}
-        value={`${steps.toLocaleString()} / ${dailyStepGoal.toLocaleString()}`}
+        value={`${formatNumber(steps)} / ${formatNumber(dailyStepGoal)}`}
       />
       <ProgressRow
         label="Active Egg"
         progress={focusEgg ? getEggProgress(focusEgg) : 0}
         value={
           focusEgg
-            ? `${focusEgg.stepsWalked.toLocaleString()} / ${focusEgg.stepsRequired.toLocaleString()}`
+            ? `${formatNumber(focusEgg.stepsWalked)} / ${formatNumber(focusEgg.stepsRequired)}`
             : "No Egg incubating"
         }
       />
       <ProgressRow
-        label="Active Pal XP"
+        label="Pal XP"
         progress={palXpProgress}
         value={
           activeHatchling
-            ? `${activeHatchling.xp % 75} / 75 to Lv ${activeHatchling.level + 1}`
+            ? `${formatNumber(activeHatchling.xp % 75)} / 75 to Lv ${activeHatchling.level + 1}`
             : "Hatch a Pal to unlock"
         }
       />
@@ -798,11 +902,11 @@ function AccountProgressCard({
           <Text style={styles.accountKicker}>PLAYER PROGRESSION</Text>
           <Text style={styles.accountTitle}>Account Lv {accountLevel}</Text>
         </View>
-        <Text style={styles.coinPill}>{coins.toLocaleString()} coins</Text>
+        <Text style={styles.coinPill}>{formatNumber(coins)} coins</Text>
       </View>
       <ProgressBar progress={levelProgress} />
       <Text style={styles.accountText}>
-        {500 - (accountXp % 500)} Account XP to the next trainer level from
+        {formatNumber(500 - (accountXp % 500))} Journey XP to the next trainer level from
         movement, hatching, and quest rewards.
       </Text>
       <View style={styles.rewardHistoryPanel}>
@@ -817,7 +921,7 @@ function AccountProgressCard({
                 </Text>
               </View>
               <Text style={styles.rewardHistoryValue}>
-                +{receipt.rewardAccountXp} XP
+                +{formatNumber(receipt.rewardAccountXp)} Journey XP
               </Text>
             </View>
           ))
@@ -855,44 +959,119 @@ function ProgressRow({
   );
 }
 
-function RewardFeedbackBanner({
+function SyncResultBottomSheet({
   gains,
   latestEvolution,
-  onDismiss,
+  onClose,
+  onPrimaryAction,
+  primaryLabel,
+  visible,
 }: {
   gains: LatestSyncGains;
   latestEvolution: MonsterStage | null;
-  onDismiss: () => void;
+  onClose: () => void;
+  onPrimaryAction: () => void;
+  primaryLabel: string;
+  visible: boolean;
 }) {
   const rewards = getRewardRows(gains, latestEvolution);
 
   return (
-    <View style={styles.rewardBanner}>
-      <View style={styles.rewardBannerHeader}>
-        <View>
-          <Text style={styles.rewardKicker}>WHAT CHANGED</Text>
-          <Text style={styles.rewardTitle}>Your movement became progress</Text>
-        </View>
-        <Pressable onPress={onDismiss} style={styles.rewardDismiss}>
-          <Text style={styles.rewardDismissText}>Dismiss</Text>
-        </Pressable>
-      </View>
-      <View style={styles.rewardRows}>
-        {rewards.map((reward) => (
-          <View key={reward.label} style={styles.rewardRow}>
-            <Text style={styles.rewardIcon}>{reward.icon}</Text>
-            <View style={styles.rewardBody}>
-              <Text style={styles.rewardLabel}>{reward.label}</Text>
-              <Text style={styles.rewardValue}>{reward.value}</Text>
+    <Modal
+      animationType="slide"
+      onRequestClose={onClose}
+      transparent
+      visible={visible}
+    >
+      <View style={styles.syncModalRoot}>
+        <Pressable
+          accessibilityLabel="Close sync result"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={styles.syncModalBackdrop}
+        />
+        <View style={styles.syncSheet}>
+          <SyncSuccessShimmer active={visible} style={styles.syncSheetShimmer} />
+          <View style={styles.syncSheetHandle} />
+          <View style={styles.rewardBannerHeader}>
+            <View style={styles.syncSheetTitleBlock}>
+              <Text style={styles.rewardKicker}>SYNC COMPLETE</Text>
+              <Text style={styles.rewardTitle}>
+                Your movement became progress
+              </Text>
             </View>
-            <SparkleBurst tone="accent" />
+            <Pressable
+              accessibilityLabel="Dismiss sync result"
+              accessibilityRole="button"
+              onPress={onClose}
+              style={styles.rewardDismiss}
+            >
+              <Text style={styles.rewardDismissText}>Close</Text>
+            </Pressable>
           </View>
-        ))}
+          <View style={styles.rewardRows}>
+            {rewards.map((reward) => (
+              <View key={reward.label} style={styles.rewardRow}>
+                <Text style={styles.rewardIcon}>{reward.icon}</Text>
+                <View style={styles.rewardBody}>
+                  <Text style={styles.rewardLabel}>{reward.label}</Text>
+                  <Text style={styles.rewardValue}>{reward.value}</Text>
+                </View>
+                <SparkleBurst tone="accent" />
+              </View>
+            ))}
+          </View>
+          <Text style={styles.rewardBreakdown}>{getRewardBreakdown(gains.xp)}</Text>
+          <Text style={styles.rewardNextStep}>{getRewardNextStep(gains)}</Text>
+          <AppButton
+            label={primaryLabel}
+            onPress={onPrimaryAction}
+            style={styles.syncSheetPrimary}
+          />
+        </View>
       </View>
-      <Text style={styles.rewardBreakdown}>{getRewardBreakdown(gains.xp)}</Text>
-      <Text style={styles.rewardNextStep}>{getRewardNextStep(gains)}</Text>
-    </View>
+    </Modal>
   );
+}
+
+function getSyncResultAction({
+  activeHatchling,
+  gains,
+  onDexPress,
+  onMonsterPress,
+  readyEggCount,
+}: {
+  activeHatchling: CollectedHatchling | null;
+  gains: LatestSyncGains;
+  onDexPress: () => void;
+  onMonsterPress: () => void;
+  readyEggCount: number;
+}) {
+  if (readyEggCount > 0) {
+    return {
+      label: readyEggCount === 1 ? "Hatch Egg" : `Hatch ${readyEggCount} Eggs`,
+      onPress: onMonsterPress,
+    };
+  }
+
+  if (gains.eggSteps > 0 || gains.eggsAwarded > 0) {
+    return {
+      label: "Open Hatchery",
+      onPress: onMonsterPress,
+    };
+  }
+
+  if (activeHatchling && gains.palXp > 0) {
+    return {
+      label: "View Pal",
+      onPress: onDexPress,
+    };
+  }
+
+  return {
+    label: "Done for today",
+    onPress: () => undefined,
+  };
 }
 
 function Metric({
@@ -1038,8 +1217,8 @@ function Quest({
           <Text style={styles.questTier}>{getQuestTierLabel(quest)}</Text>
         </View>
         <Text style={styles.questCaption}>
-          {Math.min(quest.current, quest.target).toLocaleString()} /{" "}
-          {quest.target.toLocaleString()} {quest.unit}
+          {formatQuestValue(Math.min(quest.current, quest.target))} /{" "}
+          {formatQuestValue(quest.target)} {quest.unit}
         </Text>
         <ProgressBar progress={getQuestProgress(quest)} />
         {!complete && (
@@ -1144,13 +1323,13 @@ function WeeklyChestCard({
         )}
       </View>
       <Text style={styles.chestBody}>
-        Move {chest.target.toLocaleString()} steps this week to earn a chest
-        with coins, trainer XP, and Egg progress for your next hatch.
+        Move {formatSteps(chest.target)} this week to earn a chest
+        with coins, Journey XP, and Egg progress for your next hatch.
       </Text>
       <ProgressBar progress={chest.progress} />
       <Text style={styles.chestReward}>
-        +{chest.rewardCoins} coins | +{chest.rewardAccountXp} Account XP | +
-        {chest.rewardEggSteps.toLocaleString()} egg steps
+        +{formatNumber(chest.rewardCoins)} coins | +{formatNumber(chest.rewardAccountXp)} Journey XP | +
+        {formatNumber(chest.rewardEggSteps)} Egg progress
       </Text>
       <AppButton
         disabled={!chest.canClaim}
@@ -1159,7 +1338,7 @@ function WeeklyChestCard({
             ? "Claim weekly chest"
             : chest.claimed
               ? "Chest claimed"
-              : `${chest.steps.toLocaleString()} / ${chest.target.toLocaleString()} steps`
+              : `${formatNumber(chest.steps)} / ${formatNumber(chest.target)} steps`
         }
         onPress={() => {
           void onClaim();
@@ -1187,11 +1366,11 @@ function CoinShopCard({
           <Text style={styles.shopKicker}>COIN SHOP</Text>
           <Text style={styles.shopTitle}>Spend what quests earn</Text>
         </View>
-        <Text style={styles.coinPill}>{coins.toLocaleString()} coins</Text>
+        <Text style={styles.coinPill}>{formatNumber(coins)} coins</Text>
       </View>
       <Text style={styles.shopBody}>
         Spend quest coins on boosts that support the same loop: profile growth,
-        active Pal XP, and Egg progress.
+        Pal XP, and Egg progress.
       </Text>
       {SHOP_ITEMS.map((item) => (
         <ShopRow
@@ -1219,10 +1398,10 @@ function ShopRow({
 }) {
   const disabled = coins < item.priceCoins || (item.rewardPalXp > 0 && !activeHatchling);
   const effect = [
-    item.rewardAccountXp > 0 ? `+${item.rewardAccountXp} Account XP` : null,
-    item.rewardPalXp > 0 ? `+${item.rewardPalXp} Pal XP` : null,
+    item.rewardAccountXp > 0 ? `+${formatNumber(item.rewardAccountXp)} Journey XP` : null,
+    item.rewardPalXp > 0 ? `+${formatNumber(item.rewardPalXp)} Pal XP` : null,
     item.rewardEggSteps > 0
-      ? `+${item.rewardEggSteps.toLocaleString()} egg steps`
+      ? `+${formatNumber(item.rewardEggSteps)} Egg progress`
       : null,
   ].filter(Boolean).join(" | ");
 
@@ -1240,7 +1419,7 @@ function ShopRow({
         }}
         style={[styles.shopBuy, disabled && styles.shopBuyDisabled]}
       >
-        <Text style={styles.shopBuyText}>{item.priceCoins}</Text>
+        <Text style={styles.shopBuyText}>{formatNumber(item.priceCoins)}</Text>
       </Pressable>
     </View>
   );
@@ -1248,6 +1427,10 @@ function ShopRow({
 
 function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function formatQuestValue(value: number) {
+  return Number.isInteger(value) ? formatNumber(value) : value.toFixed(1);
 }
 
 function getRewardBreakdown(xp: DailyXp) {
@@ -1274,32 +1457,26 @@ function getRewardNextStep(gains: LatestSyncGains) {
 
 function getRewardRows(gains: LatestSyncGains, latestEvolution: MonsterStage | null) {
   const rewards: { icon: string; label: string; value: string }[] = [];
-  if (gains.accountXp > 0) {
-    rewards.push({
-      icon: "LVL",
-      label: "Account XP",
-      value: `+${gains.accountXp} XP`,
-    });
-  }
-  if (gains.xp.total > 0) {
+  const journeyXp = gains.accountXp + gains.xp.total;
+  if (journeyXp > 0) {
     rewards.push({
       icon: "XP",
       label: "Journey XP",
-      value: `+${gains.xp.total} XP`,
+      value: `+${formatNumber(journeyXp)} XP`,
     });
   }
   if (gains.palXp > 0) {
     rewards.push({
       icon: "PAL",
-      label: "Active Pal XP",
-      value: `+${gains.palXp} XP`,
+      label: "Pal XP",
+      value: `+${formatNumber(gains.palXp)} XP`,
     });
   }
   if (gains.eggSteps > 0) {
     rewards.push({
       icon: "EGG",
       label: "Egg progress",
-      value: `+${gains.eggSteps.toLocaleString()} steps each`,
+      value: `+${formatNumber(gains.eggSteps)} steps each`,
     });
   }
   if (gains.eggsAwarded > 0) {
@@ -1313,7 +1490,7 @@ function getRewardRows(gains: LatestSyncGains, latestEvolution: MonsterStage | n
     rewards.push({
       icon: "$",
       label: "Coins",
-      value: `+${gains.coins}`,
+      value: `+${formatNumber(gains.coins)}`,
     });
   } else if (gains.coins < 0) {
     rewards.push({
@@ -1425,9 +1602,11 @@ function getNextAction({
 
   if (!today) {
     return {
-      body: "Sync once to turn today's movement into Egg progress, Pal growth, and quest rewards.",
+      body: activeHatchling
+        ? "Sync once to turn today's movement into Pal XP, Egg progress, and quest rewards."
+        : "Sync once to turn today's movement into Egg progress and quest rewards.",
       disabled: isSyncing,
-      label: isSyncing ? "Syncing..." : "Collect movement",
+      label: isSyncing ? "Syncing..." : "Sync movement",
       onPress: onSync,
       priority: 2,
       title: "Start today's loop",
@@ -1465,13 +1644,27 @@ function getNextAction({
 
   if (rewardAvailable) {
     return {
-      body: "Your movement just became progress. Review what grew before moving on.",
+      body: activeHatchling
+        ? "Your movement just became Pal XP, Egg progress, coins, or streak growth."
+        : "Your movement just became Egg progress, coins, or streak growth.",
       disabled: false,
-      label: "Review rewards",
-      onPress: () => undefined,
+      label: "Review progress",
+      onPress: activeHatchling ? onDexPress : onMonsterPress,
       priority: 3,
       title: "New progress landed",
       variant: "secondary" as const,
+    };
+  }
+
+  if (!activeHatchling && data.collection.length > 0) {
+    return {
+      body: "You have a hatched Pal, but no favorite is active yet. Pick one so future movement can grow it.",
+      disabled: false,
+      label: "Pick active Pal",
+      onPress: onDexPress,
+      priority: 4,
+      title: "Choose your favorite Pal",
+      variant: "primary" as const,
     };
   }
 
@@ -1500,14 +1693,41 @@ function getNextAction({
   }
 
   return {
-      body: getCollectionNudge(data.collection.length),
+    body: `${getReturnTomorrowMessage(data.currentStreak)} ${getCollectionNudge(data.collection.length)}`,
     disabled: false,
-    label: "View Collection",
+    label: "Come back tomorrow",
     onPress: onDexPress,
     priority: 6,
-    title: "Choose your next Pal goal",
+    title: "Today's loop is complete",
     variant: "secondary" as const,
   };
+}
+
+function getDailyHeroMessage({
+  activeHatchling,
+  focusEgg,
+  latestSyncGains,
+  today,
+}: {
+  activeHatchling: CollectedHatchling | null;
+  focusEgg: HatchUpData["activeEgg"] | undefined;
+  latestSyncGains: LatestSyncGains;
+  today: DailyAward | null;
+}) {
+  if (!today) return "Sync movement to start today.";
+  if (focusEgg && latestSyncGains.eggSteps > 0) {
+    return `Your movement added ${formatSteps(latestSyncGains.eggSteps)} of Egg progress today.`;
+  }
+  if (focusEgg) {
+    return `Your Egg is ${formatPercent(getEggProgress(focusEgg))} ready to hatch.`;
+  }
+  if (activeHatchling && latestSyncGains.palXp > 0) {
+    return `Your movement added ${formatNumber(latestSyncGains.palXp)} Pal XP today.`;
+  }
+  if (activeHatchling) {
+    return `${activeHatchling.name} is ready for tomorrow's movement loop.`;
+  }
+  return "Your movement synced today. Hatch or choose a Pal to keep growing.";
 }
 
 function getFirstWeekMissionWhy(mission: FirstWeekMission) {
@@ -1699,8 +1919,8 @@ const styles = StyleSheet.create({
     borderColor: colors.rewardGold,
     borderRadius: radii.hero,
     borderWidth: 1,
-    gap: 10,
-    marginBottom: 14,
+    gap: 12,
+    marginBottom: 12,
     padding: 16,
   },
   nextActionHeader: {
@@ -1713,6 +1933,65 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 17,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  syncSummaryCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 10,
+    marginBottom: 12,
+    padding: 12,
+  },
+  syncSummaryHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  syncSummaryKicker: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  syncSummaryTitle: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  syncSummaryRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  summaryTile: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    flexGrow: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 11,
+    width: "23%",
+  },
+  summaryValue: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  summaryLabel: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 3,
+    textAlign: "center",
   },
   snapshotStrip: {
     flexDirection: "row",
@@ -1843,8 +2122,59 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radii.card,
     gap: 10,
-    marginBottom: 22,
+    marginBottom: 14,
     padding: 16,
+  },
+  goalHeaderText: {
+    flex: 1,
+  },
+  goalKicker: {
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  weeklyChestTeaser: {
+    alignItems: "center",
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 12,
+  },
+  weeklyChestText: {
+    flex: 1,
+  },
+  weeklyChestTitle: {
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  weeklyChestBody: {
+    color: colors.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 3,
+  },
+  weeklyChestButton: {
+    minWidth: 96,
+  },
+  statusPill: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 12,
+  },
+  statusPillText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "900",
   },
   accountCard: {
     backgroundColor: colors.surface,
@@ -2212,15 +2542,15 @@ const styles = StyleSheet.create({
   rewardBanner: {
     backgroundColor: colors.accentSoft,
     borderColor: colors.rewardGold,
-    borderRadius: radii.hero,
+    borderRadius: radii.card,
     borderWidth: 1,
-    gap: 12,
-    marginBottom: 22,
-    padding: 16,
-    shadowColor: colors.cardShadowStrong,
-    shadowOffset: { height: 10, width: 0 },
+    gap: 9,
+    marginBottom: 12,
+    padding: 12,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { height: 6, width: 0 },
     shadowOpacity: 1,
-    shadowRadius: 20,
+    shadowRadius: 14,
   },
   rewardBannerHeader: {
     alignItems: "flex-start",
@@ -2235,7 +2565,7 @@ const styles = StyleSheet.create({
   },
   rewardTitle: {
     color: colors.ink,
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: "900",
     marginTop: 4,
   },
@@ -2253,7 +2583,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   rewardRows: {
-    gap: 8,
+    gap: 6,
   },
   rewardRow: {
     alignItems: "center",
@@ -2263,7 +2593,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
-    padding: 11,
+    padding: 9,
   },
   rewardIcon: {
     color: colors.primary,
@@ -2297,6 +2627,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
     lineHeight: 17,
+  },
+  syncModalRoot: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  syncModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(32, 49, 42, 0.38)",
+  },
+  syncSheet: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderTopLeftRadius: radii.hero,
+    borderTopRightRadius: radii.hero,
+    borderWidth: 1,
+    gap: 11,
+    paddingBottom: 22,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    position: "relative",
+    shadowColor: colors.cardShadow,
+    shadowOffset: { height: -10, width: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 22,
+  },
+  syncSheetHandle: {
+    alignSelf: "center",
+    backgroundColor: colors.line,
+    borderRadius: radii.pill,
+    height: 4,
+    width: 42,
+  },
+  syncSheetShimmer: {
+    borderTopLeftRadius: radii.hero,
+    borderTopRightRadius: radii.hero,
+  },
+  syncSheetTitleBlock: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  syncSheetPrimary: {
+    marginTop: 2,
   },
   goalHeader: {
     alignItems: "center",
