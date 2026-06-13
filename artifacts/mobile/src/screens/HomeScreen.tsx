@@ -21,6 +21,11 @@ import {
 import { toDateKey } from "../domain/date";
 import { getEggProgress, isEggReady } from "../domain/hatchery";
 import {
+  getCosmeticDefinition,
+  getEconomyItem,
+  getEconomyRewardParts,
+} from "../domain/economy";
+import {
   getActiveHatchling,
   getHatchlingXpProgress,
   getTimeAdjustedHatchling,
@@ -29,9 +34,12 @@ import { getActivitySummary, type ActivityDay } from "../domain/history";
 import { metersToMiles, stepsToMiles } from "../domain/leaderboard";
 import type {
   CollectedHatchling,
+  CosmeticUnlock,
   DailyAward,
   DailyXp,
+  EconomyRewardReceipt,
   HatchUpData,
+  InventoryItemStack,
   QuestRewardReceipt,
 } from "../domain/models";
 import {
@@ -95,6 +103,7 @@ interface Props {
   onMonsterPress: () => void;
   onSettingsPress: () => void;
   onSync: () => Promise<void>;
+  onUseInventoryItem: (itemId: ShopItemId) => Promise<boolean>;
 }
 
 export function HomeScreen({
@@ -112,6 +121,7 @@ export function HomeScreen({
   onMonsterPress,
   onSettingsPress,
   onSync,
+  onUseInventoryItem,
 }: Props) {
   const [questCadence, setQuestCadence] = useState<QuestCadence>("daily");
   const [rewardDismissed, setRewardDismissed] = useState(false);
@@ -401,6 +411,20 @@ export function HomeScreen({
           />
         </CollapsibleSection>
       )}
+      <CollapsibleSection
+        badge={`${data.inventoryItems.length} items`}
+        defaultOpen={data.inventoryItems.length > 0}
+        subtitle="Use earned boosts and view cosmetic rewards from chests."
+        title="Inventory"
+      >
+        <InventoryCard
+          activeHatchling={activeHatchling}
+          cosmeticUnlocks={data.cosmeticUnlocks}
+          inventoryItems={data.inventoryItems}
+          rewardHistory={data.economyRewardHistory}
+          onUseItem={onUseInventoryItem}
+        />
+      </CollapsibleSection>
     </Screen>
   );
 }
@@ -884,7 +908,7 @@ function AccountProgressCard({
                 </Text>
               </View>
               <Text style={styles.rewardHistoryValue}>
-                +{formatNumber(receipt.rewardAccountXp)} Journey XP
+                {getQuestReceiptValue(receipt)}
               </Text>
             </View>
           ))
@@ -897,6 +921,30 @@ function AccountProgressCard({
       </View>
     </View>
   );
+}
+
+function getQuestReceiptValue(receipt: QuestRewardReceipt) {
+  const parts = [
+    receipt.rewardAccountXp
+      ? `+${formatNumber(receipt.rewardAccountXp)} XP`
+      : null,
+    receipt.rewardCoins ? `+${formatNumber(receipt.rewardCoins)} coins` : null,
+    receipt.rewardEggSteps
+      ? `+${formatNumber(receipt.rewardEggSteps)} Egg`
+      : null,
+    receipt.rewardBond ? `+${formatNumber(receipt.rewardBond)} Bond` : null,
+    receipt.rewardChestProgress
+      ? `+${formatNumber(receipt.rewardChestProgress)} Chest`
+      : null,
+    receipt.rewardItems?.length
+      ? `${formatNumber(receipt.rewardItems.length)} item`
+      : null,
+    receipt.rewardCosmetics?.length
+      ? `${formatNumber(receipt.rewardCosmetics.length)} cosmetic`
+      : null,
+  ].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(" | ") : "Claimed";
 }
 
 function ProgressRow({
@@ -1295,7 +1343,8 @@ function WeeklyChestCard({
       </View>
       <Text style={styles.chestBody}>
         Move {formatSteps(chest.target)} this week to earn a chest
-        with coins, Journey XP, and Egg progress for your next hatch.
+        with coins, Journey XP, Egg progress, and a chance at items or
+        cosmetics.
       </Text>
       <ProgressBar progress={chest.progress} />
       <Text style={styles.chestReward}>
@@ -1368,13 +1417,22 @@ function ShopRow({
   onBuy: (itemId: ShopItemId) => Promise<boolean>;
 }) {
   const disabled = coins < item.priceCoins || (item.rewardPalXp > 0 && !activeHatchling);
-  const effect = [
-    item.rewardAccountXp > 0 ? `+${formatNumber(item.rewardAccountXp)} Journey XP` : null,
-    item.rewardPalXp > 0 ? `+${formatNumber(item.rewardPalXp)} Pal XP` : null,
-    item.rewardEggSteps > 0
-      ? `+${formatNumber(item.rewardEggSteps)} Egg progress`
-      : null,
-  ].filter(Boolean).join(" | ");
+  const economyItem = getEconomyItem(item.id);
+  const effect = economyItem
+    ? getEconomyRewardParts({
+        ...economyItem.reward,
+        label: economyItem.label,
+        source: "shop",
+      }).join(" | ")
+    : [
+        item.rewardAccountXp > 0
+          ? `+${formatNumber(item.rewardAccountXp)} Journey XP`
+          : null,
+        item.rewardPalXp > 0 ? `+${formatNumber(item.rewardPalXp)} Pal XP` : null,
+        item.rewardEggSteps > 0
+          ? `+${formatNumber(item.rewardEggSteps)} Egg progress`
+          : null,
+      ].filter(Boolean).join(" | ");
 
   return (
     <View style={styles.shopRow}>
@@ -1394,6 +1452,136 @@ function ShopRow({
       </Pressable>
     </View>
   );
+}
+
+function InventoryCard({
+  activeHatchling,
+  cosmeticUnlocks,
+  inventoryItems,
+  onUseItem,
+  rewardHistory,
+}: {
+  activeHatchling: CollectedHatchling | null;
+  cosmeticUnlocks: CosmeticUnlock[];
+  inventoryItems: InventoryItemStack[];
+  onUseItem: (itemId: ShopItemId) => Promise<boolean>;
+  rewardHistory: EconomyRewardReceipt[];
+}) {
+  const hasInventory = inventoryItems.length > 0 || cosmeticUnlocks.length > 0;
+
+  return (
+    <View style={styles.shopCard}>
+      <View style={styles.shopHeader}>
+        <View>
+          <Text style={styles.shopKicker}>INVENTORY</Text>
+          <Text style={styles.shopTitle}>Boosts and cosmetics</Text>
+        </View>
+        <Text style={styles.coinPill}>
+          {formatNumber(inventoryItems.reduce((total, item) => total + item.quantity, 0))} items
+        </Text>
+      </View>
+      <Text style={styles.shopBody}>
+        Chests can drop items like Pal Snacks, Training Tokens, Egg Boosters,
+        and Lucky Charms. Cosmetics stay unlocked once earned.
+      </Text>
+      {hasInventory ? (
+        <View style={styles.inventoryList}>
+          {inventoryItems.map((stack) => {
+            const item = getEconomyItem(stack.id);
+            if (!item) return null;
+            const needsActivePal = Boolean(item.reward.palXp || item.reward.bond);
+            const disabled = needsActivePal && !activeHatchling;
+            const rewardLabel = getEconomyRewardParts({
+              ...item.reward,
+              label: item.label,
+              source: "shop",
+            }).join(" | ");
+
+            return (
+              <View key={stack.id} style={styles.inventoryRow}>
+                <View style={styles.shopRowText}>
+                  <Text style={styles.shopItemName}>
+                    {item.label} x{formatNumber(stack.quantity)}
+                  </Text>
+                  <Text style={styles.shopItemBody}>{item.body}</Text>
+                  <Text style={styles.shopItemEffect}>{rewardLabel}</Text>
+                </View>
+                <Pressable
+                  disabled={Boolean(disabled)}
+                  onPress={() => {
+                    void onUseItem(stack.id);
+                  }}
+                  style={[styles.shopBuy, disabled && styles.shopBuyDisabled]}
+                >
+                  <Text style={styles.shopBuyText}>Use</Text>
+                </Pressable>
+              </View>
+            );
+          })}
+          {cosmeticUnlocks.map((unlock) => {
+            const cosmetic = getCosmeticDefinition(unlock.id);
+            return (
+              <View key={unlock.id} style={styles.cosmeticRow}>
+                <Text style={styles.shopItemName}>
+                  {cosmetic?.label ?? unlock.id}
+                </Text>
+                <Text style={styles.shopItemBody}>
+                  {capitalize(unlock.type)} cosmetic unlocked
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        <View style={styles.inventoryEmpty}>
+          <Text style={styles.rewardHistoryTitle}>No items yet</Text>
+          <Text style={styles.rewardHistoryEmpty}>
+            Fill the Weekly Hatch Chest to earn coins, items, and cosmetic
+            rewards.
+          </Text>
+        </View>
+      )}
+      <View style={styles.rewardHistoryPanel}>
+        <Text style={styles.rewardHistoryTitle}>Recent economy rewards</Text>
+        {rewardHistory.slice(0, 4).length > 0 ? (
+          rewardHistory.slice(0, 4).map((receipt) => (
+            <View key={receipt.id} style={styles.rewardHistoryRow}>
+              <View style={styles.rewardHistoryText}>
+                <Text style={styles.rewardHistoryLabel}>{receipt.label}</Text>
+                <Text style={styles.rewardHistoryMeta}>
+                  {capitalize(receipt.source)}
+                </Text>
+              </View>
+              <Text style={styles.rewardHistoryValue}>
+                {getReceiptValue(receipt)}
+              </Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.rewardHistoryEmpty}>
+            Sync movement, train, hatch, or claim quests to build reward history.
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function getReceiptValue(receipt: EconomyRewardReceipt) {
+  const parts = [
+    receipt.coins ? `+${formatNumber(receipt.coins)} coins` : null,
+    receipt.accountXp ? `+${formatNumber(receipt.accountXp)} XP` : null,
+    receipt.palXp ? `+${formatNumber(receipt.palXp)} Pal XP` : null,
+    receipt.bond ? `+${formatNumber(receipt.bond)} Bond` : null,
+    receipt.eggSteps ? `+${formatNumber(receipt.eggSteps)} Egg` : null,
+    receipt.chestProgress
+      ? `+${formatNumber(receipt.chestProgress)} Chest`
+      : null,
+    receipt.itemIds.length ? `${receipt.itemIds.length} item` : null,
+    receipt.cosmeticIds.length ? `${receipt.cosmeticIds.length} cosmetic` : null,
+  ].filter(Boolean);
+
+  return parts.join(" | ") || "Progress";
 }
 
 function capitalize(value: string) {
@@ -1416,6 +1604,12 @@ function getRewardBreakdown(xp: DailyXp) {
 function getRewardNextStep(gains: LatestSyncGains) {
   if (gains.eggSteps > 0) {
     return "Next: check the Hatchery for Eggs that are ready or close.";
+  }
+  if (gains.itemRewards.length > 0 || gains.cosmeticRewards.length > 0) {
+    return "Next: open Inventory to use boosts or view unlocked cosmetics.";
+  }
+  if (gains.chestProgress > 0) {
+    return "Next: keep filling the Weekly Hatch Chest for bonus rewards.";
   }
   if (gains.palXp > 0) {
     return "Next: visit Collection to review your active Pal progress.";
@@ -1498,6 +1692,35 @@ function getRewardRows(gains: LatestSyncGains, latestEvolution: MonsterStage | n
       value: `${gains.coins}`,
     });
   }
+  if (gains.chestProgress > 0) {
+    rewards.push({
+      icon: "BOX",
+      label: "Chest progress",
+      value: `+${formatNumber(gains.chestProgress)}`,
+    });
+  }
+  if (gains.itemRewards.length > 0) {
+    const firstItem = getEconomyItem(gains.itemRewards[0]);
+    rewards.push({
+      icon: "ITM",
+      label: "Item reward",
+      value:
+        gains.itemRewards.length === 1
+          ? firstItem?.label ?? "1 item"
+          : `${formatNumber(gains.itemRewards.length)} items`,
+    });
+  }
+  if (gains.cosmeticRewards.length > 0) {
+    const firstCosmetic = getCosmeticDefinition(gains.cosmeticRewards[0]);
+    rewards.push({
+      icon: "COS",
+      label: "Cosmetic reward",
+      value:
+        gains.cosmeticRewards.length === 1
+          ? firstCosmetic?.label ?? "1 cosmetic"
+          : `${formatNumber(gains.cosmeticRewards.length)} cosmetics`,
+    });
+  }
   if (gains.streakProgressed) {
     rewards.push({
       icon: "STR",
@@ -1530,6 +1753,9 @@ function hasSyncRewards(gains: LatestSyncGains) {
     gains.eggsAwarded > 0 ||
     gains.questsCompleted > 0 ||
     gains.coins > 0 ||
+    gains.chestProgress > 0 ||
+    gains.itemRewards.length > 0 ||
+    gains.cosmeticRewards.length > 0 ||
     gains.streakProgressed
   );
 }
@@ -2241,6 +2467,34 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 12,
     fontWeight: "900",
+  },
+  inventoryList: {
+    gap: 10,
+  },
+  inventoryRow: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 12,
+  },
+  cosmeticRow: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    padding: 12,
+  },
+  inventoryEmpty: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 6,
+    padding: 12,
   },
   arcHeader: {
     alignItems: "flex-start",

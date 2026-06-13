@@ -8,6 +8,10 @@ import type {
 } from "../../domain/models";
 import { MAX_ACTIVE_EGGS } from "../../domain/hatchery";
 import { getSupabaseClient } from "../auth/supabaseClient";
+import {
+  createUserSaveState,
+  hydrateHatchUpDataFromSaveState,
+} from "../saveState/userSaveState";
 
 type UntypedSupabaseClient = ReturnType<typeof getSupabaseClient> & {
   // Replace this local bridge with generated Supabase database types once the
@@ -52,7 +56,7 @@ export async function loadCloudSave(
 
   const row = data as HatchUpSaveRow;
   return {
-    data: migrateHatchUpData(row.save_data as Partial<HatchUpData>),
+    data: hydrateHatchUpDataFromSaveState(row.save_data),
     schemaVersion: row.schema_version,
     syncedAt: row.updated_at,
   };
@@ -78,7 +82,7 @@ export async function saveCloudSave(
     const { error } = await getUntypedSupabase()
       .from("hatchup_saves")
       .update({
-        save_data: merged,
+        save_data: createUserSaveState(merged, syncedAt),
         schema_version: merged.schemaVersion,
         updated_at: syncedAt,
       })
@@ -89,7 +93,7 @@ export async function saveCloudSave(
     const { error } = await getUntypedSupabase()
       .from("hatchup_saves")
       .insert({
-        save_data: merged,
+        save_data: createUserSaveState(merged, syncedAt),
         schema_version: merged.schemaVersion,
         updated_at: syncedAt,
         user_id: userId,
@@ -141,16 +145,28 @@ export function mergeLocalAndCloudSave(
       local.claimedRewardChests,
       cloud.claimedRewardChests,
     ),
+    chestProgress: Math.max(local.chestProgress, cloud.chestProgress),
     cloudSyncEnabled: true,
     cloudSyncStatus: "pending",
     coins: Math.max(local.coins, cloud.coins),
     collection,
+    cosmeticUnlocks: mergeByKey(
+      local.cosmeticUnlocks,
+      cloud.cosmeticUnlocks,
+      (item) => item.id,
+    ),
     crashReportingEnabled: local.crashReportingEnabled || cloud.crashReportingEnabled,
     currentStreak: Math.max(local.currentStreak, cloud.currentStreak),
     dailyAward: chooseAward(local.dailyAward, cloud.dailyAward),
     eggsHatched: Math.max(local.eggsHatched, cloud.eggsHatched),
+    economyRewardHistory: mergeByKey(
+      local.economyRewardHistory,
+      cloud.economyRewardHistory,
+      (item) => item.id,
+    ),
     eventEggsAwarded: mergeStrings(local.eventEggsAwarded, cloud.eventEggsAwarded),
     healthConnected: local.healthConnected || cloud.healthConnected,
+    inventoryItems: mergeInventoryItems(local.inventoryItems, cloud.inventoryItems),
     lastCloudSyncedAt: chooseLatestIso(
       local.lastCloudSyncedAt,
       cloud.lastCloudSyncedAt,
@@ -171,6 +187,10 @@ export function mergeLocalAndCloudSave(
       local.onboardingStatus,
       cloud.onboardingStatus,
     ),
+    onboardingStep:
+      local.onboardingStatus === "complete" || cloud.onboardingStatus === "complete"
+        ? null
+        : local.onboardingStep ?? cloud.onboardingStep,
     pendingEggs,
     privacyConsentVersion: chooseText(
       local.privacyConsentVersion,
@@ -338,6 +358,22 @@ function chooseOnboardingStatus(
 
 function mergeStrings(left: string[], right: string[]) {
   return Array.from(new Set([...left, ...right]));
+}
+
+function mergeInventoryItems(
+  left: HatchUpData["inventoryItems"],
+  right: HatchUpData["inventoryItems"],
+) {
+  const totals = new Map<string, number>();
+
+  [...left, ...right].forEach((item) => {
+    totals.set(item.id, (totals.get(item.id) ?? 0) + item.quantity);
+  });
+
+  return Array.from(totals.entries()).map(([id, quantity]) => ({
+    id: id as HatchUpData["inventoryItems"][number]["id"],
+    quantity,
+  }));
 }
 
 function mergeByKey<T>(left: T[], right: T[], getKey: (item: T) => string) {

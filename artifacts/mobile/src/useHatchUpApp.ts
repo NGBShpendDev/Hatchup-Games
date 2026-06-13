@@ -4,23 +4,31 @@ import { grantEventEggs } from "./domain/eventEggs";
 import {
   initialHatchUpData,
   type CollectedHatchling,
+  type CosmeticRewardId,
   type DailyAward,
   type DailyXp,
   type EggElement,
+  type EconomyItemId,
   type HatchUpData,
 } from "./domain/models";
 import { migrateHatchUpData } from "./domain/migration";
 import {
   addStepsToEggs,
-  createStarterEgg,
   grantMilestoneEggs,
   getNewStepsForSync,
   isEggReady,
   hatchEgg as hatchReadyEgg,
 } from "./domain/hatchery";
 import {
+  applyOnboardingHatch,
+  applyOnboardingIdentity,
+  applyOnboardingStarterEgg,
+  completeOnboarding,
+  createSkippedOnboardingData,
+  readyOnboardingEgg,
+} from "./domain/onboardingTutorial";
+import {
   addXpToActiveHatchling,
-  bondWithHatchling,
   getHatchlingPowerScore,
   getTrainingStatus,
   renameHatchling,
@@ -29,6 +37,13 @@ import {
 import { upsertDailyAward } from "./domain/history";
 import { updateStreak } from "./domain/streak";
 import { getWeeklyRewardChest } from "./domain/rewardChests";
+import {
+  applyEconomyReward,
+  createWeeklyChestReward,
+  ECONOMY_BALANCE,
+  getEconomyItem,
+  spendInventoryItem,
+} from "./domain/economy";
 import {
   getMonsterStage,
   getMonsterStages,
@@ -75,10 +90,13 @@ import { getQaFixtureById, type QaFixtureId } from "./qa/fixtures";
 export interface LatestSyncGains {
   accountXp: number;
   bondGained: number;
+  chestProgress: number;
   coins: number;
   distanceMeters: number;
   eggSteps: number;
   eggsAwarded: number;
+  itemRewards: EconomyItemId[];
+  cosmeticRewards: CosmeticRewardId[];
   palXp: number;
   questsCompleted: number;
   stepsSynced: number;
@@ -88,6 +106,7 @@ export interface LatestSyncGains {
 
 export interface TrainingFeedback {
   bondGained: number;
+  chestProgressGained: number;
   id: string;
   palName: string;
   powerGained: number;
@@ -107,10 +126,13 @@ const emptyDailyXp: DailyXp = {
 const emptySyncGains: LatestSyncGains = {
   accountXp: 0,
   bondGained: 0,
+  chestProgress: 0,
   coins: 0,
   distanceMeters: 0,
   eggSteps: 0,
   eggsAwarded: 0,
+  itemRewards: [],
+  cosmeticRewards: [],
   palXp: 0,
   questsCompleted: 0,
   stepsSynced: 0,
@@ -234,28 +256,16 @@ export function useHatchUpApp() {
   }
 
   async function saveMonsterName(monsterName: string) {
-    await persist({
-      ...data,
-      monsterName: monsterName.trim(),
-      onboardingStatus: "monsterCreated",
-    });
+    await persist(applyOnboardingIdentity(data, monsterName));
   }
 
   async function saveMonsterSetup(
     monsterName: string,
     starterEggElement: EggElement,
   ) {
-    const starterEgg = createStarterEgg(starterEggElement);
-    const activeEggs = [starterEgg];
+    const named = applyOnboardingIdentity(data, monsterName);
 
-    await persist({
-      ...data,
-      activeEgg: activeEggs[0],
-      activeEggs,
-      monsterName: monsterName.trim(),
-      onboardingStatus: "monsterCreated",
-      starterEggElement,
-    });
+    await persist(applyOnboardingStarterEgg(named, starterEggElement));
   }
 
   async function connectHealth() {
@@ -266,7 +276,6 @@ export function useHatchUpApp() {
       await persist({
         ...data,
         healthConnected: true,
-        onboardingStatus: "complete",
       });
       return true;
     } catch (caught) {
@@ -281,13 +290,20 @@ export function useHatchUpApp() {
     setError(null);
     await persist({
       ...data,
-      onboardingStatus: "complete",
     });
     return true;
   }
 
+  async function saveOnboardingIdentity(username: string) {
+    await persist(applyOnboardingIdentity(data, username));
+  }
+
+  async function saveOnboardingStarterEgg(starterEggElement: EggElement) {
+    await persist(applyOnboardingStarterEgg(data, starterEggElement));
+  }
+
   async function syncHealth() {
-    if (syncInFlight.current) return;
+    if (syncInFlight.current) return null;
     syncInFlight.current = true;
     setIsSyncing(true);
     setError(null);
@@ -335,7 +351,19 @@ export function useHatchUpApp() {
         previousTotalXp,
         previousTotalXp + newXp,
       );
-      const next = grantEventEggs(withMilestoneEggs, health.date);
+      const withSyncRewards =
+        newSteps > 0
+          ? applyEconomyReward(
+              withMilestoneEggs,
+              {
+                chestProgress: newSteps,
+                label: "Movement sync",
+                source: "sync",
+              },
+              new Date().toISOString(),
+            )
+          : withMilestoneEggs;
+      const next = grantEventEggs(withSyncRewards, health.date);
       const activeHatchlingAfter =
         next.activeHatchlingId && activeHatchlingBefore
           ? next.collection.find((item) => item.id === next.activeHatchlingId)
@@ -358,13 +386,16 @@ export function useHatchUpApp() {
           (activeHatchlingAfter?.bond ?? 0) - (activeHatchlingBefore?.bond ?? 0),
           0,
         ),
+        chestProgress: newSteps,
         coins: 0,
+        cosmeticRewards: [],
         distanceMeters: health.distanceMeters ?? 0,
         eggSteps: newSteps,
         eggsAwarded: Math.max(
           next.activeEggs.length + next.pendingEggs.length - previousEggRewardCount,
           0,
         ),
+        itemRewards: [],
         palXp: Math.max(
           (activeHatchlingAfter?.xp ?? 0) - (activeHatchlingBefore?.xp ?? 0),
           0,
@@ -374,25 +405,58 @@ export function useHatchUpApp() {
         streakProgressed: next.lastRewardDate === health.date && data.lastRewardDate !== health.date,
         xp: getXpGains(previousDailyXp, xp),
       });
+      return next;
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Health sync failed.",
       );
       void trackEvent(data, "health_sync_failed");
+      return null;
     } finally {
       syncInFlight.current = false;
       setIsSyncing(false);
     }
   }
 
+  async function syncOnboardingMovement() {
+    const synced = await syncHealth();
+    if (!synced) return false;
+
+    const readyStarter = readyOnboardingEgg(synced);
+    await persist(readyStarter);
+    return true;
+  }
+
   async function hatchEgg(eggId: string) {
-    const next = hatchReadyEgg(data, eggId, new Date().toISOString());
-    await persist(next);
+    const hatchedAt = new Date().toISOString();
+    const next =
+      data.onboardingStep === "hatchPal"
+        ? applyOnboardingHatch(data, eggId, hatchedAt)
+        : hatchReadyEgg(data, eggId, hatchedAt);
+    const rewarded =
+      next !== data
+        ? applyEconomyReward(
+            next,
+            {
+              coins: ECONOMY_BALANCE.hatch.coins,
+              label: "Pal hatched",
+              source: "hatch",
+            },
+            hatchedAt,
+          )
+        : next;
+    await persist(rewarded);
     void trackEvent(next, "egg_hatched", {
       eggId,
-      eggsHatched: next.eggsHatched,
+      eggsHatched: rewarded.eggsHatched,
     });
-    if (next !== data) setLatestHatchling(next.collection[0]);
+    if (rewarded !== data) {
+      setLatestHatchling(rewarded.collection[0]);
+      setLatestSyncGains({
+        ...emptySyncGains,
+        coins: ECONOMY_BALANCE.hatch.coins,
+      });
+    }
   }
 
   async function hatchAllReadyEggs() {
@@ -408,9 +472,24 @@ export function useHatchUpApp() {
         new Date(Date.now() + index).toISOString(),
       );
     });
+    const hatchedCount = Math.max(next.eggsHatched - data.eggsHatched, 0);
+
+    if (hatchedCount > 0) {
+      next = applyEconomyReward(next, {
+        coins: ECONOMY_BALANCE.hatch.coins * hatchedCount,
+        label: "Pals hatched",
+        source: "hatch",
+      });
+    }
 
     await persist(next);
-    if (next !== data) setLatestHatchling(next.collection[0]);
+    if (next !== data) {
+      setLatestHatchling(next.collection[0]);
+      setLatestSyncGains({
+        ...emptySyncGains,
+        coins: ECONOMY_BALANCE.hatch.coins * hatchedCount,
+      });
+    }
   }
 
   async function resetApp() {
@@ -514,6 +593,8 @@ export function useHatchUpApp() {
     await persist({
       ...data,
       activeHatchlingId: hatchlingId,
+      onboardingStep:
+        data.onboardingStep === "setActivePal" ? "trainPal" : data.onboardingStep,
     });
   }
 
@@ -531,18 +612,34 @@ export function useHatchUpApp() {
       (hatchling) => hatchling.id === data.activeHatchlingId,
     );
 
-    await persist(next);
-
     if (
       !before ||
       !after ||
       after.trainingSessions.length <= before.trainingSessions.length
     ) {
+      await persist(next);
       return;
     }
 
+    const progressed =
+      data.onboardingStep === "trainPal"
+        ? { ...next, onboardingStep: "rewardSummary" as const }
+        : next;
+    const rewarded = applyEconomyReward(
+      progressed,
+      {
+        chestProgress: ECONOMY_BALANCE.training.chestProgress,
+        label: "Pal training",
+        source: "training",
+      },
+      new Date().toISOString(),
+    );
+
+    await persist(rewarded);
+
     setTrainingFeedback({
       bondGained: Math.max(after.bond - before.bond, 0),
+      chestProgressGained: ECONOMY_BALANCE.training.chestProgress,
       id: `${after.id}:${
         after.trainingSessions[after.trainingSessions.length - 1] ?? Date.now()
       }`,
@@ -556,6 +653,16 @@ export function useHatchUpApp() {
     });
   }
 
+  async function completeFirstRunOnboarding() {
+    await persist(completeOnboarding(data));
+  }
+
+  async function skipFirstRunOnboarding() {
+    const next = createSkippedOnboardingData(data);
+    await persist(next);
+    setLatestHatchling(next.collection[0] ?? null);
+  }
+
   async function claimQuestReward(quest: Quest, today: string) {
     const rewardKey = getQuestRewardKey(quest, today);
     const alreadyClaimed = data.claimedQuestRewards.includes(rewardKey);
@@ -564,10 +671,6 @@ export function useHatchUpApp() {
       return false;
     }
 
-    const activeEggs =
-      quest.rewardEggSteps > 0
-        ? addStepsToEggs(data.activeEggs, quest.rewardEggSteps)
-        : data.activeEggs;
     const claimedAt = new Date().toISOString();
     const receipt = {
       cadence: quest.cadence,
@@ -577,32 +680,44 @@ export function useHatchUpApp() {
       questId: quest.id,
       rewardAccountXp: quest.rewardAccountXp,
       rewardBond: quest.rewardBond,
+      rewardChestProgress: quest.rewardChestProgress,
       rewardCoins: quest.rewardCoins,
+      rewardCosmetics: quest.rewardCosmetics,
       rewardEggSteps: quest.rewardEggSteps,
+      rewardItems: quest.rewardItems,
       tier: quest.tier,
     };
-    const rewardedData =
-      quest.rewardBond > 0 && data.activeHatchlingId
-        ? bondWithHatchling(data, data.activeHatchlingId, quest.rewardBond, claimedAt)
-        : data;
-    const next = {
-      ...rewardedData,
+    const withClaim = {
       ...data,
-      accountXp: data.accountXp + quest.rewardAccountXp,
-      activeEgg: activeEggs[0],
-      activeEggs,
-      collection: rewardedData.collection,
       claimedQuestRewards: [...data.claimedQuestRewards, rewardKey],
-      coins: data.coins + quest.rewardCoins,
       questRewardHistory: [receipt, ...data.questRewardHistory].slice(0, 30),
     };
+    const next = applyEconomyReward(
+      withClaim,
+      {
+        accountXp: quest.rewardAccountXp,
+        bond: quest.rewardBond,
+        chestProgress: quest.rewardChestProgress,
+        coins: quest.rewardCoins,
+        cosmetics: quest.rewardCosmetics,
+        eggSteps: quest.rewardEggSteps,
+        items: quest.rewardItems,
+        label: quest.label,
+        source: "quest",
+      },
+      claimedAt,
+    );
 
     await persist(next);
     setLatestSyncGains({
       ...emptySyncGains,
       accountXp: quest.rewardAccountXp,
+      bondGained: quest.rewardBond,
+      chestProgress: quest.rewardChestProgress,
       coins: quest.rewardCoins,
+      cosmeticRewards: quest.rewardCosmetics,
       eggSteps: quest.rewardEggSteps,
+      itemRewards: quest.rewardItems,
     });
     void trackEvent(next, "quest_reward_claimed", {
       cadence: quest.cadence,
@@ -616,10 +731,14 @@ export function useHatchUpApp() {
     const chest = getWeeklyRewardChest(data, today);
     if (!chest.canClaim) return false;
 
-    const activeEggs = addStepsToEggs(data.activeEggs, chest.rewardEggSteps);
+    const claimedAt = new Date().toISOString();
+    const chestReward = createWeeklyChestReward(
+      chest.key,
+      chest.steps + Date.parse(today),
+    );
     const receipt = {
       cadence: "weekly",
-      claimedAt: new Date().toISOString(),
+      claimedAt,
       id: `${chest.key}:${Date.now()}`,
       label: chest.label,
       questId: chest.key,
@@ -628,22 +747,21 @@ export function useHatchUpApp() {
       rewardEggSteps: chest.rewardEggSteps,
       tier: 1,
     };
-    const next = {
+    const withClaim = {
       ...data,
-      accountXp: data.accountXp + chest.rewardAccountXp,
-      activeEgg: activeEggs[0],
-      activeEggs,
       claimedRewardChests: [...data.claimedRewardChests, chest.key],
-      coins: data.coins + chest.rewardCoins,
       questRewardHistory: [receipt, ...data.questRewardHistory].slice(0, 30),
     };
+    const next = applyEconomyReward(withClaim, chestReward, claimedAt);
 
     await persist(next);
     setLatestSyncGains({
       ...emptySyncGains,
       accountXp: chest.rewardAccountXp,
       coins: chest.rewardCoins,
+      cosmeticRewards: chestReward.cosmetics ?? [],
       eggSteps: chest.rewardEggSteps,
+      itemRewards: chestReward.items ?? [],
     });
     void trackEvent(next, "weekly_chest_claimed", {
       key: chest.key,
@@ -655,16 +773,11 @@ export function useHatchUpApp() {
   async function buyShopItem(itemId: ShopItemId) {
     const item = getShopItem(itemId);
     if (!item || !canBuyShopItem(data, item)) return false;
+    const economyItem = getEconomyItem(itemId);
+    if (!economyItem) return false;
 
-    const activeEggs =
-      item.rewardEggSteps > 0
-        ? addStepsToEggs(data.activeEggs, item.rewardEggSteps)
-        : data.activeEggs;
-    const withAccountRewards = {
+    const withPurchase = {
       ...data,
-      accountXp: data.accountXp + item.rewardAccountXp,
-      activeEgg: activeEggs[0],
-      activeEggs,
       coins: data.coins - item.priceCoins,
       shopPurchaseHistory: [
         {
@@ -677,22 +790,58 @@ export function useHatchUpApp() {
         ...data.shopPurchaseHistory,
       ].slice(0, 30),
     };
-    const next =
-      item.rewardPalXp > 0
-        ? addXpToActiveHatchling(withAccountRewards, item.rewardPalXp)
-        : withAccountRewards;
+    const next = applyEconomyReward(withPurchase, {
+      ...economyItem.reward,
+      label: economyItem.label,
+      source: "shop",
+    });
 
     await persist(next);
     setLatestSyncGains({
       ...emptySyncGains,
-      accountXp: item.rewardAccountXp,
+      accountXp: economyItem.reward.accountXp ?? 0,
+      bondGained: economyItem.reward.bond ?? 0,
+      chestProgress: economyItem.reward.chestProgress ?? 0,
       coins: -item.priceCoins,
-      eggSteps: item.rewardEggSteps,
-      palXp: item.rewardPalXp,
+      cosmeticRewards: economyItem.reward.cosmetics ?? [],
+      eggSteps: economyItem.reward.eggSteps ?? 0,
+      itemRewards: economyItem.reward.items ?? [],
+      palXp: economyItem.reward.palXp ?? 0,
     });
     void trackEvent(next, "shop_item_purchased", {
       itemId: item.id,
       priceCoins: item.priceCoins,
+    });
+    return true;
+  }
+
+  async function useInventoryItem(itemId: ShopItemId) {
+    const item = getEconomyItem(itemId);
+    if (!item) return false;
+    if (!data.inventoryItems.some((entry) => entry.id === itemId && entry.quantity > 0)) {
+      return false;
+    }
+    if ((item.reward.palXp || item.reward.bond) && !data.activeHatchlingId) {
+      return false;
+    }
+
+    const spent = spendInventoryItem(data, itemId);
+    const next = applyEconomyReward(spent, {
+      ...item.reward,
+      label: item.label,
+      source: "shop",
+    });
+
+    await persist(next);
+    setLatestSyncGains({
+      ...emptySyncGains,
+      accountXp: item.reward.accountXp ?? 0,
+      bondGained: item.reward.bond ?? 0,
+      chestProgress: item.reward.chestProgress ?? 0,
+      cosmeticRewards: item.reward.cosmetics ?? [],
+      eggSteps: item.reward.eggSteps ?? 0,
+      itemRewards: item.reward.items ?? [],
+      palXp: item.reward.palXp ?? 0,
     });
     return true;
   }
@@ -821,7 +970,11 @@ export function useHatchUpApp() {
     readyTestEgg,
     reportCrash,
     saveMonsterSetup,
+    completeFirstRunOnboarding,
     skipHealthConnect,
+    skipFirstRunOnboarding,
+    saveOnboardingIdentity,
+    saveOnboardingStarterEgg,
     saveMonsterName,
     saveLeaderboardAlias,
     saveProfile,
@@ -835,7 +988,9 @@ export function useHatchUpApp() {
     setLeaderboardSharing,
     setTestStage,
     syncHealth,
+    syncOnboardingMovement,
     buyShopItem,
+    useInventoryItem,
     applyQaFixture,
     trainActiveHatchling,
     today: toDateKey(new Date()),

@@ -14,7 +14,7 @@ import {
   getTimeAdjustedHatchling,
   getTrainingStatus,
 } from "../domain/hatchlings";
-import { colors, radii } from "../theme";
+import { colors, gameColors, radii } from "../theme";
 import { ActiveTabTransition } from "../utils/animations";
 import { formatPercent } from "../utils/format";
 import { useBottomNavStatusData } from "./BottomNavStatusContext";
@@ -123,7 +123,7 @@ function NavItem({
         style={[styles.iconWrap, active && styles.activeIconWrap]}
       >
         <Icon
-          color={active ? colors.surface : colors.muted}
+          color={active ? colors.primaryDeep : colors.muted}
           size={19}
           strokeWidth={active ? 2.7 : 2.3}
         />
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   activeItem: {
-    backgroundColor: colors.primarySoft,
+    backgroundColor: gameColors.activeNavBackground,
   },
   pressedItem: {
     opacity: 0.72,
@@ -255,8 +255,8 @@ const styles = StyleSheet.create({
     width: 29,
   },
   activeIconWrap: {
-    backgroundColor: colors.primaryDeep,
-    borderColor: colors.primaryDeep,
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
   },
   label: {
     color: colors.muted,

@@ -1,32 +1,23 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import {
-  createNativeStackNavigator,
-  NativeStackScreenProps,
-} from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { ActionFeedbackModal } from "../components/ActionFeedbackModal";
 import { BottomNavStatusProvider } from "../components/BottomNavStatusContext";
 import { ErrorBoundary } from "../components/ErrorBoundary";
-import { ConnectHealthScreen } from "../screens/ConnectHealthScreen";
 import { CreatureDexScreen } from "../screens/CreatureDexScreen";
+import { FirstRunOnboardingScreen } from "../screens/FirstRunOnboardingScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { LeaderboardScreen } from "../screens/LeaderboardScreen";
 import { MonsterDetailScreen } from "../screens/MonsterDetailScreen";
-import { MonsterSetupScreen } from "../screens/MonsterSetupScreen";
 import { SettingsPrivacyScreen } from "../screens/SettingsPrivacyScreen";
-import { WelcomeScreen } from "../screens/WelcomeScreen";
 import { colors } from "../theme";
 import { useHatchUpApp } from "../useHatchUpApp";
-import type { MainTabParamList, OnboardingStackParamList } from "./types";
+import type { MainTabParamList } from "./types";
 
-const OnboardingStack = createNativeStackNavigator<OnboardingStackParamList>();
 const MainTabs = createBottomTabNavigator<MainTabParamList>();
 
 type HatchUpAppController = ReturnType<typeof useHatchUpApp>;
-type OnboardingProps<RouteName extends keyof OnboardingStackParamList> =
-  NativeStackScreenProps<OnboardingStackParamList, RouteName>;
 
 export function AppNavigator() {
   const app = useHatchUpApp();
@@ -49,7 +40,20 @@ export function AppNavigator() {
         {onboardingComplete ? (
           <MainTabsNavigator app={app} />
         ) : (
-          <OnboardingNavigator app={app} />
+          <FirstRunOnboardingScreen
+            data={app.data}
+            error={app.error}
+            isSyncing={app.isSyncing}
+            latestSyncGains={app.latestSyncGains}
+            onComplete={app.completeFirstRunOnboarding}
+            onHatchEgg={app.hatchEgg}
+            onPickStarterEgg={app.saveOnboardingStarterEgg}
+            onSaveIdentity={app.saveOnboardingIdentity}
+            onSetActivePal={app.setActiveHatchling}
+            onSkip={app.skipFirstRunOnboarding}
+            onSyncMovement={app.syncOnboardingMovement}
+            onTrainPal={app.trainActiveHatchling}
+          />
         )}
         <ActionFeedbackModal
           feedback={app.trainingFeedback}
@@ -57,52 +61,6 @@ export function AppNavigator() {
         />
       </NavigationContainer>
     </ErrorBoundary>
-  );
-}
-
-function OnboardingNavigator({ app }: { app: HatchUpAppController }) {
-  return (
-    <OnboardingStack.Navigator
-      initialRouteName={
-        app.data.onboardingStatus === "monsterCreated"
-          ? "ConnectHealth"
-          : "Welcome"
-      }
-      screenOptions={{ headerShown: false }}
-    >
-      <OnboardingStack.Screen name="Welcome">
-        {({ navigation }: OnboardingProps<"Welcome">) => (
-          <WelcomeScreen onContinue={() => navigation.navigate("MonsterSetup")} />
-        )}
-      </OnboardingStack.Screen>
-      <OnboardingStack.Screen name="MonsterSetup">
-        {({ navigation }: OnboardingProps<"MonsterSetup">) => (
-          <MonsterSetupScreen
-            initialName={app.data.monsterName}
-            onBack={() => navigation.goBack()}
-            onContinue={async (name, starterEggElement) => {
-              await app.saveMonsterSetup(name, starterEggElement);
-              navigation.navigate("ConnectHealth");
-            }}
-          />
-        )}
-      </OnboardingStack.Screen>
-      <OnboardingStack.Screen name="ConnectHealth">
-        {({ navigation }: OnboardingProps<"ConnectHealth">) => (
-          <ConnectHealthScreen
-            error={app.error}
-            healthMode={app.healthMode}
-            onBack={() => navigation.navigate("MonsterSetup")}
-            onConnect={async () => {
-              await app.connectHealth();
-            }}
-            onSkip={async () => {
-              await app.skipHealthConnect();
-            }}
-          />
-        )}
-      </OnboardingStack.Screen>
-    </OnboardingStack.Navigator>
   );
 }
 
@@ -130,7 +88,10 @@ function MainTabsNavigator({ app }: { app: HatchUpAppController }) {
               onLeaderboardPress={() => navigation.navigate("Ranks")}
               onMonsterPress={() => navigation.navigate("Hatchery")}
               onSettingsPress={() => navigation.navigate("Profile")}
-              onSync={app.syncHealth}
+              onSync={async () => {
+                await app.syncHealth();
+              }}
+              onUseInventoryItem={app.useInventoryItem}
             />
           )}
         </MainTabs.Screen>

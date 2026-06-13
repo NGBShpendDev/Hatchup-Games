@@ -6,6 +6,15 @@ import {
 
 export type OnboardingStatus = "notStarted" | "monsterCreated" | "complete";
 
+export type OnboardingTutorialStep =
+  | "username"
+  | "starterEgg"
+  | "syncMovement"
+  | "hatchPal"
+  | "setActivePal"
+  | "trainPal"
+  | "rewardSummary";
+
 export type HealthSource = "mock" | "appleHealth" | "healthConnect";
 
 export type AccountMode = "local" | "remote";
@@ -44,8 +53,11 @@ export interface QuestRewardReceipt {
   questId: string;
   rewardAccountXp: number;
   rewardBond?: number;
+  rewardChestProgress?: number;
   rewardCoins: number;
+  rewardCosmetics?: CosmeticRewardId[];
   rewardEggSteps: number;
+  rewardItems?: EconomyItemId[];
   tier: number;
 }
 
@@ -55,6 +67,56 @@ export interface ShopPurchaseReceipt {
   itemId: string;
   label: string;
   priceCoins: number;
+}
+
+export type EconomyItemId =
+  | "pal-snack"
+  | "training-token"
+  | "egg-booster"
+  | "lucky-charm";
+
+export type CosmeticRewardId =
+  | "profile-frame-garden-gold"
+  | "badge-style-sunlit"
+  | "pal-card-background-meadow";
+
+export type CosmeticRewardType =
+  | "profileFrame"
+  | "badgeStyle"
+  | "palCardBackground";
+
+export interface InventoryItemStack {
+  id: EconomyItemId;
+  quantity: number;
+}
+
+export interface CosmeticUnlock {
+  id: CosmeticRewardId;
+  type: CosmeticRewardType;
+  unlockedAt: string;
+}
+
+export type EconomyRewardSource =
+  | "sync"
+  | "quest"
+  | "training"
+  | "hatch"
+  | "weeklyChest"
+  | "shop";
+
+export interface EconomyRewardReceipt {
+  accountXp: number;
+  bond: number;
+  chestProgress: number;
+  coins: number;
+  cosmeticIds: CosmeticRewardId[];
+  createdAt: string;
+  eggSteps: number;
+  id: string;
+  itemIds: EconomyItemId[];
+  label: string;
+  palXp: number;
+  source: EconomyRewardSource;
 }
 
 export type EggRarity = "common" | "uncommon" | "rare" | "epic";
@@ -133,8 +195,13 @@ export interface HatchUpData {
   longestStreak: number;
   lastSyncedDate: string | null;
   onboardingStatus: OnboardingStatus;
+  onboardingStep: OnboardingTutorialStep | null;
   healthConnected: boolean;
   coins: number;
+  chestProgress: number;
+  inventoryItems: InventoryItemStack[];
+  cosmeticUnlocks: CosmeticUnlock[];
+  economyRewardHistory: EconomyRewardReceipt[];
   claimedQuestRewards: string[];
   claimedRewardChests: string[];
   questRewardHistory: QuestRewardReceipt[];
@@ -180,7 +247,7 @@ const starterEggs: IncubatorEgg[] = [
 ];
 
 export const initialHatchUpData: HatchUpData = {
-  schemaVersion: 9,
+  schemaVersion: 10,
   progressionProfile: ACTIVE_PROGRESSION_PROFILE.id,
   accountId: "local-beta-account",
   accountXp: 0,
@@ -202,8 +269,13 @@ export const initialHatchUpData: HatchUpData = {
   longestStreak: 0,
   lastSyncedDate: null,
   onboardingStatus: "notStarted",
+  onboardingStep: "username",
   healthConnected: false,
   coins: 0,
+  chestProgress: 0,
+  inventoryItems: [],
+  cosmeticUnlocks: [],
+  economyRewardHistory: [],
   claimedQuestRewards: [],
   claimedRewardChests: [],
   questRewardHistory: [],

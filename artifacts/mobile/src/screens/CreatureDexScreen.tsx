@@ -49,7 +49,7 @@ import type {
   IncubatorEgg,
 } from "../domain/models";
 import { getCreatureVisualStage, type CreatureVisualStage } from "../domain/creatureVisuals";
-import { colors, elementColors, radii, typography } from "../theme";
+import { colors, elementColors, gameColors, radii, typography } from "../theme";
 import { CardEntrance } from "../utils/animations";
 import { formatNumber, formatXp } from "../utils/format";
 
@@ -2053,14 +2053,15 @@ const styles = StyleSheet.create({
     width: "48%",
   },
   lockedCard: {
-    backgroundColor: colors.warmSurface,
+    backgroundColor: colors.softLavender,
+    borderColor: gameColors.locked,
     borderStyle: "dashed",
   },
   lockedAvatar: {
     alignItems: "center",
   },
   lockedHint: {
-    color: colors.primaryDeep,
+    color: gameColors.locked,
     fontSize: 10,
     fontWeight: "900",
     marginTop: 6,
@@ -2070,14 +2071,14 @@ const styles = StyleSheet.create({
   mysteryEggWrap: {
     alignItems: "center",
     justifyContent: "center",
-    opacity: 0.72,
+    opacity: 0.82,
   },
   mysteryMark: {
-    backgroundColor: colors.translucentSurface,
-    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    borderColor: colors.rewardGold,
     borderRadius: radii.pill,
     borderWidth: 1,
-    color: colors.primaryDeep,
+    color: colors.accent,
     fontSize: 18,
     fontWeight: "900",
     overflow: "hidden",

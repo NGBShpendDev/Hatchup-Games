@@ -2,7 +2,7 @@ import { Image, StyleSheet, Text, View } from "react-native";
 import { getCreatureAsset } from "../assets/creatureAssets";
 import { getCreatureVisualStage } from "../domain/creatureVisuals";
 import type { EggElement, EggRarity } from "../domain/models";
-import { colors, elementColors, radii } from "../theme";
+import { colors, elementColors, radii, rarityColors as themeRarityColors } from "../theme";
 
 interface Props {
   element: EggElement;
@@ -19,10 +19,10 @@ const elementLabels: Record<EggElement, string> = {
 };
 
 const rarityColors: Record<EggRarity, string> = {
-  common: colors.line,
-  uncommon: colors.primary,
-  rare: colors.accent,
-  epic: colors.final,
+  common: themeRarityColors.common,
+  uncommon: themeRarityColors.uncommon,
+  rare: themeRarityColors.rare,
+  epic: themeRarityColors.epic,
 };
 
 export function HatchlingAvatar({ element, level = 1, rarity, size = "large" }: Props) {

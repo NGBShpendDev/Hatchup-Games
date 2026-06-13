@@ -99,6 +99,10 @@ export function migrateHatchUpData(
     starterEggElement: stored.starterEggElement ?? null,
     weeklyGoalSteps: stored.weeklyGoalSteps ?? initialHatchUpData.weeklyGoalSteps,
     coins: stored.coins ?? 0,
+    chestProgress: stored.chestProgress ?? 0,
+    cosmeticUnlocks: stored.cosmeticUnlocks ?? [],
+    economyRewardHistory: stored.economyRewardHistory ?? [],
+    inventoryItems: stored.inventoryItems ?? [],
     claimedQuestRewards: stored.claimedQuestRewards ?? [],
     claimedRewardChests: stored.claimedRewardChests ?? [],
     questRewardHistory: stored.questRewardHistory ?? [],
@@ -110,6 +114,10 @@ export function migrateHatchUpData(
     activeEggs,
     activeHatchlingId:
       stored.activeHatchlingId ?? stored.collection?.[0]?.id ?? null,
+    onboardingStep:
+      stored.onboardingStatus === "complete"
+        ? null
+        : stored.onboardingStep ?? initialHatchUpData.onboardingStep,
     dailyAward: stored.dailyAward ? normalizeAward(stored.dailyAward) : null,
     activityHistory: (stored.activityHistory ?? []).map(normalizeAward),
     collection: (stored.collection ?? []).map((hatchling, index) =>

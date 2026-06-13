@@ -6,7 +6,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { colors, radii } from "../theme";
+import { colors, gameColors, radii } from "../theme";
 
 interface Props extends PressableProps {
   label: string;
@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   secondary: {
-    backgroundColor: colors.primarySoft,
+    backgroundColor: gameColors.secondaryButton,
     borderColor: colors.line,
     borderWidth: 1,
   },
@@ -79,8 +79,8 @@ const styles = StyleSheet.create({
     color: colors.primaryDeep,
   },
   disabled: {
-    backgroundColor: colors.line,
-    borderColor: colors.line,
+    backgroundColor: gameColors.disabled,
+    borderColor: gameColors.disabled,
     shadowOpacity: 0,
   },
   disabledLabel: {

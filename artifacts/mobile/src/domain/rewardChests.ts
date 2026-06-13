@@ -1,5 +1,6 @@
 import { getActivitySummary } from "./history";
 import type { HatchUpData } from "./models";
+import { ECONOMY_BALANCE } from "./economy";
 
 export interface RewardChest {
   canClaim: boolean;
@@ -27,11 +28,11 @@ export function getWeeklyRewardChest(
     canClaim: activity.steps >= target && !claimed,
     claimed,
     key,
-    label: "Weekly Hatch Chest",
+    label: ECONOMY_BALANCE.weeklyChest.label,
     progress: Math.min(activity.steps / target, 1),
-    rewardAccountXp: 250,
-    rewardCoins: 180,
-    rewardEggSteps: 1500,
+    rewardAccountXp: ECONOMY_BALANCE.weeklyChest.accountXp,
+    rewardCoins: ECONOMY_BALANCE.weeklyChest.coins,
+    rewardEggSteps: ECONOMY_BALANCE.weeklyChest.eggSteps,
     steps: activity.steps,
     target,
   };

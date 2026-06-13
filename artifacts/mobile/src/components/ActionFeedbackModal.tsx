@@ -51,6 +51,10 @@ export function ActionFeedbackModal({ feedback, onDismiss }: Props) {
                 label="Training left"
                 value={`${formatNumber(feedback.sessionsRemaining)} today`}
               />
+              <FeedbackRow
+                label="Chest progress"
+                value={`+${formatNumber(feedback.chestProgressGained)}`}
+              />
             </View>
             <Text style={styles.body}>
               Training is limited each day so each session feels meaningful.

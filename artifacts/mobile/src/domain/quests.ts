@@ -1,6 +1,12 @@
 import { getActivitySummary } from "./history";
 import { metersToMiles, stepsToMiles } from "./leaderboard";
-import type { DailyAward, DailyHealthSummary, HatchUpData } from "./models";
+import type {
+  CosmeticRewardId,
+  DailyAward,
+  DailyHealthSummary,
+  EconomyItemId,
+  HatchUpData,
+} from "./models";
 import {
   ACTIVE_PROGRESSION_PROFILE,
   type ProgressionProfile,
@@ -17,8 +23,11 @@ export interface Quest {
   previousTarget: number;
   rewardAccountXp: number;
   rewardBond: number;
+  rewardChestProgress: number;
   rewardCoins: number;
+  rewardCosmetics: CosmeticRewardId[];
   rewardEggSteps: number;
+  rewardItems: EconomyItemId[];
   rewardProgressionBonus: boolean;
   rewardStreakBonus: boolean;
   target: number;
@@ -32,8 +41,11 @@ interface QuestTier {
   label: string;
   rewardAccountXp?: number;
   rewardBond?: number;
+  rewardChestProgress?: number;
   rewardCoins?: number;
+  rewardCosmetics?: CosmeticRewardId[];
   rewardEggSteps?: number;
+  rewardItems?: EconomyItemId[];
   rewardProgressionBonus?: boolean;
   rewardStreakBonus?: boolean;
   rewardXp: number;
@@ -183,7 +195,10 @@ export function getWeeklyQuests(data: HatchUpData, today: string): Quest[] {
       tier("Hit the weekly hatch goal", data.weeklyGoalSteps, 0, reward(75, 40, 500)),
       tier("Weekly overachiever", data.weeklyGoalSteps + 15000, 0, reward(125, 70, 900)),
       tier("Big week walker", data.weeklyGoalSteps + 35000, 0, reward(200, 120, 1400)),
-      tier("Legendary week", data.weeklyGoalSteps + 65000, 0, reward(320, 200, 2200)),
+      tier("Legendary week", data.weeklyGoalSteps + 65000, 0, {
+        ...reward(320, 200, 2200),
+        rewardItems: ["egg-booster"],
+      }),
     ]),
     getTieredQuest(
       "weekly",
@@ -195,6 +210,7 @@ export function getWeeklyQuests(data: HatchUpData, today: string): Quest[] {
         tier("Five active days", 5, 0, reward(110, 65, 650)),
         tier("Full-week streak", 7, 0, {
           ...reward(180, 110, 1100),
+          rewardChestProgress: 750,
           rewardStreakBonus: true,
         }),
       ],
@@ -253,17 +269,26 @@ export function getMonthlyQuests(data: HatchUpData, today: string): Quest[] {
     getTieredQuest("monthly", "monthlySteps", activity.steps, "steps", [
       tier("Walk a launch-month journey", data.weeklyGoalSteps * 4, 0, reward(250, 160, 1800)),
       tier("Long-route month", data.weeklyGoalSteps * 6, 0, reward(425, 280, 3200)),
-      tier("Marathon month", data.weeklyGoalSteps * 8, 0, reward(700, 460, 5200)),
+      tier("Marathon month", data.weeklyGoalSteps * 8, 0, {
+        ...reward(700, 460, 5200),
+        rewardItems: ["training-token"],
+      }),
     ]),
     getTieredQuest("monthly", "monthlyCollection", data.collection.length, "Pals", [
       tier("Build your Pal team", 6, 0, reward(220, 140, 1600)),
       tier("Collect twelve Pals", 12, 0, reward(400, 260, 3000)),
-      tier("Fill a full page", 20, 0, reward(680, 440, 5200)),
+      tier("Fill a full page", 20, 0, {
+        ...reward(680, 440, 5200),
+        rewardCosmetics: ["pal-card-background-meadow"],
+      }),
     ]),
     getTieredQuest("monthly", "monthlyStreak", data.longestStreak, "days", [
       tier("Reach a seven-day streak", 7, 0, reward(200, 120, 1500)),
       tier("Two-week ritual", 14, 0, reward(375, 240, 2800)),
-      tier("Month-long momentum", 30, 0, reward(750, 500, 6000)),
+      tier("Month-long momentum", 30, 0, {
+        ...reward(750, 500, 6000),
+        rewardCosmetics: ["profile-frame-garden-gold"],
+      }),
     ]),
     getTieredQuest("monthly", "monthlyElementDex", uniqueElements, "elements", [
       tier("Discover two elements", 2, 0, reward(180, 110, 1200)),
@@ -295,22 +320,35 @@ export function getSeasonalQuests(data: HatchUpData, today: string): Quest[] {
     getTieredQuest("seasonal", "seasonalSteps", activity.steps, "steps", [
       tier(`${season.label} trail`, 25000, 0, reward(150, 90, 1000)),
       tier(`${season.label} expedition`, 75000, 0, reward(320, 210, 2400)),
-      tier(`${season.label} odyssey`, 150000, 0, reward(620, 420, 5000)),
+      tier(`${season.label} odyssey`, 150000, 0, {
+        ...reward(620, 420, 5000),
+        rewardItems: ["lucky-charm"],
+      }),
     ]),
     getTieredQuest("seasonal", "seasonalElement", seasonalPals, "Pals", [
       tier(`Find a ${capitalize(season.element)} Pal`, 1, 0, reward(120, 75, 800)),
       tier(`${capitalize(season.element)} duo`, 2, 0, reward(260, 170, 2000)),
-      tier(`${capitalize(season.element)} habitat`, 4, 0, reward(520, 350, 4200)),
+      tier(`${capitalize(season.element)} habitat`, 4, 0, {
+        ...reward(520, 350, 4200),
+        rewardCosmetics: ["badge-style-sunlit"],
+      }),
     ]),
     getTieredQuest("seasonal", "seasonalTraining", seasonalTraining, "sessions", [
       tier(`${capitalize(season.element)} drills`, 3, 0, reward(140, 90, 900)),
       tier(`${capitalize(season.element)} mastery`, 9, 0, reward(300, 200, 2300)),
-      tier(`${capitalize(season.element)} academy`, 18, 0, reward(575, 390, 4800)),
+      tier(`${capitalize(season.element)} academy`, 18, 0, {
+        ...reward(575, 390, 4800),
+        rewardItems: ["pal-snack"],
+      }),
     ]),
     getTieredQuest("seasonal", "seasonalRare", rareOrBetter, "rare+ Pals", [
       tier("Spot a rare spark", 1, 0, reward(150, 100, 1000)),
       tier("Rare season trio", 3, 0, reward(340, 230, 2600)),
-      tier("Collector season", 7, 0, reward(700, 480, 5600)),
+      tier("Collector season", 7, 0, {
+        ...reward(700, 480, 5600),
+        rewardItems: ["lucky-charm"],
+        rewardCosmetics: ["badge-style-sunlit"],
+      }),
     ]),
   ];
 }
@@ -341,6 +379,7 @@ export function getPalQuests(data: HatchUpData, today: string): Quest[] {
       tier(`${prefix} best friend`, 100, 0, {
         ...reward(350, 240, 2800),
         rewardBond: 8,
+        rewardItems: ["pal-snack"],
       }),
     ]),
     getTieredQuest("pal", `pal-${palId}-training`, activePal?.trainingSessions.length ?? 0, "sessions", [
@@ -355,6 +394,7 @@ export function getPalQuests(data: HatchUpData, today: string): Quest[] {
       tier(`${prefix} mastery arc`, 25, 0, {
         ...reward(480, 330, 3900),
         rewardBond: 10,
+        rewardItems: ["training-token"],
       }),
     ]),
     getTieredQuest("pal", `pal-${palId}-xp`, activePal?.xp ?? 0, "Pal XP", [
@@ -476,8 +516,11 @@ function getTieredQuest(
     previousTarget,
     rewardAccountXp: selected.rewardAccountXp ?? 0,
     rewardBond: selected.rewardBond ?? 0,
+    rewardChestProgress: selected.rewardChestProgress ?? 0,
     rewardCoins: selected.rewardCoins ?? 0,
+    rewardCosmetics: selected.rewardCosmetics ?? [],
     rewardEggSteps: selected.rewardEggSteps ?? 0,
+    rewardItems: selected.rewardItems ?? [],
     rewardProgressionBonus: selected.rewardProgressionBonus ?? false,
     rewardStreakBonus: selected.rewardStreakBonus ?? false,
     rewardXp: selected.rewardXp,
@@ -497,8 +540,11 @@ function tier(
       QuestTier,
       | "rewardAccountXp"
       | "rewardBond"
+      | "rewardChestProgress"
       | "rewardCoins"
+      | "rewardCosmetics"
       | "rewardEggSteps"
+      | "rewardItems"
       | "rewardProgressionBonus"
       | "rewardStreakBonus"
     >
@@ -539,10 +585,19 @@ export function getQuestRewardParts(quest: Quest) {
     rewards.push(`+${formatNumber(quest.rewardAccountXp)} Journey XP`);
   }
   if (quest.rewardCoins > 0) rewards.push(`+${formatNumber(quest.rewardCoins)} coins`);
+  if (quest.rewardChestProgress > 0) {
+    rewards.push(`+${formatNumber(quest.rewardChestProgress)} Chest progress`);
+  }
   if (quest.rewardEggSteps > 0) {
     rewards.push(`+${formatNumber(quest.rewardEggSteps)} Egg progress`);
   }
   if (quest.rewardBond > 0) rewards.push(`+${formatNumber(quest.rewardBond)} Bond`);
+  if (quest.rewardItems.length > 0) {
+    rewards.push(`${formatNumber(quest.rewardItems.length)} item reward`);
+  }
+  if (quest.rewardCosmetics.length > 0) {
+    rewards.push(`${formatNumber(quest.rewardCosmetics.length)} cosmetic reward`);
+  }
   if (quest.rewardXp > 0) rewards.push(`+${formatNumber(quest.rewardXp)} Journey XP`);
   if (quest.rewardStreakBonus) rewards.push("Streak progress");
   if (quest.rewardProgressionBonus) rewards.push("Collection progress");

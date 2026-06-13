@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Animated, StyleSheet, View } from "react-native";
-import { colors, radii } from "../theme";
+import { colors, gameColors, radii } from "../theme";
 import { useReducedMotion } from "../utils/animations";
 
 export function ProgressBar({ progress }: { progress: number }) {
@@ -37,7 +37,7 @@ export function ProgressBar({ progress }: { progress: number }) {
 
 const styles = StyleSheet.create({
   track: {
-    backgroundColor: colors.primarySoft,
+    backgroundColor: gameColors.progressTrack,
     borderColor: colors.line,
     borderWidth: 1,
     borderRadius: radii.pill,
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   fill: {
-    backgroundColor: colors.rewardGold,
+    backgroundColor: gameColors.progressFill,
     borderRadius: radii.pill,
     height: "100%",
   },

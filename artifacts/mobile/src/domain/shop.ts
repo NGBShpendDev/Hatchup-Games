@@ -1,6 +1,11 @@
-import type { HatchUpData } from "./models";
+import {
+  canBuyEconomyItem,
+  ECONOMY_ITEMS,
+  getEconomyItem,
+} from "./economy";
+import type { EconomyItemId, HatchUpData } from "./models";
 
-export type ShopItemId = "berry-bundle" | "training-charm" | "incubator-spark";
+export type ShopItemId = EconomyItemId;
 
 export interface ShopItem {
   body: string;
@@ -13,41 +18,25 @@ export interface ShopItem {
 }
 
 export const SHOP_ITEMS: readonly ShopItem[] = [
-  {
-    body: "A gentle care bundle that gives your profile a little progress.",
-    id: "berry-bundle",
-    label: "Berry Bundle",
-    priceCoins: 60,
-    rewardAccountXp: 80,
-    rewardEggSteps: 0,
-    rewardPalXp: 0,
-  },
-  {
-    body: "A focused training charm for your active Pal.",
-    id: "training-charm",
-    label: "Training Charm",
-    priceCoins: 120,
-    rewardAccountXp: 0,
-    rewardEggSteps: 0,
-    rewardPalXp: 75,
-  },
-  {
-    body: "A warm spark that nudges every incubating Egg forward.",
-    id: "incubator-spark",
-    label: "Incubator Spark",
-    priceCoins: 150,
-    rewardAccountXp: 0,
-    rewardEggSteps: 750,
-    rewardPalXp: 0,
-  },
+  ...ECONOMY_ITEMS.map((item) => ({
+    body: item.body,
+    id: item.id,
+    label: item.label,
+    priceCoins: item.priceCoins,
+    rewardAccountXp: item.reward.accountXp ?? 0,
+    rewardEggSteps: item.reward.eggSteps ?? 0,
+    rewardPalXp: item.reward.palXp ?? 0,
+  })),
 ];
 
 export function getShopItem(itemId: ShopItemId) {
-  return SHOP_ITEMS.find((item) => item.id === itemId) ?? null;
+  const item = getEconomyItem(itemId);
+  if (!item) return null;
+  return (
+    SHOP_ITEMS.find((shopItem) => shopItem.id === item.id) ?? null
+  );
 }
 
 export function canBuyShopItem(data: HatchUpData, item: ShopItem) {
-  if (data.coins < item.priceCoins) return false;
-  if (item.rewardPalXp > 0 && !data.activeHatchlingId) return false;
-  return true;
+  return canBuyEconomyItem(data, item.id);
 }

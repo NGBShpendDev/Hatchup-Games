@@ -1,7 +1,7 @@
 import { Image, StyleSheet, Text, View } from "react-native";
 import { getEggAsset } from "../assets/creatureAssets";
 import type { EggElement, EggRarity } from "../domain/models";
-import { colors, radii } from "../theme";
+import { colors, radii, rarityColors as themeRarityColors } from "../theme";
 
 interface Props {
   element: EggElement;
@@ -16,11 +16,11 @@ const elementLabels: Record<EggElement, string> = {
   storm: "STORM",
 };
 
-const rarityColors: Record<EggRarity, string> = {
-  common: colors.egg,
-  uncommon: colors.baby,
-  rare: colors.teen,
-  epic: colors.final,
+const eggRarityColors: Record<EggRarity, string> = {
+  common: themeRarityColors.common,
+  uncommon: themeRarityColors.uncommon,
+  rare: themeRarityColors.rare,
+  epic: themeRarityColors.epic,
 };
 
 export function EggAvatar({ element, rarity, size = "large" }: Props) {
@@ -41,7 +41,7 @@ export function EggAvatar({ element, rarity, size = "large" }: Props) {
 
   return (
     <View style={[styles.wrap, styles[size]]}>
-      <View style={[styles.egg, { backgroundColor: rarityColors[rarity] }]}>
+      <View style={[styles.egg, { backgroundColor: eggRarityColors[rarity] }]}>
         <View style={styles.spotRow}>
           <View style={styles.spot} />
           <View style={[styles.spot, styles.smallSpot]} />
