@@ -20,6 +20,9 @@ import {
 } from "./domain/hatchery";
 import {
   addXpToActiveHatchling,
+  bondWithHatchling,
+  getHatchlingPowerScore,
+  getTrainingStatus,
   renameHatchling,
   trainHatchling,
 } from "./domain/hatchlings";
@@ -35,6 +38,7 @@ import { ACTIVE_PROGRESSION_PROFILE } from "./domain/progressionConfig";
 import { calculateDailyXp, getXpGains, mergeDailyXp } from "./domain/xp";
 import {
   getQuestRewardKey,
+  getDailyQuests,
   isQuestComplete,
   type Quest,
 } from "./domain/quests";
@@ -70,12 +74,25 @@ import { getQaFixtureById, type QaFixtureId } from "./qa/fixtures";
 
 export interface LatestSyncGains {
   accountXp: number;
+  bondGained: number;
   coins: number;
+  distanceMeters: number;
   eggSteps: number;
   eggsAwarded: number;
   palXp: number;
+  questsCompleted: number;
+  stepsSynced: number;
   streakProgressed: boolean;
   xp: DailyXp;
+}
+
+export interface TrainingFeedback {
+  bondGained: number;
+  id: string;
+  palName: string;
+  powerGained: number;
+  sessionsRemaining: number;
+  xpGained: number;
 }
 
 const emptyDailyXp: DailyXp = {
@@ -89,10 +106,14 @@ const emptyDailyXp: DailyXp = {
 
 const emptySyncGains: LatestSyncGains = {
   accountXp: 0,
+  bondGained: 0,
   coins: 0,
+  distanceMeters: 0,
   eggSteps: 0,
   eggsAwarded: 0,
   palXp: 0,
+  questsCompleted: 0,
+  stepsSynced: 0,
   streakProgressed: false,
   xp: getXpGains(null, emptyDailyXp),
 };
@@ -109,6 +130,8 @@ export function useHatchUpApp() {
   );
   const [latestSyncGains, setLatestSyncGains] =
     useState<LatestSyncGains>(emptySyncGains);
+  const [trainingFeedback, setTrainingFeedback] =
+    useState<TrainingFeedback | null>(null);
   const [latestHatchling, setLatestHatchling] =
     useState<CollectedHatchling | null>(null);
   const [leaderboardSyncLabel, setLeaderboardSyncLabel] =
@@ -317,6 +340,7 @@ export function useHatchUpApp() {
         next.activeHatchlingId && activeHatchlingBefore
           ? next.collection.find((item) => item.id === next.activeHatchlingId)
           : null;
+      const questsCompleted = getDailyQuests(dailyAward).filter(isQuestComplete).length;
 
       await persist(next);
       void syncLeaderboard(next);
@@ -330,7 +354,12 @@ export function useHatchUpApp() {
       );
       setLatestSyncGains({
         accountXp: 0,
+        bondGained: Math.max(
+          (activeHatchlingAfter?.bond ?? 0) - (activeHatchlingBefore?.bond ?? 0),
+          0,
+        ),
         coins: 0,
+        distanceMeters: health.distanceMeters ?? 0,
         eggSteps: newSteps,
         eggsAwarded: Math.max(
           next.activeEggs.length + next.pendingEggs.length - previousEggRewardCount,
@@ -340,6 +369,8 @@ export function useHatchUpApp() {
           (activeHatchlingAfter?.xp ?? 0) - (activeHatchlingBefore?.xp ?? 0),
           0,
         ),
+        questsCompleted,
+        stepsSynced: newSteps,
         streakProgressed: next.lastRewardDate === health.date && data.lastRewardDate !== health.date,
         xp: getXpGains(previousDailyXp, xp),
       });
@@ -492,7 +523,37 @@ export function useHatchUpApp() {
 
   async function trainActiveHatchling() {
     if (!data.activeHatchlingId) return;
-    await persist(trainHatchling(data, data.activeHatchlingId));
+    const before = data.collection.find(
+      (hatchling) => hatchling.id === data.activeHatchlingId,
+    );
+    const next = trainHatchling(data, data.activeHatchlingId);
+    const after = next.collection.find(
+      (hatchling) => hatchling.id === data.activeHatchlingId,
+    );
+
+    await persist(next);
+
+    if (
+      !before ||
+      !after ||
+      after.trainingSessions.length <= before.trainingSessions.length
+    ) {
+      return;
+    }
+
+    setTrainingFeedback({
+      bondGained: Math.max(after.bond - before.bond, 0),
+      id: `${after.id}:${
+        after.trainingSessions[after.trainingSessions.length - 1] ?? Date.now()
+      }`,
+      palName: after.name,
+      powerGained: Math.max(
+        getHatchlingPowerScore(after) - getHatchlingPowerScore(before),
+        0,
+      ),
+      sessionsRemaining: getTrainingStatus(after).remainingToday,
+      xpGained: Math.max(after.xp - before.xp, 0),
+    });
   }
 
   async function claimQuestReward(quest: Quest, today: string) {
@@ -515,15 +576,22 @@ export function useHatchUpApp() {
       label: quest.label,
       questId: quest.id,
       rewardAccountXp: quest.rewardAccountXp,
+      rewardBond: quest.rewardBond,
       rewardCoins: quest.rewardCoins,
       rewardEggSteps: quest.rewardEggSteps,
       tier: quest.tier,
     };
+    const rewardedData =
+      quest.rewardBond > 0 && data.activeHatchlingId
+        ? bondWithHatchling(data, data.activeHatchlingId, quest.rewardBond, claimedAt)
+        : data;
     const next = {
+      ...rewardedData,
       ...data,
       accountXp: data.accountXp + quest.rewardAccountXp,
       activeEgg: activeEggs[0],
       activeEggs,
+      collection: rewardedData.collection,
       claimedQuestRewards: [...data.claimedQuestRewards, rewardKey],
       coins: data.coins + quest.rewardCoins,
       questRewardHistory: [receipt, ...data.questRewardHistory].slice(0, 30),
@@ -742,9 +810,11 @@ export function useHatchUpApp() {
     latestEvolution,
     latestSync,
     latestSyncGains,
+    trainingFeedback,
     ready,
     connectHealth,
     dismissLatestHatchling: () => setLatestHatchling(null),
+    dismissTrainingFeedback: () => setTrainingFeedback(null),
     hatchAllReadyEggs,
     hatchEgg,
     resetApp,

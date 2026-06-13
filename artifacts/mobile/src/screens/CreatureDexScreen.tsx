@@ -9,7 +9,12 @@ import { HatchlingAvatar } from "../components/HatchlingAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
 import { SparkleBurst } from "../components/SparkleBurst";
-import { PageTitle, SegmentedControl } from "../components/ui";
+import {
+  PageTitle,
+  PrimaryCard,
+  SecondaryCard,
+  UtilityCard,
+} from "../components/ui";
 import { getCollectionNudge, getScreenLoopSubtitle } from "../content/coreLoopCopy";
 import {
   DEX_ELEMENTS,
@@ -34,12 +39,14 @@ import {
   PASSIVE_BOND_HOURS,
   TRAINING_XP,
 } from "../domain/hatchlings";
+import { getPalTrait } from "../domain/palTraits";
 import type {
   CollectedHatchling,
   EggElement,
   EggRarity,
   HatchUpData,
   HatchlingStats,
+  IncubatorEgg,
 } from "../domain/models";
 import { getCreatureVisualStage, type CreatureVisualStage } from "../domain/creatureVisuals";
 import { colors, elementColors, radii, typography } from "../theme";
@@ -73,6 +80,10 @@ export function CreatureDexScreen({
   const raritySummary = getDexRaritySummary(data.collection);
   const nextMissingEntry = getNextMissingDexEntry(data.collection);
   const activeHatchling = getActiveHatchling(data);
+  const smartTargets = useMemo(
+    () => getSmartTargets(entries, elementSummary, data),
+    [data, elementSummary, entries],
+  );
   const initialIndex = Math.max(
     data.collection.findIndex((item) => item.id === activeHatchling?.id),
     0,
@@ -135,7 +146,7 @@ export function CreatureDexScreen({
       {!hasPals ? (
         <EmptyCollectionState onHatcheryPress={onMonsterPress} />
       ) : (
-        <View style={styles.progressCard}>
+        <SecondaryCard style={styles.progressCard}>
           <View style={styles.progressHeader}>
             <Text style={styles.progressTitle}>Collection progress</Text>
             <Text style={styles.progressMeta}>
@@ -167,10 +178,30 @@ export function CreatureDexScreen({
               />
             ))}
           </View>
-        </View>
+        </SecondaryCard>
       )}
+      <CollectionFilterChips
+        elementFilter={elementFilter}
+        onClear={() => {
+          setElementFilter("all");
+          setRarityFilter("all");
+          setStatusFilter("all");
+        }}
+        onElementToggle={(value) =>
+          setElementFilter((current) => (current === value ? "all" : value))
+        }
+        onRarityToggle={(value) =>
+          setRarityFilter((current) => (current === value ? "all" : value))
+        }
+        onStatusToggle={(value) =>
+          setStatusFilter((current) => (current === value ? "all" : value))
+        }
+        rarityFilter={rarityFilter}
+        statusFilter={statusFilter}
+      />
+      <SmartTargetsSection targets={smartTargets} />
       {nextMissingEntry && (
-        <View style={styles.targetCard}>
+        <SecondaryCard style={styles.targetCard}>
           <View style={styles.targetText}>
             <Text style={styles.targetKicker}>NEXT COLLECTION TARGET</Text>
             <Text style={styles.targetTitle}>{nextMissingEntry.name}</Text>
@@ -186,7 +217,7 @@ export function CreatureDexScreen({
               size="small"
             />
           </View>
-        </View>
+        </SecondaryCard>
       )}
       {!hasPals && (
         <CollapsibleSection
@@ -196,7 +227,7 @@ export function CreatureDexScreen({
           title="Preview Collection Book"
         >
           <View style={styles.grid}>
-            {entries.map((entry) => (
+            {filteredEntries.map((entry) => (
               <DexCard collection={data.collection} entry={entry} key={entry.id} />
             ))}
           </View>
@@ -215,7 +246,7 @@ export function CreatureDexScreen({
         />
       )}
       {selectedHatchling ? (
-        <View style={styles.detailCard}>
+        <PrimaryCard style={styles.detailCard}>
           <Text style={styles.detailKicker}>
             {selectedHatchling.id === data.activeHatchlingId
               ? "ACTIVE PAL"
@@ -240,7 +271,7 @@ export function CreatureDexScreen({
             Mood: {capitalize(selectedHatchling.mood)} | Bond{" "}
             {selectedHatchling.bond}/100
           </Text>
-          <View style={styles.identityCard}>
+          <UtilityCard style={styles.identityCard}>
             <Text style={styles.identityTitle}>Companion identity</Text>
             <Text style={styles.identityText}>
               {getPalPersonality(selectedHatchling)}
@@ -252,7 +283,8 @@ export function CreatureDexScreen({
               Set a favorite Pal to grow bond from daily activity and return
               visits.
             </Text>
-          </View>
+          </UtilityCard>
+          <PalTraitCard hatchling={selectedHatchling} />
           <LabeledProgress
             label="Bond"
             progress={selectedHatchling.bond / 100}
@@ -284,7 +316,7 @@ export function CreatureDexScreen({
             subtitle="Rename this Pal whenever its personality clicks."
             title="Nickname"
           >
-            <View style={styles.renameCard}>
+            <UtilityCard style={styles.renameCard}>
               <Text style={styles.renameLabel}>Nickname</Text>
               <TextInput
                 autoCapitalize="words"
@@ -302,7 +334,7 @@ export function CreatureDexScreen({
                 }}
                 variant="secondary"
               />
-            </View>
+            </UtilityCard>
           </CollapsibleSection>
           <CollapsibleSection
             badge={`P${getHatchlingPowerScore(selectedHatchling)}`}
@@ -341,7 +373,7 @@ export function CreatureDexScreen({
             subtitle="Training is limited each day so growth feels earned."
             title="Training plan"
           >
-            <View style={styles.trainingCard}>
+            <UtilityCard style={styles.trainingCard}>
               <Text style={styles.trainingTitle}>Training plan</Text>
               <Text style={styles.trainingText}>
                 {selectedHatchling.id === data.activeHatchlingId
@@ -384,14 +416,14 @@ export function CreatureDexScreen({
                 }
                 variant="secondary"
               />
-            </View>
+            </UtilityCard>
           </CollapsibleSection>
           <CollapsibleSection
             badge={String(selectedHatchling.memories.length)}
             subtitle="Key moments this Pal has earned with you."
             title="Memory log"
           >
-            <View style={styles.memoryCard}>
+            <UtilityCard style={styles.memoryCard}>
               <Text style={styles.trainingTitle}>Memory log</Text>
               {selectedHatchling.memories.slice(0, 4).map((memory) => (
                 <View key={memory.id} style={styles.memoryRow}>
@@ -402,7 +434,7 @@ export function CreatureDexScreen({
                   </Text>
                 </View>
               ))}
-            </View>
+            </UtilityCard>
           </CollapsibleSection>
           <View style={styles.carouselActions}>
             <AppButton
@@ -440,34 +472,20 @@ export function CreatureDexScreen({
                 : undefined
             }
           />
-        </View>
+        </PrimaryCard>
       ) : null}
       {hasPals && (
         <>
           <CollapsibleSection
             badge={`${filteredEntries.length}`}
             defaultOpen={false}
-            subtitle="Narrow by element, rarity, or discovery status."
-            title="Filter"
+            subtitle="The chip bar above controls this view."
+            title="Filtered collection book"
           >
-            <View style={styles.filterCard}>
-              <Text style={styles.filterTitle}>Collection filters</Text>
-              <FilterRow
-                activeValue={elementFilter}
-                options={["all", ...DEX_ELEMENTS]}
-                onChange={(value) => setElementFilter(value as "all" | EggElement)}
-              />
-              <FilterRow
-                activeValue={rarityFilter}
-                options={["all", ...DEX_RARITIES]}
-                onChange={(value) => setRarityFilter(value as "all" | EggRarity)}
-              />
-              <FilterRow
-                activeValue={statusFilter}
-                options={["all", "owned", "missing"]}
-                onChange={(value) => setStatusFilter(value as "all" | "owned" | "missing")}
-              />
-            </View>
+            <Text style={styles.filterHelp}>
+              Owned Pals stay prioritized. Locked entries show which Egg type to
+              chase next.
+            </Text>
           </CollapsibleSection>
           <ActiveFilterSummary
             elementFilter={elementFilter}
@@ -524,13 +542,13 @@ function EmptyCollectionState({
   onHatcheryPress: () => void;
 }) {
   return (
-    <View style={styles.emptyCollectionHero}>
+    <PrimaryCard style={styles.emptyCollectionHero}>
       <Text style={styles.emptyCollectionTitle}>No Pals yet</Text>
       <Text style={styles.emptyCollectionBody}>
         Hatch your first Egg to unlock your first Pal.
       </Text>
       <AppButton label="Go to Hatchery" onPress={onHatcheryPress} />
-    </View>
+    </PrimaryCard>
   );
 }
 
@@ -556,7 +574,7 @@ function OwnedPalShelf({
     });
 
   return (
-    <View style={styles.ownedShelf}>
+    <SecondaryCard style={styles.ownedShelf}>
       <View style={styles.ownedShelfHeader}>
         <View>
           <Text style={styles.ownedShelfKicker}>Your Pals</Text>
@@ -635,7 +653,7 @@ function OwnedPalShelf({
           );
         })}
       </View>
-    </View>
+    </SecondaryCard>
   );
 }
 
@@ -663,7 +681,7 @@ function ActiveFilterSummary({
   if (!hasFilters) return null;
 
   return (
-    <View style={styles.activeFilterCard}>
+    <UtilityCard style={styles.activeFilterCard}>
       <View style={styles.activeFilterText}>
         <Text style={styles.activeFilterTitle}>
           Collection entries in view: {filteredCount}/{totalCount}
@@ -675,6 +693,137 @@ function ActiveFilterSummary({
       <Pressable onPress={onClear} style={styles.clearFilterButton}>
         <Text style={styles.clearFilterText}>Clear</Text>
       </Pressable>
+    </UtilityCard>
+  );
+}
+
+function CollectionFilterChips({
+  elementFilter,
+  onClear,
+  onElementToggle,
+  onRarityToggle,
+  onStatusToggle,
+  rarityFilter,
+  statusFilter,
+}: {
+  elementFilter: "all" | EggElement;
+  onClear: () => void;
+  onElementToggle: (value: EggElement) => void;
+  onRarityToggle: (value: EggRarity) => void;
+  onStatusToggle: (value: "owned" | "missing") => void;
+  rarityFilter: "all" | EggRarity;
+  statusFilter: "all" | "owned" | "missing";
+}) {
+  const hasActiveFilter =
+    elementFilter !== "all" || rarityFilter !== "all" || statusFilter !== "all";
+
+  return (
+    <SecondaryCard style={styles.filterBarCard}>
+      <View style={styles.filterBarHeader}>
+        <View>
+          <Text style={styles.filterBarKicker}>Browse smarter</Text>
+          <Text style={styles.filterBarTitle}>Filter Collection</Text>
+        </View>
+        {hasActiveFilter && (
+          <Pressable
+            accessibilityLabel="Clear Collection filters"
+            accessibilityRole="button"
+            onPress={onClear}
+            style={styles.filterClearChip}
+          >
+            <Text style={styles.filterClearText}>Clear</Text>
+          </Pressable>
+        )}
+      </View>
+      <View style={styles.filterChipRow}>
+        <FilterChip active={!hasActiveFilter} label="All" onPress={onClear} />
+        <FilterChip
+          active={statusFilter === "owned"}
+          label="Owned"
+          onPress={() => onStatusToggle("owned")}
+        />
+        <FilterChip
+          active={statusFilter === "missing"}
+          label="Locked"
+          onPress={() => onStatusToggle("missing")}
+        />
+        {DEX_ELEMENTS.map((element) => (
+          <FilterChip
+            active={elementFilter === element}
+            key={element}
+            label={capitalize(element)}
+            onPress={() => onElementToggle(element)}
+          />
+        ))}
+        {DEX_RARITIES.map((rarity) => (
+          <FilterChip
+            active={rarityFilter === rarity}
+            key={rarity}
+            label={capitalize(rarity)}
+            onPress={() => onRarityToggle(rarity)}
+          />
+        ))}
+      </View>
+    </SecondaryCard>
+  );
+}
+
+function FilterChip({
+  active,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={`Filter Collection by ${label}`}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.filterChip, active && styles.filterChipActive]}
+    >
+      <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function SmartTargetsSection({
+  targets,
+}: {
+  targets: ReturnType<typeof getSmartTargets>;
+}) {
+  return (
+    <SecondaryCard style={styles.smartTargetsCard}>
+      <View style={styles.smartTargetsHeader}>
+        <View>
+          <Text style={styles.smartTargetsKicker}>Smart Targets</Text>
+          <Text style={styles.smartTargetsTitle}>Choose the next Egg chase</Text>
+        </View>
+        <Text style={styles.smartTargetsBadge}>Guide</Text>
+      </View>
+      <View style={styles.smartTargetGrid}>
+        {targets.map((target) => (
+          <SmartTargetCard key={target.id} target={target} />
+        ))}
+      </View>
+    </SecondaryCard>
+  );
+}
+
+function SmartTargetCard({
+  target,
+}: {
+  target: SmartCollectionTarget;
+}) {
+  return (
+    <View style={styles.smartTargetCard}>
+      <Text style={styles.smartTargetLabel}>{target.label}</Text>
+      <Text style={styles.smartTargetTitle}>{target.title}</Text>
+      <Text style={styles.smartTargetBody}>{target.body}</Text>
     </View>
   );
 }
@@ -771,7 +920,7 @@ function EvolutionPreviewCard({ hatchling }: { hatchling: CollectedHatchling }) 
     : 0;
 
   return (
-    <View style={styles.evolutionCard}>
+    <UtilityCard style={styles.evolutionCard}>
       <View style={styles.evolutionHeader}>
         <View>
           <Text style={styles.evolutionKicker}>Evolution preview</Text>
@@ -807,28 +956,28 @@ function EvolutionPreviewCard({ hatchling }: { hatchling: CollectedHatchling }) 
       <Text style={styles.evolutionMicrocopy}>
         Move, train, and return tomorrow to grow this Pal.
       </Text>
-    </View>
+    </UtilityCard>
   );
 }
 
-function FilterRow({
-  activeValue,
-  onChange,
-  options,
-}: {
-  activeValue: string;
-  onChange: (value: string) => void;
-  options: readonly string[];
-}) {
+function PalTraitCard({ hatchling }: { hatchling: CollectedHatchling }) {
+  const trait = getPalTrait(hatchling);
+
   return (
-    <SegmentedControl
-      onChange={onChange}
-      options={options.map((option) => ({
-        label: capitalize(option),
-        value: option,
-      }))}
-      value={activeValue}
-    />
+    <UtilityCard style={styles.traitCard}>
+      <View style={styles.traitHeader}>
+        <View>
+          <Text style={styles.traitKicker}>Personality trait</Text>
+          <Text style={styles.traitTitle}>{trait.displayName}</Text>
+        </View>
+        <Text style={styles.traitPill}>Trait</Text>
+      </View>
+      <Text style={styles.traitDescription}>{trait.description}</Text>
+      <Text style={styles.traitEffect}>Effect: {trait.effect}</Text>
+      {trait.implementationNote && (
+        <Text style={styles.traitNote}>{trait.implementationNote}</Text>
+      )}
+    </UtilityCard>
   );
 }
 
@@ -965,6 +1114,121 @@ function getStatBarMax(stats: HatchlingStats) {
   return Math.max(...Object.values(stats), 20);
 }
 
+interface SmartCollectionTarget {
+  body: string;
+  id: string;
+  label: string;
+  title: string;
+}
+
+function getSmartTargets(
+  entries: readonly CreatureDexEntry[],
+  elementSummary: ReturnType<typeof getDexElementSummary>,
+  data: HatchUpData,
+): SmartCollectionTarget[] {
+  const missingEntries = entries.filter((entry) => entry.ownedCount === 0);
+  const closestEggTarget = getClosestEggTarget(missingEntries, data);
+  const closestDiscovery = closestEggTarget?.entry ?? missingEntries[0] ?? null;
+  const bestElement =
+    elementSummary
+      .filter((summary) => summary.unlocked < summary.total)
+      .sort((left, right) => {
+        if (right.percent !== left.percent) return right.percent - left.percent;
+        return right.unlocked - left.unlocked;
+      })[0] ?? null;
+  const recommendedEntry =
+    (bestElement &&
+      missingEntries.find((entry) => entry.element === bestElement.id)) ??
+    closestDiscovery;
+  const rarestMissing =
+    [...missingEntries].sort(
+      (left, right) =>
+        getRarityRank(right.rarity) - getRarityRank(left.rarity) ||
+        DEX_ELEMENTS.indexOf(left.element) - DEX_ELEMENTS.indexOf(right.element),
+    )[0] ?? null;
+
+  return [
+    {
+      body: closestDiscovery
+        ? closestEggTarget
+          ? `${formatNumber(closestEggTarget.stepsLeft)} steps left on a ${capitalize(closestEggTarget.entry.rarity)} ${capitalize(closestEggTarget.entry.element)} Egg.`
+          : `Hatch a ${capitalize(closestDiscovery.rarity)} ${capitalize(closestDiscovery.element)} Egg to reveal it.`
+        : "Every Collection entry is discovered. Focus on leveling your favorite Pals.",
+      id: "closest-discovery",
+      label: "Closest discovery",
+      title: closestDiscovery?.name ?? "Collection complete",
+    },
+    {
+      body: recommendedEntry
+        ? `Best next chase: ${capitalize(recommendedEntry.rarity)} ${capitalize(recommendedEntry.element)} Egg.`
+        : "No missing Egg type found. Keep growing levels, bond, and memories.",
+      id: "recommended-egg",
+      label: "Recommended next Egg",
+      title: recommendedEntry
+        ? `${capitalize(recommendedEntry.element)} ${capitalize(recommendedEntry.rarity)}`
+        : "Train your team",
+    },
+    {
+      body: bestElement
+        ? `${bestElement.unlocked}/${bestElement.total} discovered. One more ${capitalize(bestElement.id)} hatch pushes this element forward.`
+        : "All elements are fully discovered. Your next goal is evolution progress.",
+      id: "element-closest",
+      label: "Element closest to completion",
+      title: bestElement ? capitalize(bestElement.id) : "All elements",
+    },
+    {
+      body: rarestMissing
+        ? `The highest-rarity missing target in your book is ${rarestMissing.name}.`
+        : "No rare targets remain locked. That is a very good problem.",
+      id: "rarest-missing",
+      label: "Rarest missing",
+      title: rarestMissing
+        ? `${capitalize(rarestMissing.rarity)} ${capitalize(rarestMissing.element)}`
+        : "None missing",
+    },
+  ];
+}
+
+function getClosestEggTarget(
+  missingEntries: readonly CreatureDexEntry[],
+  data: HatchUpData,
+) {
+  const eggs = [...data.activeEggs, data.activeEgg, ...data.pendingEggs];
+  const uniqueEggs = eggs.filter(
+    (egg, index, source) => source.findIndex((item) => item.id === egg.id) === index,
+  );
+  return uniqueEggs
+    .map((egg) => {
+      const entry = missingEntries.find(
+        (candidate) =>
+          candidate.element === egg.element && candidate.rarity === egg.rarity,
+      );
+      if (!entry) return null;
+      return {
+        entry,
+        progress: egg.stepsRequired > 0 ? egg.stepsWalked / egg.stepsRequired : 0,
+        stepsLeft: getEggStepsLeft(egg),
+      };
+    })
+    .filter((target): target is {
+      entry: CreatureDexEntry;
+      progress: number;
+      stepsLeft: number;
+    } => target !== null)
+    .sort((left, right) => {
+      if (right.progress !== left.progress) return right.progress - left.progress;
+      return left.stepsLeft - right.stepsLeft;
+    })[0] ?? null;
+}
+
+function getEggStepsLeft(egg: IncubatorEgg) {
+  return Math.max(egg.stepsRequired - egg.stepsWalked, 0);
+}
+
+function getRarityRank(rarity: EggRarity) {
+  return DEX_RARITIES.indexOf(rarity);
+}
+
 const styles = StyleSheet.create({
   kicker: {
     color: colors.primary,
@@ -991,18 +1255,18 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
-    gap: 12,
-    marginTop: 20,
-    padding: 16,
+    gap: 10,
+    marginTop: 16,
+    padding: 14,
   },
   detailCard: {
     backgroundColor: colors.surface,
     borderColor: colors.line,
     borderRadius: radii.hero,
     borderWidth: 1,
-    gap: 10,
-    marginTop: 20,
-    padding: 16,
+    gap: 9,
+    marginTop: 16,
+    padding: 14,
     shadowColor: colors.cardShadowStrong,
     shadowOffset: { height: 10, width: 0 },
     shadowOpacity: 1,
@@ -1018,8 +1282,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.hero,
     borderWidth: 1,
     gap: 10,
-    marginTop: 20,
-    padding: 18,
+    marginTop: 16,
+    padding: 15,
   },
   emptyCollectionTitle: {
     color: colors.ink,
@@ -1037,9 +1301,9 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
-    gap: 12,
+    gap: 10,
     marginTop: 16,
-    padding: 14,
+    padding: 12,
   },
   ownedShelfHeader: {
     alignItems: "center",
@@ -1144,7 +1408,7 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.pill,
     borderWidth: 1,
-    minHeight: 34,
+    minHeight: 44,
     justifyContent: "center",
     paddingHorizontal: 8,
   },
@@ -1161,8 +1425,8 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
-    marginTop: 20,
-    padding: 16,
+    marginTop: 16,
+    padding: 14,
   },
   detailKicker: {
     color: colors.primary,
@@ -1243,6 +1507,56 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 17,
+  },
+  traitCard: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+  },
+  traitHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  traitKicker: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+  },
+  traitTitle: {
+    color: colors.ink,
+    fontSize: 18,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  traitPill: {
+    backgroundColor: colors.rewardGold,
+    borderRadius: radii.pill,
+    color: colors.ink,
+    fontSize: 10,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  traitDescription: {
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: "800",
+    lineHeight: 18,
+  },
+  traitEffect: {
+    color: colors.primaryDeep,
+    fontSize: 12,
+    fontWeight: "900",
+    lineHeight: 17,
+  },
+  traitNote: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 16,
   },
   renameCard: {
     backgroundColor: colors.surface,
@@ -1603,6 +1917,127 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 11,
     fontWeight: "900",
+  },
+  filterBarCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 10,
+    marginTop: 12,
+    padding: 12,
+  },
+  filterBarHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  filterBarKicker: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+  },
+  filterBarTitle: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  filterClearChip: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  filterClearText: {
+    color: colors.primaryDeep,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  filterChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+  },
+  filterHelp: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  smartTargetsCard: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 10,
+    marginTop: 12,
+    padding: 12,
+  },
+  smartTargetsHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  smartTargetsKicker: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+  },
+  smartTargetsTitle: {
+    color: colors.ink,
+    fontSize: 17,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  smartTargetsBadge: {
+    backgroundColor: colors.rewardGold,
+    borderRadius: radii.pill,
+    color: colors.ink,
+    fontSize: 10,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  smartTargetGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  smartTargetCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.button,
+    borderWidth: 1,
+    minHeight: 118,
+    padding: 11,
+    width: "48%",
+  },
+  smartTargetLabel: {
+    color: colors.primary,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  smartTargetTitle: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+    lineHeight: 18,
+    marginTop: 5,
+  },
+  smartTargetBody: {
+    color: colors.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 5,
   },
   grid: {
     flexDirection: "row",

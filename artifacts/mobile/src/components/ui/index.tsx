@@ -41,6 +41,33 @@ export function Card({
   );
 }
 
+export function PrimaryCard({
+  children,
+  style,
+}: WithStyle & {
+  children: React.ReactNode;
+}) {
+  return <View style={[styles.primaryCard, style]}>{children}</View>;
+}
+
+export function SecondaryCard({
+  children,
+  style,
+}: WithStyle & {
+  children: React.ReactNode;
+}) {
+  return <View style={[styles.secondaryCard, style]}>{children}</View>;
+}
+
+export function UtilityCard({
+  children,
+  style,
+}: WithStyle & {
+  children: React.ReactNode;
+}) {
+  return <View style={[styles.utilityCard, style]}>{children}</View>;
+}
+
 export function SectionHeader({
   action,
   eyebrow,
@@ -385,6 +412,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: spacing.card,
   },
+  primaryCard: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.hero,
+    borderWidth: 1,
+    gap: 10,
+    padding: 15,
+    shadowColor: colors.cardShadowStrong,
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 22,
+  },
+  secondaryCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 9,
+    padding: 12,
+  },
+  utilityCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.button,
+    borderWidth: 1,
+    gap: 7,
+    padding: 11,
+  },
   disabled: {
     opacity: 0.55,
   },
@@ -414,9 +469,9 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.pill,
     borderWidth: 1,
-    height: 42,
+    height: 44,
     justifyContent: "center",
-    minWidth: 42,
+    minWidth: 44,
     paddingHorizontal: 14,
   },
   iconButtonText: {
@@ -425,16 +480,16 @@ const styles = StyleSheet.create({
   },
   pageSubtitle: {
     color: colors.muted,
-    fontSize: 15,
-    lineHeight: typography.bodyLineHeight,
-    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 5,
   },
   pageTitle: {
     color: colors.ink,
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: typography.titleWeight,
     letterSpacing: -0.7,
-    lineHeight: 33,
+    lineHeight: 30,
   },
   pageTitleText: {
     flex: 1,
@@ -442,7 +497,7 @@ const styles = StyleSheet.create({
   pageTitleWrap: {
     alignItems: "flex-start",
     flexDirection: "row",
-    gap: 14,
+    gap: 12,
     justifyContent: "space-between",
   },
   pill: {
@@ -528,7 +583,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     flexGrow: 1,
     justifyContent: "center",
-    minHeight: 38,
+    minHeight: 44,
     paddingHorizontal: 12,
   },
   segmentActive: {

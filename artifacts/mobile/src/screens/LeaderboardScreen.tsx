@@ -4,7 +4,13 @@ import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
 import { Screen } from "../components/Screen";
 import { SparkleBurst } from "../components/SparkleBurst";
-import { PageTitle, SegmentedControl } from "../components/ui";
+import {
+  PageTitle,
+  PrimaryCard,
+  SecondaryCard,
+  SegmentedControl,
+  UtilityCard,
+} from "../components/ui";
 import { getScreenLoopSubtitle } from "../content/coreLoopCopy";
 import {
   getLeaderboardEntries,
@@ -13,6 +19,7 @@ import {
   type LeaderboardEntry,
   type LeaderboardMetric,
 } from "../domain/leaderboard";
+import { WEEKLY_CHALLENGE_REWARDS } from "../domain/leaderboardMockData";
 import type { HatchUpData } from "../domain/models";
 import { colors, radii, typography } from "../theme";
 import { formatDistanceMiles, formatNumber, formatSteps } from "../utils/format";
@@ -55,6 +62,7 @@ export function LeaderboardScreen({
   const [confirmShareOpen, setConfirmShareOpen] = useState(false);
   const [reportedId, setReportedId] = useState<string | null>(null);
   const userStats = getUserLeaderboardStats(data, today);
+  const challengeStatus = getWeeklyChallengeStatus(today);
   const sharedEntries = getLeaderboardEntries(data, today, metric).filter(
     (entry) => !blockedIds.includes(entry.id),
   );
@@ -62,6 +70,11 @@ export function LeaderboardScreen({
   const userRank = data.leaderboardShareEnabled
     ? sharedEntries.find((entry) => entry.isUser)?.rank ?? null
     : null;
+  const climbTarget = getStepsToPassNextPlayer({
+    entries: sharedEntries,
+    sharingEnabled: data.leaderboardShareEnabled,
+    userStats,
+  });
   const aliasChanged = alias.trim() !== data.leaderboardAlias.trim();
 
   async function handleSaveAlias() {
@@ -103,12 +116,47 @@ export function LeaderboardScreen({
         title="Move, hatch, climb."
       />
       <Text style={styles.syncLabel}>{leaderboardSyncLabel}</Text>
-      <View style={styles.privacyCard}>
+      <PrimaryCard style={styles.challengeCard}>
+        <View style={styles.challengeHeader}>
+          <View style={styles.challengeTitleBlock}>
+            <Text style={styles.challengeKicker}>Weekly Challenge</Text>
+            <Text style={styles.challengeTitle}>{challengeStatus.name}</Text>
+            <Text style={styles.challengeBody}>
+              Score with {metricLabels[metric]}. Sync movement, train your Pal,
+              and return daily to climb.
+            </Text>
+          </View>
+          <View style={styles.challengeTimePill}>
+            <Text style={styles.challengeTimeText}>
+              {challengeStatus.timeRemainingLabel}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.challengeStats}>
+          <ChallengeStat
+            label="Your rank"
+            value={
+              data.leaderboardShareEnabled
+                ? userRank
+                  ? `#${userRank}`
+                  : "-"
+                : "Private"
+            }
+          />
+          <ChallengeStat label="Score type" value={metricLabels[metric]} />
+          <ChallengeStat
+            label="Weekly steps"
+            value={formatSteps(userStats.steps)}
+          />
+        </View>
+      </PrimaryCard>
+      <PrimaryCard style={styles.privacyCard}>
         <View style={styles.privacyHeader}>
           <View style={styles.privacyText}>
             <Text style={styles.cardTitle}>Ranks privacy</Text>
             <Text style={styles.privacyBody}>
-              Ranks are optional. Only your public name and weekly score are shared.
+              Ranks are optional. Only your public name, rank, and selected
+              weekly score are shared. Health details stay private.
             </Text>
           </View>
           <View
@@ -150,12 +198,14 @@ export function LeaderboardScreen({
             />
           ) : (
             <Text style={styles.savedStatusText}>
-              {aliasSaved || data.leaderboardAlias ? "Name saved" : "Name ready"}
+              {aliasSaved || data.leaderboardAlias
+                ? "Public name saved"
+                : "Public name ready"}
             </Text>
           )}
           {data.leaderboardShareEnabled ? (
             <AppButton
-              label="Go private"
+              label="Stop sharing"
               onPress={handleGoPrivate}
               style={styles.actionButton}
               variant="secondary"
@@ -168,8 +218,8 @@ export function LeaderboardScreen({
             />
           )}
         </View>
-      </View>
-      <View style={styles.scoreCard}>
+      </PrimaryCard>
+      <SecondaryCard style={styles.scoreCard}>
         <View style={styles.scoreHeader}>
           <Text style={styles.cardTitle}>Your weekly score</Text>
           <Text style={styles.rankLabel}>
@@ -183,8 +233,34 @@ export function LeaderboardScreen({
           <Stat label="Distance" value={formatDistanceMiles(userStats.distanceMiles)} />
           <Stat label="Journey XP" value={formatNumber(userStats.totalXp)} />
         </View>
-      </View>
-      <View style={styles.leaderboardCard}>
+      </SecondaryCard>
+      <SecondaryCard style={styles.climbCard}>
+        <View style={styles.climbHeader}>
+          <View style={styles.climbIcon}>
+            <Text style={styles.climbIconText}>↑</Text>
+          </View>
+          <View style={styles.climbText}>
+            <Text style={styles.cardTitle}>How to climb</Text>
+            <Text style={styles.climbBody}>{climbTarget.message}</Text>
+          </View>
+        </View>
+      </SecondaryCard>
+      <SecondaryCard style={styles.rewardsCard}>
+        <Text style={styles.cardTitle}>Weekly rewards</Text>
+        <View style={styles.rewardRows}>
+          {WEEKLY_CHALLENGE_REWARDS.map((reward) => (
+            <RewardRow
+              key={reward.label}
+              label={reward.label}
+              value={reward.value}
+            />
+          ))}
+        </View>
+        <Text style={styles.rewardFootnote}>
+          Rewards are preview tuning for this weekly challenge.
+        </Text>
+      </SecondaryCard>
+      <SecondaryCard style={styles.leaderboardCard}>
         <View style={styles.boardHeader}>
           <View>
             <Text style={styles.cardTitle}>Leaderboard</Text>
@@ -195,7 +271,15 @@ export function LeaderboardScreen({
             </Text>
           </View>
         </View>
-        {data.leaderboardShareEnabled ? (
+        {challengeStatus.hasEnded ? (
+          <UtilityCard style={styles.privatePreviewCard}>
+            <Text style={styles.emptyMissionTitle}>Challenge ended</Text>
+            <Text style={styles.emptyMissionBody}>
+              This weekly board has closed. Come back when the next weekly
+              challenge starts.
+            </Text>
+          </UtilityCard>
+        ) : data.leaderboardShareEnabled ? (
           <>
             <SegmentedControl
               onChange={setMetric}
@@ -206,23 +290,33 @@ export function LeaderboardScreen({
               value={metric}
             />
             <View style={styles.board}>
-              {entries.map((entry) => (
-                <RankRow
-                  entry={entry}
-                  key={entry.id}
-                  metric={metric}
-                  onBlock={() => {
-                    if (!entry.isUser) {
-                      setBlockedIds((ids) => [...new Set([...ids, entry.id])]);
-                    }
-                  }}
-                  onReport={() => setReportedId(entry.id)}
-                />
-              ))}
+              {entries.length > 0 ? (
+                entries.map((entry) => (
+                  <RankRow
+                    entry={entry}
+                    key={entry.id}
+                    metric={metric}
+                    onBlock={() => {
+                      if (!entry.isUser) {
+                        setBlockedIds((ids) => [...new Set([...ids, entry.id])]);
+                      }
+                    }}
+                    onReport={() => setReportedId(entry.id)}
+                  />
+                ))
+              ) : (
+                <UtilityCard style={styles.privatePreviewCard}>
+                  <Text style={styles.emptyMissionTitle}>No leaderboard data</Text>
+                  <Text style={styles.emptyMissionBody}>
+                    Sync movement or change score type to populate this weekly
+                    challenge board.
+                  </Text>
+                </UtilityCard>
+              )}
             </View>
           </>
         ) : (
-          <View style={styles.privatePreviewCard}>
+          <UtilityCard style={styles.privatePreviewCard}>
             <Text style={styles.emptyMissionTitle}>You are private right now</Text>
             <Text style={styles.emptyMissionBody}>
               Share only your display name and weekly score when you want to compare.
@@ -233,9 +327,9 @@ export function LeaderboardScreen({
               onPress={() => setConfirmShareOpen(true)}
               variant="secondary"
             />
-          </View>
+          </UtilityCard>
         )}
-      </View>
+      </SecondaryCard>
       {reportedId && (
         <View style={styles.safetyNotice}>
           <Text style={styles.safetyTitle}>Report received</Text>
@@ -366,6 +460,24 @@ function ShareScoreModal({
   );
 }
 
+function ChallengeStat({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.challengeStat}>
+      <Text style={styles.challengeStatValue}>{value}</Text>
+      <Text style={styles.challengeStatLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function RewardRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.rewardRow}>
+      <Text style={styles.rewardLabel}>{label}</Text>
+      <Text style={styles.rewardValue}>{value}</Text>
+    </View>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.stat}>
@@ -380,6 +492,80 @@ function formatMetric(entry: LeaderboardEntry, metric: LeaderboardMetric) {
   if (metric === "distance") return formatDistanceMiles(value);
   if (metric === "xp") return `${formatNumber(value)} XP`;
   return formatNumber(value);
+}
+
+function getStepsToPassNextPlayer({
+  entries,
+  sharingEnabled,
+  userStats,
+}: {
+  entries: readonly LeaderboardEntry[];
+  sharingEnabled: boolean;
+  userStats: ReturnType<typeof getUserLeaderboardStats>;
+}) {
+  if (!sharingEnabled) {
+    return {
+      message:
+        "Share your weekly score to see exactly who you can pass next. Your health details stay private.",
+    };
+  }
+
+  const userEntry = entries.find((entry) => entry.isUser);
+  if (!userEntry) {
+    return {
+      message: "Sync movement to place yourself on this week’s challenge board.",
+    };
+  }
+
+  if (userEntry.rank <= 1) {
+    return {
+      message:
+        "You are holding the top visible spot. Keep syncing this week to defend it.",
+    };
+  }
+
+  const nextPlayer = entries.find((entry) => entry.rank === userEntry.rank - 1);
+  if (!nextPlayer) {
+    return {
+      message:
+        "Keep syncing movement to find your next climb target on the weekly board.",
+    };
+  }
+
+  const stepsNeeded = Math.max(nextPlayer.steps - userStats.steps + 1, 0);
+  if (stepsNeeded === 0) {
+    return {
+      message: `You already lead ${nextPlayer.displayName} on steps. Switch score types or keep earning Journey XP to climb.`,
+    };
+  }
+
+  return {
+    message: `You need ${formatSteps(stepsNeeded)} more to pass ${nextPlayer.displayName}.`,
+  };
+}
+
+function getWeeklyChallengeStatus(today: string) {
+  const parsedDate = new Date(`${today}T12:00:00`);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return {
+      hasEnded: true,
+      name: "7-Day Movement Cup",
+      timeRemainingLabel: "Challenge ended",
+    };
+  }
+
+  const day = parsedDate.getDay();
+  const daysUntilSunday = (7 - day) % 7;
+  const timeRemainingLabel =
+    daysUntilSunday === 0
+      ? "Ends tonight"
+      : `${daysUntilSunday} day${daysUntilSunday === 1 ? "" : "s"} left`;
+
+  return {
+    hasEnded: false,
+    name: "7-Day Movement Cup",
+    timeRemainingLabel,
+  };
 }
 
 const styles = StyleSheet.create({
@@ -408,6 +594,83 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
     marginTop: 8,
+  },
+  challengeCard: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.hero,
+    borderWidth: 1,
+    gap: 14,
+    marginTop: 16,
+    padding: 16,
+    shadowColor: colors.cardShadowStrong,
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 22,
+  },
+  challengeHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  challengeTitleBlock: {
+    flex: 1,
+  },
+  challengeKicker: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  challengeTitle: {
+    color: colors.ink,
+    fontSize: 23,
+    fontWeight: "900",
+    letterSpacing: -0.4,
+    marginTop: 3,
+  },
+  challengeBody: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 6,
+  },
+  challengeTimePill: {
+    backgroundColor: colors.primaryDeep,
+    borderRadius: radii.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  challengeTimeText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  challengeStats: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  challengeStat: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    flex: 1,
+    padding: 10,
+  },
+  challengeStatValue: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  challengeStatLabel: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: "800",
+    marginTop: 4,
+    textTransform: "uppercase",
   },
   privacyCard: {
     backgroundColor: colors.surface,
@@ -509,6 +772,85 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 4,
   },
+  climbCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    marginTop: 12,
+    padding: 12,
+  },
+  climbHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+  },
+  climbIcon: {
+    alignItems: "center",
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  climbIconText: {
+    color: colors.primaryDeep,
+    fontSize: 22,
+    fontWeight: "900",
+  },
+  climbText: {
+    flex: 1,
+  },
+  climbBody: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 4,
+  },
+  rewardsCard: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 8,
+    marginTop: 12,
+    padding: 12,
+  },
+  rewardRows: {
+    gap: 8,
+  },
+  rewardRow: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.button,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between",
+    padding: 9,
+  },
+  rewardLabel: {
+    color: colors.primaryDeep,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  rewardValue: {
+    color: colors.muted,
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 17,
+    textAlign: "right",
+  },
+  rewardFootnote: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 16,
+  },
   shareCard: {
     backgroundColor: colors.surface,
     borderColor: colors.line,
@@ -588,8 +930,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     color: colors.ink,
     fontSize: 15,
-    marginTop: 14,
-    padding: 13,
+    marginTop: 12,
+    minHeight: 48,
+    padding: 12,
   },
   shareActions: {
     flexDirection: "row",
@@ -648,9 +991,9 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
-    gap: 12,
-    marginTop: 14,
-    padding: 16,
+    gap: 10,
+    marginTop: 12,
+    padding: 13,
   },
   boardHeader: {
     flexDirection: "row",
@@ -667,8 +1010,8 @@ const styles = StyleSheet.create({
     borderColor: colors.rewardGold,
     borderRadius: radii.card,
     borderWidth: 1,
-    gap: 10,
-    padding: 14,
+    gap: 8,
+    padding: 12,
   },
   safetyNotice: {
     backgroundColor: colors.accentSoft,
@@ -697,7 +1040,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
-    padding: 13,
+    padding: 11,
   },
   userRow: {
     backgroundColor: colors.warmSurface,

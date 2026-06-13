@@ -6,18 +6,16 @@ import { CollapsibleSection } from "../components/CollapsibleSection";
 import { EggAvatar } from "../components/EggAvatar";
 import { HatchlingAvatar } from "../components/HatchlingAvatar";
 import { MonsterAvatar } from "../components/MonsterAvatar";
+import { NextBestAction } from "../components/NextBestAction";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
 import { SparkleBurst } from "../components/SparkleBurst";
-import { PageTitle, SegmentedControl } from "../components/ui";
+import { PageTitle, SecondaryCard, SegmentedControl } from "../components/ui";
 import {
   ENABLE_SHOP,
   ENABLE_WEEKLY_CHEST,
 } from "../config/features";
 import {
-  getCollectionNudge,
-  getEggProgressMessage,
-  getReturnTomorrowMessage,
   getScreenLoopSubtitle,
 } from "../content/coreLoopCopy";
 import { toDateKey } from "../domain/date";
@@ -26,7 +24,6 @@ import {
   getActiveHatchling,
   getHatchlingXpProgress,
   getTimeAdjustedHatchling,
-  getTrainingStatus,
 } from "../domain/hatchlings";
 import { getActivitySummary, type ActivityDay } from "../domain/history";
 import { metersToMiles, stepsToMiles } from "../domain/leaderboard";
@@ -37,6 +34,10 @@ import type {
   HatchUpData,
   QuestRewardReceipt,
 } from "../domain/models";
+import {
+  getNextBestAction,
+  type NextBestActionTarget,
+} from "../domain/nextBestAction";
 import { getProgression, type MonsterStage } from "../domain/progression";
 import { ACTIVE_PROGRESSION_PROFILE } from "../domain/progressionConfig";
 import { getWeeklyRewardChest } from "../domain/rewardChests";
@@ -49,6 +50,7 @@ import {
   getQuestRemainingText,
   getQuestRewardKey,
   getQuestRewardLabel,
+  getQuestRewardParts,
   getQuestTierLabel,
   getWeeklyQuests,
   isQuestComplete,
@@ -158,9 +160,6 @@ export function HomeScreen({
     : null;
   const focusEgg =
     data.activeEggs.find((egg) => !isEggReady(egg)) ?? data.activeEggs[0];
-  const trainingStatus = activeHatchling
-    ? getTrainingStatus(activeHatchling)
-    : null;
   const showRewardFeedback =
     !rewardDismissed &&
     hasSyncRewards(latestSyncGains) &&
@@ -198,30 +197,17 @@ export function HomeScreen({
     onSync,
   });
   const firstWeekMissionAction = handleMissionPress(firstWeekMission.target);
-  const claimableQuest = getFirstClaimableQuest(
-    [...quests, ...weeklyQuests],
-    todayKey,
-    data.claimedQuestRewards,
-  );
-  const nextAction = getNextAction({
-    activeHatchling,
-    claimableQuest,
-    data,
-    firstWeekMission,
-    firstWeekMissionAction,
+  const nextBestAction = getNextBestAction(data, {
     isSyncing,
-    onClaimQuestReward,
-    onClaimWeeklyChest,
+    todayKey,
+  });
+  const handleNextBestAction = getNextBestActionHandler({
+    data,
     onDexPress,
     onMonsterPress,
+    onSettingsPress,
     onSync,
-    rewardAvailable: showRewardFeedback,
-    readyEggCount,
-    trainingStatus,
-    today,
-    todayKey,
-    weeklyChest: effectiveWeeklyChest,
-  });
+  })(nextBestAction.target);
   const syncResultAction = getSyncResultAction({
     activeHatchling,
     gains: latestSyncGains,
@@ -266,7 +252,10 @@ export function HomeScreen({
         progression={progression}
         today={today}
       />
-      <NextActionCard nextAction={nextAction} />
+      <NextBestAction
+        action={nextBestAction}
+        onPress={handleNextBestAction}
+      />
       {today && (
         <SyncSummaryCard
           focusEgg={focusEgg}
@@ -628,32 +617,6 @@ function StarterGuideCard({
   );
 }
 
-function NextActionCard({
-  nextAction,
-}: {
-  nextAction: ReturnType<typeof getNextAction>;
-}) {
-  return (
-    <View style={styles.nextActionCard}>
-      <View style={styles.nextActionHeader}>
-        <View>
-          <Text style={styles.actionKicker}>NEXT ACTION</Text>
-          <Text style={styles.actionTitle}>{nextAction.title}</Text>
-        </View>
-        {nextAction.priority <= 3 && <SparkleBurst label="NOW" tone="accent" />}
-      </View>
-      <Text style={styles.actionText}>{nextAction.body}</Text>
-      <AppButton
-        disabled={nextAction.disabled}
-        label={nextAction.label}
-        onPress={nextAction.onPress}
-        style={nextAction.disabled ? styles.disabledAction : undefined}
-        variant={nextAction.variant}
-      />
-    </View>
-  );
-}
-
 function SyncSummaryCard({
   focusEgg,
   gains,
@@ -670,7 +633,7 @@ function SyncSummaryCard({
       : "No Egg";
 
   return (
-    <View style={styles.syncSummaryCard}>
+    <SecondaryCard style={styles.syncSummaryCard}>
       <View style={styles.syncSummaryHeader}>
         <View>
           <Text style={styles.syncSummaryKicker}>SYNCED TODAY</Text>
@@ -686,7 +649,7 @@ function SyncSummaryCard({
         />
         <SummaryTile label="Egg progress" value={eggProgress} />
       </View>
-    </View>
+    </SecondaryCard>
   );
 }
 
@@ -772,7 +735,7 @@ function TodayProgressCard({
     : 0;
 
   return (
-    <View style={styles.todayProgressCard}>
+    <SecondaryCard style={styles.todayProgressCard}>
       <View style={styles.todayProgressHeader}>
         <View>
           <Text style={styles.todayProgressKicker}>TODAY PROGRESS</Text>
@@ -809,7 +772,7 @@ function TodayProgressCard({
         Your movement powers today's hatch progress. Private health details stay
         off rankings unless you choose to share a public score.
       </Text>
-    </View>
+    </SecondaryCard>
   );
 }
 
@@ -1180,10 +1143,10 @@ function QuestBoardSummary({
                 <Text style={styles.questSuggestionMeta}>
                   {getQuestRemainingText(quest)} | {getQuestTierLabel(quest)}
                 </Text>
+                <Text style={styles.questSuggestionReward}>
+                  Reward: {getQuestRewardLabel(quest)}
+                </Text>
               </View>
-              <Text style={styles.questSuggestionReward}>
-                {getQuestRewardLabel(quest)}
-              </Text>
             </View>
           ))}
         </View>
@@ -1207,6 +1170,9 @@ function Quest({
 }) {
   const complete = isQuestComplete(quest);
   const claimable = quest.cadence !== "daily" && complete && !claimed;
+  const rewardParts = getQuestRewardParts(quest);
+  const rewardLabel =
+    rewardParts.length > 0 ? rewardParts.join(", ") : "Milestone tracker";
 
   return (
     <View style={[styles.quest, claimable && styles.questReady]}>
@@ -1226,7 +1192,12 @@ function Quest({
             {getQuestRemainingText(quest)}
           </Text>
         )}
-        <Text style={styles.questReward}>{getQuestRewardLabel(quest)}</Text>
+        <View style={[styles.questRewardLine, complete && styles.questRewardLineEarned]}>
+          <Text style={styles.questRewardPrefix}>
+            {complete ? "Earned" : "Reward"}
+          </Text>
+          <Text style={styles.questReward}>{rewardLabel}</Text>
+        </View>
       </View>
       {claimable ? (
         <Pressable
@@ -1457,6 +1428,20 @@ function getRewardNextStep(gains: LatestSyncGains) {
 
 function getRewardRows(gains: LatestSyncGains, latestEvolution: MonsterStage | null) {
   const rewards: { icon: string; label: string; value: string }[] = [];
+  if (gains.stepsSynced > 0) {
+    rewards.push({
+      icon: "STP",
+      label: "Steps synced",
+      value: formatSteps(gains.stepsSynced),
+    });
+  }
+  if (gains.distanceMeters > 0) {
+    rewards.push({
+      icon: "DST",
+      label: "Distance synced",
+      value: formatDistanceMiles(metersToMiles(gains.distanceMeters)),
+    });
+  }
   const journeyXp = gains.accountXp + gains.xp.total;
   if (journeyXp > 0) {
     rewards.push({
@@ -1472,6 +1457,13 @@ function getRewardRows(gains: LatestSyncGains, latestEvolution: MonsterStage | n
       value: `+${formatNumber(gains.palXp)} XP`,
     });
   }
+  if (gains.bondGained > 0) {
+    rewards.push({
+      icon: "BND",
+      label: "Bond gained",
+      value: `+${formatNumber(gains.bondGained)} Bond`,
+    });
+  }
   if (gains.eggSteps > 0) {
     rewards.push({
       icon: "EGG",
@@ -1484,6 +1476,13 @@ function getRewardRows(gains: LatestSyncGains, latestEvolution: MonsterStage | n
       icon: "NEW",
       label: "Bonus Eggs",
       value: `+${gains.eggsAwarded} Egg${gains.eggsAwarded === 1 ? "" : "s"}`,
+    });
+  }
+  if (gains.questsCompleted > 0) {
+    rewards.push({
+      icon: "QST",
+      label: "Quests completed",
+      value: `${formatNumber(gains.questsCompleted)} today`,
     });
   }
   if (gains.coins > 0) {
@@ -1523,9 +1522,13 @@ function hasSyncRewards(gains: LatestSyncGains) {
   return (
     gains.accountXp > 0 ||
     gains.xp.total > 0 ||
+    gains.stepsSynced > 0 ||
+    gains.distanceMeters > 0 ||
     gains.eggSteps > 0 ||
     gains.palXp > 0 ||
+    gains.bondGained > 0 ||
     gains.eggsAwarded > 0 ||
+    gains.questsCompleted > 0 ||
     gains.coins > 0 ||
     gains.streakProgressed
   );
@@ -1537,170 +1540,6 @@ function getTodayDistanceMiles(today: DailyAward | null) {
     return metersToMiles(today.health.distanceMeters ?? 0);
   }
   return stepsToMiles(today.health.steps);
-}
-
-function getFirstClaimableQuest(
-  quests: QuestModel[],
-  todayKey: string,
-  claimedQuestRewards: string[],
-) {
-  return quests.find(
-    (quest) =>
-      isQuestComplete(quest) &&
-      !claimedQuestRewards.includes(getQuestRewardKey(quest, todayKey)),
-  );
-}
-
-function getNextAction({
-  activeHatchling,
-  claimableQuest,
-  data,
-  firstWeekMission,
-  firstWeekMissionAction,
-  isSyncing,
-  onClaimQuestReward,
-  onClaimWeeklyChest,
-  onDexPress,
-  onMonsterPress,
-  onSync,
-  rewardAvailable,
-  readyEggCount,
-  trainingStatus,
-  today,
-  todayKey,
-  weeklyChest,
-}: {
-  activeHatchling: CollectedHatchling | null;
-  claimableQuest: QuestModel | undefined;
-  data: HatchUpData;
-  firstWeekMission: FirstWeekMission;
-  firstWeekMissionAction: () => void;
-  isSyncing: boolean;
-  onClaimQuestReward: (quest: QuestModel, today: string) => Promise<boolean>;
-  onClaimWeeklyChest: (today: string) => Promise<boolean>;
-  onDexPress: () => void;
-  onMonsterPress: () => void;
-  onSync: () => Promise<void>;
-  rewardAvailable: boolean;
-  readyEggCount: number;
-  trainingStatus: ReturnType<typeof getTrainingStatus> | null;
-  today: DailyAward | null;
-  todayKey: string;
-  weeklyChest: ReturnType<typeof getWeeklyRewardChest>;
-}) {
-  if (readyEggCount > 0) {
-    return {
-      body: "Your movement filled an Egg. Open the Hatchery and reveal your next Pal.",
-      disabled: false,
-      label: readyEggCount > 1 ? `Hatch ${readyEggCount} Eggs` : "Open Hatchery",
-      onPress: onMonsterPress,
-      priority: 1,
-      title: `${readyEggCount} Egg${readyEggCount === 1 ? "" : "s"} ready`,
-      variant: "primary" as const,
-    };
-  }
-
-  if (!today) {
-    return {
-      body: activeHatchling
-        ? "Sync once to turn today's movement into Pal XP, Egg progress, and quest rewards."
-        : "Sync once to turn today's movement into Egg progress and quest rewards.",
-      disabled: isSyncing,
-      label: isSyncing ? "Syncing..." : "Sync movement",
-      onPress: onSync,
-      priority: 2,
-      title: "Start today's loop",
-      variant: "primary" as const,
-    };
-  }
-
-  if (weeklyChest.canClaim) {
-    return {
-      body: "Your weekly movement chest is ready. Claim it for coins, trainer XP, and Egg progress.",
-      disabled: false,
-      label: "Claim weekly chest",
-      onPress: () => {
-        void onClaimWeeklyChest(todayKey);
-      },
-      priority: 3,
-      title: "Reward ready",
-      variant: "primary" as const,
-    };
-  }
-
-  if (claimableQuest) {
-    return {
-      body: `${claimableQuest.label} is complete. Claim it to grow your Pal, Eggs, and trainer card.`,
-      disabled: false,
-      label: "Claim quest reward",
-      onPress: () => {
-        void onClaimQuestReward(claimableQuest, todayKey);
-      },
-      priority: 3,
-      title: "Quest reward ready",
-      variant: "primary" as const,
-    };
-  }
-
-  if (rewardAvailable) {
-    return {
-      body: activeHatchling
-        ? "Your movement just became Pal XP, Egg progress, coins, or streak growth."
-        : "Your movement just became Egg progress, coins, or streak growth.",
-      disabled: false,
-      label: "Review progress",
-      onPress: activeHatchling ? onDexPress : onMonsterPress,
-      priority: 3,
-      title: "New progress landed",
-      variant: "secondary" as const,
-    };
-  }
-
-  if (!activeHatchling && data.collection.length > 0) {
-    return {
-      body: "You have a hatched Pal, but no favorite is active yet. Pick one so future movement can grow it.",
-      disabled: false,
-      label: "Pick active Pal",
-      onPress: onDexPress,
-      priority: 4,
-      title: "Choose your favorite Pal",
-      variant: "primary" as const,
-    };
-  }
-
-  if (activeHatchling && trainingStatus?.canTrain) {
-    return {
-      body: `${activeHatchling.name} has a training session ready. Training is capped at three sessions per day.`,
-      disabled: false,
-      label: "Open Collection",
-      onPress: onDexPress,
-      priority: 4,
-      title: "Training ready",
-      variant: "secondary" as const,
-    };
-  }
-
-  if (!firstWeekMission.complete) {
-    return {
-      body: getFirstWeekMissionWhy(firstWeekMission),
-      disabled: false,
-      label: firstWeekMission.actionLabel,
-      onPress: firstWeekMissionAction,
-      priority: 5,
-      title: `Day ${firstWeekMission.day}: ${firstWeekMission.label}`,
-      variant: "secondary" as const,
-    };
-  }
-
-  return {
-    body: `${getReturnTomorrowMessage(data.currentStreak)} ${getCollectionNudge(data.collection.length)}`,
-    disabled: false,
-    label: "Come back tomorrow",
-    onPress: onDexPress,
-    priority: 6,
-    title: "Today's loop is complete",
-    variant: "secondary" as const,
-  };
 }
 
 function getDailyHeroMessage({
@@ -1783,15 +1622,6 @@ function getAdvancedSectionCopy(mission: FirstWeekMission) {
   };
 }
 
-function getNextActionReason(priority: number) {
-  if (priority === 1) return "Recommended because a hatch is ready now.";
-  if (priority === 2) return "Recommended because today has not been rewarded yet.";
-  if (priority === 3) return "Recommended because progress is waiting to be claimed.";
-  if (priority === 4) return "Recommended because your active Pal can grow today.";
-  if (priority === 5) return "Recommended because it advances the first-week journey.";
-  return "Recommended because collection goals keep the loop moving.";
-}
-
 function getMissionAction({
   onDexPress,
   onLeaderboardPress,
@@ -1813,6 +1643,32 @@ function getMissionAction({
     return () => {
       void onSync();
     };
+  };
+}
+
+function getNextBestActionHandler({
+  data,
+  onDexPress,
+  onMonsterPress,
+  onSettingsPress,
+  onSync,
+}: {
+  data: HatchUpData;
+  onDexPress: () => void;
+  onMonsterPress: () => void;
+  onSettingsPress: () => void;
+  onSync: () => Promise<void>;
+}) {
+  return (target: NextBestActionTarget) => {
+    if (target === "sync") {
+      return () => {
+        void onSync();
+      };
+    }
+    if (target === "hatchery") return onMonsterPress;
+    if (target === "profile") return onSettingsPress;
+    if (target === "collection" || target === "tomorrow") return onDexPress;
+    return (data.collection?.length ?? 0) > 0 ? onDexPress : onMonsterPress;
   };
 }
 
@@ -1860,8 +1716,8 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.hero,
     borderWidth: 1,
-    marginBottom: 12,
-    padding: 18,
+    marginBottom: 10,
+    padding: 15,
     shadowColor: colors.cardShadowStrong,
     shadowOffset: { height: 10, width: 0 },
     shadowOpacity: 1,
@@ -1873,8 +1729,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.hero,
     borderWidth: 1,
     gap: 9,
-    marginBottom: 14,
-    padding: 16,
+    marginBottom: 12,
+    padding: 14,
     shadowColor: colors.cardShadow,
     shadowOffset: { height: 8, width: 0 },
     shadowOpacity: 1,
@@ -1905,7 +1761,7 @@ const styles = StyleSheet.create({
   },
   heroSparkles: {
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 5,
   },
   loopPromise: {
     color: colors.primaryDeep,
@@ -1914,40 +1770,20 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: 10,
   },
-  nextActionCard: {
-    backgroundColor: colors.warmSurface,
-    borderColor: colors.rewardGold,
-    borderRadius: radii.hero,
-    borderWidth: 1,
-    gap: 12,
-    marginBottom: 12,
-    padding: 16,
-  },
-  nextActionHeader: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  actionReason: {
-    color: colors.primaryDeep,
-    fontSize: 12,
-    fontWeight: "800",
-    lineHeight: 17,
-  },
   summaryRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   syncSummaryCard: {
     backgroundColor: colors.surface,
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
-    gap: 10,
-    marginBottom: 12,
-    padding: 12,
+    gap: 8,
+    marginBottom: 10,
+    padding: 11,
   },
   syncSummaryHeader: {
     alignItems: "center",
@@ -1997,7 +1833,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 11,
   },
   snapshotPill: {
     backgroundColor: colors.surface,
@@ -2032,18 +1868,18 @@ const styles = StyleSheet.create({
     borderColor: colors.primarySoft,
     borderRadius: radii.hero,
     borderWidth: 1,
-    gap: 10,
-    marginBottom: 14,
-    padding: 16,
+    gap: 9,
+    marginBottom: 11,
+    padding: 14,
   },
   dailyMissionCard: {
     backgroundColor: colors.surface,
     borderColor: colors.line,
     borderRadius: radii.hero,
     borderWidth: 1,
-    gap: 12,
-    marginBottom: 14,
-    padding: 16,
+    gap: 10,
+    marginBottom: 11,
+    padding: 14,
   },
   dailyMissionHeader: {
     alignItems: "flex-start",
@@ -2690,22 +2526,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
-  actionKicker: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 1,
-  },
-  actionTitle: {
-    color: colors.ink,
-    fontSize: 19,
-    fontWeight: "900",
-  },
-  actionText: {
-    color: colors.muted,
-    fontSize: 13,
-    lineHeight: 19,
-  },
   disabledAction: {
     opacity: 0.58,
   },
@@ -2968,9 +2788,9 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
-    gap: 10,
+    gap: 8,
     marginBottom: 10,
-    padding: 14,
+    padding: 12,
   },
   questSummaryHeader: {
     alignItems: "center",
@@ -3040,11 +2860,9 @@ const styles = StyleSheet.create({
   },
   questSuggestionReward: {
     color: colors.primary,
-    flexShrink: 1,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "900",
-    maxWidth: 112,
-    textAlign: "right",
+    marginTop: 3,
   },
   questSummaryDone: {
     color: colors.muted,
@@ -3059,7 +2877,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
-    padding: 13,
+    padding: 11,
   },
   questReady: {
     backgroundColor: colors.accentSoft,
@@ -3109,10 +2927,32 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "900",
   },
+  questRewardLine: {
+    alignItems: "flex-start",
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.line,
+    borderRadius: radii.button,
+    borderWidth: 1,
+    gap: 3,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+  },
+  questRewardLineEarned: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.rewardGold,
+  },
+  questRewardPrefix: {
+    color: colors.primaryDeep,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+  },
   questReward: {
     color: colors.primary,
     fontSize: 11,
-    fontWeight: "800",
+    fontWeight: "900",
+    lineHeight: 15,
   },
   questStatus: {
     color: colors.muted,

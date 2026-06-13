@@ -6,6 +6,8 @@ import {
 } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActionFeedbackModal } from "../components/ActionFeedbackModal";
+import { BottomNavStatusProvider } from "../components/BottomNavStatusContext";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { ConnectHealthScreen } from "../screens/ConnectHealthScreen";
 import { CreatureDexScreen } from "../screens/CreatureDexScreen";
@@ -49,6 +51,10 @@ export function AppNavigator() {
         ) : (
           <OnboardingNavigator app={app} />
         )}
+        <ActionFeedbackModal
+          feedback={app.trainingFeedback}
+          onDismiss={app.dismissTrainingFeedback}
+        />
       </NavigationContainer>
     </ErrorBoundary>
   );
@@ -102,102 +108,104 @@ function OnboardingNavigator({ app }: { app: HatchUpAppController }) {
 
 function MainTabsNavigator({ app }: { app: HatchUpAppController }) {
   return (
-    <MainTabs.Navigator
-      initialRouteName="Home"
-      screenOptions={{ headerShown: false, lazy: true }}
-      tabBar={() => null}
-    >
-      <MainTabs.Screen name="Home">
-        {({ navigation }) => (
-          <HomeScreen
-            data={app.data}
-            error={app.error}
-            isSyncing={app.isSyncing}
-            latestSync={app.latestSync}
-            latestSyncGains={app.latestSyncGains}
-            latestEvolution={app.latestEvolution}
-            onBuyShopItem={app.buyShopItem}
-            onClaimWeeklyChest={app.claimWeeklyChest}
-            onClaimQuestReward={app.claimQuestReward}
-            onDexPress={() => navigation.navigate("Collection")}
-            onLeaderboardPress={() => navigation.navigate("Ranks")}
-            onMonsterPress={() => navigation.navigate("Hatchery")}
-            onSettingsPress={() => navigation.navigate("Profile")}
-            onSync={app.syncHealth}
-          />
-        )}
-      </MainTabs.Screen>
-      <MainTabs.Screen name="Hatchery">
-        {({ navigation }) => (
-          <MonsterDetailScreen
-            data={app.data}
-            latestHatchling={app.latestHatchling}
-            onBack={() => navigation.navigate("Home")}
-            onDexPress={() => navigation.navigate("Collection")}
-            onDismissHatch={app.dismissLatestHatchling}
-            onHatchAll={app.hatchAllReadyEggs}
-            onHatch={app.hatchEgg}
-            onLeaderboardPress={() => navigation.navigate("Ranks")}
-            onSetActiveHatchling={app.setActiveHatchling}
-            onSettingsPress={() => navigation.navigate("Profile")}
-          />
-        )}
-      </MainTabs.Screen>
-      <MainTabs.Screen name="Collection">
-        {({ navigation }) => (
-          <CreatureDexScreen
-            data={app.data}
-            onHomePress={() => navigation.navigate("Home")}
-            onLeaderboardPress={() => navigation.navigate("Ranks")}
-            onMonsterPress={() => navigation.navigate("Hatchery")}
-            onRenameHatchling={app.renameCollectedHatchling}
-            onSetActiveHatchling={app.setActiveHatchling}
-            onSettingsPress={() => navigation.navigate("Profile")}
-            onTrainActiveHatchling={app.trainActiveHatchling}
-          />
-        )}
-      </MainTabs.Screen>
-      <MainTabs.Screen name="Ranks">
-        {({ navigation }) => (
-          <LeaderboardScreen
-            data={app.data}
-            leaderboardSyncLabel={app.leaderboardSyncLabel}
-            today={app.today}
-            onDexPress={() => navigation.navigate("Collection")}
-            onHomePress={() => navigation.navigate("Home")}
-            onMonsterPress={() => navigation.navigate("Hatchery")}
-            onSaveAlias={app.saveLeaderboardAlias}
-            onSettingsPress={() => navigation.navigate("Profile")}
-            onSetSharing={app.setLeaderboardSharing}
-          />
-        )}
-      </MainTabs.Screen>
-      <MainTabs.Screen name="Profile">
-        {({ navigation }) => (
-          <SettingsPrivacyScreen
-            data={app.data}
-            cloudSyncLabel={app.cloudSyncLabel}
-            healthMode={app.healthMode}
-            leaderboardSyncLabel={app.leaderboardSyncLabel}
-            progressionProfile={app.progressionProfile}
-            testLabEnabled={app.testLabEnabled}
-            onBack={() => navigation.navigate("Home")}
-            onDexPress={() => navigation.navigate("Collection")}
-            onLeaderboardPress={() => navigation.navigate("Ranks")}
-            onMonsterPress={() => navigation.navigate("Hatchery")}
-            onReadyTestEgg={app.readyTestEgg}
-            onReset={app.resetApp}
-            onSaveProfile={app.saveProfile}
-            onSetAnalyticsEnabled={app.setAnalyticsEnabled}
-            onSetCloudSyncEnabled={app.setCloudSyncEnabled}
-            onSetCrashReportingEnabled={app.setCrashReportingEnabled}
-            onSetLeaderboardSharing={app.setLeaderboardSharing}
-            onSetTestStage={app.setTestStage}
-            onApplyQaFixture={app.applyQaFixture}
-          />
-        )}
-      </MainTabs.Screen>
-    </MainTabs.Navigator>
+    <BottomNavStatusProvider data={app.data}>
+      <MainTabs.Navigator
+        initialRouteName="Home"
+        screenOptions={{ headerShown: false, lazy: true }}
+        tabBar={() => null}
+      >
+        <MainTabs.Screen name="Home">
+          {({ navigation }) => (
+            <HomeScreen
+              data={app.data}
+              error={app.error}
+              isSyncing={app.isSyncing}
+              latestSync={app.latestSync}
+              latestSyncGains={app.latestSyncGains}
+              latestEvolution={app.latestEvolution}
+              onBuyShopItem={app.buyShopItem}
+              onClaimWeeklyChest={app.claimWeeklyChest}
+              onClaimQuestReward={app.claimQuestReward}
+              onDexPress={() => navigation.navigate("Collection")}
+              onLeaderboardPress={() => navigation.navigate("Ranks")}
+              onMonsterPress={() => navigation.navigate("Hatchery")}
+              onSettingsPress={() => navigation.navigate("Profile")}
+              onSync={app.syncHealth}
+            />
+          )}
+        </MainTabs.Screen>
+        <MainTabs.Screen name="Hatchery">
+          {({ navigation }) => (
+            <MonsterDetailScreen
+              data={app.data}
+              latestHatchling={app.latestHatchling}
+              onBack={() => navigation.navigate("Home")}
+              onDexPress={() => navigation.navigate("Collection")}
+              onDismissHatch={app.dismissLatestHatchling}
+              onHatchAll={app.hatchAllReadyEggs}
+              onHatch={app.hatchEgg}
+              onLeaderboardPress={() => navigation.navigate("Ranks")}
+              onSetActiveHatchling={app.setActiveHatchling}
+              onSettingsPress={() => navigation.navigate("Profile")}
+            />
+          )}
+        </MainTabs.Screen>
+        <MainTabs.Screen name="Collection">
+          {({ navigation }) => (
+            <CreatureDexScreen
+              data={app.data}
+              onHomePress={() => navigation.navigate("Home")}
+              onLeaderboardPress={() => navigation.navigate("Ranks")}
+              onMonsterPress={() => navigation.navigate("Hatchery")}
+              onRenameHatchling={app.renameCollectedHatchling}
+              onSetActiveHatchling={app.setActiveHatchling}
+              onSettingsPress={() => navigation.navigate("Profile")}
+              onTrainActiveHatchling={app.trainActiveHatchling}
+            />
+          )}
+        </MainTabs.Screen>
+        <MainTabs.Screen name="Ranks">
+          {({ navigation }) => (
+            <LeaderboardScreen
+              data={app.data}
+              leaderboardSyncLabel={app.leaderboardSyncLabel}
+              today={app.today}
+              onDexPress={() => navigation.navigate("Collection")}
+              onHomePress={() => navigation.navigate("Home")}
+              onMonsterPress={() => navigation.navigate("Hatchery")}
+              onSaveAlias={app.saveLeaderboardAlias}
+              onSettingsPress={() => navigation.navigate("Profile")}
+              onSetSharing={app.setLeaderboardSharing}
+            />
+          )}
+        </MainTabs.Screen>
+        <MainTabs.Screen name="Profile">
+          {({ navigation }) => (
+            <SettingsPrivacyScreen
+              data={app.data}
+              cloudSyncLabel={app.cloudSyncLabel}
+              healthMode={app.healthMode}
+              leaderboardSyncLabel={app.leaderboardSyncLabel}
+              progressionProfile={app.progressionProfile}
+              testLabEnabled={app.testLabEnabled}
+              onBack={() => navigation.navigate("Home")}
+              onDexPress={() => navigation.navigate("Collection")}
+              onLeaderboardPress={() => navigation.navigate("Ranks")}
+              onMonsterPress={() => navigation.navigate("Hatchery")}
+              onReadyTestEgg={app.readyTestEgg}
+              onReset={app.resetApp}
+              onSaveProfile={app.saveProfile}
+              onSetAnalyticsEnabled={app.setAnalyticsEnabled}
+              onSetCloudSyncEnabled={app.setCloudSyncEnabled}
+              onSetCrashReportingEnabled={app.setCrashReportingEnabled}
+              onSetLeaderboardSharing={app.setLeaderboardSharing}
+              onSetTestStage={app.setTestStage}
+              onApplyQaFixture={app.applyQaFixture}
+            />
+          )}
+        </MainTabs.Screen>
+      </MainTabs.Navigator>
+    </BottomNavStatusProvider>
   );
 }
 

@@ -43,6 +43,7 @@ export interface QuestRewardReceipt {
   label: string;
   questId: string;
   rewardAccountXp: number;
+  rewardBond?: number;
   rewardCoins: number;
   rewardEggSteps: number;
   tier: number;
@@ -94,11 +95,20 @@ export interface CollectedHatchling {
   hatchedAt: string;
   level: number;
   stats: HatchlingStats;
+  traitId?: PalTraitId;
   trainingSessions: string[];
   xp: number;
 }
 
 export type HatchlingMood = "happy" | "excited" | "sleepy" | "lonely";
+
+export type PalTraitId =
+  | "brave"
+  | "curious"
+  | "energetic"
+  | "loyal"
+  | "playful"
+  | "sleepy";
 
 export interface HatchUpData {
   schemaVersion: number;

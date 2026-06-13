@@ -1,5 +1,7 @@
 import { getActivitySummary } from "./history";
+import { MOCK_LEADERBOARD_RIVALS } from "./leaderboardMockData";
 import type { HatchUpData } from "./models";
+import { getWeeklyChallengeXpWithTrait } from "./palTraits";
 import { getMonsterStage } from "./progression";
 
 export type LeaderboardMetric = "steps" | "distance" | "xp";
@@ -23,54 +25,19 @@ export interface LeaderboardValidation {
 export const DISTANCE_MILES_PER_STEP = 0.000473;
 export const METERS_PER_MILE = 1609.344;
 
-const betaRivals: Omit<LeaderboardEntry, "rank">[] = [
-  {
-    id: "rival-a",
-    displayName: "Nova",
-    distanceMiles: stepsToMiles(46800),
-    isUser: false,
-    monsterStage: "Teen",
-    steps: 46800,
-    totalXp: 620,
-  },
-  {
-    id: "rival-b",
-    displayName: "Mika",
-    distanceMiles: stepsToMiles(31200),
-    isUser: false,
-    monsterStage: "Baby",
-    steps: 31200,
-    totalXp: 410,
-  },
-  {
-    id: "rival-c",
-    displayName: "Ren",
-    distanceMiles: stepsToMiles(22400),
-    isUser: false,
-    monsterStage: "Baby",
-    steps: 22400,
-    totalXp: 255,
-  },
-  {
-    id: "rival-d",
-    displayName: "Kai",
-    distanceMiles: stepsToMiles(14800),
-    isUser: false,
-    monsterStage: "Egg",
-    steps: 14800,
-    totalXp: 120,
-  },
-];
-
 export function getUserLeaderboardStats(data: HatchUpData, today: string) {
   const activity = getActivitySummary(data.activityHistory, today, 7);
   const stage = getMonsterStage(data.totalXp);
+  const activePal =
+    data.collection.find((item) => item.id === data.activeHatchlingId) ??
+    data.collection[0] ??
+    null;
 
   return {
     distanceMiles: getDistanceMiles(activity.days),
     monsterStage: stage.label,
     steps: activity.steps,
-    totalXp: data.totalXp,
+    totalXp: getWeeklyChallengeXpWithTrait(activePal, data.totalXp),
   };
 }
 
@@ -88,8 +55,8 @@ export function getLeaderboardEntries(
     ...userStats,
   };
   const entries = data.leaderboardShareEnabled
-    ? [userEntry, ...betaRivals]
-    : betaRivals;
+    ? [userEntry, ...MOCK_LEADERBOARD_RIVALS]
+    : MOCK_LEADERBOARD_RIVALS;
 
   return entries
     .sort(

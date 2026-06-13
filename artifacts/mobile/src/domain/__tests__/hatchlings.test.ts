@@ -101,12 +101,17 @@ describe("hatchling progression", () => {
       index: 1,
     });
 
+    expect(hatchling).toMatchObject({
+      name: "Sprig",
+      traitId: "sleepy",
+    });
+
     const adjusted = getTimeAdjustedHatchling(
       hatchling,
       "2026-06-02T08:00:00.000Z",
     );
 
-    expect(adjusted.bond).toBe(8);
+    expect(adjusted.bond).toBe(9);
     expect(adjusted.lastInteractionAt).toBe("2026-06-02T08:00:00.000Z");
   });
 

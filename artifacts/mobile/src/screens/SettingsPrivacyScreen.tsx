@@ -16,7 +16,13 @@ import { HatchlingAvatar } from "../components/HatchlingAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
 import { SparkleBurst } from "../components/SparkleBurst";
-import { PageTitle, SegmentedControl } from "../components/ui";
+import {
+  PageTitle,
+  PrimaryCard,
+  SecondaryCard,
+  SegmentedControl,
+  UtilityCard,
+} from "../components/ui";
 import { QaTestLabScreen } from "./QaTestLabScreen";
 import { ENABLE_PROFILE_BADGES } from "../config/features";
 import { getScreenLoopSubtitle } from "../content/coreLoopCopy";
@@ -256,7 +262,7 @@ export function SettingsPrivacyScreen({
       />
       {activeTab === "profile" && (
         <>
-      <View style={styles.profileCard}>
+      <PrimaryCard style={styles.profileCard}>
         <View style={styles.profileHero}>
           <View style={styles.profileAvatar}>
             {profilePet ? (
@@ -317,9 +323,9 @@ export function SettingsPrivacyScreen({
               ))}
             </View>
           ) : (
-            <View style={styles.emptyMissionCard}>
+            <UtilityCard style={styles.emptyMissionCard}>
               <View style={styles.emptyMissionText}>
-                <Text style={styles.emptyMissionTitle}>No profile pet yet</Text>
+                <Text style={styles.emptyMissionTitle}>No profile Pal yet</Text>
                 <Text style={styles.privacyText}>
                   Hatch your first Pal to unlock trainer card picture choices.
                 </Text>
@@ -330,7 +336,7 @@ export function SettingsPrivacyScreen({
                 style={styles.emptyMissionButton}
                 variant="secondary"
               />
-            </View>
+            </UtilityCard>
           )}
         </View>
         <View style={styles.profileStatsGrid}>
@@ -353,7 +359,7 @@ export function SettingsPrivacyScreen({
             value={formatCompact(weeklyActivity.steps)}
           />
         </View>
-        <View style={styles.profileReadinessCard}>
+        <SecondaryCard style={styles.profileReadinessCard}>
           <View style={styles.profileReadinessHeader}>
             <Text style={styles.profileReadinessTitle}>Trainer card growth</Text>
             <Text style={styles.profileReadinessValue}>
@@ -402,13 +408,13 @@ export function SettingsPrivacyScreen({
               </View>
             ))}
           </View>
-        </View>
+        </SecondaryCard>
         <CollapsibleSection
           badge={`${Math.round(dexCompletion.percent * 100)}%`}
           subtitle="Your species progress, strongest Pal, and next target."
           title="Collection showcase"
         >
-          <View style={styles.profileShowcaseCard}>
+          <SecondaryCard style={styles.profileShowcaseCard}>
             <View style={styles.profileShowcaseHeader}>
               <View>
                 <Text style={styles.profileShowcaseKicker}>Collection showcase</Text>
@@ -452,10 +458,10 @@ export function SettingsPrivacyScreen({
               onPress={onDexPress}
               variant="secondary"
             />
-          </View>
+          </SecondaryCard>
         </CollapsibleSection>
         {activeHatchling && (
-          <View style={styles.activeHatchling}>
+          <UtilityCard style={styles.activeHatchling}>
             <HatchlingAvatar
               element={activeHatchling.element}
               level={activeHatchling.level}
@@ -474,10 +480,10 @@ export function SettingsPrivacyScreen({
                 {trainingStatus?.cooldownLabel}
               </Text>
             </View>
-          </View>
+          </UtilityCard>
         )}
         {!activeHatchling && (
-          <View style={styles.emptyMissionCard}>
+          <UtilityCard style={styles.emptyMissionCard}>
             <View style={styles.emptyMissionText}>
               <Text style={styles.emptyMissionTitle}>No active Pal selected</Text>
               <Text style={styles.privacyText}>
@@ -490,7 +496,7 @@ export function SettingsPrivacyScreen({
               style={styles.emptyMissionButton}
               variant="secondary"
             />
-          </View>
+          </UtilityCard>
         )}
         <AppButton
           label="Save profile"
@@ -506,14 +512,14 @@ export function SettingsPrivacyScreen({
         {profileSaveMessage && (
           <Text style={styles.profileSaveMessage}>{profileSaveMessage}</Text>
         )}
-      </View>
+      </PrimaryCard>
       {ENABLE_PROFILE_BADGES && (
         <CollapsibleSection
           badge={`${unlockedBadgeCount}/${badges.length}`}
           subtitle="Badge paths for collection, movement, bonds, rarity, streaks, and XP."
           title="Badges"
         >
-          <View style={styles.badgeCard}>
+          <SecondaryCard style={styles.badgeCard}>
             <Text style={styles.cardTitle}>Milestones and badges</Text>
             <Text style={styles.privacyText}>
               Badge progress is local on this device and can become shareable once
@@ -575,7 +581,7 @@ export function SettingsPrivacyScreen({
                 />
               ))}
             </View>
-          </View>
+          </SecondaryCard>
         </CollapsibleSection>
       )}
         </>
@@ -587,7 +593,7 @@ export function SettingsPrivacyScreen({
         subtitle="Support, privacy, local data controls, and launch readiness."
         title="Trust & Data"
       >
-      <View style={styles.launchCard}>
+      <SecondaryCard style={styles.launchCard}>
         <Text style={styles.launchKicker}>
           {IS_PUBLIC_BUILD ? "PUBLIC BUILD" : "LAUNCH READINESS"}
         </Text>
@@ -628,8 +634,8 @@ export function SettingsPrivacyScreen({
             variant="secondary"
           />
         </View>
-      </View>
-      <View style={styles.readinessCard}>
+      </SecondaryCard>
+      <SecondaryCard style={styles.readinessCard}>
         <View style={styles.readinessHeader}>
           <View>
             <Text style={styles.readinessKicker}>PUBLIC READINESS</Text>
@@ -645,8 +651,8 @@ export function SettingsPrivacyScreen({
             <ReadinessRow item={item} key={item.id} />
           ))}
         </View>
-      </View>
-      <View style={styles.card}>
+      </SecondaryCard>
+      <UtilityCard style={styles.card}>
         <Setting label="Health source" value={healthMode} />
         <Setting
           label="Connection"
@@ -679,15 +685,15 @@ export function SettingsPrivacyScreen({
           value={progressionProfile.label}
           withBorder={false}
         />
-      </View>
-      <View style={styles.privacyCard}>
+      </UtilityCard>
+      <UtilityCard style={styles.privacyCard}>
         <Text style={styles.cardTitle}>Privacy promise</Text>
         <Text style={styles.privacyText}>{privacyCopy}</Text>
         <Text style={styles.trustBullet}>Read-only health access.</Text>
         <Text style={styles.trustBullet}>No ads, no health-data sale.</Text>
         <Text style={styles.trustBullet}>Leaderboard sharing is opt-in.</Text>
-      </View>
-      <View style={styles.feedbackCard}>
+      </UtilityCard>
+      <UtilityCard style={styles.feedbackCard}>
         <Text style={styles.cardTitle}>Support and feedback</Text>
         <Text style={styles.privacyText}>
           Found a confusing flow, rough UI moment, or reward bug? Send a quick
@@ -704,8 +710,8 @@ export function SettingsPrivacyScreen({
           }}
           variant="secondary"
         />
-      </View>
-      <View style={styles.readOnlyCard}>
+      </UtilityCard>
+      <UtilityCard style={styles.readOnlyCard}>
         <Text style={styles.cardTitle}>Public-ready data controls</Text>
         <Text style={styles.privacyText}>
           Cloud save and analytics are opt-in foundations for launch. They stay
@@ -765,8 +771,8 @@ export function SettingsPrivacyScreen({
             variant="secondary"
           />
         </View>
-      </View>
-      <View style={styles.readOnlyCard}>
+      </UtilityCard>
+      <UtilityCard style={styles.readOnlyCard}>
         <Text style={styles.cardTitle}>Leaderboard privacy</Text>
         <Text style={styles.privacyText}>
           Rankings are optional. Turning sharing on adds your
@@ -780,14 +786,14 @@ export function SettingsPrivacyScreen({
             variant={data.leaderboardShareEnabled ? "secondary" : "primary"}
           />
         </View>
-      </View>
-      <View style={styles.readOnlyCard}>
+      </UtilityCard>
+      <UtilityCard style={styles.readOnlyCard}>
         <Text style={styles.cardTitle}>Read-only health access</Text>
         <Text style={styles.privacyText}>
           HatchUp never writes data back to Apple Health or Health Connect in
           the current launch build.
         </Text>
-      </View>
+      </UtilityCard>
       </CollapsibleSection>
       {testLabEnabled && (
         <CollapsibleSection
@@ -1107,17 +1113,17 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
-    marginTop: 22,
-    paddingHorizontal: 16,
+    marginTop: 16,
+    paddingHorizontal: 14,
   },
   launchCard: {
     backgroundColor: colors.surface,
     borderColor: colors.line,
     borderRadius: radii.hero,
     borderWidth: 1,
-    gap: 10,
-    marginTop: 22,
-    padding: 16,
+    gap: 8,
+    marginTop: 16,
+    padding: 14,
     shadowColor: colors.cardShadow,
     shadowOffset: { height: 8, width: 0 },
     shadowOpacity: 1,
@@ -1135,9 +1141,9 @@ const styles = StyleSheet.create({
     borderColor: colors.primarySoft,
     borderRadius: radii.card,
     borderWidth: 1,
-    gap: 10,
-    marginTop: 14,
-    padding: 16,
+    gap: 8,
+    marginTop: 12,
+    padding: 13,
   },
   readinessHeader: {
     alignItems: "center",
@@ -1211,9 +1217,9 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.hero,
     borderWidth: 1,
-    gap: 14,
-    marginTop: 22,
-    padding: 16,
+    gap: 12,
+    marginTop: 16,
+    padding: 14,
     shadowColor: colors.cardShadowStrong,
     shadowOffset: { height: 10, width: 0 },
     shadowOpacity: 1,
@@ -1222,7 +1228,7 @@ const styles = StyleSheet.create({
   profileHero: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 14,
+    gap: 12,
   },
   profileAvatar: {
     alignItems: "center",
@@ -1230,10 +1236,10 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
-    height: 170,
+    height: 150,
     justifyContent: "center",
     overflow: "hidden",
-    width: 142,
+    width: 124,
   },
   emptyAvatar: {
     alignItems: "center",
@@ -1352,7 +1358,7 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
-    padding: 10,
+    padding: 9,
     width: "31.5%",
   },
   profileStatValue: {
@@ -1777,8 +1783,8 @@ const styles = StyleSheet.create({
     borderColor: colors.rewardGold,
     borderRadius: radii.card,
     borderWidth: 1,
-    marginTop: 14,
-    padding: 16,
+    marginTop: 12,
+    padding: 13,
   },
   trustBullet: {
     color: colors.primary,
@@ -1791,9 +1797,9 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
-    gap: 10,
-    marginTop: 14,
-    padding: 16,
+    gap: 8,
+    marginTop: 12,
+    padding: 13,
   },
   betaToolsHandle: {
     backgroundColor: colors.primarySoft,
@@ -1820,8 +1826,8 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
-    marginTop: 14,
-    padding: 16,
+    marginTop: 12,
+    padding: 13,
   },
   leaderboardActions: {
     marginTop: 12,

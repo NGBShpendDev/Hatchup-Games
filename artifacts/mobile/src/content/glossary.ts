@@ -1,5 +1,6 @@
 export const HATCHUP_TERMS = {
   collection: "Collection",
+  bond: "Bond",
   egg: "Egg",
   eggProgress: "Egg progress",
   hatchery: "Hatchery",
@@ -8,6 +9,7 @@ export const HATCHUP_TERMS = {
   palXp: "Pal XP",
   ranks: "Ranks",
   syncMovement: "Sync movement",
+  training: "Training",
   weeklyGoal: "Weekly goal",
 } as const;
 

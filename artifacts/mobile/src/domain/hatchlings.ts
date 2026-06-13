@@ -8,6 +8,11 @@ import type {
   HatchUpData,
   IncubatorEgg,
 } from "./models";
+import {
+  assignPalTrait,
+  getPassiveBondWithTrait,
+  getTrainingBondWithTrait,
+} from "./palTraits";
 
 const ELEMENT_NAMES: Record<EggElement, readonly string[]> = {
   ember: ["Cinder", "Kindle", "Flare"],
@@ -93,6 +98,11 @@ export function createHatchlingFromEgg({
     name: nameOptions[(index - 1) % nameOptions.length],
     rarity: egg.rarity,
     stats: getHatchlingStats(egg.element, egg.rarity, level),
+    traitId: assignPalTrait({
+      element: egg.element,
+      index,
+      rarity: egg.rarity,
+    }),
     trainingSessions: [],
     xp: 0,
   };
@@ -128,6 +138,13 @@ export function normalizeHatchling(
     name: hatchling.name ?? ELEMENT_NAMES[element][(index - 1) % 3],
     rarity,
     stats: getHatchlingStats(element, rarity, level),
+    traitId:
+      hatchling.traitId ??
+      assignPalTrait({
+        element,
+        index,
+        rarity,
+      }),
     trainingSessions: hatchling.trainingSessions ?? [],
     xp,
   };
@@ -189,7 +206,8 @@ export function trainHatchling(
     const xp = current.xp + TRAINING_XP;
     const level = getHatchlingLevel(xp);
     const leveledUp = level > current.level;
-    const bond = clampBond(current.bond + TRAINING_BOND);
+    const trainingBond = getTrainingBondWithTrait(current, TRAINING_BOND);
+    const bond = clampBond(current.bond + trainingBond);
 
     return {
       ...current,
@@ -390,7 +408,7 @@ export function getTrainingPreview(
   const currentPower = getHatchlingPowerScore(hatchling);
 
   return {
-    bondGain: TRAINING_BOND,
+    bondGain: getTrainingBondWithTrait(hatchling, TRAINING_BOND),
     levelAfterTraining,
     levelsGained: Math.max(levelAfterTraining - hatchling.level, 0),
     powerAfterTraining,
@@ -426,13 +444,21 @@ export function getHatchlingPowerScore(hatchling: CollectedHatchling) {
 }
 
 export function getPassiveBondGain(
-  hatchling: Pick<CollectedHatchling, "bond" | "lastInteractionAt">,
+  hatchling: Pick<CollectedHatchling, "bond" | "lastInteractionAt" | "traitId">,
   now = new Date().toISOString(),
 ) {
   if (!hatchling.lastInteractionAt || hatchling.bond >= 100) return 0;
 
   const elapsedMs = Math.max(Date.parse(now) - Date.parse(hatchling.lastInteractionAt), 0);
-  return Math.min(Math.floor(elapsedMs / (PASSIVE_BOND_HOURS * 60 * 60 * 1000)), 3);
+  const baseBondGain = Math.min(
+    Math.floor(elapsedMs / (PASSIVE_BOND_HOURS * 60 * 60 * 1000)),
+    3,
+  );
+  return getPassiveBondWithTrait({
+    baseBondGain,
+    hatchling,
+    now,
+  });
 }
 
 export function getHatchlingMood({

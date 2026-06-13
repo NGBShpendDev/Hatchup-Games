@@ -8,8 +8,16 @@ import {
 } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ENABLE_LEADERBOARD } from "../config/features";
+import { getEggProgress, isEggReady } from "../domain/hatchery";
+import {
+  getActiveHatchling,
+  getTimeAdjustedHatchling,
+  getTrainingStatus,
+} from "../domain/hatchlings";
 import { colors, radii } from "../theme";
 import { ActiveTabTransition } from "../utils/animations";
+import { formatPercent } from "../utils/format";
+import { useBottomNavStatusData } from "./BottomNavStatusContext";
 
 interface Props {
   active: "home" | "monster" | "dex" | "leaderboard" | "settings";
@@ -28,6 +36,7 @@ export function BottomNav({
   onMonsterPress,
   onSettingsPress,
 }: Props) {
+  const data = useBottomNavStatusData();
   const items: NavItemConfig[] = [
     {
       accessibilityLabel: "Go to Home",
@@ -71,10 +80,13 @@ export function BottomNav({
   ];
 
   return (
-    <View style={styles.nav}>
-      {items.map((item) => (
-        <NavItem key={item.label} {...item} />
-      ))}
+    <View style={styles.footerStack}>
+      {data && <MiniStatusBar data={data} />}
+      <View style={styles.nav}>
+        {items.map((item) => (
+          <NavItem key={item.label} {...item} />
+        ))}
+      </View>
     </View>
   );
 }
@@ -121,7 +133,85 @@ function NavItem({
   );
 }
 
+function MiniStatusBar({
+  data,
+}: {
+  data: NonNullable<ReturnType<typeof useBottomNavStatusData>>;
+}) {
+  const activePalRaw = getActiveHatchling(data);
+  const activePal = activePalRaw ? getTimeAdjustedHatchling(activePalRaw) : null;
+  const training = activePal ? getTrainingStatus(activePal) : null;
+  const closestEgg =
+    data.activeEggs
+      .filter((egg) => !isEggReady(egg))
+      .sort((left, right) => getEggProgress(right) - getEggProgress(left))[0] ??
+    data.activeEggs[0] ??
+    null;
+
+  return (
+    <View style={styles.statusBar}>
+      <View style={styles.statusItemWide}>
+        <Text style={styles.statusLabel}>Active Pal</Text>
+        <Text numberOfLines={1} style={styles.statusValue}>
+          {activePal ? `${activePal.name} L${activePal.level}` : "Hatch one"}
+        </Text>
+      </View>
+      <View style={styles.statusDivider} />
+      <View style={styles.statusItem}>
+        <Text style={styles.statusLabel}>Training</Text>
+        <Text style={styles.statusValue}>
+          {training ? `${training.remainingToday} left` : "Hatch Pal"}
+        </Text>
+      </View>
+      <View style={styles.statusDivider} />
+      <View style={styles.statusItem}>
+        <Text style={styles.statusLabel}>Egg</Text>
+        <Text style={styles.statusValue}>
+          {closestEgg ? formatPercent(getEggProgress(closestEgg)) : "None"}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  footerStack: {
+    gap: 7,
+  },
+  statusBar: {
+    alignItems: "center",
+    backgroundColor: colors.translucentSurface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  statusItem: {
+    flex: 0.75,
+  },
+  statusItemWide: {
+    flex: 1.2,
+  },
+  statusDivider: {
+    backgroundColor: colors.line,
+    height: 24,
+    width: 1,
+  },
+  statusLabel: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  statusValue: {
+    color: colors.primaryDeep,
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: 2,
+  },
   nav: {
     backgroundColor: colors.surface,
     borderColor: colors.primarySoft,
@@ -131,7 +221,7 @@ const styles = StyleSheet.create({
     gap: 4,
     justifyContent: "space-between",
     paddingHorizontal: 7,
-    paddingVertical: 8,
+    paddingVertical: 6,
     shadowColor: colors.cardShadowStrong,
     shadowOffset: { height: 10, width: 0 },
     shadowOpacity: 1,
@@ -143,7 +233,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
     justifyContent: "center",
-    minHeight: 54,
+    minHeight: 48,
     minWidth: 44,
     paddingHorizontal: 3,
     paddingVertical: 5,
@@ -160,9 +250,9 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderWidth: 1,
     borderRadius: radii.pill,
-    height: 32,
+    height: 29,
     justifyContent: "center",
-    width: 32,
+    width: 29,
   },
   activeIconWrap: {
     backgroundColor: colors.primaryDeep,

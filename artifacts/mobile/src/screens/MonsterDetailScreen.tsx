@@ -2,32 +2,29 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../components/AppButton";
 import { BottomNav } from "../components/BottomNav";
-import { CollapsibleSection } from "../components/CollapsibleSection";
 import { EggAvatar } from "../components/EggAvatar";
 import { HatchlingAvatar } from "../components/HatchlingAvatar";
-import { MonsterAvatar } from "../components/MonsterAvatar";
 import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
-import { ScreenHeader } from "../components/ui";
+import { ScreenHeader, SecondaryCard, UtilityCard } from "../components/ui";
 import { toDateKey } from "../domain/date";
 import { getEggProgress, isEggReady } from "../domain/hatchery";
 import {
   getActiveHatchling,
-  getHatchlingLevelProgress,
   getHatchlingPowerScore,
-  getHatchlingXpProgress,
   getTimeAdjustedHatchling,
   getTrainingStatus,
 } from "../domain/hatchlings";
+import { getCreatureVisualStage } from "../domain/creatureVisuals";
+import { getPalTrait } from "../domain/palTraits";
 import type { CollectedHatchling, HatchUpData } from "../domain/models";
-import { getProgression, MONSTER_STAGES } from "../domain/progression";
 import { colors, radii, typography } from "../theme";
 import {
   EggReadyPulse,
   HatchCelebration,
   useReducedMotion,
 } from "../utils/animations";
-import { formatNumber, formatSteps, formatXp } from "../utils/format";
+import { formatNumber, formatSteps } from "../utils/format";
 
 interface Props {
   data: HatchUpData;
@@ -62,7 +59,6 @@ export function MonsterDetailScreen({
   onSettingsPress,
 }: Props) {
   const todayKey = toDateKey(new Date());
-  const progression = getProgression(data.totalXp);
   const readyEggCount = data.activeEggs.filter(isEggReady).length;
   const firstReadyEgg = data.activeEggs.find(isEggReady);
   const closestEgg = getClosestEgg(data.activeEggs);
@@ -70,9 +66,6 @@ export function MonsterDetailScreen({
   const activeHatchlingRaw = getActiveHatchling(data);
   const activeHatchling = activeHatchlingRaw
     ? getTimeAdjustedHatchling(activeHatchlingRaw)
-    : null;
-  const activePalProgress = activeHatchling
-    ? getHatchlingLevelProgress(activeHatchling.xp)
     : null;
   const activePalTraining = activeHatchling
     ? getTrainingStatus(activeHatchling)
@@ -98,6 +91,13 @@ export function MonsterDetailScreen({
       />
       <HatchRevealModal
         hatchling={latestHatchling}
+        onHatchAnother={
+          firstReadyEgg
+            ? async () => {
+                await onHatch(firstReadyEgg.id);
+              }
+            : undefined
+        }
         onClose={onDismissHatch}
         onSetActive={async (hatchlingId) => {
           await onSetActiveHatchling(hatchlingId);
@@ -157,149 +157,13 @@ export function MonsterDetailScreen({
           />
         ))}
       </View>
-      <CollapsibleSection
-        badge={`${data.collection.length} Pals`}
-        subtitle="Growth details, stages, and your Pal preview live here when you want the deeper view."
-        title="More about your Pals"
-      >
-        <View style={styles.palInfoBlock}>
-          <Text style={styles.palInfoTitle}>Journey Pal</Text>
-          <MonsterAvatar stage={progression.current.id} />
-          <Text style={styles.name}>{data.monsterName}</Text>
-          <Text style={styles.stage}>{progression.current.label} stage</Text>
-          <ProgressBar progress={progression.progress} />
-          <Text style={styles.caption}>
-            {progression.next
-              ? `${formatNumber(progression.xpToNext)} Journey XP to reach ${progression.next.label}`
-              : "Your Pal journey has reached its final stage."}
-          </Text>
-        </View>
-        <View style={styles.palInfoBlock}>
-          <View style={styles.palInfoHeader}>
-            <Text style={styles.palInfoTitle}>Journey stages</Text>
-            <Text style={styles.palInfoBadge}>{formatXp(data.totalXp)}</Text>
-          </View>
-        {MONSTER_STAGES.map((stage) => {
-          const unlocked = data.totalXp >= stage.xp;
-          return (
-            <View style={styles.stageRow} key={stage.id}>
-              <View style={[styles.dot, unlocked && styles.unlockedDot]} />
-              <View style={styles.stageText}>
-                <Text style={styles.rowTitle}>{stage.label}</Text>
-                <Text style={styles.rowCaption}>{formatNumber(stage.xp)} Journey XP</Text>
-              </View>
-              <Text style={[styles.status, unlocked && styles.unlocked]}>
-                {unlocked ? "Unlocked" : "Locked"}
-              </Text>
-            </View>
-          );
-        })}
-        <View style={styles.stats}>
-          <Stat label="Journey XP" value={formatNumber(data.totalXp)} />
-          <Stat label="Active Eggs" value={`${data.activeEggs.length}/3`} />
-          <Stat label="Queued Eggs" value={String(data.pendingEggs.length)} />
-        </View>
-        </View>
-        <View style={styles.palInfoBlock}>
-          <View style={styles.palInfoHeader}>
-            <Text style={styles.palInfoTitle}>Active Pal details</Text>
-            <Text style={styles.palInfoBadge}>
-              {activeHatchling ? `L${activeHatchling.level}` : "None"}
-            </Text>
-          </View>
-        {activeHatchling ? (
-          <View style={styles.trainingCard}>
-            <HatchlingAvatar
-              element={activeHatchling.element}
-              level={activeHatchling.level}
-              rarity={activeHatchling.rarity}
-              size="small"
-            />
-            <View style={styles.trainingBody}>
-              <Text style={styles.trainingName}>{activeHatchling.name}</Text>
-              <Text style={styles.trainingMeta}>
-                {capitalize(activeHatchling.rarity)}{" "}
-                {capitalize(activeHatchling.element)} | {capitalize(activeHatchling.mood)} | Bond{" "}
-                {activeHatchling.bond}
-              </Text>
-              <View style={styles.activePalMiniStats}>
-                <Text style={styles.activePalChip}>
-                  Power {getHatchlingPowerScore(activeHatchling)}
-                </Text>
-                <Text style={styles.activePalChip}>
-                  {activePalTraining?.remainingToday ?? 0} trains left
-                </Text>
-              </View>
-              <View style={styles.activePalProgress}>
-                <ProgressBar progress={getHatchlingXpProgress(activeHatchling.xp)} />
-                <Text style={styles.activePalProgressText}>
-                  {activePalProgress?.nextLevel
-                    ? `${activePalProgress.xpToNext} XP to L${activePalProgress.nextLevel}`
-                    : "Max level reached"}
-                </Text>
-              </View>
-            </View>
-            <AppButton
-              label="Collection"
-              onPress={onDexPress}
-              style={styles.trainingButton}
-              variant="secondary"
-            />
-          </View>
-        ) : (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>No active Pal yet.</Text>
-            <Text style={styles.emptyText}>
-              Hatch an Egg to unlock Pal training.
-            </Text>
-          </View>
-        )}
-        </View>
-        <View style={styles.palInfoBlock}>
-          <View style={styles.palInfoHeader}>
-            <Text style={styles.palInfoTitle}>Your Pals preview</Text>
-            <Text style={styles.palInfoBadge}>
-              {formatNumber(data.collection.length)} collected
-            </Text>
-          </View>
-        {data.collection.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>Your collection starts with movement.</Text>
-            <Text style={styles.emptyText}>
-              Your first Pal is waiting inside an Egg. Move today, sync progress,
-              then hatch it.
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.collection}>
-            {data.collection.map((hatchling) => (
-              <View style={styles.hatchlingCard} key={hatchling.id}>
-                <HatchlingAvatar
-                  element={hatchling.element}
-                  level={hatchling.level}
-                  rarity={hatchling.rarity}
-                  size="small"
-                />
-                <Text style={styles.hatchlingName}>{hatchling.name}</Text>
-                <Text style={styles.hatchlingMeta}>
-                  {capitalize(hatchling.rarity)} {capitalize(hatchling.element)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-        </View>
-      </CollapsibleSection>
+      <ActivePalShortcut
+        activeHatchling={activeHatchling}
+        collectionCount={data.collection.length}
+        onCollectionPress={onDexPress}
+        trainingSessionsLeft={activePalTraining?.remainingToday ?? 0}
+      />
     </Screen>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.stat}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
   );
 }
 
@@ -313,7 +177,7 @@ function AllEggsSummary({
   todaySteps: number;
 }) {
   return (
-    <View style={styles.eggsSummaryCard}>
+    <SecondaryCard style={styles.eggsSummaryCard}>
       <View style={styles.eggsSummaryHeader}>
         <View>
           <Text style={styles.eggsSummaryKicker}>All Eggs</Text>
@@ -342,7 +206,7 @@ function AllEggsSummary({
             ? "Open a ready Egg below to meet your next Pal."
             : "Add an Egg to start filling the incubator."}
       </Text>
-    </View>
+    </SecondaryCard>
   );
 }
 
@@ -369,7 +233,7 @@ function EggSlotCard({
 
   return (
     <EggReadyPulse active={ready}>
-      <View style={[styles.eggSlotCard, ready && styles.eggSlotCardReady]}>
+      <UtilityCard style={[styles.eggSlotCard, ready && styles.eggSlotCardReady]}>
       <View style={styles.eggSlotArt}>
         <EggAvatar element={egg.element} rarity={egg.rarity} size="small" />
       </View>
@@ -382,35 +246,93 @@ function EggSlotCard({
             </Text>
           </View>
           <Text style={[styles.eggSlotStatus, ready && styles.eggSlotStatusReady]}>
-            {ready ? "Ready" : `${formatSteps(stepsLeft)} left`}
+            {ready ? "Ready to hatch" : `${formatSteps(stepsLeft)} left`}
           </Text>
         </View>
         <ProgressBar progress={getEggProgress(egg)} />
         {ready ? (
+          <>
+          <Text style={styles.eggReadyHint}>
+            Tap Hatch Egg for the reveal moment.
+          </Text>
           <AppButton
             label="Hatch Egg"
             onPress={() => {
               void onHatch();
             }}
           />
+          </>
         ) : (
           <Text style={styles.eggSlotHint}>
             Sync movement from Home to keep this Egg filling.
           </Text>
         )}
       </View>
-      </View>
+      </UtilityCard>
     </EggReadyPulse>
+  );
+}
+
+function ActivePalShortcut({
+  activeHatchling,
+  collectionCount,
+  onCollectionPress,
+  trainingSessionsLeft,
+}: {
+  activeHatchling: CollectedHatchling | null;
+  collectionCount: number;
+  onCollectionPress: () => void;
+  trainingSessionsLeft: number;
+}) {
+  return (
+    <UtilityCard style={styles.activePalShortcut}>
+      {activeHatchling ? (
+        <>
+          <HatchlingAvatar
+            element={activeHatchling.element}
+            level={activeHatchling.level}
+            rarity={activeHatchling.rarity}
+            size="small"
+          />
+          <View style={styles.activePalShortcutBody}>
+            <Text style={styles.activePalShortcutKicker}>Active Pal shortcut</Text>
+            <Text style={styles.activePalShortcutTitle}>
+              {activeHatchling.name} | L{activeHatchling.level}
+            </Text>
+            <Text style={styles.activePalShortcutText}>
+              {capitalize(activeHatchling.rarity)} {capitalize(activeHatchling.element)} | Power{" "}
+              {getHatchlingPowerScore(activeHatchling)} | Training: {trainingSessionsLeft} left
+            </Text>
+          </View>
+        </>
+      ) : (
+        <View style={styles.activePalShortcutBody}>
+          <Text style={styles.activePalShortcutKicker}>Collection shortcut</Text>
+          <Text style={styles.activePalShortcutTitle}>No active Pal yet</Text>
+          <Text style={styles.activePalShortcutText}>
+            Hatch an Egg here, then manage Pal stats, evolution, and training in Collection.
+          </Text>
+        </View>
+      )}
+      <AppButton
+        label="Open Collection"
+        onPress={onCollectionPress}
+        style={styles.activePalShortcutButton}
+        variant="secondary"
+      />
+    </UtilityCard>
   );
 }
 
 function HatchRevealModal({
   hatchling,
+  onHatchAnother,
   onClose,
   onSetActive,
   onViewPal,
 }: {
   hatchling: CollectedHatchling | null;
+  onHatchAnother?: () => Promise<void>;
   onClose: () => void;
   onSetActive: (hatchlingId: string) => Promise<void>;
   onViewPal: () => void;
@@ -480,6 +402,9 @@ function HatchRevealModal({
     outputRange: [0.12, 0.88],
   });
   const revealed = stage === "reveal";
+  const visualStage = getCreatureVisualStage(hatchling.level);
+  const stats = hatchling.stats;
+  const trait = getPalTrait(hatchling);
 
   return (
     <Modal animationType="fade" transparent visible>
@@ -540,18 +465,45 @@ function HatchRevealModal({
               <Text style={styles.revealTitle}>Meet {hatchling.name}</Text>
               <Text style={styles.revealText}>
                 {capitalize(hatchling.rarity)} {capitalize(hatchling.element)} Pal
-                | Level {hatchling.level}
+                | {capitalize(visualStage)} | Level {hatchling.level}
               </Text>
+              <View style={styles.revealInfoGrid}>
+                <RevealInfo label="Rarity" value={capitalize(hatchling.rarity)} />
+                <RevealInfo label="Element" value={capitalize(hatchling.element)} />
+                <RevealInfo label="Stage" value={capitalize(visualStage)} />
+                <RevealInfo label="Trait" value={trait.displayName} />
+              </View>
+              <Text style={styles.revealPersonality}>
+                {getRevealPersonality(hatchling)}
+              </Text>
+              <Text style={styles.revealTraitEffect}>
+                Trait effect: {trait.effect}
+              </Text>
+              <View style={styles.revealStatsGrid}>
+                <RevealStat label="Heart" value={stats.heart} />
+                <RevealStat label="Power" value={stats.power} />
+                <RevealStat label="Speed" value={stats.speed} />
+                <RevealStat label="Resilience" value={stats.resilience} />
+              </View>
               <View style={styles.revealActions}>
-                <AppButton
-                  label="View Pal"
-                  onPress={onViewPal}
-                  variant="secondary"
-                />
                 <AppButton
                   label="Set Active Pal"
                   onPress={() => onSetActive(hatchling.id)}
                 />
+                <AppButton
+                  label="View in Collection"
+                  onPress={onViewPal}
+                  variant="secondary"
+                />
+                {onHatchAnother && (
+                  <AppButton
+                    label="Hatch another"
+                    onPress={() => {
+                      void onHatchAnother();
+                    }}
+                    variant="secondary"
+                  />
+                )}
               </View>
             </View>
           )}
@@ -559,6 +511,42 @@ function HatchRevealModal({
       </View>
     </Modal>
   );
+}
+
+function RevealInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.revealInfoPill}>
+      <Text style={styles.revealInfoLabel}>{label}</Text>
+      <Text style={styles.revealInfoValue}>{value}</Text>
+    </View>
+  );
+}
+
+function RevealStat({ label, value }: { label: string; value: number }) {
+  return (
+    <View style={styles.revealStat}>
+      <Text style={styles.revealStatValue}>{value}</Text>
+      <Text style={styles.revealStatLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function getRevealPersonality(hatchling: CollectedHatchling) {
+  const trait = getPalTrait(hatchling);
+  const elementTone = {
+    ember: "brave and eager to train after active days",
+    leaf: "steady and happiest when you return tomorrow",
+    storm: "restless, bright, and drawn to streaks",
+    tide: "playful and powered by long walks",
+  }[hatchling.element];
+  const moodCopy = {
+    excited: "already bouncing with energy",
+    happy: "warmly bonded from the first hatch",
+    lonely: "looking for a favorite trainer",
+    sleepy: "soft-eyed but ready to grow",
+  }[hatchling.mood];
+
+  return `${capitalize(hatchling.name)} is ${elementTone}, ${moodCopy}. Personality: ${trait.displayName}.`;
 }
 
 function capitalize(value: string) {
@@ -653,6 +641,7 @@ const styles = StyleSheet.create({
     width: 210,
   },
   revealResult: {
+    gap: 10,
     width: "100%",
   },
   revealTitle: {
@@ -665,8 +654,81 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 13,
     lineHeight: 19,
-    marginBottom: 14,
     marginTop: 5,
+    textAlign: "center",
+  },
+  revealInfoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  revealInfoPill: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    width: "48%",
+  },
+  revealInfoLabel: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+  },
+  revealInfoValue: {
+    color: colors.primaryDeep,
+    fontSize: 13,
+    fontWeight: "900",
+    marginTop: 3,
+  },
+  revealPersonality: {
+    backgroundColor: colors.translucentSurface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: "800",
+    lineHeight: 18,
+    padding: 11,
+  },
+  revealTraitEffect: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    color: colors.primaryDeep,
+    fontSize: 12,
+    fontWeight: "900",
+    lineHeight: 17,
+    padding: 10,
+  },
+  revealStatsGrid: {
+    flexDirection: "row",
+    gap: 7,
+  },
+  revealStat: {
+    backgroundColor: colors.surface,
+    borderColor: colors.primarySoft,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    flex: 1,
+    padding: 9,
+  },
+  revealStatValue: {
+    color: colors.ink,
+    fontSize: 16,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  revealStatLabel: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: "800",
+    marginTop: 3,
     textAlign: "center",
   },
   revealActions: {
@@ -824,6 +886,38 @@ const styles = StyleSheet.create({
   trainingButton: {
     minWidth: 110,
   },
+  activePalShortcut: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
+  },
+  activePalShortcutBody: {
+    flex: 1,
+  },
+  activePalShortcutKicker: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  activePalShortcutTitle: {
+    color: colors.ink,
+    fontSize: 15,
+    fontWeight: "900",
+    marginTop: 3,
+  },
+  activePalShortcutText: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: "800",
+    lineHeight: 16,
+    marginTop: 3,
+  },
+  activePalShortcutButton: {
+    minWidth: 120,
+  },
   hatcheryStatusRow: {
     alignItems: "center",
     flexDirection: "row",
@@ -853,9 +947,9 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
-    gap: 12,
-    marginBottom: 12,
-    padding: 14,
+    gap: 10,
+    marginBottom: 10,
+    padding: 12,
   },
   eggsSummaryHeader: {
     alignItems: "center",
@@ -922,8 +1016,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,
-    marginBottom: 12,
-    padding: 14,
+    marginBottom: 10,
+    padding: 12,
   },
   readyCelebrationText: {
     flex: 1,
@@ -952,17 +1046,21 @@ const styles = StyleSheet.create({
     borderRadius: radii.card,
     borderWidth: 1,
     flexDirection: "row",
-    gap: 12,
-    padding: 12,
+    gap: 10,
+    padding: 11,
   },
   eggSlotCardReady: {
-    backgroundColor: colors.warmSurface,
+    backgroundColor: colors.accentSoft,
     borderColor: colors.rewardGold,
+    shadowColor: colors.cardShadowStrong,
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 16,
   },
   eggSlotArt: {
     alignItems: "center",
     justifyContent: "center",
-    width: 92,
+    width: 84,
   },
   eggSlotBody: {
     flex: 1,
@@ -998,6 +1096,12 @@ const styles = StyleSheet.create({
   eggSlotStatusReady: {
     color: colors.primaryDeep,
   },
+  eggReadyHint: {
+    color: colors.primaryDeep,
+    fontSize: 12,
+    fontWeight: "900",
+    lineHeight: 17,
+  },
   eggSlotHint: {
     color: colors.muted,
     fontSize: 12,
@@ -1009,9 +1113,9 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
-    gap: 10,
-    marginTop: 10,
-    padding: 14,
+    gap: 8,
+    marginTop: 8,
+    padding: 12,
   },
   palInfoHeader: {
     alignItems: "center",

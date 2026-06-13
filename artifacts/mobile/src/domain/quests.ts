@@ -16,8 +16,11 @@ export interface Quest {
   current: number;
   previousTarget: number;
   rewardAccountXp: number;
+  rewardBond: number;
   rewardCoins: number;
   rewardEggSteps: number;
+  rewardProgressionBonus: boolean;
+  rewardStreakBonus: boolean;
   target: number;
   tier: number;
   totalTiers: number;
@@ -28,8 +31,11 @@ export interface Quest {
 interface QuestTier {
   label: string;
   rewardAccountXp?: number;
+  rewardBond?: number;
   rewardCoins?: number;
   rewardEggSteps?: number;
+  rewardProgressionBonus?: boolean;
+  rewardStreakBonus?: boolean;
   rewardXp: number;
   target: number;
 }
@@ -76,7 +82,7 @@ export function getDailyQuests(
       tier("Ten-mile odyssey", 10, questReward(baseReward, 70)),
     ]),
     getTieredQuest("daily", "firstSync", award ? 1 : 0, "sync", [
-      tier("Sync movement", 1, baseReward),
+      tier("Sync movement", 1, baseReward, { rewardStreakBonus: true }),
     ]),
   ];
 }
@@ -187,23 +193,53 @@ export function getWeeklyQuests(data: HatchUpData, today: string): Quest[] {
       [
         tier("Move on three days", 3, 0, reward(60, 35, 300)),
         tier("Five active days", 5, 0, reward(110, 65, 650)),
-        tier("Full-week streak", 7, 0, reward(180, 110, 1100)),
+        tier("Full-week streak", 7, 0, {
+          ...reward(180, 110, 1100),
+          rewardStreakBonus: true,
+        }),
       ],
     ),
     getTieredQuest("weekly", "weeklyHatches", data.eggsHatched, "hatches", [
-      tier("Grow the collection", 2, 0, reward(70, 45, 500)),
-      tier("Hatch four Pals", 4, 0, reward(135, 85, 900)),
-      tier("Hatch seven Pals", 7, 0, reward(225, 150, 1600)),
+      tier("Grow the collection", 2, 0, {
+        ...reward(70, 45, 500),
+        rewardProgressionBonus: true,
+      }),
+      tier("Hatch four Pals", 4, 0, {
+        ...reward(135, 85, 900),
+        rewardProgressionBonus: true,
+      }),
+      tier("Hatch seven Pals", 7, 0, {
+        ...reward(225, 150, 1600),
+        rewardProgressionBonus: true,
+      }),
     ]),
     getTieredQuest("weekly", "weeklyElementTeam", focusElementCount, "Pals", [
-      tier(`Meet a ${capitalize(focusElement)} Pal`, 1, 0, reward(50, 30, 250)),
-      tier(`Build a ${capitalize(focusElement)} pair`, 2, 0, reward(100, 65, 650)),
-      tier(`${capitalize(focusElement)} circle`, 4, 0, reward(175, 120, 1300)),
+      tier(`Meet a ${capitalize(focusElement)} Pal`, 1, 0, {
+        ...reward(50, 30, 250),
+        rewardProgressionBonus: true,
+      }),
+      tier(`Build a ${capitalize(focusElement)} pair`, 2, 0, {
+        ...reward(100, 65, 650),
+        rewardProgressionBonus: true,
+      }),
+      tier(`${capitalize(focusElement)} circle`, 4, 0, {
+        ...reward(175, 120, 1300),
+        rewardProgressionBonus: true,
+      }),
     ]),
     getTieredQuest("weekly", "weeklyElementTraining", focusElementTraining, "sessions", [
-      tier(`Train a ${capitalize(focusElement)} Pal`, 1, 0, reward(50, 30, 250)),
-      tier(`${capitalize(focusElement)} practice week`, 3, 0, reward(115, 75, 750)),
-      tier(`${capitalize(focusElement)} training camp`, 6, 0, reward(190, 130, 1400)),
+      tier(`Train a ${capitalize(focusElement)} Pal`, 1, 0, {
+        ...reward(50, 30, 250),
+        rewardBond: 2,
+      }),
+      tier(`${capitalize(focusElement)} practice week`, 3, 0, {
+        ...reward(115, 75, 750),
+        rewardBond: 4,
+      }),
+      tier(`${capitalize(focusElement)} training camp`, 6, 0, {
+        ...reward(190, 130, 1400),
+        rewardBond: 6,
+      }),
     ]),
   ];
 }
@@ -294,14 +330,32 @@ export function getPalQuests(data: HatchUpData, today: string): Quest[] {
       tier(`${prefix} reaches Lv 20`, 20, 0, reward(650, 450, 5200)),
     ]),
     getTieredQuest("pal", `pal-${palId}-bond`, activePal?.bond ?? 0, "bond", [
-      tier(`Bond with ${prefix}`, 25, 0, reward(80, 45, 500)),
-      tier(`${prefix} trusts you`, 50, 0, reward(160, 100, 1200)),
-      tier(`${prefix} best friend`, 100, 0, reward(350, 240, 2800)),
+      tier(`Bond with ${prefix}`, 25, 0, {
+        ...reward(80, 45, 500),
+        rewardBond: 2,
+      }),
+      tier(`${prefix} trusts you`, 50, 0, {
+        ...reward(160, 100, 1200),
+        rewardBond: 4,
+      }),
+      tier(`${prefix} best friend`, 100, 0, {
+        ...reward(350, 240, 2800),
+        rewardBond: 8,
+      }),
     ]),
     getTieredQuest("pal", `pal-${palId}-training`, activePal?.trainingSessions.length ?? 0, "sessions", [
-      tier(`Train ${prefix}`, 3, 0, reward(90, 55, 600)),
-      tier(`${prefix} practice arc`, 10, 0, reward(210, 140, 1600)),
-      tier(`${prefix} mastery arc`, 25, 0, reward(480, 330, 3900)),
+      tier(`Train ${prefix}`, 3, 0, {
+        ...reward(90, 55, 600),
+        rewardBond: 2,
+      }),
+      tier(`${prefix} practice arc`, 10, 0, {
+        ...reward(210, 140, 1600),
+        rewardBond: 5,
+      }),
+      tier(`${prefix} mastery arc`, 25, 0, {
+        ...reward(480, 330, 3900),
+        rewardBond: 10,
+      }),
     ]),
     getTieredQuest("pal", `pal-${palId}-xp`, activePal?.xp ?? 0, "Pal XP", [
       tier(`${prefix} earns 75 XP`, 75, 0, reward(70, 40, 400)),
@@ -421,8 +475,11 @@ function getTieredQuest(
     label: selected.label,
     previousTarget,
     rewardAccountXp: selected.rewardAccountXp ?? 0,
+    rewardBond: selected.rewardBond ?? 0,
     rewardCoins: selected.rewardCoins ?? 0,
     rewardEggSteps: selected.rewardEggSteps ?? 0,
+    rewardProgressionBonus: selected.rewardProgressionBonus ?? false,
+    rewardStreakBonus: selected.rewardStreakBonus ?? false,
     rewardXp: selected.rewardXp,
     target: selected.target,
     tier: selectedIndex + 1,
@@ -436,7 +493,15 @@ function tier(
   target: number,
   rewardXp: number,
   rewards: Partial<
-    Pick<QuestTier, "rewardAccountXp" | "rewardCoins" | "rewardEggSteps">
+    Pick<
+      QuestTier,
+      | "rewardAccountXp"
+      | "rewardBond"
+      | "rewardCoins"
+      | "rewardEggSteps"
+      | "rewardProgressionBonus"
+      | "rewardStreakBonus"
+    >
   > = {},
 ): QuestTier {
   return {
@@ -464,16 +529,24 @@ export function getQuestRewardKey(quest: Quest, today: string) {
 }
 
 export function getQuestRewardLabel(quest: Quest) {
+  const rewards = getQuestRewardParts(quest);
+  return rewards.length > 0 ? rewards.join(", ") : "Milestone tracker";
+}
+
+export function getQuestRewardParts(quest: Quest) {
   const rewards: string[] = [];
   if (quest.rewardAccountXp > 0) {
     rewards.push(`+${formatNumber(quest.rewardAccountXp)} Journey XP`);
   }
-  if (quest.rewardCoins > 0) rewards.push(`+${quest.rewardCoins} coins`);
+  if (quest.rewardCoins > 0) rewards.push(`+${formatNumber(quest.rewardCoins)} coins`);
   if (quest.rewardEggSteps > 0) {
     rewards.push(`+${formatNumber(quest.rewardEggSteps)} Egg progress`);
   }
+  if (quest.rewardBond > 0) rewards.push(`+${formatNumber(quest.rewardBond)} Bond`);
   if (quest.rewardXp > 0) rewards.push(`+${formatNumber(quest.rewardXp)} Journey XP`);
-  return rewards.length > 0 ? rewards.join(" | ") : "Milestone tracker";
+  if (quest.rewardStreakBonus) rewards.push("Streak progress");
+  if (quest.rewardProgressionBonus) rewards.push("Collection progress");
+  return rewards;
 }
 
 function getQuestPeriodKey(cadence: QuestCadence, today: string) {
