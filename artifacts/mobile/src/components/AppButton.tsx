@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
   label: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
     fontSize: 16,
     fontWeight: "900",
     letterSpacing: 0.1,

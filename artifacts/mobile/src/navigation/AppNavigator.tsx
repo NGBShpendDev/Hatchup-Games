@@ -47,6 +47,7 @@ export function AppNavigator() {
             latestSyncGains={app.latestSyncGains}
             onComplete={app.completeFirstRunOnboarding}
             onHatchEgg={app.hatchEgg}
+            onAcknowledgeSyncExplanation={app.continueOnboardingAfterSyncExplanation}
             onPickStarterEgg={app.saveOnboardingStarterEgg}
             onSaveIdentity={app.saveOnboardingIdentity}
             onSetActivePal={app.setActiveHatchling}

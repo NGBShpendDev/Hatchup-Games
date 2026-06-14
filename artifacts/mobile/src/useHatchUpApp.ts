@@ -20,6 +20,7 @@ import {
   hatchEgg as hatchReadyEgg,
 } from "./domain/hatchery";
 import {
+  advanceOnboardingSyncExplanation,
   applyOnboardingHatch,
   applyOnboardingIdentity,
   applyOnboardingStarterEgg,
@@ -302,6 +303,10 @@ export function useHatchUpApp() {
     await persist(applyOnboardingStarterEgg(data, starterEggElement));
   }
 
+  async function continueOnboardingAfterSyncExplanation() {
+    await persist(advanceOnboardingSyncExplanation(data));
+  }
+
   async function syncHealth() {
     if (syncInFlight.current) return null;
     syncInFlight.current = true;
@@ -420,10 +425,17 @@ export function useHatchUpApp() {
 
   async function syncOnboardingMovement() {
     const synced = await syncHealth();
-    if (!synced) return false;
+    const tutorialSource = synced ?? data;
 
-    const readyStarter = readyOnboardingEgg(synced);
+    const readyStarter = readyOnboardingEgg(tutorialSource);
     await persist(readyStarter);
+    if (!synced) {
+      setError(null);
+      setLatestSyncGains((previous) => ({
+        ...previous,
+        eggSteps: readyStarter.activeEgg.stepsRequired,
+      }));
+    }
     return true;
   }
 
@@ -975,6 +987,7 @@ export function useHatchUpApp() {
     skipFirstRunOnboarding,
     saveOnboardingIdentity,
     saveOnboardingStarterEgg,
+    continueOnboardingAfterSyncExplanation,
     saveMonsterName,
     saveLeaderboardAlias,
     saveProfile,

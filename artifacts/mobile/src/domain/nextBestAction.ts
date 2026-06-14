@@ -1,19 +1,34 @@
-import { formatNumber, formatPercent, formatSteps } from "../utils/format";
+import { formatNumber, formatSteps } from "../utils/format";
 import { toDateKey } from "./date";
-import { getEggProgress, isEggReady } from "./hatchery";
+import {
+  getEggProgressSummary,
+  getReadyEggCount,
+  getTrackedEgg,
+} from "./eggProgress";
 import {
   getActiveHatchling,
   getTimeAdjustedHatchling,
   getTrainingStatus,
 } from "./hatchlings";
 import type { HatchUpData } from "./models";
+import {
+  getDailyQuests,
+  getQuestProgress,
+  getQuestRemainingText,
+  isQuestComplete,
+  type Quest,
+} from "./quests";
+import { getWeeklyRewardChest } from "./rewardChests";
 
 export type NextBestActionTarget =
   | "collection"
+  | "claimWeeklyChest"
+  | "dailyQuest"
   | "hatchery"
   | "profile"
   | "sync"
-  | "tomorrow";
+  | "tomorrow"
+  | "weeklyChest";
 
 export interface NextBestActionModel {
   ctaLabel: string;
@@ -32,21 +47,26 @@ interface NextBestActionOptions {
   todayKey?: string;
 }
 
+const CLOSE_DAILY_QUEST_PROGRESS = 0.75;
+const CLOSE_WEEKLY_CHEST_PROGRESS = 0.8;
+
 export function getNextBestAction(
   data: HatchUpData,
   options: NextBestActionOptions = {},
 ): NextBestActionModel {
   const todayKey = options.todayKey ?? toDateKey(new Date());
   const now = options.now ?? new Date().toISOString();
-  const activeEggs = Array.isArray(data.activeEggs) ? data.activeEggs : [];
+  const activeEggs =
+    Array.isArray(data.activeEggs) && data.activeEggs.length > 0
+      ? data.activeEggs
+      : data.activeEgg
+        ? [data.activeEgg]
+        : [];
   const collection = Array.isArray(data.collection) ? data.collection : [];
-  const todayAward =
-    data.dailyAward?.date === todayKey
-      ? data.dailyAward
-      : data.activityHistory?.find((award) => award.date === todayKey) ?? null;
-  const readyEggCount = activeEggs.filter(isEggReady).length;
-  const focusEgg =
-    activeEggs.find((egg) => !isEggReady(egg)) ?? activeEggs[0] ?? null;
+  const todayAward = getSyncedAwardForDate(data, todayKey);
+  const movementAvailableToSync = !todayAward;
+  const readyEggCount = getReadyEggCount(activeEggs);
+  const focusEgg = getTrackedEgg(activeEggs);
   const activeHatchlingRaw = getActiveHatchling({
     ...data,
     collection,
@@ -60,8 +80,12 @@ export function getNextBestAction(
   const profileIncomplete =
     !data.profileUsername?.trim() ||
     (collection.length > 0 && !data.profileHatchlingId);
+  const closeDailyQuest = todayAward
+    ? getCloseDailyQuest(getDailyQuests(todayAward))
+    : null;
+  const weeklyChest = getWeeklyRewardChest(data, todayKey);
 
-  if (!todayAward) {
+  if (movementAvailableToSync) {
     return {
       ctaLabel: options.isSyncing ? "Syncing..." : "Sync movement",
       description: activeHatchling
@@ -103,6 +127,45 @@ export function getNextBestAction(
     };
   }
 
+  if (closeDailyQuest) {
+    return {
+      ctaLabel: "Sync movement",
+      description: `${closeDailyQuest.label} is almost done. A little more movement can turn it into today's quest progress.`,
+      progressLabel: `${Math.round(getQuestProgress(closeDailyQuest) * 100)}% done`,
+      target: "dailyQuest",
+      title: "Finish today's quest",
+      valueLabel: getQuestRemainingText(closeDailyQuest),
+      variant: "primary",
+    };
+  }
+
+  if (weeklyChest.canClaim) {
+    return {
+      ctaLabel: "Claim chest",
+      description:
+        "Your weekly movement filled the chest. Claim it before pushing for the next goal.",
+      progressLabel: "Ready",
+      target: "claimWeeklyChest",
+      title: "Claim weekly chest",
+      valueLabel: `${formatNumber(weeklyChest.rewardCoins)} coins`,
+      variant: "primary",
+    };
+  }
+
+  if (!weeklyChest.claimed && weeklyChest.progress >= CLOSE_WEEKLY_CHEST_PROGRESS) {
+    return {
+      ctaLabel: options.isSyncing ? "Syncing..." : "Sync movement",
+      description:
+        "Your weekly chest is close. Sync new movement after your next walk to push it over the line.",
+      disabled: Boolean(options.isSyncing),
+      progressLabel: `${Math.round(weeklyChest.progress * 100)}% filled`,
+      target: "weeklyChest",
+      title: "Push weekly chest",
+      valueLabel: `${formatSteps(Math.max(weeklyChest.target - weeklyChest.steps, 0))} left`,
+      variant: "primary",
+    };
+  }
+
   if (profileIncomplete) {
     return {
       ctaLabel: "Complete profile",
@@ -137,5 +200,22 @@ export function getNextBestAction(
 }
 
 function formatEggProgress(egg: HatchUpData["activeEgg"]) {
-  return `${formatPercent(getEggProgress(egg))} Egg progress`;
+  const summary = getEggProgressSummary(egg);
+  return `${summary.progressLabel} | ${summary.stepsLeftLabel}`;
+}
+
+export function getSyncedAwardForDate(data: HatchUpData, todayKey: string) {
+  if (data.dailyAward?.date === todayKey) return data.dailyAward;
+  return data.activityHistory?.find((award) => award.date === todayKey) ?? null;
+}
+
+function getCloseDailyQuest(quests: readonly Quest[]) {
+  return [...quests]
+    .filter((quest) => !isQuestComplete(quest))
+    .map((quest) => ({
+      progress: getQuestProgress(quest),
+      quest,
+    }))
+    .filter(({ progress }) => progress >= CLOSE_DAILY_QUEST_PROGRESS)
+    .sort((left, right) => right.progress - left.progress)[0]?.quest ?? null;
 }

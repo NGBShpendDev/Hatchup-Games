@@ -70,6 +70,7 @@ interface Props {
   latestSyncGains: LatestSyncGains;
   onComplete: () => Promise<void>;
   onHatchEgg: (eggId: string) => Promise<void>;
+  onAcknowledgeSyncExplanation: () => Promise<void>;
   onPickStarterEgg: (element: EggElement) => Promise<void>;
   onSaveIdentity: (username: string) => Promise<void>;
   onSetActivePal: (hatchlingId: string) => Promise<void>;
@@ -85,6 +86,7 @@ export function FirstRunOnboardingScreen({
   latestSyncGains,
   onComplete,
   onHatchEgg,
+  onAcknowledgeSyncExplanation,
   onPickStarterEgg,
   onSaveIdentity,
   onSetActivePal,
@@ -208,6 +210,14 @@ export function FirstRunOnboardingScreen({
         action: () => Promise<unknown>;
       }
     > = {
+      explainSync: {
+        action: onAcknowledgeSyncExplanation,
+        body: "HatchUp reads movement totals only. Steps become Egg progress now, then Pal XP and Bond after your first hatch.",
+        cta: "Continue to sync",
+        enabled: true,
+        eyebrow: "How progress works",
+        title: "Your movement powers the Hatchery",
+      },
       hatchPal: {
         action: () =>
           readyEgg
@@ -249,8 +259,8 @@ export function FirstRunOnboardingScreen({
       },
       syncMovement: {
         action: onSyncMovement,
-        body: "Sync movement to turn today’s steps into Journey XP and Egg progress. For the tutorial, your first sync includes a starter hatch boost.",
-        cta: "Sync movement",
+        body: "Sync available movement to start. If Health is not ready yet, HatchUp will use a tutorial boost so you can still learn the first hatch.",
+        cta: "Run first sync",
         enabled: true,
         eyebrow: "Movement powered",
         title: currentData.dailyAward
@@ -347,6 +357,28 @@ function renderStepBody({
     );
   }
 
+  if (step === "explainSync") {
+    return (
+      <View style={styles.explainStack}>
+        <TutorialBeat
+          index="1"
+          title="Move"
+          body="Walk, work out, or let the day add up naturally."
+        />
+        <TutorialBeat
+          index="2"
+          title="Sync movement"
+          body="HatchUp reads steps, distance, workouts, and active energy totals only."
+        />
+        <TutorialBeat
+          index="3"
+          title="Grow your world"
+          body="Before your first hatch, movement fills your Egg. Afterward, it also grows your active Pal."
+        />
+      </View>
+    );
+  }
+
   if (step === "syncMovement") {
     return (
       <View style={styles.statGrid}>
@@ -415,6 +447,28 @@ function renderStepBody({
       />
       <Stat label="Pals collected" value={formatNumber(data.collection.length)} />
     </View>
+  );
+}
+
+function TutorialBeat({
+  body,
+  index,
+  title,
+}: {
+  body: string;
+  index: string;
+  title: string;
+}) {
+  return (
+    <UtilityCard style={styles.explainBeat}>
+      <View style={styles.explainNumber}>
+        <Text style={styles.explainNumberText}>{index}</Text>
+      </View>
+      <View style={styles.explainCopy}>
+        <Text style={styles.explainTitle}>{title}</Text>
+        <Text style={styles.explainBody}>{body}</Text>
+      </View>
+    </UtilityCard>
   );
 }
 
@@ -487,6 +541,41 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     color: colors.danger,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  explainBeat: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+  },
+  explainCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  explainNumber: {
+    alignItems: "center",
+    backgroundColor: colors.primarySoft,
+    borderRadius: 999,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+  },
+  explainNumberText: {
+    color: colors.primaryDeep,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  explainStack: {
+    gap: 9,
+  },
+  explainBody: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  explainTitle: {
+    color: colors.ink,
     fontSize: 15,
     fontWeight: "900",
   },

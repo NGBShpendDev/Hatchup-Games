@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   selectedPill: {
     backgroundColor: colors.primaryDeep,
     borderRadius: radii.pill,
-    color: "#FFFFFF",
+    color: colors.primaryText,
     fontSize: 10,
     fontWeight: "900",
     marginTop: 8,

@@ -6,9 +6,12 @@ type ObservabilityEvent =
   | "egg_hatched"
   | "health_sync_failed"
   | "health_sync_succeeded"
+  | "hatch_shared"
+  | "collection_shared"
   | "leaderboard_sharing_changed"
   | "quest_reward_claimed"
   | "shop_item_purchased"
+  | "trainer_card_shared"
   | "weekly_chest_claimed";
 
 export async function trackEvent(

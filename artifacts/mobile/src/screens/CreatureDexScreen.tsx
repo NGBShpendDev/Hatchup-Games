@@ -26,6 +26,7 @@ import {
   getNextMissingDexEntry,
   type CreatureDexEntry,
 } from "../domain/creatureDex";
+import { getEggProgressSummary } from "../domain/eggProgress";
 import {
   getActiveHatchling,
   getHatchlingLevelProgress,
@@ -46,7 +47,6 @@ import type {
   EggRarity,
   HatchUpData,
   HatchlingStats,
-  IncubatorEgg,
 } from "../domain/models";
 import { getCreatureVisualStage, type CreatureVisualStage } from "../domain/creatureVisuals";
 import { colors, elementColors, gameColors, radii, typography } from "../theme";
@@ -63,6 +63,8 @@ interface Props {
   onSettingsPress: () => void;
   onTrainActiveHatchling: () => Promise<void>;
 }
+
+type CollectionStatusFilter = "all" | "owned" | "missing";
 
 export function CreatureDexScreen({
   data,
@@ -92,7 +94,7 @@ export function CreatureDexScreen({
   const [draftName, setDraftName] = useState("");
   const [elementFilter, setElementFilter] = useState<"all" | EggElement>("all");
   const [rarityFilter, setRarityFilter] = useState<"all" | EggRarity>("all");
-  const [statusFilter, setStatusFilter] = useState<"all" | "owned" | "missing">("all");
+  const [statusFilter, setStatusFilter] = useState<CollectionStatusFilter>("all");
   const selectedHatchling = useMemo(() => {
     if (data.collection.length === 0) return null;
     const hatchling = data.collection[
@@ -180,25 +182,32 @@ export function CreatureDexScreen({
           </View>
         </SecondaryCard>
       )}
-      <CollectionFilterChips
-        elementFilter={elementFilter}
-        onClear={() => {
-          setElementFilter("all");
-          setRarityFilter("all");
-          setStatusFilter("all");
-        }}
-        onElementToggle={(value) =>
-          setElementFilter((current) => (current === value ? "all" : value))
-        }
-        onRarityToggle={(value) =>
-          setRarityFilter((current) => (current === value ? "all" : value))
-        }
-        onStatusToggle={(value) =>
-          setStatusFilter((current) => (current === value ? "all" : value))
-        }
-        rarityFilter={rarityFilter}
-        statusFilter={statusFilter}
-      />
+      <CollapsibleSection
+        badge={getFilterBadge(elementFilter, rarityFilter, statusFilter)}
+        defaultOpen={false}
+        subtitle="Narrow the book when you want to chase a specific Pal."
+        title="Collection filters"
+      >
+        <CollectionFilterChips
+          elementFilter={elementFilter}
+          onClear={() => {
+            setElementFilter("all");
+            setRarityFilter("all");
+            setStatusFilter("all");
+          }}
+          onElementToggle={(value) =>
+            setElementFilter((current) => (current === value ? "all" : value))
+          }
+          onRarityToggle={(value) =>
+            setRarityFilter((current) => (current === value ? "all" : value))
+          }
+          onStatusToggle={(value) =>
+            setStatusFilter((current) => (current === value ? "all" : value))
+          }
+          rarityFilter={rarityFilter}
+          statusFilter={statusFilter}
+        />
+      </CollapsibleSection>
       <SmartTargetsSection targets={smartTargets} />
       {nextMissingEntry && (
         <SecondaryCard style={styles.targetCard}>
@@ -1070,6 +1079,16 @@ function capitalize(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function getFilterBadge(
+  element: EggElement | "all",
+  rarity: EggRarity | "all",
+  status: CollectionStatusFilter,
+) {
+  const active = [element, rarity, status].filter((value) => value !== "all");
+  if (active.length === 0) return "All";
+  return active.map(capitalize).join(" · ");
+}
+
 function isRecentlyHatched(hatchling: CollectedHatchling) {
   return Date.now() - Date.parse(hatchling.hatchedAt) < 1000 * 60 * 60 * 24;
 }
@@ -1151,7 +1170,7 @@ function getSmartTargets(
     {
       body: closestDiscovery
         ? closestEggTarget
-          ? `${formatNumber(closestEggTarget.stepsLeft)} steps left on a ${capitalize(closestEggTarget.entry.rarity)} ${capitalize(closestEggTarget.entry.element)} Egg.`
+          ? `${closestEggTarget.summary.eggName}: ${closestEggTarget.summary.progressLabel}. ${closestEggTarget.summary.stepsLeftLabel}.`
           : `Hatch a ${capitalize(closestDiscovery.rarity)} ${capitalize(closestDiscovery.element)} Egg to reveal it.`
         : "Every Collection entry is discovered. Focus on leveling your favorite Pals.",
       id: "closest-discovery",
@@ -1204,25 +1223,24 @@ function getClosestEggTarget(
           candidate.element === egg.element && candidate.rarity === egg.rarity,
       );
       if (!entry) return null;
+      const summary = getEggProgressSummary(egg);
       return {
         entry,
-        progress: egg.stepsRequired > 0 ? egg.stepsWalked / egg.stepsRequired : 0,
-        stepsLeft: getEggStepsLeft(egg),
+        progress: summary.percent,
+        stepsLeft: summary.stepsLeft,
+        summary,
       };
     })
     .filter((target): target is {
       entry: CreatureDexEntry;
       progress: number;
       stepsLeft: number;
+      summary: ReturnType<typeof getEggProgressSummary>;
     } => target !== null)
     .sort((left, right) => {
       if (right.progress !== left.progress) return right.progress - left.progress;
       return left.stepsLeft - right.stepsLeft;
     })[0] ?? null;
-}
-
-function getEggStepsLeft(egg: IncubatorEgg) {
-  return Math.max(egg.stepsRequired - egg.stepsWalked, 0);
 }
 
 function getRarityRank(rarity: EggRarity) {
@@ -1326,7 +1344,7 @@ const styles = StyleSheet.create({
   ownedShelfCount: {
     backgroundColor: colors.primaryDeep,
     borderRadius: radii.pill,
-    color: "#FFFFFF",
+    color: colors.primaryText,
     fontSize: 12,
     fontWeight: "900",
     overflow: "hidden",
@@ -1880,7 +1898,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   filterChipTextActive: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
   },
   activeFilterCard: {
     alignItems: "center",
@@ -1914,7 +1932,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   clearFilterText: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
     fontSize: 11,
     fontWeight: "900",
   },

@@ -9,6 +9,7 @@ export type OnboardingStatus = "notStarted" | "monsterCreated" | "complete";
 export type OnboardingTutorialStep =
   | "username"
   | "starterEgg"
+  | "explainSync"
   | "syncMovement"
   | "hatchPal"
   | "setActivePal"

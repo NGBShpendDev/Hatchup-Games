@@ -12,6 +12,7 @@ import type {
 export const ONBOARDING_TUTORIAL_STEPS: readonly OnboardingTutorialStep[] = [
   "username",
   "starterEgg",
+  "explainSync",
   "syncMovement",
   "hatchPal",
   "setActivePal",
@@ -28,6 +29,7 @@ export function getOnboardingStepIndex(step: OnboardingTutorialStep | null) {
 
 export function getOnboardingStepTitle(step: OnboardingTutorialStep | null) {
   const titles: Record<OnboardingTutorialStep, string> = {
+    explainSync: "Learn movement sync",
     hatchPal: "Hatch your first Pal",
     rewardSummary: "Your first reward",
     setActivePal: "Choose your active Pal",
@@ -75,8 +77,16 @@ export function applyOnboardingStarterEgg(
     activeEgg: starterEgg,
     activeEggs: [starterEgg],
     onboardingStatus: "monsterCreated",
-    onboardingStep: "syncMovement",
+    onboardingStep: "explainSync",
     starterEggElement: element,
+  };
+}
+
+export function advanceOnboardingSyncExplanation(data: HatchUpData): HatchUpData {
+  return {
+    ...data,
+    onboardingStatus: "monsterCreated",
+    onboardingStep: "syncMovement",
   };
 }
 

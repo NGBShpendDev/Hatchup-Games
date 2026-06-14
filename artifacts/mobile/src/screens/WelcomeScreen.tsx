@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   loopNumber: {
     backgroundColor: colors.primaryDeep,
     borderRadius: radii.pill,
-    color: "#FFFFFF",
+    color: colors.primaryText,
     fontSize: 12,
     fontWeight: "900",
     overflow: "hidden",

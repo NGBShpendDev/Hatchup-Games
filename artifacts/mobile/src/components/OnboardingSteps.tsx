@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   stepTextActive: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
   },
   stepTextComplete: {
     color: colors.primaryDeep,

@@ -29,6 +29,7 @@ import { getScreenLoopSubtitle } from "../content/coreLoopCopy";
 import {
   buildSupportMailto,
   IS_PUBLIC_BUILD,
+  PUBLIC_PROFILE_BASE_URL,
   PRIVACY_POLICY_URL,
   SUPPORT_EMAIL,
   TERMS_URL,
@@ -55,7 +56,6 @@ import {
   getActiveHatchling,
   getHatchlingPowerScore,
   getTimeAdjustedHatchling,
-  getTrainingStatus,
 } from "../domain/hatchlings";
 import { getActivitySummary } from "../domain/history";
 import type { CollectedHatchling, HatchUpData } from "../domain/models";
@@ -67,11 +67,14 @@ import {
   getPublicReadinessScore,
   type PublicReadinessItem,
 } from "../domain/publicReadiness";
+import { trackEvent } from "../services/observability/observabilityService";
 import { colors, radii, typography } from "../theme";
-import { formatNumber, formatPercent } from "../utils/format";
+import { formatNumber, formatPercent, formatSteps } from "../utils/format";
 
 const privacyCopy =
   "HatchUp reads your steps, workouts, and active energy only to reward your Pal with XP. We do not sell your health data or use it for ads. Distance is used only for optional journey board rankings when you choose to share.";
+
+type ShareState = "idle" | "loading" | "success" | "failure";
 
 interface Props {
   data: HatchUpData;
@@ -142,9 +145,6 @@ export function SettingsPrivacyScreen({
   const activeHatchling = activeHatchlingRaw
     ? getTimeAdjustedHatchling(activeHatchlingRaw)
     : null;
-  const trainingStatus = activeHatchling
-    ? getTrainingStatus(activeHatchling)
-    : null;
   const unlockedBadgeCount = getUnlockedBadgeCount(data, today);
   const weeklyActivity = useMemo(
     () => getActivitySummary(data.activityHistory, today),
@@ -156,6 +156,9 @@ export function SettingsPrivacyScreen({
   const [activeTab, setActiveTab] = useState<"profile" | "settings">("profile");
   const [showBetaTools, setShowBetaTools] = useState(false);
   const [profileSaveMessage, setProfileSaveMessage] = useState("");
+  const [trainerShareState, setTrainerShareState] =
+    useState<ShareState>("idle");
+  const [linkShareState, setLinkShareState] = useState<ShareState>("idle");
   const profileName =
     data.profileUsername ||
     data.leaderboardAlias ||
@@ -182,6 +185,16 @@ export function SettingsPrivacyScreen({
   const profileReadiness =
     profileChecklist.filter((item) => item.done).length / profileChecklist.length;
   const nextProfileStep = profileChecklist.find((item) => !item.done) ?? null;
+  const publicProfileUrl = buildPublicProfileUrl(data);
+  const trainerSharePayload = getTrainerCardSharePayload({
+    activePal: profilePet,
+    badgeCount: unlockedBadgeCount,
+    collectionCount: data.collection.length,
+    data,
+    profileName,
+    publicProfileUrl,
+    weeklySteps: weeklyActivity.steps,
+  });
   const nextProfileAction = nextProfileStep
     ? getProfileStepAction(nextProfileStep.label, {
         onDexPress,
@@ -232,6 +245,55 @@ export function SettingsPrivacyScreen({
       ),
       title: "HatchUp local account summary",
     });
+  }
+
+  async function shareTrainerCard() {
+    setTrainerShareState("loading");
+    try {
+      await Share.share({
+        message: trainerSharePayload.message,
+        title: trainerSharePayload.title,
+        url: publicProfileUrl,
+      });
+      setTrainerShareState("success");
+      void trackEvent(data, "trainer_card_shared", {
+        badgesUnlocked: unlockedBadgeCount,
+        collectionCount: data.collection.length,
+        hasActivePal: Boolean(profilePet),
+        privacyMode: data.leaderboardShareEnabled ? "public_ranks" : "private",
+      });
+    } catch {
+      setTrainerShareState("failure");
+    }
+  }
+
+  async function copyProfileLink() {
+    setLinkShareState("loading");
+    try {
+      const clipboard = (
+        globalThis.navigator as
+          | { clipboard?: { writeText?: (text: string) => Promise<void> } }
+          | undefined
+      )?.clipboard;
+
+      if (clipboard?.writeText) {
+        await clipboard.writeText(publicProfileUrl);
+      } else {
+        await Share.share({
+          message: publicProfileUrl,
+          title: "HatchUp Trainer Card",
+          url: publicProfileUrl,
+        });
+      }
+
+      setLinkShareState("success");
+      void trackEvent(data, "trainer_card_shared", {
+        action: "profile_link",
+        privacyMode: data.leaderboardShareEnabled ? "public_ranks" : "private",
+      });
+    } catch {
+      setLinkShareState("failure");
+    }
   }
 
   return (
@@ -359,6 +421,67 @@ export function SettingsPrivacyScreen({
             value={formatCompact(weeklyActivity.steps)}
           />
         </View>
+        <SecondaryCard style={styles.trainerShareCard}>
+          <View style={styles.trainerShareHeader}>
+            <View style={styles.trainerShareTitleBlock}>
+              <Text style={styles.profileShowcaseKicker}>Shareable profile</Text>
+              <Text style={styles.trainerShareTitle}>Trainer Card</Text>
+              <Text style={styles.trainerShareBody}>
+                Share a clean card with your Pal, Collection, badges, and
+                streak. Weekly steps are only included when Ranks sharing is on.
+              </Text>
+            </View>
+            <View style={styles.trainerSharePrivacyPill}>
+              <Text style={styles.trainerSharePrivacyText}>
+                {data.leaderboardShareEnabled ? "Ranks public" : "Steps private"}
+              </Text>
+            </View>
+          </View>
+          <TrainerCardPreview
+            activePal={profilePet}
+            badgeCount={unlockedBadgeCount}
+            collectionCount={data.collection.length}
+            profileName={profileName}
+            streak={data.currentStreak}
+            weeklySteps={weeklyActivity.steps}
+            weeklyStepsPublic={data.leaderboardShareEnabled}
+          />
+          <View style={styles.trainerShareActions}>
+            <AppButton
+              disabled={trainerShareState === "loading"}
+              label={
+                trainerShareState === "loading"
+                  ? "Preparing..."
+                  : "Share trainer card"
+              }
+              onPress={() => {
+                void shareTrainerCard();
+              }}
+              style={styles.trainerShareAction}
+            />
+            <AppButton
+              disabled={linkShareState === "loading"}
+              label={linkShareState === "loading" ? "Preparing..." : "Copy profile link"}
+              onPress={() => {
+                void copyProfileLink();
+              }}
+              style={styles.trainerShareAction}
+              variant="secondary"
+            />
+          </View>
+          <Text
+            style={[
+              styles.trainerShareStatus,
+              (trainerShareState === "failure" || linkShareState === "failure") &&
+                styles.trainerShareStatusError,
+            ]}
+          >
+            {getShareStatusLabel(trainerShareState, linkShareState)}
+          </Text>
+          <Text style={styles.trainerShareFootnote}>
+            Public profile page placeholder: {publicProfileUrl}
+          </Text>
+        </SecondaryCard>
         <SecondaryCard style={styles.profileReadinessCard}>
           <View style={styles.profileReadinessHeader}>
             <Text style={styles.profileReadinessTitle}>Trainer card growth</Text>
@@ -460,28 +583,6 @@ export function SettingsPrivacyScreen({
             />
           </SecondaryCard>
         </CollapsibleSection>
-        {activeHatchling && (
-          <UtilityCard style={styles.activeHatchling}>
-            <HatchlingAvatar
-              element={activeHatchling.element}
-              level={activeHatchling.level}
-              rarity={activeHatchling.rarity}
-              size="small"
-            />
-            <View style={styles.activeHatchlingText}>
-              <Text style={styles.activeLabel}>Active Pal</Text>
-              <Text style={styles.activeName}>
-                {activeHatchling.name} L{activeHatchling.level}
-              </Text>
-              <Text style={styles.activeMood}>
-                {capitalize(activeHatchling.mood)} | Bond {activeHatchling.bond}
-              </Text>
-              <Text style={styles.activeMood}>
-                {trainingStatus?.cooldownLabel}
-              </Text>
-            </View>
-          </UtilityCard>
-        )}
         {!activeHatchling && (
           <UtilityCard style={styles.emptyMissionCard}>
             <View style={styles.emptyMissionText}>
@@ -875,6 +976,138 @@ function ProfileStat({ label, value }: { label: string; value: string }) {
   );
 }
 
+function TrainerCardPreview({
+  activePal,
+  badgeCount,
+  collectionCount,
+  profileName,
+  streak,
+  weeklySteps,
+  weeklyStepsPublic,
+}: {
+  activePal: CollectedHatchling | null;
+  badgeCount: number;
+  collectionCount: number;
+  profileName: string;
+  streak: number;
+  weeklySteps: number;
+  weeklyStepsPublic: boolean;
+}) {
+  return (
+    <View style={styles.trainerCardPreview}>
+      <View style={styles.trainerCardArt}>
+        {activePal ? (
+          <HatchlingAvatar
+            element={activePal.element}
+            level={activePal.level}
+            rarity={activePal.rarity}
+            size="large"
+          />
+        ) : (
+          <View style={styles.trainerCardEmptyArt}>
+            <Text style={styles.trainerCardEmptyText}>Egg</Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.trainerCardText}>
+        <Text style={styles.trainerCardKicker}>HatchUp Trainer</Text>
+        <Text style={styles.trainerCardName}>{profileName}</Text>
+        <Text style={styles.trainerCardPal}>
+          {activePal
+            ? `${activePal.name} | L${activePal.level} ${capitalize(activePal.rarity)} ${capitalize(activePal.element)}`
+            : "First Pal waiting to hatch"}
+        </Text>
+        <View style={styles.trainerCardStats}>
+          <TrainerCardStat
+            label="Weekly steps"
+            value={weeklyStepsPublic ? formatSteps(weeklySteps) : "Private"}
+          />
+          <TrainerCardStat label="Collection" value={`${collectionCount} Pals`} />
+          <TrainerCardStat label="Badges" value={`${badgeCount}`} />
+          <TrainerCardStat label="Streak" value={`${streak}d`} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function TrainerCardStat({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.trainerCardStat}>
+      <Text style={styles.trainerCardStatValue}>{value}</Text>
+      <Text style={styles.trainerCardStatLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function buildPublicProfileUrl(data: HatchUpData) {
+  const slugSource =
+    data.leaderboardShareEnabled && data.leaderboardAlias.trim()
+      ? data.leaderboardAlias
+      : data.leaderboardId || data.accountId || "local-trainer";
+  const slug = slugSource
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `${PUBLIC_PROFILE_BASE_URL.replace(/\/$/, "")}/${slug || "local-trainer"}`;
+}
+
+function getTrainerCardSharePayload({
+  activePal,
+  badgeCount,
+  collectionCount,
+  data,
+  profileName,
+  publicProfileUrl,
+  weeklySteps,
+}: {
+  activePal: CollectedHatchling | null;
+  badgeCount: number;
+  collectionCount: number;
+  data: HatchUpData;
+  profileName: string;
+  publicProfileUrl: string;
+  weeklySteps: number;
+}) {
+  const palLine = activePal
+    ? `${activePal.name} - Level ${activePal.level} ${capitalize(activePal.rarity)} ${capitalize(activePal.element)} Pal`
+    : "First Pal: waiting to hatch";
+  const weeklyStepsLine = data.leaderboardShareEnabled
+    ? `Weekly steps: ${formatSteps(weeklySteps)}`
+    : "Weekly steps: private";
+
+  return {
+    message: [
+      `${profileName}'s HatchUp Trainer Card`,
+      palLine,
+      weeklyStepsLine,
+      `Collection: ${formatNumber(collectionCount)} Pal${collectionCount === 1 ? "" : "s"}`,
+      `Badges: ${formatNumber(badgeCount)}`,
+      `Streak: ${formatNumber(data.currentStreak)} day${data.currentStreak === 1 ? "" : "s"}`,
+      "",
+      publicProfileUrl,
+    ].join("\n"),
+    title: "HatchUp Trainer Card",
+  };
+}
+
+function getShareStatusLabel(
+  trainerShareState: ShareState,
+  linkShareState: ShareState,
+) {
+  if (trainerShareState === "failure" || linkShareState === "failure") {
+    return "Sharing hit a snag. Try again when your device share sheet is available.";
+  }
+  if (trainerShareState === "success") {
+    return "Trainer card shared. Nice little growth loop unlocked.";
+  }
+  if (linkShareState === "success") {
+    return "Profile link ready to share.";
+  }
+  return "Shared cards never include private health details.";
+}
+
 function getProfileStepCopy(label: string) {
   if (label === "Choose username") {
     return "Add a username above so your trainer card feels owned before sharing or testing with friends.";
@@ -1106,7 +1339,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   profileTabTextActive: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
   },
   card: {
     backgroundColor: colors.surface,
@@ -1373,6 +1606,155 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     marginTop: 3,
   },
+  trainerShareCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.primarySoft,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 12,
+    padding: 13,
+  },
+  trainerShareHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+  },
+  trainerShareTitleBlock: {
+    flex: 1,
+  },
+  trainerShareTitle: {
+    color: colors.ink,
+    fontSize: 20,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+    marginTop: 2,
+  },
+  trainerShareBody: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 4,
+  },
+  trainerSharePrivacyPill: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+  trainerSharePrivacyText: {
+    color: colors.primaryDeep,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  trainerCardPreview: {
+    backgroundColor: colors.warmSurface,
+    borderColor: colors.rewardGold,
+    borderRadius: radii.hero,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    overflow: "hidden",
+    padding: 12,
+  },
+  trainerCardArt: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    height: 136,
+    justifyContent: "center",
+    overflow: "hidden",
+    width: 112,
+  },
+  trainerCardEmptyArt: {
+    alignItems: "center",
+    backgroundColor: colors.primarySoft,
+    borderRadius: radii.pill,
+    height: 82,
+    justifyContent: "center",
+    width: 82,
+  },
+  trainerCardEmptyText: {
+    color: colors.primaryDeep,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  trainerCardText: {
+    flex: 1,
+    gap: 5,
+  },
+  trainerCardKicker: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  trainerCardName: {
+    color: colors.ink,
+    fontSize: 21,
+    fontWeight: "900",
+  },
+  trainerCardPal: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "800",
+    lineHeight: 17,
+  },
+  trainerCardStats: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 4,
+  },
+  trainerCardStat: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.button,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    width: "47%",
+  },
+  trainerCardStatValue: {
+    color: colors.ink,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  trainerCardStatLabel: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  trainerShareActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  trainerShareAction: {
+    flex: 1,
+  },
+  trainerShareStatus: {
+    color: colors.primaryDeep,
+    fontSize: 12,
+    fontWeight: "900",
+    lineHeight: 17,
+    textAlign: "center",
+  },
+  trainerShareStatusError: {
+    color: colors.danger,
+  },
+  trainerShareFootnote: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "700",
+    lineHeight: 15,
+    textAlign: "center",
+  },
   profileReadinessCard: {
     backgroundColor: colors.surface,
     borderColor: colors.primarySoft,
@@ -1515,35 +1897,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
     textAlign: "right",
-  },
-  activeHatchling: {
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.line,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    padding: 10,
-  },
-  activeHatchlingText: {
-    flex: 1,
-  },
-  activeLabel: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: "900",
-  },
-  activeName: {
-    color: colors.ink,
-    fontSize: 15,
-    fontWeight: "900",
-    marginTop: 2,
-  },
-  activeMood: {
-    color: colors.muted,
-    fontSize: 12,
-    marginTop: 3,
   },
   badgeCard: {
     backgroundColor: colors.surface,

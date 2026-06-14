@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   stage: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
     fontSize: 8,
     fontWeight: "900",
     letterSpacing: 0.6,

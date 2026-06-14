@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
     width: 44,
   },
   sourceMarkText: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
     fontSize: 18,
     fontWeight: "900",
   },

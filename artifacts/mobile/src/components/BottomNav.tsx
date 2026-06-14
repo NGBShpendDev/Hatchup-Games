@@ -6,17 +6,19 @@ import {
   User,
   type LucideIcon,
 } from "lucide-react-native";
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ENABLE_LEADERBOARD } from "../config/features";
-import { getEggProgress, isEggReady } from "../domain/hatchery";
+import { toDateKey } from "../domain/date";
+import { getEggProgressSummary, getTrackedEgg } from "../domain/eggProgress";
 import {
   getActiveHatchling,
   getTimeAdjustedHatchling,
   getTrainingStatus,
 } from "../domain/hatchlings";
+import { getNextBestAction, getSyncedAwardForDate } from "../domain/nextBestAction";
 import { colors, gameColors, radii } from "../theme";
 import { ActiveTabTransition } from "../utils/animations";
-import { formatPercent } from "../utils/format";
 import { useBottomNavStatusData } from "./BottomNavStatusContext";
 
 interface Props {
@@ -37,6 +39,7 @@ export function BottomNav({
   onSettingsPress,
 }: Props) {
   const data = useBottomNavStatusData();
+  const [statusCollapsed, setStatusCollapsed] = useState(false);
   const items: NavItemConfig[] = [
     {
       accessibilityLabel: "Go to Home",
@@ -81,7 +84,13 @@ export function BottomNav({
 
   return (
     <View style={styles.footerStack}>
-      {data && <MiniStatusBar data={data} />}
+      {data && (
+        <MiniStatusBar
+          collapsed={statusCollapsed}
+          data={data}
+          onToggle={() => setStatusCollapsed((current) => !current)}
+        />
+      )}
       <View style={styles.nav}>
         {items.map((item) => (
           <NavItem key={item.label} {...item} />
@@ -134,44 +143,105 @@ function NavItem({
 }
 
 function MiniStatusBar({
+  collapsed,
   data,
+  onToggle,
 }: {
+  collapsed: boolean;
   data: NonNullable<ReturnType<typeof useBottomNavStatusData>>;
+  onToggle: () => void;
 }) {
   const activePalRaw = getActiveHatchling(data);
   const activePal = activePalRaw ? getTimeAdjustedHatchling(activePalRaw) : null;
   const training = activePal ? getTrainingStatus(activePal) : null;
-  const closestEgg =
-    data.activeEggs
-      .filter((egg) => !isEggReady(egg))
-      .sort((left, right) => getEggProgress(right) - getEggProgress(left))[0] ??
-    data.activeEggs[0] ??
-    null;
+  const closestEgg = getTrackedEgg(
+    data.activeEggs.length > 0 ? data.activeEggs : [data.activeEgg],
+  );
+  const eggSummary = closestEgg ? getEggProgressSummary(closestEgg) : null;
+  const todayKey = toDateKey(new Date());
+  const nextAction = getNextBestAction(data, { todayKey });
+  const syncedToday = Boolean(getSyncedAwardForDate(data, todayKey));
+
+  const activePalLabel = activePal ? `${activePal.name} L${activePal.level}` : "Hatch one";
+  const trainingLabel = getStickyTrainingLabel({
+    nextActionTarget: nextAction.target,
+    syncedToday,
+    trainingRemaining: training?.remainingToday,
+  });
+  const eggLabel = eggSummary
+    ? eggSummary.isReady
+      ? "Ready"
+      : `${eggSummary.percentLabel} | ${eggSummary.stepsLeftLabel}`
+    : "None";
+
+  if (collapsed) {
+    return (
+      <Pressable
+        accessibilityLabel="Show active Pal status"
+        accessibilityRole="button"
+        onPress={onToggle}
+        style={({ pressed }) => [
+          styles.statusBar,
+          styles.statusBarCompact,
+          pressed && styles.pressedItem,
+        ]}
+      >
+        <Text numberOfLines={1} style={styles.statusCompactText}>
+          {activePalLabel} · {trainingLabel} · Egg {eggLabel}
+        </Text>
+        <Text style={styles.statusToggle}>Show</Text>
+      </Pressable>
+    );
+  }
 
   return (
-    <View style={styles.statusBar}>
+    <Pressable
+      accessibilityLabel="Hide active Pal status"
+      accessibilityRole="button"
+      onPress={onToggle}
+      style={({ pressed }) => [
+        styles.statusBar,
+        pressed && styles.pressedItem,
+      ]}
+    >
       <View style={styles.statusItemWide}>
         <Text style={styles.statusLabel}>Active Pal</Text>
         <Text numberOfLines={1} style={styles.statusValue}>
-          {activePal ? `${activePal.name} L${activePal.level}` : "Hatch one"}
+          {activePalLabel}
         </Text>
       </View>
       <View style={styles.statusDivider} />
       <View style={styles.statusItem}>
         <Text style={styles.statusLabel}>Training</Text>
         <Text style={styles.statusValue}>
-          {training ? `${training.remainingToday} left` : "Hatch Pal"}
+          {trainingLabel}
         </Text>
       </View>
       <View style={styles.statusDivider} />
       <View style={styles.statusItem}>
         <Text style={styles.statusLabel}>Egg</Text>
-        <Text style={styles.statusValue}>
-          {closestEgg ? formatPercent(getEggProgress(closestEgg)) : "None"}
+        <Text numberOfLines={1} style={styles.statusValue}>
+          {eggLabel}
         </Text>
       </View>
-    </View>
+      <Text style={styles.statusToggle}>Hide</Text>
+    </Pressable>
   );
+}
+
+function getStickyTrainingLabel({
+  nextActionTarget,
+  syncedToday,
+  trainingRemaining,
+}: {
+  nextActionTarget: ReturnType<typeof getNextBestAction>["target"];
+  syncedToday: boolean;
+  trainingRemaining: number | undefined;
+}) {
+  if (!syncedToday && nextActionTarget === "sync") return "Sync first";
+  if (nextActionTarget === "hatchery") return "Hatch first";
+  if (typeof trainingRemaining === "number") return `${trainingRemaining} left`;
+  return "Hatch Pal";
 }
 
 const styles = StyleSheet.create({
@@ -186,8 +256,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     gap: 8,
+    minHeight: 44,
     paddingHorizontal: 11,
     paddingVertical: 7,
+  },
+  statusBarCompact: {
+    paddingVertical: 6,
+  },
+  statusCompactText: {
+    color: colors.primaryDeep,
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "900",
   },
   statusItem: {
     flex: 0.75,
@@ -211,6 +291,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
     marginTop: 2,
+  },
+  statusToggle: {
+    color: colors.muted,
+    fontSize: 10,
+    fontWeight: "900",
+    textTransform: "uppercase",
   },
   nav: {
     backgroundColor: colors.surface,

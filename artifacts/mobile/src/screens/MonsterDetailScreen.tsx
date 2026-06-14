@@ -8,7 +8,11 @@ import { ProgressBar } from "../components/ProgressBar";
 import { Screen } from "../components/Screen";
 import { ScreenHeader, SecondaryCard, UtilityCard } from "../components/ui";
 import { toDateKey } from "../domain/date";
-import { getEggProgress, isEggReady } from "../domain/hatchery";
+import {
+  getEggProgressSummary,
+  getEggProgressSummaries,
+  getReadyEggCount,
+} from "../domain/eggProgress";
 import {
   getActiveHatchling,
   getHatchlingPowerScore,
@@ -44,6 +48,7 @@ type ClosestEggSummary = {
   egg: ActiveEgg;
   slotNumber: number;
   stepsLeft: number;
+  summary: ReturnType<typeof getEggProgressSummary>;
 };
 
 export function MonsterDetailScreen({
@@ -59,8 +64,9 @@ export function MonsterDetailScreen({
   onSettingsPress,
 }: Props) {
   const todayKey = toDateKey(new Date());
-  const readyEggCount = data.activeEggs.filter(isEggReady).length;
-  const firstReadyEgg = data.activeEggs.find(isEggReady);
+  const eggSummaries = getEggProgressSummaries(data.activeEggs);
+  const readyEggCount = getReadyEggCount(data.activeEggs);
+  const firstReadyEgg = eggSummaries.find((summary) => summary.isReady)?.egg;
   const closestEgg = getClosestEgg(data.activeEggs);
   const todaySteps = data.dailyAward?.date === todayKey ? data.dailyAward.health.steps : 0;
   const activeHatchlingRaw = getActiveHatchling(data);
@@ -201,7 +207,7 @@ function AllEggsSummary({
       </View>
       <Text style={styles.eggsSummaryNote}>
         {closestEgg
-          ? `${capitalize(closestEgg.egg.rarity)} ${capitalize(closestEgg.egg.element)} Egg has ${formatSteps(closestEgg.stepsLeft)} left.`
+          ? `${closestEgg.summary.eggName} has ${closestEgg.summary.stepsLeftLabel}.`
           : readyEggCount > 0
             ? "Open a ready Egg below to meet your next Pal."
             : "Add an Egg to start filling the incubator."}
@@ -228,8 +234,8 @@ function EggSlotCard({
   onHatch: () => Promise<void>;
   slotNumber: number;
 }) {
-  const ready = isEggReady(egg);
-  const stepsLeft = Math.max(egg.stepsRequired - egg.stepsWalked, 0);
+  const summary = getEggProgressSummary(egg);
+  const ready = summary.isReady;
 
   return (
     <EggReadyPulse active={ready}>
@@ -241,15 +247,14 @@ function EggSlotCard({
         <View style={styles.eggSlotHeader}>
           <View>
             <Text style={styles.eggSlotNumber}>Slot {slotNumber}</Text>
-            <Text style={styles.eggSlotName}>
-              {capitalize(egg.rarity)} {capitalize(egg.element)} Egg
-            </Text>
+            <Text style={styles.eggSlotName}>{summary.eggName}</Text>
           </View>
           <Text style={[styles.eggSlotStatus, ready && styles.eggSlotStatusReady]}>
-            {ready ? "Ready to hatch" : `${formatSteps(stepsLeft)} left`}
+            {summary.stepsLeftLabel}
           </Text>
         </View>
-        <ProgressBar progress={getEggProgress(egg)} />
+        <ProgressBar progress={summary.percent} />
+        <Text style={styles.eggSlotHint}>{summary.progressLabel}</Text>
         {ready ? (
           <>
           <Text style={styles.eggReadyHint}>
@@ -264,7 +269,7 @@ function EggSlotCard({
           </>
         ) : (
           <Text style={styles.eggSlotHint}>
-            Sync movement from Home to keep this Egg filling.
+            {summary.readinessLabel}. Sync movement from Home to keep this Egg filling.
           </Text>
         )}
       </View>
@@ -555,13 +560,14 @@ function capitalize(value: string) {
 
 function getClosestEgg(eggs: ActiveEgg[]): ClosestEggSummary | null {
   return eggs.reduce<ClosestEggSummary | null>((closest, egg, index) => {
-    if (isEggReady(egg)) return closest;
-    const stepsLeft = Math.max(egg.stepsRequired - egg.stepsWalked, 0);
-    if (!closest || stepsLeft < closest.stepsLeft) {
+    const summary = getEggProgressSummary(egg);
+    if (summary.isReady) return closest;
+    if (!closest || summary.stepsLeft < closest.stepsLeft) {
       return {
         egg,
         slotNumber: index + 1,
-        stepsLeft,
+        stepsLeft: summary.stepsLeft,
+        summary,
       };
     }
     return closest;
@@ -932,7 +938,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   hatcheryStatusText: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
     fontSize: 12,
     fontWeight: "900",
   },

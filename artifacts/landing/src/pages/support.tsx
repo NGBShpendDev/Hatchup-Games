@@ -37,7 +37,7 @@ const CATEGORIES: Category[] = [
   {
     icon: Egg,
     label: "Pals & Gameplay",
-    color: "text-emerald-400",
+    color: "text-[var(--hatchup-primary)]",
     faqs: [
       {
         q: "What are Pals?",
@@ -56,7 +56,7 @@ const CATEGORIES: Category[] = [
   {
     icon: Activity,
     label: "Health Sync",
-    color: "text-emerald-400",
+    color: "text-[var(--hatchup-leaf)]",
     faqs: [
       {
         q: "Which health data does HatchUp use?",
@@ -75,7 +75,7 @@ const CATEGORIES: Category[] = [
   {
     icon: BookOpen,
     label: "Collection",
-    color: "text-amber-400",
+    color: "text-[var(--hatchup-progress)]",
     faqs: [
       {
         q: "What is the Collection book?",
@@ -94,7 +94,7 @@ const CATEGORIES: Category[] = [
   {
     icon: Trophy,
     label: "Ranks & Profile",
-    color: "text-blue-400",
+    color: "text-[var(--hatchup-tide)]",
     faqs: [
       {
         q: "How do weekly ranks work?",
@@ -113,7 +113,7 @@ const CATEGORIES: Category[] = [
   {
     icon: Shield,
     label: "Trust & Privacy",
-    color: "text-purple-400",
+    color: "text-[var(--hatchup-highlight)]",
     faqs: [
       {
         q: "Do you sell health data?",
@@ -140,21 +140,21 @@ function FAQItem({ faq, index }: { faq: FAQ; index: number }) {
       whileInView="visible"
       viewport={{ once: true }}
       custom={index}
-      className="border border-white/10 rounded-2xl overflow-hidden bg-white/[0.02]"
+      className="overflow-hidden rounded-2xl border border-[var(--hatchup-border)] bg-[var(--hatchup-card)] shadow-sm"
     >
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-white/5 transition-colors"
+        className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-[var(--hatchup-secondary)]"
       >
-        <span className="text-sm font-medium text-white/90">{faq.q}</span>
+        <span className="text-sm font-semibold text-[var(--hatchup-text)]">{faq.q}</span>
         {open ? (
-          <ChevronUp className="w-4 h-4 text-white/40 shrink-0" />
+          <ChevronUp className="h-4 w-4 shrink-0 text-[var(--hatchup-muted)]" />
         ) : (
-          <ChevronDown className="w-4 h-4 text-white/40 shrink-0" />
+          <ChevronDown className="h-4 w-4 shrink-0 text-[var(--hatchup-muted)]" />
         )}
       </button>
       {open && (
-        <div className="px-5 pb-5 text-sm text-white/60 leading-relaxed border-t border-white/10 pt-4">
+        <div className="border-t border-[var(--hatchup-border)] px-5 pb-5 pt-4 text-sm leading-relaxed text-[var(--hatchup-muted)]">
           {faq.a}
         </div>
       )}
@@ -168,28 +168,28 @@ export default function SupportPage() {
   const Icon = cat.icon;
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans selection:bg-pink-500/30">
+    <div className="min-h-screen bg-[var(--hatchup-bg)] font-sans text-[var(--hatchup-text)] selection:bg-[var(--hatchup-progress)]/40">
       {/* Subtle gradient orb */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-20%] left-[40%] w-[700px] h-[700px] rounded-full bg-pink-600/10 blur-[120px]" />
+        <div className="absolute left-[40%] top-[-20%] h-[700px] w-[700px] rounded-full bg-[var(--hatchup-highlight)]/15 blur-[120px]" />
       </div>
 
       {/* Nav */}
-      <nav className="relative z-10 border-b border-white/10 bg-black/60 backdrop-blur-xl">
-        <div className="max-w-5xl mx-auto px-6 sm:px-8 h-16 flex items-center gap-4">
+      <nav className="relative z-10 border-b border-[var(--hatchup-border)] bg-[var(--hatchup-card)]/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-5xl items-center gap-4 px-6 sm:px-8">
           <a
             href="/"
-            className="flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm"
+            className="flex items-center gap-2 text-sm text-[var(--hatchup-muted)] transition-colors hover:text-[var(--hatchup-primary)]"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="h-4 w-4" />
             Back to HATCHUP
           </a>
-          <span className="text-white/20">|</span>
-          <span className="font-semibold text-white text-sm">Help & Support</span>
+          <span className="text-[var(--hatchup-disabled)]">|</span>
+          <span className="text-sm font-semibold text-[var(--hatchup-text)]">Help & Support</span>
         </div>
       </nav>
 
-      <div className="relative z-10 max-w-5xl mx-auto px-6 sm:px-8 py-16 space-y-16">
+      <div className="relative z-10 mx-auto max-w-5xl space-y-16 px-6 py-16 sm:px-8">
 
         {/* Hero */}
         <motion.div
@@ -199,16 +199,16 @@ export default function SupportPage() {
           className="text-center"
         >
           <h1 className="font-display text-4xl sm:text-5xl font-bold tracking-tight">
-            How can we <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-red-400">help you?</span>
+            How can we <span className="bg-gradient-to-r from-[var(--hatchup-primary)] via-[var(--hatchup-highlight)] to-[var(--hatchup-progress)] bg-clip-text text-transparent">help you?</span>
           </h1>
-          <p className="mt-4 text-white/60 text-lg max-w-xl mx-auto">
+          <p className="mx-auto mt-4 max-w-xl text-lg text-[var(--hatchup-muted)]">
             Browse our FAQs below, or reach out directly — we're here for you.
           </p>
           <a
             href="mailto:support@hatchup.app"
-            className="mt-6 inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 text-sm font-medium transition-all"
+            className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-[var(--hatchup-border)] bg-[var(--hatchup-card)] px-5 py-3 text-sm font-bold text-[var(--hatchup-primary)] transition-all hover:bg-[var(--hatchup-secondary)]"
           >
-            <Mail className="w-4 h-4 text-pink-400" />
+            <Mail className="h-4 w-4 text-[var(--hatchup-highlight)]" />
             support@hatchup.app
           </a>
         </motion.div>
@@ -220,7 +220,7 @@ export default function SupportPage() {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            className="text-xs uppercase tracking-widest text-white/40 mb-4 text-center"
+            className="mb-4 text-center text-xs uppercase tracking-widest text-[var(--hatchup-muted)]"
           >
             Browse by topic
           </motion.p>
@@ -237,10 +237,10 @@ export default function SupportPage() {
                   viewport={{ once: true }}
                   custom={i}
                   onClick={() => setActiveCategory(i)}
-                  className={`flex flex-col items-center gap-2 px-3 py-4 rounded-2xl border text-center text-xs font-medium transition-all ${
+                  className={`flex flex-col items-center gap-2 rounded-2xl border px-3 py-4 text-center text-xs font-bold transition-all ${
                     active
-                      ? "bg-white/10 border-white/25 text-white"
-                      : "bg-white/[0.03] border-white/10 text-white/50 hover:bg-white/[0.06] hover:text-white/80"
+                      ? "border-[var(--hatchup-primary)]/25 bg-[var(--hatchup-active-nav)] text-[var(--hatchup-primary)]"
+                      : "border-[var(--hatchup-border)] bg-[var(--hatchup-card)] text-[var(--hatchup-muted)] hover:bg-[var(--hatchup-secondary)] hover:text-[var(--hatchup-primary)]"
                   }`}
                 >
                   <CIcon className={`w-5 h-5 ${active ? c.color : ""}`} />
@@ -270,12 +270,12 @@ export default function SupportPage() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6 flex gap-4"
+          className="flex gap-4 rounded-2xl border border-[var(--hatchup-leaf)]/30 bg-[var(--hatchup-secondary)] p-6"
         >
-          <Shield className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
+          <Shield className="mt-0.5 h-6 w-6 shrink-0 text-[var(--hatchup-leaf)]" />
           <div>
-            <p className="font-semibold text-emerald-300 mb-1">Health-data trust</p>
-            <p className="text-sm text-white/60 leading-relaxed">
+            <p className="mb-1 font-semibold text-[var(--hatchup-primary)]">Health-data trust</p>
+            <p className="text-sm leading-relaxed text-[var(--hatchup-muted)]">
               HatchUp reads movement data only to power gameplay. Health details
               are not sold or used for ads, and weekly ranking sharing is optional.
             </p>
@@ -288,25 +288,25 @@ export default function SupportPage() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center"
+          className="rounded-2xl border border-[var(--hatchup-border)] bg-[var(--hatchup-card)] p-8 text-center shadow-lg shadow-[#12201F]/5"
         >
-          <Mail className="w-10 h-10 text-pink-400 mx-auto mb-4" />
+          <Mail className="mx-auto mb-4 h-10 w-10 text-[var(--hatchup-highlight)]" />
           <h3 className="text-xl font-bold mb-2">Still need help?</h3>
-          <p className="text-white/60 text-sm mb-6 max-w-md mx-auto">
+          <p className="mx-auto mb-6 max-w-md text-sm text-[var(--hatchup-muted)]">
             Our support team is available Monday–Friday. We aim to respond within 24 hours.
           </p>
           <a
             href="mailto:support@hatchup.app"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-red-500 hover:from-pink-400 hover:to-red-400 font-semibold text-sm transition-all shadow-lg"
+            className="inline-flex items-center gap-2 rounded-2xl bg-[var(--hatchup-primary)] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#004F46]/20 transition-all hover:bg-[var(--hatchup-primary-deep)]"
           >
-            <Mail className="w-4 h-4" />
+            <Mail className="h-4 w-4" />
             Email Support
           </a>
         </motion.div>
 
         {/* Footer */}
-        <p className="text-center text-xs text-white/30 pb-4">
-          © 2026 HATCHUP · <a href="mailto:support@hatchup.app" className="hover:text-white/60 transition-colors">support@hatchup.app</a>
+        <p className="pb-4 text-center text-xs text-[var(--hatchup-muted)]">
+          © 2026 HATCHUP · <a href="mailto:support@hatchup.app" className="transition-colors hover:text-[var(--hatchup-primary)]">support@hatchup.app</a>
         </p>
       </div>
     </div>

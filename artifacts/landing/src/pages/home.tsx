@@ -31,11 +31,11 @@ function StoreButtons({ size = "lg" }: { size?: "lg" | "md" }) {
     <div className="flex flex-col gap-3 sm:flex-row">
       <span
         aria-label="App Store beta access coming soon"
-        className={`flex items-center gap-3 ${pad} rounded-2xl border border-[#EADCC8] bg-white text-[#20312A] shadow-lg shadow-[#0B6F5C]/10`}
+        className={`flex items-center gap-3 ${pad} rounded-2xl border border-[var(--hatchup-border)] bg-[var(--hatchup-card)] text-[var(--hatchup-text)] shadow-lg shadow-[#004F46]/10`}
       >
         <FaApple className="h-7 w-7" />
         <div className="text-left">
-          <div className="text-[10px] uppercase leading-none tracking-wider text-[#718078]">
+          <div className="text-[10px] uppercase leading-none tracking-wider text-[var(--hatchup-muted)]">
             Beta access
           </div>
           <div className="text-lg font-semibold leading-tight">iOS coming soon</div>
@@ -43,11 +43,11 @@ function StoreButtons({ size = "lg" }: { size?: "lg" | "md" }) {
       </span>
       <span
         aria-label="Google Play beta access coming soon"
-        className={`flex items-center gap-3 ${pad} rounded-2xl border border-[#EADCC8] bg-white text-[#20312A] shadow-lg shadow-[#0B6F5C]/10`}
+        className={`flex items-center gap-3 ${pad} rounded-2xl border border-[var(--hatchup-border)] bg-[var(--hatchup-card)] text-[var(--hatchup-text)] shadow-lg shadow-[#004F46]/10`}
       >
         <FaGooglePlay className="h-6 w-6" />
         <div className="text-left">
-          <div className="text-[10px] uppercase leading-none tracking-wider text-[#718078]">
+          <div className="text-[10px] uppercase leading-none tracking-wider text-[var(--hatchup-muted)]">
             Beta access
           </div>
           <div className="text-lg font-semibold leading-tight">Android coming soon</div>
@@ -60,10 +60,10 @@ function StoreButtons({ size = "lg" }: { size?: "lg" | "md" }) {
 function Logo() {
   return (
     <div className="flex items-center gap-2">
-      <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[#0B6F5C] to-[#79A66A] shadow-lg shadow-[#0B6F5C]/20">
+      <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[var(--hatchup-primary)] to-[var(--hatchup-leaf)] shadow-lg shadow-[#004F46]/20">
         <Egg className="h-5 w-5 text-white" />
       </div>
-      <span className="font-display text-xl font-bold tracking-tight text-[#20312A]">
+      <span className="font-display text-xl font-bold tracking-tight text-[var(--hatchup-text)]">
         HATCHUP
       </span>
     </div>
@@ -82,15 +82,15 @@ function MiniProgress({
   return (
     <div>
       <div className="mb-1 flex justify-between text-xs">
-        <span className="font-semibold text-[#718078]">{label}</span>
-        <span className="font-black text-[#0B6F5C]">{value}</span>
+        <span className="font-semibold text-[var(--hatchup-muted)]">{label}</span>
+        <span className="font-black text-[var(--hatchup-primary)]">{value}</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-[#DDF4EC]">
+      <div className="h-2 overflow-hidden rounded-full bg-[var(--hatchup-secondary)]">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
           transition={{ duration: 1.2, delay: 0.35 }}
-          className="h-full rounded-full bg-gradient-to-r from-[#0B6F5C] to-[#E8B84A]"
+          className="h-full rounded-full bg-gradient-to-r from-[var(--hatchup-primary)] to-[var(--hatchup-progress)]"
         />
       </div>
     </div>
@@ -105,58 +105,58 @@ function PhoneMockup() {
       transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
       className="relative mx-auto"
     >
-      <div className="float-slow relative h-[610px] w-[280px] overflow-hidden rounded-[44px] border-[10px] border-[#20312A] bg-[#20312A] shadow-2xl shadow-[#0B6F5C]/25 sm:w-[320px]">
-        <div className="absolute left-1/2 top-2 z-20 h-6 w-24 -translate-x-1/2 rounded-full bg-[#111B17]" />
-        <div className="absolute inset-0 flex flex-col gap-4 bg-[#FBF4E6] p-5 pt-12 text-[#20312A]">
-          <div className="rounded-3xl border border-[#EADCC8] bg-white p-4 shadow-lg shadow-[#0B6F5C]/10">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0B6F5C]">
+      <div className="float-slow relative h-[610px] w-[280px] overflow-hidden rounded-[44px] border-[10px] border-[var(--hatchup-text)] bg-[var(--hatchup-text)] shadow-2xl shadow-[#004F46]/25 sm:w-[320px]">
+        <div className="absolute left-1/2 top-2 z-20 h-6 w-24 -translate-x-1/2 rounded-full bg-[var(--hatchup-text)]" />
+        <div className="absolute inset-0 flex flex-col gap-4 bg-[var(--hatchup-bg)] p-5 pt-12 text-[var(--hatchup-text)]">
+          <div className="rounded-3xl border border-[var(--hatchup-border)] bg-[var(--hatchup-card)] p-4 shadow-lg shadow-[#004F46]/10">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--hatchup-primary)]">
               Today's Journey
             </p>
             <h3 className="mt-1 font-display text-2xl font-black">Grow Ember</h3>
-            <p className="mt-1 text-xs leading-5 text-[#718078]">
+            <p className="mt-1 text-xs leading-5 text-[var(--hatchup-muted)]">
               Move, sync, hatch, and return tomorrow.
             </p>
           </div>
 
-          <div className="relative overflow-hidden rounded-3xl border border-[#EADCC8] bg-[#FFF3D8] p-4">
-            <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-[#E8B84A]/25 blur-2xl" />
+          <div className="relative overflow-hidden rounded-3xl border border-[var(--hatchup-border)] bg-[var(--hatchup-magical)] p-4">
+            <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-[var(--hatchup-progress)]/25 blur-2xl" />
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0B6F5C]">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--hatchup-primary)]">
                   Active Pal
                 </p>
                 <h4 className="mt-1 text-lg font-black">Ember Sprout</h4>
-                <p className="text-xs font-bold text-[#FF9B5F]">Rare Ember | Baby</p>
+                <p className="text-xs font-bold text-[var(--hatchup-ember)]">Rare Ember | Baby</p>
               </div>
               <motion.div
                 animate={{ y: [0, -8, 0] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                className="grid h-24 w-24 place-items-center rounded-[28px] border border-[#EADCC8] bg-white text-5xl shadow-inner"
+                className="grid h-24 w-24 place-items-center rounded-[28px] border border-[var(--hatchup-border)] bg-[var(--hatchup-card)] text-5xl shadow-inner"
               >
-                <Flame className="h-12 w-12 fill-[#FF9B5F] text-[#FF9B5F]" />
+                <Flame className="h-12 w-12 fill-[var(--hatchup-ember)] text-[var(--hatchup-ember)]" />
               </motion.div>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-[#0B6F5C]/30 bg-[#DDF4EC] p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0B6F5C]">
+          <div className="rounded-3xl border border-[var(--hatchup-primary)]/30 bg-[var(--hatchup-secondary)] p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--hatchup-primary)]">
               Next Action
             </p>
             <div className="mt-2 flex items-center justify-between gap-3">
               <div>
                 <h4 className="text-base font-black">Sync movement</h4>
-                <p className="text-xs leading-5 text-[#4F6259]">
+                <p className="text-xs leading-5 text-[var(--hatchup-muted)]">
                   Convert today's activity into egg progress and Pal XP.
                 </p>
               </div>
-              <ChevronRight className="h-5 w-5 text-[#0B6F5C]" />
+              <ChevronRight className="h-5 w-5 text-[var(--hatchup-primary)]" />
             </div>
           </div>
 
-          <div className="space-y-3 rounded-3xl border border-[#EADCC8] bg-white p-4">
+          <div className="space-y-3 rounded-3xl border border-[var(--hatchup-border)] bg-[var(--hatchup-card)] p-4">
             <div className="flex items-center justify-between">
               <h4 className="font-black">Today Progress</h4>
-              <span className="rounded-full bg-[#FFF3D8] px-2 py-1 text-[10px] font-black text-[#8A641D]">
+              <span className="rounded-full bg-[var(--hatchup-magical)] px-2 py-1 text-[10px] font-black text-[var(--hatchup-primary)]">
                 +42 XP
               </span>
             </div>
@@ -171,16 +171,16 @@ function PhoneMockup() {
         initial={{ opacity: 0, x: -20, y: 10 }}
         animate={{ opacity: 1, x: 0, y: 0 }}
         transition={{ delay: 0.6, duration: 0.6 }}
-        className="absolute -left-10 top-24 hidden items-center gap-2 rounded-2xl border border-[#EADCC8] bg-white px-4 py-3 shadow-xl shadow-[#0B6F5C]/10 md:flex"
+        className="absolute -left-10 top-24 hidden items-center gap-2 rounded-2xl border border-[var(--hatchup-border)] bg-[var(--hatchup-card)] px-4 py-3 shadow-xl shadow-[#004F46]/10 md:flex"
       >
-        <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#FFF3D8]">
-          <Sparkles className="h-5 w-5 text-[#E8B84A]" />
+        <div className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--hatchup-magical)]">
+          <Sparkles className="h-5 w-5 text-[var(--hatchup-progress)]" />
         </div>
         <div>
-          <div className="text-[10px] font-black uppercase tracking-wider text-[#718078]">
+          <div className="text-[10px] font-black uppercase tracking-wider text-[var(--hatchup-muted)]">
             Streak
           </div>
-          <div className="text-sm font-black text-[#20312A]">Return tomorrow</div>
+          <div className="text-sm font-black text-[var(--hatchup-text)]">Return tomorrow</div>
         </div>
       </motion.div>
 
@@ -188,16 +188,16 @@ function PhoneMockup() {
         initial={{ opacity: 0, x: 20, y: 10 }}
         animate={{ opacity: 1, x: 0, y: 0 }}
         transition={{ delay: 0.8, duration: 0.6 }}
-        className="absolute -right-12 bottom-32 hidden items-center gap-2 rounded-2xl border border-[#EADCC8] bg-white px-4 py-3 shadow-xl shadow-[#0B6F5C]/10 md:flex"
+        className="absolute -right-12 bottom-32 hidden items-center gap-2 rounded-2xl border border-[var(--hatchup-border)] bg-[var(--hatchup-card)] px-4 py-3 shadow-xl shadow-[#004F46]/10 md:flex"
       >
-        <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#DDF4EC]">
-          <BookOpen className="h-5 w-5 text-[#0B6F5C]" />
+        <div className="grid h-9 w-9 place-items-center rounded-xl bg-[var(--hatchup-secondary)]">
+          <BookOpen className="h-5 w-5 text-[var(--hatchup-primary)]" />
         </div>
         <div>
-          <div className="text-[10px] font-black uppercase tracking-wider text-[#718078]">
+          <div className="text-[10px] font-black uppercase tracking-wider text-[var(--hatchup-muted)]">
             Collection
           </div>
-          <div className="text-sm font-black text-[#20312A]">Leaf, Ember, Tide, Storm</div>
+          <div className="text-sm font-black text-[var(--hatchup-text)]">Leaf, Ember, Tide, Storm</div>
         </div>
       </motion.div>
     </motion.div>
@@ -210,37 +210,37 @@ export default function Home() {
       icon: Activity,
       title: "Movement-powered hatching",
       body: "Steps, distance, workouts, and active energy push your eggs closer to hatching.",
-      color: "bg-[#DDF4EC] text-[#0B6F5C]",
+      color: "bg-[var(--hatchup-secondary)] text-[var(--hatchup-primary)]",
     },
     {
       icon: HeartPulse,
       title: "Hatch and grow Pals",
       body: "Hatch elemental Pals, train your active companion, build bond, and unlock Baby, Teen, and Final forms.",
-      color: "bg-[#FFF3D8] text-[#B16F1A]",
+      color: "bg-[var(--hatchup-magical)] text-[var(--hatchup-primary)]",
     },
     {
       icon: BookOpen,
       title: "Collection book",
       body: "Discover Leaf, Ember, Tide, and Storm Pals across rarity tiers and track what is still missing.",
-      color: "bg-[#EAF7D9] text-[#5E8D4C]",
+      color: "bg-[var(--hatchup-secondary)] text-[var(--hatchup-leaf)]",
     },
     {
       icon: Sparkles,
       title: "Daily journey",
       body: "Home gives you one clear next action so today’s movement turns into progress, rewards, and a reason to return tomorrow.",
-      color: "bg-[#FFF3D8] text-[#8A641D]",
+      color: "bg-[var(--hatchup-magical)] text-[var(--hatchup-primary)]",
     },
     {
       icon: Trophy,
       title: "Optional weekly ranks",
       body: "Compare public weekly scores only when you choose. Private health details stay off rankings.",
-      color: "bg-[#F0ECFF] text-[#7F67D8]",
+      color: "bg-[var(--hatchup-magical)] text-[var(--hatchup-highlight)]",
     },
     {
       icon: ShieldCheck,
       title: "Trust and data controls",
       body: "HatchUp explains what health data is used, what is private, and how ranking sharing works.",
-      color: "bg-[#DDF4EC] text-[#064E43]",
+      color: "bg-[var(--hatchup-secondary)] text-[var(--hatchup-primary)]",
     },
   ];
 
@@ -279,26 +279,26 @@ export default function Home() {
   ];
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#FBF4E6] text-[#20312A]">
+    <div className="relative min-h-screen overflow-hidden bg-[var(--hatchup-bg)] text-[var(--hatchup-text)]">
       <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-6 py-5 sm:px-8">
         <Logo />
-        <nav className="hidden items-center gap-8 text-sm font-semibold text-[#718078] md:flex">
-          <a href="#features" className="hover:text-[#0B6F5C]">Features</a>
-          <a href="#how-it-works" className="hover:text-[#0B6F5C]">How it works</a>
-          <a href="#trust" className="hover:text-[#0B6F5C]">Trust</a>
-          <a href="/support" className="hover:text-[#0B6F5C]">Support</a>
+        <nav className="hidden items-center gap-8 text-sm font-semibold text-[var(--hatchup-muted)] md:flex">
+          <a href="#features" className="hover:text-[var(--hatchup-primary)]">Features</a>
+          <a href="#how-it-works" className="hover:text-[var(--hatchup-primary)]">How it works</a>
+          <a href="#trust" className="hover:text-[var(--hatchup-primary)]">Trust</a>
+          <a href="/support" className="hover:text-[var(--hatchup-primary)]">Support</a>
         </nav>
         <a
           href="/support"
-          className="hidden items-center gap-1 rounded-full border border-[#0B6F5C]/20 bg-white px-4 py-2 text-sm font-black text-[#0B6F5C] shadow-sm transition hover:bg-[#DDF4EC] md:inline-flex"
+          className="hidden items-center gap-1 rounded-full border border-[var(--hatchup-primary)]/20 bg-[var(--hatchup-card)] px-4 py-2 text-sm font-black text-[var(--hatchup-primary)] shadow-sm transition hover:bg-[var(--hatchup-secondary)] md:inline-flex"
         >
           Get beta updates <ChevronRight className="h-4 w-4" />
         </a>
       </header>
 
       <section className="relative">
-        <div className="absolute -left-40 top-0 h-96 w-96 rounded-full bg-[#E8B84A]/25 blur-3xl" />
-        <div className="absolute -right-32 top-40 h-[32rem] w-[32rem] rounded-full bg-[#DDF4EC] blur-3xl" />
+        <div className="absolute -left-40 top-0 h-96 w-96 rounded-full bg-[var(--hatchup-progress)]/25 blur-3xl" />
+        <div className="absolute -right-32 top-40 h-[32rem] w-[32rem] rounded-full bg-[var(--hatchup-secondary)] blur-3xl" />
         <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-6 pb-24 pt-12 sm:px-8 lg:grid-cols-2 lg:py-24">
           <div>
             <motion.div
@@ -306,7 +306,7 @@ export default function Home() {
               initial="hidden"
               animate="visible"
               custom={0}
-              className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#E8B84A]/40 bg-[#FFF3D8] px-3 py-1 text-xs font-black uppercase tracking-wider text-[#8A641D]"
+              className="mb-6 inline-flex items-center gap-2 rounded-full border border-[var(--hatchup-progress)]/40 bg-[var(--hatchup-magical)] px-3 py-1 text-xs font-black uppercase tracking-wider text-[var(--hatchup-primary)]"
             >
               <Sparkles className="h-3.5 w-3.5" /> Advanced beta in progress
             </motion.div>
@@ -316,11 +316,11 @@ export default function Home() {
               initial="hidden"
               animate="visible"
               custom={1}
-              className="font-display text-5xl font-black leading-[1.05] tracking-tight text-[#20312A] sm:text-6xl lg:text-7xl"
+              className="font-display text-5xl font-black leading-[1.05] tracking-tight text-[var(--hatchup-text)] sm:text-6xl lg:text-7xl"
             >
               Move your body.
               <br />
-              <span className="text-[#0B6F5C]">Hatch your Pal.</span>
+              <span className="text-[var(--hatchup-primary)]">Hatch your Pal.</span>
             </motion.h1>
 
             <motion.p
@@ -328,7 +328,7 @@ export default function Home() {
               initial="hidden"
               animate="visible"
               custom={2}
-              className="mt-6 max-w-xl text-lg leading-8 text-[#4F6259] sm:text-xl"
+              className="mt-6 max-w-xl text-lg leading-8 text-[var(--hatchup-muted)] sm:text-xl"
             >
               HatchUp turns real-world movement into egg progress, Pal growth,
               collection goals, and daily rewards. Sync your activity, hatch
@@ -346,19 +346,19 @@ export default function Home() {
               <div className="mb-5 flex flex-col gap-3 sm:flex-row">
                 <a
                   href="/support"
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0B6F5C] px-6 py-4 text-sm font-black text-white shadow-lg shadow-[#0B6F5C]/25 transition-transform hover:-translate-y-0.5"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[var(--hatchup-primary)] px-6 py-4 text-sm font-black text-white shadow-lg shadow-[#004F46]/25 transition-transform hover:-translate-y-0.5"
                 >
                   Get beta updates <ChevronRight className="h-4 w-4" />
                 </a>
                 <a
                   href="#how-it-works"
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#EADCC8] bg-white px-6 py-4 text-sm font-black text-[#0B6F5C] transition hover:bg-[#DDF4EC]"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[var(--hatchup-border)] bg-[var(--hatchup-card)] px-6 py-4 text-sm font-black text-[var(--hatchup-primary)] transition hover:bg-[var(--hatchup-secondary)]"
                 >
                   Learn how it works
                 </a>
               </div>
               <StoreButtons />
-              <p className="mt-3 text-xs font-semibold text-[#718078]">
+              <p className="mt-3 text-xs font-semibold text-[var(--hatchup-muted)]">
                 Mobile beta access is rolling out through test builds first. Store
                 links will be added when public listings are ready.
               </p>
@@ -377,7 +377,7 @@ export default function Home() {
                 "Daily rewards",
               ].map((item) => (
                 <div
-                  className="rounded-2xl border border-[#EADCC8] bg-white px-4 py-3 font-black text-[#0B6F5C] shadow-sm"
+                  className="rounded-2xl border border-[var(--hatchup-border)] bg-[var(--hatchup-card)] px-4 py-3 font-black text-[var(--hatchup-primary)] shadow-sm"
                   key={item}
                 >
                   {item}
@@ -395,13 +395,13 @@ export default function Home() {
       <section id="features" className="relative py-24">
         <div className="mx-auto max-w-7xl px-6 sm:px-8">
           <div className="mb-14 max-w-2xl">
-            <p className="mb-3 text-xs font-black uppercase tracking-widest text-[#0B6F5C]">
+            <p className="mb-3 text-xs font-black uppercase tracking-widest text-[var(--hatchup-primary)]">
               Current mobile app
             </p>
-            <h2 className="font-display text-4xl font-black tracking-tight text-[#20312A] sm:text-5xl">
+            <h2 className="font-display text-4xl font-black tracking-tight text-[var(--hatchup-text)] sm:text-5xl">
               A cozy creature loop powered by real movement.
             </h2>
-            <p className="mt-4 text-lg leading-8 text-[#718078]">
+            <p className="mt-4 text-lg leading-8 text-[var(--hatchup-muted)]">
               Move your body → hatch Pals → grow your collection → return tomorrow.
             </p>
           </div>
@@ -417,15 +417,15 @@ export default function Home() {
                   whileInView="visible"
                   viewport={{ once: true, margin: "-60px" }}
                   custom={i}
-                  className="rounded-3xl border border-[#EADCC8] bg-white p-6 shadow-lg shadow-[#0B6F5C]/5 transition-transform hover:-translate-y-0.5"
+                  className="rounded-3xl border border-[var(--hatchup-border)] bg-[var(--hatchup-card)] p-6 shadow-lg shadow-[#004F46]/5 transition-transform hover:-translate-y-0.5"
                 >
                   <div className={`mb-5 grid h-12 w-12 place-items-center rounded-2xl ${feature.color}`}>
                     <Icon className="h-6 w-6" />
                   </div>
-                  <h3 className="font-display text-xl font-black text-[#20312A]">
+                  <h3 className="font-display text-xl font-black text-[var(--hatchup-text)]">
                     {feature.title}
                   </h3>
-                  <p className="mt-2 text-sm leading-6 text-[#718078]">
+                  <p className="mt-2 text-sm leading-6 text-[var(--hatchup-muted)]">
                     {feature.body}
                   </p>
                 </motion.div>
@@ -436,13 +436,13 @@ export default function Home() {
       </section>
 
       <section id="how-it-works" className="relative py-24">
-        <div className="absolute inset-x-0 top-20 h-64 bg-[#FFF3D8]" />
+        <div className="absolute inset-x-0 top-20 h-64 bg-[var(--hatchup-magical)]" />
         <div className="relative mx-auto max-w-7xl px-6 sm:px-8">
           <div className="mx-auto mb-14 max-w-2xl text-center">
-            <p className="mb-3 text-xs font-black uppercase tracking-widest text-[#8A641D]">
+            <p className="mb-3 text-xs font-black uppercase tracking-widest text-[var(--hatchup-primary)]">
               How it works
             </p>
-            <h2 className="font-display text-4xl font-black tracking-tight text-[#20312A] sm:text-5xl">
+            <h2 className="font-display text-4xl font-black tracking-tight text-[var(--hatchup-text)] sm:text-5xl">
               The daily loop is simple on purpose.
             </h2>
           </div>
@@ -458,19 +458,19 @@ export default function Home() {
                   whileInView="visible"
                   viewport={{ once: true }}
                   custom={i}
-                  className="relative overflow-hidden rounded-3xl border border-[#EADCC8] bg-white p-6 shadow-lg shadow-[#0B6F5C]/5"
+                  className="relative overflow-hidden rounded-3xl border border-[var(--hatchup-border)] bg-[var(--hatchup-card)] p-6 shadow-lg shadow-[#004F46]/5"
                 >
-                  <div className="absolute right-4 top-4 font-display text-5xl font-black text-[#EADCC8]/60">
+                  <div className="absolute right-4 top-4 font-display text-5xl font-black text-[var(--hatchup-border)]/60">
                     {step.n}
                   </div>
                   <div className="relative">
-                    <div className="mb-5 grid h-10 w-10 place-items-center rounded-xl bg-[#DDF4EC] text-[#0B6F5C]">
+                    <div className="mb-5 grid h-10 w-10 place-items-center rounded-xl bg-[var(--hatchup-secondary)] text-[var(--hatchup-primary)]">
                       <Icon className="h-5 w-5" />
                     </div>
-                    <h3 className="font-display text-xl font-black text-[#20312A]">
+                    <h3 className="font-display text-xl font-black text-[var(--hatchup-text)]">
                       {step.title}
                     </h3>
-                    <p className="mt-2 text-sm leading-6 text-[#718078]">
+                    <p className="mt-2 text-sm leading-6 text-[var(--hatchup-muted)]">
                       {step.body}
                     </p>
                   </div>
@@ -483,16 +483,16 @@ export default function Home() {
 
       <section className="relative py-20">
         <div className="mx-auto max-w-7xl px-6 sm:px-8">
-          <div className="rounded-[2rem] border border-[#EADCC8] bg-white p-8 shadow-xl shadow-[#0B6F5C]/10 sm:p-12">
+          <div className="rounded-[2rem] border border-[var(--hatchup-border)] bg-[var(--hatchup-card)] p-8 shadow-xl shadow-[#004F46]/10 sm:p-12">
             <div className="grid gap-8 lg:grid-cols-[1fr_0.9fr] lg:items-center">
               <div>
-                <p className="mb-3 text-xs font-black uppercase tracking-widest text-[#0B6F5C]">
+                <p className="mb-3 text-xs font-black uppercase tracking-widest text-[var(--hatchup-primary)]">
                   Creature collection
                 </p>
                 <h2 className="font-display text-3xl font-black tracking-tight sm:text-4xl">
                   Leaf, Ember, Tide, and Storm Pals grow from Baby to Final forms.
                 </h2>
-                <p className="mt-4 text-lg leading-8 text-[#718078]">
+                <p className="mt-4 text-lg leading-8 text-[var(--hatchup-muted)]">
                   Each Pal has element, rarity, level, bond, stats, training,
                   and memories. The Collection book helps players see what they
                   have discovered and what is still waiting to hatch.
@@ -500,22 +500,22 @@ export default function Home() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { icon: Leaf, label: "Leaf", color: "bg-[#EAF7D9] text-[#79A66A]" },
-                  { icon: Flame, label: "Ember", color: "bg-[#FFF0E6] text-[#FF9B5F]" },
-                  { icon: Waves, label: "Tide", color: "bg-[#E5F8FE] text-[#2BA4C7]" },
-                  { icon: Zap, label: "Storm", color: "bg-[#F0ECFF] text-[#8B73E6]" },
+                  { icon: Leaf, label: "Leaf", color: "bg-[var(--hatchup-secondary)] text-[var(--hatchup-leaf)]" },
+                  { icon: Flame, label: "Ember", color: "bg-[var(--hatchup-magical)] text-[var(--hatchup-ember)]" },
+                  { icon: Waves, label: "Tide", color: "bg-[var(--hatchup-secondary)] text-[var(--hatchup-tide)]" },
+                  { icon: Zap, label: "Storm", color: "bg-[var(--hatchup-magical)] text-[var(--hatchup-highlight)]" },
                 ].map((item) => {
                   const Icon = item.icon;
                   return (
                     <div
-                      className="rounded-3xl border border-[#EADCC8] bg-[#FBF4E6] p-5"
+                      className="rounded-3xl border border-[var(--hatchup-border)] bg-[var(--hatchup-bg)] p-5"
                       key={item.label}
                     >
                       <div className={`mb-4 grid h-12 w-12 place-items-center rounded-2xl ${item.color}`}>
                         <Icon className="h-6 w-6" />
                       </div>
                       <p className="font-display text-xl font-black">{item.label}</p>
-                      <p className="mt-1 text-xs font-semibold text-[#718078]">
+                      <p className="mt-1 text-xs font-semibold text-[var(--hatchup-muted)]">
                         Common → Epic rarity tiers
                       </p>
                     </div>
@@ -534,16 +534,16 @@ export default function Home() {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            className="grid items-center gap-8 rounded-[2rem] border border-[#0B6F5C]/20 bg-[#DDF4EC] p-8 sm:p-12 md:grid-cols-[1fr_auto]"
+            className="grid items-center gap-8 rounded-[2rem] border border-[var(--hatchup-primary)]/20 bg-[var(--hatchup-secondary)] p-8 sm:p-12 md:grid-cols-[1fr_auto]"
           >
             <div className="max-w-2xl">
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#0B6F5C]/20 bg-white px-3 py-1 text-xs font-black uppercase tracking-wider text-[#0B6F5C]">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--hatchup-primary)]/20 bg-[var(--hatchup-card)] px-3 py-1 text-xs font-black uppercase tracking-wider text-[var(--hatchup-primary)]">
                 <ShieldCheck className="h-3.5 w-3.5" /> Health-data trust
               </div>
-              <h2 className="font-display text-3xl font-black tracking-tight text-[#20312A] sm:text-4xl">
+              <h2 className="font-display text-3xl font-black tracking-tight text-[var(--hatchup-text)] sm:text-4xl">
                 Private movement data should stay understandable.
               </h2>
-              <p className="mt-4 leading-8 text-[#4F6259]">
+              <p className="mt-4 leading-8 text-[var(--hatchup-muted)]">
                 HatchUp reads movement data only to power gameplay. Health details
                 are not sold or used for ads. Weekly ranks are optional, and
                 players choose whether to share a public ranking name and score.
@@ -556,10 +556,10 @@ export default function Home() {
                 return (
                   <div
                     key={item.label}
-                    className="rounded-2xl border border-[#0B6F5C]/15 bg-white p-4 text-center"
+                    className="rounded-2xl border border-[var(--hatchup-primary)]/15 bg-[var(--hatchup-card)] p-4 text-center"
                   >
-                    <Icon className="mx-auto mb-2 h-5 w-5 text-[#0B6F5C]" />
-                    <div className="text-xs font-black text-[#20312A]">{item.label}</div>
+                    <Icon className="mx-auto mb-2 h-5 w-5 text-[var(--hatchup-primary)]" />
+                    <div className="text-xs font-black text-[var(--hatchup-text)]">{item.label}</div>
                   </div>
                 );
               })}
@@ -569,18 +569,18 @@ export default function Home() {
       </section>
 
       <section className="relative py-24">
-        <div className="absolute inset-x-0 bottom-0 h-72 bg-[#FFF3D8]" />
+        <div className="absolute inset-x-0 bottom-0 h-72 bg-[var(--hatchup-magical)]" />
         <div className="relative mx-auto max-w-4xl px-6 text-center sm:px-8">
           <motion.h2
             variants={fadeUp}
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true }}
-            className="font-display text-4xl font-black tracking-tight text-[#20312A] sm:text-6xl"
+            className="font-display text-4xl font-black tracking-tight text-[var(--hatchup-text)] sm:text-6xl"
           >
             Follow the beta as HatchUp gets ready for launch.
           </motion.h2>
-          <p className="mx-auto mt-5 max-w-xl text-lg leading-8 text-[#718078]">
+          <p className="mx-auto mt-5 max-w-xl text-lg leading-8 text-[var(--hatchup-muted)]">
             The mobile app is being shaped around a tighter daily creature loop,
             clearer onboarding, richer collection goals, and privacy-first health
             sync.
@@ -588,28 +588,28 @@ export default function Home() {
           <div className="mt-8 flex justify-center">
             <a
               href="/support"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0B6F5C] px-6 py-4 text-sm font-black text-white shadow-lg shadow-[#0B6F5C]/25 transition-transform hover:-translate-y-0.5"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[var(--hatchup-primary)] px-6 py-4 text-sm font-black text-white shadow-lg shadow-[#004F46]/25 transition-transform hover:-translate-y-0.5"
             >
               Contact support <ChevronRight className="h-4 w-4" />
             </a>
           </div>
-          <div className="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-[#718078]">
+          <div className="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-[var(--hatchup-muted)]">
             <Smartphone className="h-3.5 w-3.5" /> iOS and Android beta access coming soon
           </div>
         </div>
       </section>
 
-      <footer className="relative border-t border-[#EADCC8] bg-[#FBF4E6]">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-10 text-sm text-[#718078] sm:flex-row sm:items-center sm:justify-between sm:px-8">
+      <footer className="relative border-t border-[var(--hatchup-border)] bg-[var(--hatchup-bg)]">
+        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-10 text-sm text-[var(--hatchup-muted)] sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div className="flex items-center gap-3">
             <Logo />
-            <span className="text-[#B9AA96]">·</span>
+            <span className="text-[var(--hatchup-disabled)]">·</span>
             <span>© {new Date().getFullYear()} HATCHUP</span>
           </div>
           <div className="flex items-center gap-6">
-            <a href="/support" className="hover:text-[#0B6F5C]">Privacy</a>
-            <a href="/support" className="hover:text-[#0B6F5C]">Terms</a>
-            <a href="/support" className="hover:text-[#0B6F5C]">Support</a>
+            <a href="/support" className="hover:text-[var(--hatchup-primary)]">Privacy</a>
+            <a href="/support" className="hover:text-[var(--hatchup-primary)]">Terms</a>
+            <a href="/support" className="hover:text-[var(--hatchup-primary)]">Support</a>
           </div>
         </div>
       </footer>

@@ -40,7 +40,7 @@ export function Screen({ children, contentStyle, footer }: Props) {
   );
 }
 
-const FOOTER_SCROLL_RESERVE = 112;
+const FOOTER_SCROLL_RESERVE = 168;
 
 const styles = StyleSheet.create({
   safe: {

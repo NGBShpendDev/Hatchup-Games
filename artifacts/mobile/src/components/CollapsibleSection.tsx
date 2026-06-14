@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
-    marginBottom: 12,
+    marginBottom: 10,
     overflow: "hidden",
   },
   header: {
@@ -64,9 +64,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     justifyContent: "space-between",
-    minHeight: 68,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    minHeight: 58,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
   },
   pressed: {
     opacity: 0.75,
@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
     lineHeight: 17,
-    marginTop: 3,
+    marginTop: 2,
   },
   meta: {
     alignItems: "flex-end",
@@ -110,6 +110,6 @@ const styles = StyleSheet.create({
     borderTopColor: colors.line,
     borderTopWidth: 1,
     backgroundColor: colors.surface,
-    padding: 14,
+    padding: 12,
   },
 });

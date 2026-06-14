@@ -19,7 +19,11 @@ import {
   getScreenLoopSubtitle,
 } from "../content/coreLoopCopy";
 import { toDateKey } from "../domain/date";
-import { getEggProgress, isEggReady } from "../domain/hatchery";
+import {
+  getEggProgressSummary,
+  getReadyEggCount,
+  getTrackedEgg,
+} from "../domain/eggProgress";
 import {
   getCosmeticDefinition,
   getEconomyItem,
@@ -153,7 +157,7 @@ export function HomeScreen({
   );
   const nextQuestSuggestions = getNextQuestSuggestions(visibleQuests);
   const activity = getActivitySummary(data.activityHistory, todayKey);
-  const readyEggCount = data.activeEggs.filter(isEggReady).length;
+  const readyEggCount = getReadyEggCount(data.activeEggs);
   const completedQuestCount = quests.filter(isQuestComplete).length;
   const todayDistanceMiles = getTodayDistanceMiles(today);
   const retention = getRetentionPlan(data, todayKey);
@@ -168,8 +172,7 @@ export function HomeScreen({
   const activeHatchling = activeHatchlingRaw
     ? getTimeAdjustedHatchling(activeHatchlingRaw)
     : null;
-  const focusEgg =
-    data.activeEggs.find((egg) => !isEggReady(egg)) ?? data.activeEggs[0];
+  const focusEgg = getTrackedEgg(data.activeEggs) ?? undefined;
   const showRewardFeedback =
     !rewardDismissed &&
     hasSyncRewards(latestSyncGains) &&
@@ -214,9 +217,11 @@ export function HomeScreen({
   const handleNextBestAction = getNextBestActionHandler({
     data,
     onDexPress,
+    onClaimWeeklyChest,
     onMonsterPress,
     onSettingsPress,
     onSync,
+    todayKey,
   })(nextBestAction.target);
   const syncResultAction = getSyncResultAction({
     activeHatchling,
@@ -266,7 +271,7 @@ export function HomeScreen({
         action={nextBestAction}
         onPress={handleNextBestAction}
       />
-      {today && (
+      {today && hasSyncRewards(latestSyncGains) && (
         <SyncSummaryCard
           focusEgg={focusEgg}
           gains={latestSyncGains}
@@ -413,7 +418,6 @@ export function HomeScreen({
       )}
       <CollapsibleSection
         badge={`${data.inventoryItems.length} items`}
-        defaultOpen={data.inventoryItems.length > 0}
         subtitle="Use earned boosts and view cosmetic rewards from chests."
         title="Inventory"
       >
@@ -445,6 +449,7 @@ function DailyHeroCard({
   today: DailyAward | null;
 }) {
   const showingEgg = Boolean(focusEgg);
+  const eggSummary = focusEgg ? getEggProgressSummary(focusEgg) : null;
 
   return (
     <CardEntrance style={styles.heroCard}>
@@ -460,15 +465,15 @@ function DailyHeroCard({
         <MonsterAvatar stage={progression.current.id} />
       )}
       <Text style={styles.stage}>
-        {focusEgg
-          ? `${capitalize(focusEgg.rarity)} ${capitalize(focusEgg.element)} Egg`
+        {eggSummary
+          ? eggSummary.eggName
           : activeHatchling
             ? `Active Pal | ${capitalize(activeHatchling.rarity)} ${capitalize(activeHatchling.element)}`
             : `${progression.current.label} starter Pal`}
       </Text>
       <Text style={styles.xp}>
-        {focusEgg
-          ? `${formatPercent(getEggProgress(focusEgg))} hatch progress`
+        {eggSummary
+          ? `${eggSummary.progressLabel} | ${eggSummary.percentLabel} ready`
           : activeHatchling
             ? `Level ${activeHatchling.level} | Bond ${activeHatchling.bond}/100`
             : `${progression.current.label} journey`}
@@ -484,7 +489,7 @@ function DailyHeroCard({
       <ProgressBar
         progress={
           focusEgg
-            ? getEggProgress(focusEgg)
+            ? eggSummary?.percent ?? 0
             : activeHatchling
               ? getHatchlingXpProgress(activeHatchling.xp)
               : progression.progress
@@ -513,6 +518,7 @@ function TodaySummaryRow({
   today: DailyAward | null;
 }) {
   const todayDistanceMiles = getTodayDistanceMiles(today);
+  const eggSummary = focusEgg ? getEggProgressSummary(focusEgg) : null;
 
   return (
     <View style={styles.summaryRow}>
@@ -524,7 +530,7 @@ function TodaySummaryRow({
       <SummaryTile label="Journey XP" value={`+${formatNumber(movementXp)}`} />
       <SummaryTile
         label="Egg progress"
-        value={focusEgg ? formatPercent(getEggProgress(focusEgg)) : "None"}
+        value={eggSummary ? eggSummary.stepsLeftLabel : "No Egg"}
       />
     </View>
   );
@@ -653,7 +659,7 @@ function SyncSummaryCard({
   const eggProgress = gains.eggSteps > 0
     ? `+${formatSteps(gains.eggSteps)}`
     : focusEgg
-      ? formatPercent(getEggProgress(focusEgg))
+      ? getEggProgressSummary(focusEgg).percentLabel
       : "No Egg";
 
   return (
@@ -704,7 +710,7 @@ function DailySnapshotStrip({
           readyEggCount > 0
             ? `${readyEggCount} ready`
             : focusEgg
-              ? formatPercent(getEggProgress(focusEgg))
+              ? getEggProgressSummary(focusEgg).percentLabel
               : "Empty"
         }
       />
@@ -757,6 +763,7 @@ function TodayProgressCard({
   const palXpProgress = activeHatchling
     ? getHatchlingXpProgress(activeHatchling.xp)
     : 0;
+  const eggSummary = focusEgg ? getEggProgressSummary(focusEgg) : null;
 
   return (
     <SecondaryCard style={styles.todayProgressCard}>
@@ -776,10 +783,10 @@ function TodayProgressCard({
       />
       <ProgressRow
         label="Active Egg"
-        progress={focusEgg ? getEggProgress(focusEgg) : 0}
+        progress={eggSummary ? eggSummary.percent : 0}
         value={
-          focusEgg
-            ? `${formatNumber(focusEgg.stepsWalked)} / ${formatNumber(focusEgg.stepsRequired)}`
+          eggSummary
+            ? `${eggSummary.eggName}: ${eggSummary.progressLabel} (${eggSummary.stepsLeftLabel})`
             : "No Egg incubating"
         }
       />
@@ -1784,7 +1791,10 @@ function getDailyHeroMessage({
     return `Your movement added ${formatSteps(latestSyncGains.eggSteps)} of Egg progress today.`;
   }
   if (focusEgg) {
-    return `Your Egg is ${formatPercent(getEggProgress(focusEgg))} ready to hatch.`;
+    const summary = getEggProgressSummary(focusEgg);
+    return summary.isReady
+      ? `${summary.eggName} is ready to hatch.`
+      : `${summary.readinessLabel}. ${summary.stepsLeftLabel}.`;
   }
   if (activeHatchling && latestSyncGains.palXp > 0) {
     return `Your movement added ${formatNumber(latestSyncGains.palXp)} Pal XP today.`;
@@ -1876,19 +1886,28 @@ function getNextBestActionHandler({
   data,
   onDexPress,
   onMonsterPress,
+  onClaimWeeklyChest,
   onSettingsPress,
   onSync,
+  todayKey,
 }: {
   data: HatchUpData;
   onDexPress: () => void;
+  onClaimWeeklyChest: (today: string) => Promise<boolean>;
   onMonsterPress: () => void;
   onSettingsPress: () => void;
   onSync: () => Promise<void>;
+  todayKey: string;
 }) {
   return (target: NextBestActionTarget) => {
-    if (target === "sync") {
+    if (target === "sync" || target === "dailyQuest" || target === "weeklyChest") {
       return () => {
         void onSync();
+      };
+    }
+    if (target === "claimWeeklyChest") {
+      return () => {
+        void onClaimWeeklyChest(todayKey);
       };
     }
     if (target === "hatchery") return onMonsterPress;
@@ -2464,7 +2483,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.line,
   },
   shopBuyText: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -2590,7 +2609,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   journeyStepNumberActive: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
   },
   journeyStepText: {
     flex: 1,
@@ -3035,7 +3054,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   questTabLabelActive: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
   },
   questSummaryCard: {
     backgroundColor: colors.surface,
@@ -3223,7 +3242,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   questClaimText: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
     fontSize: 11,
     fontWeight: "900",
   },

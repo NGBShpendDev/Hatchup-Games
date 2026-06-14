@@ -20,6 +20,10 @@ export const PRIVACY_POLICY_URL =
 
 export const TERMS_URL = process.env.EXPO_PUBLIC_TERMS_URL ?? null;
 
+export const PUBLIC_PROFILE_BASE_URL =
+  process.env.EXPO_PUBLIC_PUBLIC_PROFILE_BASE_URL ??
+  "https://hatchup.games/profile";
+
 export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 
 export const SUPABASE_ANON_KEY =

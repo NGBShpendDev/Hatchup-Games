@@ -844,6 +844,9 @@ importers:
 
   artifacts/mobile:
     dependencies:
+      '@babel/runtime':
+        specifier: ^7.29.2
+        version: 7.29.2
       '@kingstinct/react-native-healthkit':
         specifier: ^14.0.1
         version: 14.0.1(react-native-nitro-modules@0.35.9(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)

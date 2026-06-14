@@ -42,6 +42,9 @@ const metricLabels: Record<LeaderboardMetric, string> = {
   xp: "Journey XP",
 };
 
+const ranksPrivacyCopy =
+  "Only your display name, rank, and selected weekly score are public. Health details stay private.";
+
 export function LeaderboardScreen({
   data,
   leaderboardSyncLabel,
@@ -145,6 +148,10 @@ export function LeaderboardScreen({
           />
           <ChallengeStat label="Score type" value={metricLabels[metric]} />
           <ChallengeStat
+            label="Weekly score"
+            value={formatUserScore(userStats, metric)}
+          />
+          <ChallengeStat
             label="Weekly steps"
             value={formatSteps(userStats.steps)}
           />
@@ -153,11 +160,8 @@ export function LeaderboardScreen({
       <PrimaryCard style={styles.privacyCard}>
         <View style={styles.privacyHeader}>
           <View style={styles.privacyText}>
-            <Text style={styles.cardTitle}>Ranks privacy</Text>
-            <Text style={styles.privacyBody}>
-              Ranks are optional. Only your public name, rank, and selected
-              weekly score are shared. Health details stay private.
-            </Text>
+            <Text style={styles.cardTitle}>Ranks are opt-in</Text>
+            <Text style={styles.privacyBody}>{ranksPrivacyCopy}</Text>
           </View>
           <View
             style={[
@@ -171,7 +175,7 @@ export function LeaderboardScreen({
                 data.leaderboardShareEnabled && styles.statePillTextSharing,
               ]}
             >
-              {data.leaderboardShareEnabled ? "Sharing" : "Private"}
+              {data.leaderboardShareEnabled ? "Joined" : "Private"}
             </Text>
           </View>
         </View>
@@ -205,14 +209,14 @@ export function LeaderboardScreen({
           )}
           {data.leaderboardShareEnabled ? (
             <AppButton
-              label="Stop sharing"
+              label="Stay private"
               onPress={handleGoPrivate}
               style={styles.actionButton}
               variant="secondary"
             />
           ) : (
             <AppButton
-              label="Share weekly score"
+              label="Join weekly ranks"
               onPress={() => setConfirmShareOpen(true)}
               style={styles.actionButton}
             />
@@ -266,8 +270,8 @@ export function LeaderboardScreen({
             <Text style={styles.cardTitle}>Leaderboard</Text>
             <Text style={styles.boardSubtitle}>
               {data.leaderboardShareEnabled
-                ? "Weekly public scores from players who opted in."
-                : "Preview Ranks without sharing your score yet."}
+                ? "Only opted-in weekly scores appear here."
+                : "Join weekly ranks when you want to compare. Staying private is always okay."}
             </Text>
           </View>
         </View>
@@ -306,10 +310,10 @@ export function LeaderboardScreen({
                 ))
               ) : (
                 <UtilityCard style={styles.privatePreviewCard}>
-                  <Text style={styles.emptyMissionTitle}>No leaderboard data</Text>
+                  <Text style={styles.emptyMissionTitle}>No weekly scores yet</Text>
                   <Text style={styles.emptyMissionBody}>
-                    Sync movement or change score type to populate this weekly
-                    challenge board.
+                    Sync movement or check back after players join this weekly
+                    challenge.
                   </Text>
                 </UtilityCard>
               )}
@@ -317,13 +321,10 @@ export function LeaderboardScreen({
           </>
         ) : (
           <UtilityCard style={styles.privatePreviewCard}>
-            <Text style={styles.emptyMissionTitle}>You are private right now</Text>
-            <Text style={styles.emptyMissionBody}>
-              Share only your display name and weekly score when you want to compare.
-              Health details stay private.
-            </Text>
+            <Text style={styles.emptyMissionTitle}>Private by default</Text>
+            <Text style={styles.emptyMissionBody}>{ranksPrivacyCopy}</Text>
             <AppButton
-              label="Share weekly score"
+              label="Join weekly ranks"
               onPress={() => setConfirmShareOpen(true)}
               variant="secondary"
             />
@@ -370,10 +371,10 @@ function RankRow({
     <View style={[styles.rankRow, entry.isUser && styles.userRow]}>
       <Text style={styles.rank}>#{entry.rank}</Text>
       <View style={styles.rankBody}>
-        <Text style={styles.rankName}>
-          {entry.displayName}
-          {entry.isUser ? " (you)" : ""}
-        </Text>
+        <View style={styles.rankNameRow}>
+          <Text style={styles.rankName}>{entry.displayName}</Text>
+          {entry.isUser && <Text style={styles.youBadge}>You</Text>}
+        </View>
         <Text style={styles.rankMeta}>
           {entry.monsterStage} | {formatSteps(entry.steps)} |{" "}
           {formatDistanceMiles(entry.distanceMiles)}
@@ -435,19 +436,17 @@ function ShareScoreModal({
       <View style={styles.modalBackdrop}>
         <View style={styles.shareModal}>
           <Text style={styles.modalKicker}>Ranks sharing</Text>
-          <Text style={styles.modalTitle}>Share your weekly score?</Text>
-          <Text style={styles.modalBody}>
-            Only your display name and weekly score are shared. Health details stay private.
-          </Text>
+          <Text style={styles.modalTitle}>Join weekly ranks?</Text>
+          <Text style={styles.modalBody}>{ranksPrivacyCopy}</Text>
           <View style={styles.modalActions}>
             <AppButton
-              label="Not now"
+              label="Stay private"
               onPress={onCancel}
               style={styles.modalButton}
               variant="secondary"
             />
             <AppButton
-              label="Share score"
+              label="Join weekly ranks"
               onPress={() => {
                 void onConfirm();
               }}
@@ -492,6 +491,15 @@ function formatMetric(entry: LeaderboardEntry, metric: LeaderboardMetric) {
   if (metric === "distance") return formatDistanceMiles(value);
   if (metric === "xp") return `${formatNumber(value)} XP`;
   return formatNumber(value);
+}
+
+function formatUserScore(
+  stats: ReturnType<typeof getUserLeaderboardStats>,
+  metric: LeaderboardMetric,
+) {
+  if (metric === "distance") return formatDistanceMiles(stats.distanceMiles);
+  if (metric === "xp") return `${formatNumber(stats.totalXp)} XP`;
+  return formatSteps(stats.steps);
 }
 
 function getStepsToPassNextPlayer({
@@ -540,7 +548,7 @@ function getStepsToPassNextPlayer({
   }
 
   return {
-    message: `You need ${formatSteps(stepsNeeded)} more to pass ${nextPlayer.displayName}.`,
+    message: `You need ${formatSteps(stepsNeeded)} to pass ${nextPlayer.displayName}.`,
   };
 }
 
@@ -644,12 +652,13 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   challengeTimeText: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
     fontSize: 11,
     fontWeight: "900",
   },
   challengeStats: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   challengeStat: {
@@ -657,7 +666,8 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radii.card,
     borderWidth: 1,
-    flex: 1,
+    flexBasis: "47%",
+    flexGrow: 1,
     padding: 10,
   },
   challengeStatValue: {
@@ -714,7 +724,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   statePillTextSharing: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
   },
   savedStatusText: {
     color: colors.muted,
@@ -921,7 +931,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   sharePillTextOn: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
   },
   input: {
     backgroundColor: colors.surface,
@@ -980,7 +990,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   metricTabTextActive: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
   },
   board: {
     gap: 8,
@@ -1059,6 +1069,23 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 15,
     fontWeight: "900",
+  },
+  rankNameRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  youBadge: {
+    backgroundColor: colors.primaryDeep,
+    borderRadius: radii.pill,
+    color: colors.primaryText,
+    fontSize: 10,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    textTransform: "uppercase",
   },
   rankMeta: {
     color: colors.muted,

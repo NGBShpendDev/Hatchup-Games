@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   modeButtonTextActive: {
-    color: "#FFFFFF",
+    color: colors.primaryText,
   },
   modeTitle: {
     color: colors.ink,
