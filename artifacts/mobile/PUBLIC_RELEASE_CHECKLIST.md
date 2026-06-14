@@ -20,6 +20,15 @@
 - [ ] Row Level Security prevents access to another user's profile or save data.
 - [ ] No plaintext passwords are stored in app tables.
 
+## Journey QA
+
+- [ ] Run `docs/public-beta-journey-qa.md` before every TestFlight build.
+- [ ] New Pal detail route opens from Collection and returns cleanly.
+- [ ] Profile Activity Log shows sync, hatch, reward, and Egg-ready moments.
+- [ ] Trainer Card share copy matches the visual preview and hides private health data.
+- [ ] Ranks clearly explains whether the board is server-backed or beta local.
+- [ ] Cloud sync failure shows a retry path without losing local progress.
+
 ## Command Reminders
 
 ```sh

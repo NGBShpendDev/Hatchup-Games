@@ -1,11 +1,11 @@
 import "react-native-url-polyfill/auto";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { AppState } from "react-native";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "../../config/runtime";
 
-type HatchUpSupabaseClient = ReturnType<typeof createClient>;
+type HatchUpSupabaseClient = SupabaseClient;
 
 let client: HatchUpSupabaseClient | null = null;
 let autoRefreshConfigured = false;
@@ -14,7 +14,7 @@ export function isSupabaseConfigured() {
   return SUPABASE_URL.length > 0 && SUPABASE_ANON_KEY.length > 0;
 }
 
-export function getSupabaseClient() {
+export function getSupabaseClient<Database = any>() {
   if (!isSupabaseConfigured()) {
     throw new Error(
       "Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.",
@@ -33,7 +33,7 @@ export function getSupabaseClient() {
     configureSessionAutoRefresh(client);
   }
 
-  return client;
+  return client as SupabaseClient<Database>;
 }
 
 function configureSessionAutoRefresh(supabase: HatchUpSupabaseClient) {

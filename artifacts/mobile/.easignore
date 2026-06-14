@@ -1,0 +1,15 @@
+.git
+.expo
+.expo-shared
+node_modules/.cache
+coverage
+dist
+build
+*.log
+*.tmp
+*.ipa
+*.apk
+*.aab
+docs
+src/domain/__tests__
+src/services/saveState/__tests__

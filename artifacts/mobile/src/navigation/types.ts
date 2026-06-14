@@ -1,3 +1,12 @@
+import type { NavigatorScreenParams } from "@react-navigation/native";
+
+export type RootStackParamList = {
+  MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
+  PalDetail: {
+    palId: string;
+  };
+};
+
 export type OnboardingStackParamList = {
   Welcome: undefined;
   MonsterSetup: undefined;
@@ -11,4 +20,3 @@ export type MainTabParamList = {
   Ranks: undefined;
   Profile: undefined;
 };
-

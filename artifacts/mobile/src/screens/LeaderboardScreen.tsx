@@ -79,6 +79,7 @@ export function LeaderboardScreen({
     userStats,
   });
   const aliasChanged = alias.trim() !== data.leaderboardAlias.trim();
+  const remoteRanksEnabled = leaderboardSyncLabel.toLowerCase().startsWith("synced");
 
   async function handleSaveAlias() {
     if (aliasChanged) {
@@ -119,6 +120,16 @@ export function LeaderboardScreen({
         title="Move, hatch, climb."
       />
       <Text style={styles.syncLabel}>{leaderboardSyncLabel}</Text>
+      {!remoteRanksEnabled && (
+        <UtilityCard style={styles.localRanksNotice}>
+          <Text style={styles.localRanksTitle}>Beta local challenge board</Text>
+          <Text style={styles.localRanksBody}>
+            This build can sync to a server when a leaderboard API is configured.
+            Until then, Ranks use local challenge rivals so you can test the opt-in
+            flow safely.
+          </Text>
+        </UtilityCard>
+      )}
       <PrimaryCard style={styles.challengeCard}>
         <View style={styles.challengeHeader}>
           <View style={styles.challengeTitleBlock}>
@@ -602,6 +613,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
     marginTop: 8,
+  },
+  localRanksBody: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  localRanksNotice: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.line,
+    marginTop: 10,
+  },
+  localRanksTitle: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
   },
   challengeCard: {
     backgroundColor: colors.warmSurface,

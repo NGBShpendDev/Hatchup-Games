@@ -45,6 +45,7 @@ import {
   type Badge,
   type BadgeCategory,
 } from "../domain/badges";
+import { getActivityLogItems, type ActivityLogItem } from "../domain/activityLog";
 import {
   getDexCompletion,
   getDexElementSummary,
@@ -141,6 +142,7 @@ export function SettingsPrivacyScreen({
   });
   const publicReadinessScore = getPublicReadinessScore(publicReadinessItems);
   const nextBadges = getNextBadges(data, today);
+  const activityLogItems = getActivityLogItems(data);
   const activeHatchlingRaw = getActiveHatchling(data);
   const activeHatchling = activeHatchlingRaw
     ? getTimeAdjustedHatchling(activeHatchlingRaw)
@@ -614,6 +616,36 @@ export function SettingsPrivacyScreen({
           <Text style={styles.profileSaveMessage}>{profileSaveMessage}</Text>
         )}
       </PrimaryCard>
+      <CollapsibleSection
+        badge={`${activityLogItems.length}`}
+        defaultOpen={activityLogItems.length > 0}
+        subtitle="A compact memory trail of syncs, hatches, rewards, and profile-worthy moments."
+        title="Activity Log"
+      >
+        <SecondaryCard style={styles.activityLogCard}>
+          {activityLogItems.length > 0 ? (
+            activityLogItems.slice(0, 8).map((item) => (
+              <ActivityLogRow item={item} key={item.id} />
+            ))
+          ) : (
+            <UtilityCard style={styles.emptyMissionCard}>
+              <View style={styles.emptyMissionText}>
+                <Text style={styles.emptyMissionTitle}>No journey moments yet</Text>
+                <Text style={styles.privacyText}>
+                  Sync movement, hatch an Egg, train a Pal, or claim a reward
+                  to start building your HatchUp history.
+                </Text>
+              </View>
+              <AppButton
+                label="Start today"
+                onPress={onMonsterPress}
+                style={styles.emptyMissionButton}
+                variant="secondary"
+              />
+            </UtilityCard>
+          )}
+        </SecondaryCard>
+      </CollapsibleSection>
       {ENABLE_PROFILE_BADGES && (
         <CollapsibleSection
           badge={`${unlockedBadgeCount}/${badges.length}`}
@@ -818,6 +850,20 @@ export function SettingsPrivacyScreen({
           Cloud save and analytics are opt-in foundations for launch. They stay
           local unless backend URLs are configured.
         </Text>
+        {data.cloudSyncStatus === "failed" && (
+          <View style={styles.cloudRetryCard}>
+            <Text style={styles.cloudRetryTitle}>Cloud sync needs a retry</Text>
+            <Text style={styles.privacyText}>
+              Your local progress is still saved on this device. Retry when your
+              connection is stable.
+            </Text>
+            <AppButton
+              label="Retry cloud sync"
+              onPress={() => onSetCloudSyncEnabled(true)}
+              variant="secondary"
+            />
+          </View>
+        )}
         <View style={styles.privacyActions}>
           <AppButton
             label={data.cloudSyncEnabled ? "Disable cloud save" : "Enable cloud save"}
@@ -955,6 +1001,24 @@ function Setting({
     <View style={[styles.setting, withBorder && styles.settingBorder]}>
       <Text style={styles.settingLabel}>{label}</Text>
       <Text style={styles.settingValue}>{value}</Text>
+    </View>
+  );
+}
+
+function ActivityLogRow({ item }: { item: ActivityLogItem }) {
+  return (
+    <View style={styles.activityLogRow}>
+      <View style={[styles.activityLogDot, styles[`activityLogDot_${item.tone}`]]} />
+      <View style={styles.activityLogText}>
+        <Text style={styles.activityLogLabel}>{item.label}</Text>
+        <Text style={styles.privacyText}>{item.body}</Text>
+        <Text style={styles.activityLogDate}>
+          {new Date(item.createdAt).toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+          })}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -1836,6 +1900,56 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "900",
   },
+  activityLogCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12,
+  },
+  activityLogDate: {
+    color: colors.primaryDeep,
+    fontSize: 11,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+  activityLogDot: {
+    borderRadius: radii.pill,
+    height: 12,
+    marginTop: 4,
+    width: 12,
+  },
+  activityLogDot_default: {
+    backgroundColor: colors.line,
+  },
+  activityLogDot_pal: {
+    backgroundColor: colors.accent,
+  },
+  activityLogDot_reward: {
+    backgroundColor: colors.rewardGold,
+  },
+  activityLogDot_sync: {
+    backgroundColor: colors.primaryDeep,
+  },
+  activityLogLabel: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  activityLogRow: {
+    alignItems: "flex-start",
+    backgroundColor: colors.background,
+    borderColor: colors.line,
+    borderRadius: radii.button,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 10,
+  },
+  activityLogText: {
+    flex: 1,
+  },
   profileShowcaseCard: {
     backgroundColor: colors.surface,
     borderColor: colors.line,
@@ -2181,6 +2295,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: 12,
     padding: 13,
+  },
+  cloudRetryCard: {
+    backgroundColor: colors.dangerSoft,
+    borderColor: colors.danger,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    gap: 8,
+    marginTop: 12,
+    padding: 12,
+  },
+  cloudRetryTitle: {
+    color: colors.danger,
+    fontSize: 14,
+    fontWeight: "900",
   },
   leaderboardActions: {
     marginTop: 12,

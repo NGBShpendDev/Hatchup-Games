@@ -12,20 +12,9 @@ import {
   createUserSaveState,
   hydrateHatchUpDataFromSaveState,
 } from "../saveState/userSaveState";
+import type { Database, Json } from "./database.types";
 
-type UntypedSupabaseClient = ReturnType<typeof getSupabaseClient> & {
-  // Replace this local bridge with generated Supabase database types once the
-  // production project schema is connected to the app.
-  from(table: "hatchup_saves"): any;
-};
-
-interface HatchUpSaveRow {
-  id: string;
-  save_data: unknown;
-  schema_version: number;
-  updated_at: string;
-  user_id: string;
-}
+type HatchUpSaveRow = Database["public"]["Tables"]["hatchup_saves"]["Row"];
 
 export interface CloudSavePayload {
   data: HatchUpData;
@@ -82,7 +71,7 @@ export async function saveCloudSave(
     const { error } = await getUntypedSupabase()
       .from("hatchup_saves")
       .update({
-        save_data: createUserSaveState(merged, syncedAt),
+        save_data: createUserSaveState(merged, syncedAt) as unknown as Json,
         schema_version: merged.schemaVersion,
         updated_at: syncedAt,
       })
@@ -93,7 +82,7 @@ export async function saveCloudSave(
     const { error } = await getUntypedSupabase()
       .from("hatchup_saves")
       .insert({
-        save_data: createUserSaveState(merged, syncedAt),
+        save_data: createUserSaveState(merged, syncedAt) as unknown as Json,
         schema_version: merged.schemaVersion,
         updated_at: syncedAt,
         user_id: userId,
@@ -244,7 +233,7 @@ export async function syncCloudSave(
 }
 
 function getUntypedSupabase() {
-  return getSupabaseClient() as UntypedSupabaseClient;
+  return getSupabaseClient<Database>();
 }
 
 function getSaveScore(data: HatchUpData) {

@@ -72,6 +72,7 @@ import {
 import { healthService } from "./services/health";
 import { useAuth } from "./services/auth/AuthProvider";
 import { syncLeaderboardEntry } from "./services/leaderboard/leaderboardService";
+import { createTrainingFeedback } from "./services/appControllers/appActionHelpers";
 import {
   reportCrash as reportObservedCrash,
   trackEvent,
@@ -610,6 +611,17 @@ export function useHatchUpApp() {
     });
   }
 
+  async function setProfileHatchling(hatchlingId: string) {
+    if (!data.collection.some((hatchling) => hatchling.id === hatchlingId)) {
+      return;
+    }
+
+    await persist({
+      ...data,
+      profileHatchlingId: hatchlingId,
+    });
+  }
+
   async function renameCollectedHatchling(hatchlingId: string, name: string) {
     await persist(renameHatchling(data, hatchlingId, name));
   }
@@ -649,20 +661,13 @@ export function useHatchUpApp() {
 
     await persist(rewarded);
 
-    setTrainingFeedback({
-      bondGained: Math.max(after.bond - before.bond, 0),
-      chestProgressGained: ECONOMY_BALANCE.training.chestProgress,
-      id: `${after.id}:${
-        after.trainingSessions[after.trainingSessions.length - 1] ?? Date.now()
-      }`,
-      palName: after.name,
-      powerGained: Math.max(
-        getHatchlingPowerScore(after) - getHatchlingPowerScore(before),
-        0,
-      ),
-      sessionsRemaining: getTrainingStatus(after).remainingToday,
-      xpGained: Math.max(after.xp - before.xp, 0),
-    });
+    setTrainingFeedback(
+      createTrainingFeedback({
+        after,
+        before,
+        chestProgressGained: ECONOMY_BALANCE.training.chestProgress,
+      }),
+    );
   }
 
   async function completeFirstRunOnboarding() {
@@ -995,6 +1000,7 @@ export function useHatchUpApp() {
     claimQuestReward,
     claimWeeklyChest,
     setActiveHatchling,
+    setProfileHatchling,
     setAnalyticsEnabled,
     setCloudSyncEnabled,
     setCrashReportingEnabled,

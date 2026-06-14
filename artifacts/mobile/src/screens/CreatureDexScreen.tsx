@@ -58,6 +58,7 @@ interface Props {
   onHomePress: () => void;
   onLeaderboardPress: () => void;
   onMonsterPress: () => void;
+  onPalPress: (hatchlingId: string) => void;
   onRenameHatchling: (hatchlingId: string, name: string) => Promise<void>;
   onSetActiveHatchling: (hatchlingId: string) => Promise<void>;
   onSettingsPress: () => void;
@@ -71,6 +72,7 @@ export function CreatureDexScreen({
   onHomePress,
   onLeaderboardPress,
   onMonsterPress,
+  onPalPress,
   onRenameHatchling,
   onSetActiveHatchling,
   onSettingsPress,
@@ -246,243 +248,11 @@ export function CreatureDexScreen({
         <OwnedPalShelf
           activeHatchlingId={data.activeHatchlingId}
           collection={data.collection}
-          onSelect={(hatchlingId) => {
-            const index = data.collection.findIndex((item) => item.id === hatchlingId);
-            if (index >= 0) setSelectedIndex(index);
-          }}
+          onSelect={onPalPress}
           onSetActiveHatchling={onSetActiveHatchling}
           onTrainActiveHatchling={onTrainActiveHatchling}
         />
       )}
-      {selectedHatchling ? (
-        <PrimaryCard style={styles.detailCard}>
-          <Text style={styles.detailKicker}>
-            {selectedHatchling.id === data.activeHatchlingId
-              ? "ACTIVE PAL"
-              : "COLLECTED PAL"}
-          </Text>
-          {selectedHatchling.id === data.activeHatchlingId && (
-            <View style={styles.detailSparkles}>
-              <SparkleBurst label="ACTIVE" tone="accent" />
-            </View>
-          )}
-          <HatchlingAvatar
-            element={selectedHatchling.element}
-            level={selectedHatchling.level}
-            rarity={selectedHatchling.rarity}
-          />
-          <Text style={styles.detailName}>{selectedHatchling.name}</Text>
-          <Text style={styles.detailMeta}>
-            Level {selectedHatchling.level} | {capitalize(selectedHatchling.rarity)}{" "}
-            {capitalize(selectedHatchling.element)}
-          </Text>
-          <Text style={styles.moodText}>
-            Mood: {capitalize(selectedHatchling.mood)} | Bond{" "}
-            {selectedHatchling.bond}/100
-          </Text>
-          <UtilityCard style={styles.identityCard}>
-            <Text style={styles.identityTitle}>Companion identity</Text>
-            <Text style={styles.identityText}>
-              {getPalPersonality(selectedHatchling)}
-            </Text>
-            <Text style={styles.identityEffect}>
-              {getPalCompanionEffect(selectedHatchling)}
-            </Text>
-            <Text style={styles.identityLoop}>
-              Set a favorite Pal to grow bond from daily activity and return
-              visits.
-            </Text>
-          </UtilityCard>
-          <PalTraitCard hatchling={selectedHatchling} />
-          <LabeledProgress
-            label="Bond"
-            progress={selectedHatchling.bond / 100}
-            value={`${selectedHatchling.bond}/100`}
-          />
-          <LabeledProgress
-            label={
-              levelProgress?.nextLevel
-                ? `Level ${selectedHatchling.level} progress`
-                : "Max level"
-            }
-            progress={getHatchlingXpProgress(selectedHatchling.xp)}
-            value={
-              levelProgress?.nextLevel
-                ? `${formatNumber(levelProgress.currentLevelXp)}/${formatNumber(levelProgress.xpPerLevel)} XP`
-                : "Complete"
-            }
-          />
-          <Text style={styles.detailCaption}>
-            {formatNumber(selectedHatchling.xp)} Pal XP | Power{" "}
-            {getHatchlingPowerScore(selectedHatchling)}
-            {levelProgress?.nextLevel
-              ? ` | ${formatXp(levelProgress.xpToNext)} to L${levelProgress.nextLevel}`
-              : " | Max level"}
-          </Text>
-          <EvolutionPreviewCard hatchling={selectedHatchling} />
-          <CollapsibleSection
-            badge="Edit"
-            subtitle="Rename this Pal whenever its personality clicks."
-            title="Nickname"
-          >
-            <UtilityCard style={styles.renameCard}>
-              <Text style={styles.renameLabel}>Nickname</Text>
-              <TextInput
-                autoCapitalize="words"
-                maxLength={18}
-                onChangeText={setDraftName}
-                placeholder={selectedHatchling.name}
-                placeholderTextColor={colors.muted}
-                style={styles.renameInput}
-                value={draftName}
-              />
-              <AppButton
-                label="Save nickname"
-                onPress={async () => {
-                  await onRenameHatchling(selectedHatchling.id, draftName);
-                }}
-                variant="secondary"
-              />
-            </UtilityCard>
-          </CollapsibleSection>
-          <CollapsibleSection
-            badge={`P${getHatchlingPowerScore(selectedHatchling)}`}
-            subtitle="Heart, power, guard, and speed for this Pal."
-            title="Stats"
-          >
-            <View style={styles.statGrid}>
-              <Stat
-                highlight={getTopStats(selectedHatchling.stats).includes("heart")}
-                label="Heart"
-                max={getStatBarMax(selectedHatchling.stats)}
-                value={selectedHatchling.stats.heart}
-              />
-              <Stat
-                highlight={getTopStats(selectedHatchling.stats).includes("power")}
-                label="Power"
-                max={getStatBarMax(selectedHatchling.stats)}
-                value={selectedHatchling.stats.power}
-              />
-              <Stat
-                highlight={getTopStats(selectedHatchling.stats).includes("resilience")}
-                label="Guard"
-                max={getStatBarMax(selectedHatchling.stats)}
-                value={selectedHatchling.stats.resilience}
-              />
-              <Stat
-                highlight={getTopStats(selectedHatchling.stats).includes("speed")}
-                label="Speed"
-                max={getStatBarMax(selectedHatchling.stats)}
-                value={selectedHatchling.stats.speed}
-              />
-            </View>
-          </CollapsibleSection>
-          <CollapsibleSection
-            badge={`${trainingStatus?.remainingToday ?? 0} left`}
-            subtitle="Training is limited each day so growth feels earned."
-            title="Training plan"
-          >
-            <UtilityCard style={styles.trainingCard}>
-              <Text style={styles.trainingTitle}>Training plan</Text>
-              <Text style={styles.trainingText}>
-                {selectedHatchling.id === data.activeHatchlingId
-                  ? trainingStatus?.cooldownLabel
-                  : "Make this Pal active before training."}
-              </Text>
-              <TrainingPips sessionsToday={trainingStatus?.sessionsToday ?? 0} />
-              <Text style={styles.trainingHint}>
-                +{trainingPreview?.xpGain ?? TRAINING_XP} XP and +
-                {trainingPreview?.bondGain ?? 0} bond per session.{" "}
-                {trainingPreview?.levelsGained
-                  ? `Next training reaches L${trainingPreview.levelAfterTraining}.`
-                  : `Power +${trainingPreview?.powerGain ?? 0} after the next level-up.`}{" "}
-                Passive bond grows every {PASSIVE_BOND_HOURS} hours.
-              </Text>
-              <AppButton
-                disabled={
-                  selectedHatchling.id === data.activeHatchlingId &&
-                  !trainingStatus?.canTrain
-                }
-                label={
-                  selectedHatchling.id !== data.activeHatchlingId
-                    ? "Set active Pal"
-                    : trainingStatus?.canTrain
-                      ? "Train now"
-                      : "Training cooling down"
-                }
-                onPress={() => {
-                  if (selectedHatchling.id !== data.activeHatchlingId) {
-                    void onSetActiveHatchling(selectedHatchling.id);
-                    return;
-                  }
-                  void onTrainActiveHatchling();
-                }}
-                style={
-                  selectedHatchling.id === data.activeHatchlingId &&
-                  !trainingStatus?.canTrain
-                    ? styles.disabledAction
-                    : undefined
-                }
-                variant="secondary"
-              />
-            </UtilityCard>
-          </CollapsibleSection>
-          <CollapsibleSection
-            badge={String(selectedHatchling.memories.length)}
-            subtitle="Key moments this Pal has earned with you."
-            title="Memory log"
-          >
-            <UtilityCard style={styles.memoryCard}>
-              <Text style={styles.trainingTitle}>Memory log</Text>
-              {selectedHatchling.memories.slice(0, 4).map((memory) => (
-                <View key={memory.id} style={styles.memoryRow}>
-                  <Text style={styles.memoryLabel}>{memory.label}</Text>
-                  <Text style={styles.memoryText}>{memory.description}</Text>
-                  <Text style={styles.memoryDate}>
-                    {new Date(memory.happenedAt).toLocaleDateString()}
-                  </Text>
-                </View>
-              ))}
-            </UtilityCard>
-          </CollapsibleSection>
-          <View style={styles.carouselActions}>
-            <AppButton
-              label="Previous"
-              onPress={() => {
-                setDraftName("");
-                setSelectedIndex((index) =>
-                  index === 0 ? data.collection.length - 1 : index - 1,
-                );
-              }}
-              style={styles.carouselButton}
-              variant="secondary"
-            />
-            <AppButton
-              label="Next"
-              onPress={() => {
-                setDraftName("");
-                setSelectedIndex((index) => (index + 1) % data.collection.length);
-              }}
-              style={styles.carouselButton}
-              variant="secondary"
-            />
-          </View>
-          <AppButton
-            disabled={selectedHatchling.id === data.activeHatchlingId}
-            label={
-              selectedHatchling.id === data.activeHatchlingId
-                ? "Active Pal selected"
-                : "Set as active Pal"
-            }
-            onPress={() => onSetActiveHatchling(selectedHatchling.id)}
-            style={
-              selectedHatchling.id === data.activeHatchlingId
-                ? styles.disabledAction
-                : undefined
-            }
-          />
-        </PrimaryCard>
-      ) : null}
       {hasPals && (
         <>
           <CollapsibleSection

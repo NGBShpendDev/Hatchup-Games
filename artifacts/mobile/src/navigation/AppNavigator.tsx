@@ -1,5 +1,6 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { ActionFeedbackModal } from "../components/ActionFeedbackModal";
@@ -10,12 +11,14 @@ import { FirstRunOnboardingScreen } from "../screens/FirstRunOnboardingScreen";
 import { HomeScreen } from "../screens/HomeScreen";
 import { LeaderboardScreen } from "../screens/LeaderboardScreen";
 import { MonsterDetailScreen } from "../screens/MonsterDetailScreen";
+import { PalDetailScreen } from "../screens/PalDetailScreen";
 import { SettingsPrivacyScreen } from "../screens/SettingsPrivacyScreen";
 import { colors } from "../theme";
 import { useHatchUpApp } from "../useHatchUpApp";
-import type { MainTabParamList } from "./types";
+import type { MainTabParamList, RootStackParamList } from "./types";
 
 const MainTabs = createBottomTabNavigator<MainTabParamList>();
+const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 type HatchUpAppController = ReturnType<typeof useHatchUpApp>;
 
@@ -38,7 +41,37 @@ export function AppNavigator() {
       <StatusBar style="dark" />
       <NavigationContainer>
         {onboardingComplete ? (
-          <MainTabsNavigator app={app} />
+          <RootStack.Navigator
+            initialRouteName="MainTabs"
+            screenOptions={{ headerShown: false }}
+          >
+            <RootStack.Screen name="MainTabs">
+              {() => <MainTabsNavigator app={app} />}
+            </RootStack.Screen>
+            <RootStack.Screen name="PalDetail">
+              {({ navigation, route }) => (
+                <PalDetailScreen
+                  data={app.data}
+                  onBack={() => navigation.goBack()}
+                  onHomePress={() => navigation.navigate("MainTabs", { screen: "Home" })}
+                  onLeaderboardPress={() =>
+                    navigation.navigate("MainTabs", { screen: "Ranks" })
+                  }
+                  onMonsterPress={() =>
+                    navigation.navigate("MainTabs", { screen: "Hatchery" })
+                  }
+                  onProfilePress={() =>
+                    navigation.navigate("MainTabs", { screen: "Profile" })
+                  }
+                  onRenameHatchling={app.renameCollectedHatchling}
+                  onSetActiveHatchling={app.setActiveHatchling}
+                  onSetProfilePal={app.setProfileHatchling}
+                  onTrainActiveHatchling={app.trainActiveHatchling}
+                  palId={route.params.palId}
+                />
+              )}
+            </RootStack.Screen>
+          </RootStack.Navigator>
         ) : (
           <FirstRunOnboardingScreen
             data={app.data}
@@ -119,6 +152,9 @@ function MainTabsNavigator({ app }: { app: HatchUpAppController }) {
               onHomePress={() => navigation.navigate("Home")}
               onLeaderboardPress={() => navigation.navigate("Ranks")}
               onMonsterPress={() => navigation.navigate("Hatchery")}
+              onPalPress={(palId) => {
+                navigation.getParent()?.navigate("PalDetail", { palId });
+              }}
               onRenameHatchling={app.renameCollectedHatchling}
               onSetActiveHatchling={app.setActiveHatchling}
               onSettingsPress={() => navigation.navigate("Profile")}
